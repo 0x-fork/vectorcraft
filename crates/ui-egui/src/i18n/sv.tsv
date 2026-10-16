@@ -1017,7 +1017,7 @@
 	File Info Dialog	Dialogrutan Filinformation
 	File Info…	Filinformation…
 	File Name:	Filnamn:
-	File › Place… brings in an image, linked or embedded.	Arkiv › Placera… hämtar in en bild, länkad eller inbäddad.
+	File › Place… brings in an image, linked or embedded.	Fil › Placera… hämtar in en bild, länkad eller inbäddad.
 	Files	Filer
 	Files of a PDF standard can't be password-protected.	Filer enligt en PDF-standard kan inte lösenordsskyddas.
 	Files of this standard tag their colours with ICC profiles.	Filer enligt den här standarden märker sina färger med ICC-profiler.
@@ -4784,7 +4784,6 @@ theme	Appearance	Utseende
 	Softness	Mjukhet
 	Ambient Light	Omgivande ljus
 	Light behind the object	Ljus bakom objektet
-# Strings added upstream after this catalog was written (machine-drafted; review welcome).
 	 cancels  |  Double-click the tool for options	 avbryter  |  Dubbelklicka på verktyget för alternativ
 	 out from a highlighted edge to place its dimension  |  	 utåt från en framhävd kant för att placera dess mått  |  
 	A legacy .ai file holds one artboard: each artboard you check is saved as a separate file.	En äldre .ai-fil rymmer en rityta: varje rityta du markerar sparas som en separat fil.
@@ -4792,7 +4791,7 @@ theme	Appearance	Utseende
 	Batch…	Batch…
 	By Layer	Efter lager
 	By Object	Efter objekt
-	Check an artboard to save.	Markera en rityta att spara.
+	Check an artboard to save.	Markera en rityta som ska sparas.
 	Clear All	Rensa alla
 	Close the circular ends of open profiles. Partial sweeps keep their cut sides open.	Stäng de cirkulära ändarna på öppna profiler. Partiella svep behåller sina snittsidor öppna.
 	Color Panel Options	Alternativ för panelen Färg
@@ -4803,14 +4802,14 @@ theme	Appearance	Utseende
 	Dimension	Mått
 	Dimension Tool	Måttverktyg
 	Dimension Tool Options	Alternativ för måttverktyget
-	Drawing : real size — 1:10 labels 1 unit on the page as 10.	Ritning : verklig storlek — 1:10 märker 1 enhet på sidan som 10.
+	Drawing : real size — 1:10 labels 1 unit on the page as 10.	Ritning : verklig storlek — 1:10 visar 1 enhet på sidan som 10.
 	Editable	Redigerbar
 	Export Data Sets…	Exportera datauppsättningar…
 	Filter	Filter
 	Filter Layers Panel Rows	Filtrera rader i panelen Lager
 	Flatten	Platta till
 	Font Family:	Teckensnittsfamilj:
-	Font Style:	Teckenstil:
+	Font Style:	Teckensnittsstil:
 	Groups	Grupper
 	Hidden	Dold
 	Hidden Layer	Dolt lager
@@ -4883,7 +4882,7 @@ theme	Appearance	Utseende
 @msg	span: "selection" places the gradient itself: leave out `start` and `end` (they already place it in document coordinates)	span: "selection" placerar själva övertoningen: utelämna `start` och `end` (de placerar den redan i dokumentkoordinater)
 @msg	the Color Picker is not open	färgväljaren är inte öppen
 @msg	the action has no steps	åtgärden har inga steg
-@msg	the file's layers weren't read ({_1}): it comes in as its page, in one layer	filens lager lästes inte ({_1}): den öppnas som sin sida, i ett lager
+@msg	the file's layers weren't read ({_1}): it comes in as its page, in one layer	filens lager lästes inte ({_1}): den hämtas in som en sida, i ett enda lager
 @msg	the file's layers weren't read from its editing data ({_1}): they come from its PDF part	filens lager lästes inte från dess redigeringsdata ({_1}): de kommer från dess PDF-del
 @msg	the screen color sampler is already open	färghämtningen från skärmen är redan öppen
 @msg	this is a PostScript file (an .ai saved in an older format or without PDF compatibility, or an EPS file), not a PDF: File › Open and File › Place read it as EPS	det här är en PostScript-fil (en .ai sparad i ett äldre format eller utan PDF-kompatibilitet, eller en EPS-fil), inte en PDF: Fil › Öppna och Fil › Placera läser den som EPS
