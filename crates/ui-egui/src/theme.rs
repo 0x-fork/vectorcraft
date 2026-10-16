@@ -85,6 +85,29 @@ impl Accent {
     }
 }
 
+/// User Interface › Color Scheme: Modern (the default: slate greys and the chosen accent) or
+/// Classic (the neutral greys and blue accent of earlier versions). Both keep the same layout,
+/// cards and corners; only the colours differ.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Scheme {
+    #[default]
+    Modern,
+    Classic,
+}
+
+impl Scheme {
+    pub const ALL: [Scheme; 2] = [Scheme::Modern, Scheme::Classic];
+    pub fn id(self) -> &'static str {
+        match self {
+            Scheme::Modern => "modern",
+            Scheme::Classic => "classic",
+        }
+    }
+    pub fn parse(s: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|c| c.id().eq_ignore_ascii_case(s))
+    }
+}
+
 /// All colours and metrics the UI uses. Never hard-code a colour in a widget.
 #[derive(Clone, Copy, Debug)]
 pub struct Tokens {
@@ -280,6 +303,129 @@ impl Tokens {
         }
     }
 
+    /// The Classic colour scheme at brightness `b`: neutral greys with a blue accent, a dark
+    /// pressed tool and blue-grey selected rows, on the Modern metrics (corners, sizes).
+    pub fn classic(b: Brightness) -> Self {
+        let hex = |s: u32| Color32::from_rgb((s >> 16) as u8, (s >> 8) as u8, s as u8);
+        let base = Tokens {
+            app_bar: hex(0x262626),
+            panel: hex(0x323232),
+            panel_darker: hex(0x282828),
+            input: hex(0x1f1f1f),
+            input_border: hex(0x464646),
+            border: hex(0x1b1b1b),
+            divider: hex(0x3f3f3f),
+            text: hex(0xd8d8d8),
+            text_dim: hex(0xa8a8a8),
+            text_disabled: hex(0x6e6e6e),
+            icon: hex(0xcfcfcf),
+            hover: hex(0x444444),
+            tool_active: hex(0x1d1d1d),
+            accent: hex(0x378ef0),
+            accent_strong: hex(0x1473e6),
+            row_selected: hex(0x484b50),
+            pasteboard: hex(0x1e1e1e),
+            ruler: hex(0x2f2f2f),
+            ruler_tick: hex(0x8a8a8a),
+            measure_bg: Color32::from_rgba_unmultiplied(92, 92, 92, 235),
+            button: hex(0x444444),
+            text_strong: hex(0xf5f5f5),
+            tab_strip: hex(0x282828),
+            button_border: hex(0x6a6a6a),
+            flyout_active: hex(0x54b2f7),
+            ..Tokens::for_brightness(Brightness::Dark)
+        };
+        match b {
+            Brightness::Dark => base,
+            Brightness::MediumDark => Tokens {
+                // A shade below the panels, so the cards stand out from the window behind them.
+                app_bar: hex(0x464646),
+                panel: hex(0x535353),
+                panel_darker: hex(0x424242),
+                tab_strip: hex(0x424242),
+                input: hex(0x454545),
+                input_border: hex(0x5f5f5f),
+                border: hex(0x383838),
+                divider: hex(0x4b4b4b),
+                text: hex(0xd1d1d1),
+                text_strong: hex(0xffffff),
+                text_dim: hex(0xb0b0b0),
+                text_disabled: hex(0x7a7a7a),
+                icon: hex(0xc2c2c2),
+                hover: hex(0x606060),
+                tool_active: hex(0x303030),
+                row_selected: hex(0x52677c),
+                pasteboard: hex(0x606060),
+                ruler: hex(0x333333),
+                button: hex(0x535353),
+                button_border: hex(0x747474),
+                ..base
+            },
+            Brightness::MediumLight => Tokens {
+                dark: false,
+                app_bar: hex(0xa9a9a9),
+                panel: hex(0xb8b8b8),
+                panel_darker: hex(0xaaaaaa),
+                tab_strip: hex(0xa6a6a6),
+                input: hex(0xd6d6d6),
+                input_border: hex(0x8c8c8c),
+                border: hex(0x969696),
+                divider: hex(0x9e9e9e),
+                text: hex(0x1f1f1f),
+                text_strong: hex(0x000000),
+                text_dim: hex(0x3c3c3c),
+                text_disabled: hex(0x7c7c7c),
+                icon: hex(0x2a2a2a),
+                hover: hex(0xc8c8c8),
+                tool_active: hex(0x969696),
+                row_selected: hex(0x9fb4d6),
+                pasteboard: hex(0xa0a0a0),
+                ruler: hex(0xc2c2c2),
+                ruler_tick: hex(0x4a4a4a),
+                measure_bg: Color32::from_rgba_unmultiplied(184, 184, 184, 235),
+                button: hex(0xcacaca),
+                button_border: hex(0x7a7a7a),
+                flyout_active: hex(0x1473e6),
+                ..base
+            },
+            Brightness::Light => Tokens {
+                dark: false,
+                app_bar: hex(0xe4e4e4),
+                panel: hex(0xf0f0f0),
+                panel_darker: hex(0xe2e2e2),
+                tab_strip: hex(0xdddddd),
+                input: hex(0xffffff),
+                input_border: hex(0xb4b4b4),
+                border: hex(0xcfcfcf),
+                divider: hex(0xd6d6d6),
+                text: hex(0x1f1f1f),
+                text_strong: hex(0x000000),
+                text_dim: hex(0x4b4b4b),
+                text_disabled: hex(0x9a9a9a),
+                icon: hex(0x303030),
+                hover: hex(0xdddddd),
+                tool_active: hex(0xcdcdcd),
+                row_selected: hex(0xc8daf7),
+                pasteboard: hex(0xdcdcdc),
+                ruler: hex(0xeaeaea),
+                ruler_tick: hex(0x5a5a5a),
+                measure_bg: Color32::from_rgba_unmultiplied(240, 240, 240, 235),
+                button: hex(0xe0e0e0),
+                button_border: hex(0x9a9a9a),
+                flyout_active: hex(0x1473e6),
+                ..base
+            },
+        }
+    }
+
+    /// The tokens for `b` in `scheme`; Modern takes `accent`, Classic has its own blue.
+    pub fn for_scheme(scheme: Scheme, b: Brightness, accent: Accent) -> Self {
+        match scheme {
+            Scheme::Modern => Self::for_brightness(b).with_accent(accent),
+            Scheme::Classic => Self::classic(b),
+        }
+    }
+
     /// These tokens with `accent`: the accent, buttons filled with it, the active item in flyouts and
     /// selected rows (the panel tinted towards it).
     pub fn with_accent(self, accent: Accent) -> Self {
@@ -400,12 +546,12 @@ fn add_craft_fonts(fonts: &mut FontDefinitions) {
 
 /// Apply tokens to egui's global style.
 pub fn apply(ctx: &egui::Context, b: Brightness) {
-    apply_with(ctx, b, Accent::default());
+    apply_with(ctx, b, Accent::default(), Scheme::default());
 }
 
-/// [`apply`] with an accent colour.
-pub fn apply_with(ctx: &egui::Context, b: Brightness, accent: Accent) {
-    let t = Tokens::for_brightness(b).with_accent(accent);
+/// [`apply`] with an accent colour and colour scheme.
+pub fn apply_with(ctx: &egui::Context, b: Brightness, accent: Accent, scheme: Scheme) {
+    let t = Tokens::for_scheme(scheme, b, accent);
     ctx.data_mut(|d| d.insert_temp(egui::Id::NULL, t));
     let mut v = if t.dark { Visuals::dark() } else { Visuals::light() };
     v.panel_fill = t.panel;
@@ -467,10 +613,26 @@ mod tests {
     /// in every brightness.
     #[test]
     fn slider_rails_show_on_every_panel() {
-        for b in [Brightness::Dark, Brightness::MediumDark, Brightness::MediumLight, Brightness::Light] {
-            let t = Tokens::for_brightness(b);
-            let gap = (i32::from(t.button_border.r()) - i32::from(t.panel.r())).abs();
-            assert!(gap >= 24, "{b:?}: rail {:?} on panel {:?}", t.button_border, t.panel);
+        for b in Brightness::ALL {
+            for scheme in Scheme::ALL {
+                let t = Tokens::for_scheme(scheme, b, Accent::default());
+                let gap = (i32::from(t.button_border.r()) - i32::from(t.panel.r())).abs();
+                assert!(gap >= 24, "{scheme:?} {b:?}: rail {:?} on panel {:?}", t.button_border, t.panel);
+            }
+        }
+    }
+
+    /// Classic keeps the Modern corners and the cards' frame, and has its own blue accent
+    /// whatever accent is chosen.
+    #[test]
+    fn classic_scheme_keeps_the_corners_and_its_blue() {
+        for b in Brightness::ALL {
+            let (modern, classic) = (Tokens::for_brightness(b), Tokens::for_scheme(Scheme::Classic, b, Accent::Pink));
+            assert_eq!(classic.radius, modern.radius);
+            assert_eq!(classic.dark, modern.dark, "{b:?}");
+            assert_ne!(classic.app_bar, classic.panel, "{b:?}: the cards need a frame");
+            assert_eq!(classic.accent, Color32::from_rgb(0x37, 0x8e, 0xf0));
+            assert_eq!(Scheme::parse(Scheme::Classic.id()), Some(Scheme::Classic));
         }
     }
 }

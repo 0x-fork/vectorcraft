@@ -563,6 +563,7 @@
 	Convert to RGB	Konvertera till RGB
 	Convert to Shape	Konvertera till form
 	Convert to sRGB	Konvertera till sRGB
+	Convert to Straight Lines	Konvertera till raka linjer
 	Convert:	Konvertera:
 	Copied the CSS of {rules} object(s)	Kopierade CSS för {rules} objekt
 	Copies:	Kopior:
@@ -581,6 +582,7 @@
 	Copyright Notice:	Upphovsrättsmeddelande:
 	Copyright Status:	Upphovsrättsstatus:
 	Copyright Symbol	Upphovsrättssymbol
+	Corner Point Angle Threshold:	Vinkeltröskel för hörnpunkter:
 	Corner Radius	Hörnradie
 	Corner Radius:	Hörnradie:
 	Corner:	Hörn:
@@ -958,6 +960,32 @@
 	Export All…	Exportera alla…
 	Export and Clipboard Transparency Flattener Settings	Inställningar för transparensförenkling vid export och urklipp
 	Export Artboard	Exportera rityta
+	A File per Object	En fil per objekt
+	Example: {name}	Exempel: {name}
+	Export Preset:	Exportförinställning:
+	Folders:	Mappar:
+	Insert	Infoga
+	Nothing is selected. Select the art to export, then open this tab again.	Inget är markerat. Markera teckningen som ska exporteras och öppna fliken igen.
+	One File of the Selection	En fil av markeringen
+	Start at:	Börja på:
+	{n} objects selected	{n} objekt markerade
+	Delete Export Preset	Ta bort exportförinställning
+	Export Presets	Exportförinställningar
+	Save Export Preset	Spara exportförinställning
+	Export Layer	Exportera lager
+	Export Selection	Exportera markering
+	All in One Folder	Allt i en mapp
+	By Size or Row	Efter storlek eller rad
+	By Format	Efter format
+	By Artboard or Item	Efter rityta eller objekt
+	By Item, Then Format	Efter objekt, sedan format
+	Document Name	Dokumentnamn
+	Artboard or Item Name	Ritytans eller objektets namn
+	Number (####)	Nummer (####)
+	Date (YYYYMMDD)	Datum (ÅÅÅÅMMDD)
+	Date (YYYY-MM-DD)	Datum (ÅÅÅÅ-MM-DD)
+	Time (hhmmss)	Tid (ttmmss)
+	PDF Print	Tryck-PDF
 	Export As	Exportera som
 	Export As PNG…	Exportera som PNG…
 	Export As SVG…	Exportera som SVG…
@@ -1048,7 +1076,9 @@
 	Fit dashes to corners and ends	Anpassa streck till hörn och ändar
 	Fit Headline	Anpassa rubrik
 	Decrease Font Size	Minska teckenstorleken
+	Decrease Font Size by Five Steps	Minska teckenstorleken fem steg
 	Increase Font Size	Öka teckenstorleken
+	Increase Font Size by Five Steps	Öka teckenstorleken fem steg
 	Spacing	Avstånd
 	Step Type	Stegtyp
 	Fit in View	Anpassa till vyn
@@ -1287,6 +1317,14 @@
 	Hyphenate	Avstava
 	Hyphenation	Avstavning
 	Hyphenation…	Avstavning…
+	Words Longer Than:	Ord längre än:
+	After First:	Efter första:
+	Before Last:	Före sista:
+	Hyphen Limit:	Avstavningsgräns:
+	Hyphenation Zone:	Avstavningszon:
+	letters	bokstäver
+	hyphens	bindestreck
+	Hyphenate Capitalized Words	Avstava ord med inledande versal
 	ICC Profile	ICC-profil
 	Identify Objects By	Identifiera objekt efter
 	Ignore	Ignorera
@@ -1944,6 +1982,7 @@
 	Out Tangent Handles	Utgående tangenthandtag
 	Outer Glow…	Yttre glöd…
 	Outline	Disposition
+	Outline Object	Konvertera objekt till konturer
 	Outline Others	Visa övriga som disposition
 	Outline Stroke	Konvertera kontur till form
 	Outline Text	Konvertera text till konturer
@@ -2370,6 +2409,7 @@
 	Reset Preferences	Återställ inställningar
 	Reset Profiles	Återställ profiler
 	Reset Rotate View	Återställ Rotera vy
+	Rotate View to Selection	Rotera vyn efter markeringen
 	Reset the rows to the artwork's colors	Återställ raderna till teckningens färger
 	Reset to Default	Återställ till standard
 	Reset to White, Black	Återställ till vitt, svart
@@ -2479,6 +2519,7 @@
 	Save Save for Web Preset	Spara förinställning för Spara för webben
 	Save selected colors as swatches	Spara markerade färger som färgrutor
 	Save Selection…	Spara markering…
+	Update Selection	Uppdatera markering
 	Save Swatch Library	Spara färgrutebibliotek
 	Save Swatch Library…	Spara färgrutebibliotek…
 	Save the current layout under this name	Spara den aktuella layouten under det här namnet
@@ -2706,6 +2747,7 @@
 	Show Modified	Visa ändrade
 	Show Note	Visa anteckning
 	Show Options	Visa alternativ
+	Show Original Path	Visa ursprunglig bana
 	Show Package	Visa paket
 	Show Panel	Visa panel
 	Show Pattern Swatches	Visa mönsterprover
@@ -3628,6 +3670,8 @@ axis	Both	Båda
 @msg	cannot split an open path at its end point	kan inte dela en öppen bana vid dess slutpunkt
 @msg	closing needs three anchors	att sluta banan kräver tre ankarpunkter
 @msg	check an asset to export	kryssa för en resurs att exportera
+@msg	check a layer to export	markera ett lager att exportera
+@msg	select the art to export first	markera först teckningen som ska exporteras
 @msg	choice must be "merge" or "add", not `{choice}`	choice måste vara "merge" eller "add", inte `{choice}`
 @msg	choose a direction to divide in	välj en riktning att dela upp i
 @msg	choose a folder to export to	välj en mapp att exportera till
@@ -3739,6 +3783,7 @@ axis	Both	Båda
 @msg	no saved presets	inga sparade förinställningar
 @msg	no saved print preset named `{name}` ({DEFAULT_PRESET} is protected: start a new one from it)	ingen sparad utskriftsförinställning med namnet `{name}` ({DEFAULT_PRESET} är skyddad: skapa en ny utifrån den)
 @msg	no saved profiles	inga sparade profiler
+@msg	no saved selection recalled	ingen sparad markering hämtad
 @msg	no saved selections	inga sparade markeringar
 @msg	no saved themes	inga sparade teman
 @msg	no segment {segment} on line {line}	inget segment {segment} på rad {line}
@@ -4820,6 +4865,7 @@ theme	Appearance	Utseende
 	Intertwine	Sammanfläta
 	Isolate Selected Object	Isolera markerat objekt
 	Keep selected	Behåll markerad
+	Merge only with selection	Sammanfoga endast med markeringen
 	Legacy (version 7)	Äldre (version 7)
 	Legacy .ai Options	Alternativ för äldre .ai
 	Linked Files	Länkade filer
@@ -4834,6 +4880,7 @@ theme	Appearance	Utseende
 	Precision:	Precision:
 	Preview (1 inch on the page)	Förhandsgranskning (1 tum på sidan)
 	Registration:	Registreringspunkt:
+	Reset Horizontal Scale	Återställ horisontell skala
 	Reset Tracking and Kerning	Återställ spärrning och kerning
 	Sample Color from Screen	Hämta färg från skärmen
 	Set as Default	Ange som standard
@@ -4894,3 +4941,17 @@ theme	Appearance	Utseende
 	Amber	Bärnsten
 	Coral	Korall
 	Violet	Violett
+	Sketch	Skiss
+	Halftone Pattern…	Rastermönster…
+	Halftone Pattern	Rastermönster
+	Pattern Type	Mönstertyp
+	Dot	Punkt
+# User Interface › Color Scheme
+	Color Scheme	Färgschema
+	Modern	Modern
+
+# Symbol Options › Export Type
+	Export Type:	Exporttyp:
+	Movie Clip	Filmklipp
+@msg	name is empty	namnet är tomt
+@msg	no symbol named `{n}`	ingen symbol med namnet `{n}`
