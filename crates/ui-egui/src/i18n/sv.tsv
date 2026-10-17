@@ -4955,3 +4955,225 @@ theme	Appearance	Utseende
 	Movie Clip	Filmklipp
 @msg	name is empty	namnet är tomt
 @msg	no symbol named `{n}`	ingen symbol med namnet `{n}`
+	Angular	Vinkelmått
+	Away from the Line	Bort från linjen
+	Between Line and Object	Mellan linje och objekt
+	Drag out from a segment, or click two points, then click to place.	Dra utåt från ett segment eller klicka på två punkter och klicka sedan för att placera.
+	Drag out from a corner, or click two straight lines, then click to place.	Dra utåt från ett hörn eller klicka på två raka linjer och klicka sedan för att placera.
+	Drag out from a circle or arc for its radius, inwards for its diameter.	Dra utåt från en cirkel eller båge för radien, inåt för diametern.
+	Display	Visning
+@msg	Unknown dimension style	Okänd måttstil
+@msg	Unknown unit	Okänd enhet
+	Automate	Automatisera
+	Blur Mode	Oskärpeläge
+	Edge Only	Endast kanter
+	Include All Subdirectories	Inkludera alla underkataloger
+	Mode	Läge
+	Overlay Edge	Överläggskant
+	Override Action "Export" Commands	Åsidosätt åtgärdens "Exportera"-kommandon
+	Override Action "Open" Commands	Åsidosätt åtgärdens "Öppna"-kommandon
+	Override Action "Save" Commands	Åsidosätt åtgärdens "Spara"-kommandon
+	Path Length	Banlängd
+	Play:	Spela upp:
+	Save and Close	Spara och stäng
+	Stop on Errors	Stoppa vid fel
+swatch	[None]	[Ingen]
+swatch	[Registration]	[Passmärke]
+swatch	Amber	Bärnsten
+swatch	Aqua	Akvamarin
+swatch	Azure	Azurblå
+swatch	Black	Svart
+swatch	Blue	Blå
+swatch	Bright Blue	Klarblå
+swatch	Bright Green	Klargrön
+swatch	Bright Red	Klarröd
+swatch	Bright Violet	Klarviolett
+swatch	Bright Yellow	Klargul
+swatch	Brights	Ljusa toner
+swatch	Brown	Brun
+swatch	Chocolate	Choklad
+swatch	Coffee	Kaffe
+swatch	Copper	Koppar
+swatch	Cyan	Cyan
+swatch	Cyan Green	Cyangrön
+swatch	Emerald	Smaragd
+swatch	Espresso	Espresso
+swatch	Grays	Gråtoner
+swatch	Green	Grön
+swatch	Indigo	Indigo
+swatch	Lime	Lime
+swatch	Magenta	Magenta
+swatch	Ocean	Ocean
+swatch	Orange	Orange
+swatch	Orange Red	Orangeröd
+swatch	Pink	Rosa
+swatch	Purple	Lila
+swatch	Radial White, Black	Radiell vit, svart
+swatch	Red	Röd
+swatch	Rose	Rosa
+swatch	Rust	Rost
+swatch	Sand	Sand
+swatch	Sunset	Solnedgång
+swatch	Tan	Sandbrun
+swatch	Teal	Blågrön
+swatch	Violet	Violett
+swatch	Walnut	Valnöt
+swatch	White	Vit
+swatch	White, Black	Vit, svart
+swatch	Yellow	Gul
+swatch	Yellow Green	Gulgrön
+	Trackpad Gesture to Rotate View	Styrplattegest för att rotera vyn
+	Remove Color Profile…	Ta bort färgprofil…
+	Color wheel	Färghjul
+	First Artboard	Första ritytan
+	Last Artboard	Sista ritytan
+	Next Artboard	Nästa rityta
+	Previous Artboard	Föregående rityta
+	Step up or down	Stega upp eller ned
+	Add Event	Lägg till händelse
+	Add JavaScript File	Lägg till JavaScript-fil
+	Chop Design	Beskär design
+	Clear Events	Rensa händelser
+	Close Gaps With Paths	Stäng luckor med banor
+	Column Type:	Kolumntyp:
+	Each Design Represents:	Varje design motsvarar:
+	Event:	Händelse:
+	File or URL:	Fil eller URL:
+	For Fractions:	För bråk:
+	Gap Detection	Identifiering av luckor
+	Gap Options	Alternativ för luckor
+	Gap Preview Color:	Förhandsgranskningsfärg för luckor:
+	Graph Column	Diagramkolumn
+	JavaScript Files	JavaScript-filer
+	JavaScript:	JavaScript:
+	Link JavaScript Files…	Länka JavaScript-filer…
+	New Artboard Options…	Alternativ för ny rityta…
+	Paint Stops At:	Målning stannar vid:
+	Remove JavaScript File	Ta bort JavaScript-fil
+	Remove Selected Entry	Ta bort markerad post
+	Repeating	Upprepande
+	Resize	Ändra storlek
+	Scale Design	Skala design
+	Sliding	Glidande
+	The name in the save panel was “{typed}”; VectorCraft added the file type's extension. Replacing the file overwrites its contents.	Namnet i sparpanelen var ”{typed}”; VectorCraft lade till filtypens filnamnstillägg. Om du ersätter filen skrivs dess innehåll över.
+	Uniformly Scaled	Likformigt skalad
+	Vertically Scaled	Vertikalt skalad
+	“{name}” already exists. Replace it?	”{name}” finns redan. Vill du ersätta den?
+	Enable Guides for 9-Slice Scaling	Aktivera stödlinjer för 9-delad skalning
+	Lock Variables	Lås variabler
+	Unlock Variables	Lås upp variabler
+	Change to Artboard Rulers	Ändra till ritytelinjaler
+	Cutout…	Urklipp…
+	Neon Glow…	Neonglöd…
+	Poster Edges…	Affischkanter…
+	Cutout	Urklipp
+	Neon Glow	Neonglöd
+	Poster Edges	Affischkanter
+	Apply Data Set	Använd datauppsättning
+	Cancel Pattern Editing	Avbryt mönsterredigering
+	Copy Appearance	Kopiera utseende
+	Copy Guide	Kopiera stödlinje
+	Copy in Perspective	Kopiera i perspektiv
+	Create Slice from Selection	Skapa skiva från markering
+	Create Slices from Guides	Skapa skivor från stödlinjer
+	Delete All Slices	Radera alla skivor
+	Delete Data Sets	Radera datauppsättningar
+	Delete Graphic Styles	Radera grafikstilar
+	Delete Guide	Radera stödlinje
+	Delete Guides	Radera stödlinjer
+	Delete Slice	Radera skiva
+	Delete Style	Ta bort stil
+	Delete Variables	Radera variabler
+	Delete View	Radera vy
+	Done Editing Pattern	Klar med mönsterredigeringen
+	Duplicate Rows	Duplicera rader
+	Edit Perspective Grid	Redigera perspektivrutnät
+	Expand Blend	Expandera blandning
+	Expand Envelope	Expandera kuvert
+	Expand Image Trace	Expandera bildkalkering
+	Expand Live Paint	Expandera direktmålning
+	Live Shape	Dynamisk form
+	Make Blend	Skapa blandning
+	Make Dynamic	Gör dynamisk
+	Make Intertwine	Skapa sammanflätning
+	Make Live Paint	Skapa direktmålning
+	Make Pattern	Skapa mönster
+	Make Slice	Skapa skiva
+	Merge Live Paint	Sammanfoga direktmålning
+	Mesh Point Color	Nätpunktsfärg
+	Move Envelope Point	Flytta kuvertpunkt
+	Move Plane and Copy Objects	Flytta plan och kopiera objekt
+	Move Plane and Objects	Flytta plan och objekt
+	Move Slice	Flytta skiva
+	Move Type on a Path	Flytta text på bana
+	New Guide	Ny stödlinje
+	Place from Library	Placera från bibliotek
+	Rearrange Artboards	Ordna om ritytor
+	Release Blend	Släpp blandning
+	Release Envelope	Släpp kuvert
+	Release Intertwine	Släpp sammanflätning
+	Release Live Paint	Släpp direktmålning
+	Release Repeat	Släpp upprepning
+	Release Slice	Släpp skiva
+	Release Threaded Text	Släpp länkad text
+	Rename Design	Byt namn på design
+	Rename Style	Byt namn på stil
+	Rename View	Byt namn på vy
+	Reorder Appearance	Ändra ordning i utseende
+	Reorder Artboards	Ändra ordning på ritytor
+	Reshape Spine	Omforma ryggrad
+	Resize Artboard	Ändra storlek på rityta
+	Resize Slice	Ändra storlek på skiva
+	Resize Type Area	Ändra storlek på textområde
+	Scale in Perspective	Skala i perspektiv
+	Shape Builder Delete	Radera med formbyggaren
+	Sort Swatches	Sortera färgrutor
+	Symbol Screener	Symboltonare
+	Symbol Scruncher	Symbolhopdragare
+	Symbol Shifter	Symbolförskjutare
+	Symbol Sizer	Symbolstorleksändrare
+	Symbol Spinner	Symbolsnurrare
+	Symbol Stainer	Symbolfärgare
+	Symbol Styler	Symbolstilsättare
+	Text Orientation	Textorientering
+	Thread Text	Länka text
+	Typing	Skrivning
+	Edge Fidelity	Kanttrohet
+	Edge Intensity	Kantintensitet
+	Edge Simplicity	Kantförenkling
+	Edge Thickness	Kanttjocklek
+	Glow Brightness	Glödens ljusstyrka
+	Glow Size	Glödstorlek
+	Large Gaps	Stora luckor
+	Levels	Nivåer
+	Medium Gaps	Medelstora luckor
+	Posterization	Posterisering
+	Small Gaps	Små luckor
+@msg	`{key}` must be a #rrggbb color	`{key}` måste vara en #rrggbb-färg
+@msg	a key object sits on that point	ett nyckelobjekt ligger på den punkten
+@msg	a linked image can't become a gradient mesh: embed it first	en länkad bild kan inte bli ett gradientnät: bädda in den först
+@msg	a mask has more than one art block	en mask har mer än ett grafikblock
+@msg	a spine keeps at least two points	en ryggrad behåller minst två punkter
+@msg	cancelled; nothing was changed	avbrutet; ingenting ändrades
+@msg	handle must be in or out	handtaget måste vara in eller ut
+@msg	index must be ≥ 0	index måste vara ≥ 0
+@msg	mask art ends outside a mask dictionary	maskgrafiken slutar utanför en maskordlista
+@msg	missing number `{key}`	talet `{key}` saknas
+@msg	no such spine point	ingen sådan ryggradspunkt
+@msg	no such spine segment	inget sådant ryggradssegment
+@msg	not a blend	inte en blandning
+@msg	Save writes {_1}, not {_2}: use file.saveAsTemplate to write it	Spara skriver {_1}, inte {_2}: använd file.saveAsTemplate för att skriva det
+@msg	select a blend or give `id`	markera en blandning eller ange `id`
+@msg	t, dx and dy must be finite	t, dx och dy måste vara ändliga
+@msg	the blend has no spine	blandningen har ingen ryggrad
+@msg	the image has no usable size or position	bilden har ingen användbar storlek eller position
+@msg	the image's pixels can't be read	bildens pixlar kan inte läsas
+@msg	the spine has no segments	ryggraden har inga segment
+@msg	variables are locked	variablerna är låsta
+@msg	x and y must be finite	x och y måste vara ändliga
+	Persistent	Beständigt
+	Library Panel Options	Alternativ för bibliotekspanel
+@msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` är inte en bibliotekspanel (se window.swatchLibrary)
+@msg	library panel `{given}` isn't open	bibliotekspanelen `{given}` är inte öppen
+@msg	Persistent libraries not found: {files}	Beständiga bibliotek hittades inte: {files}
+@msg	too many library panels were opened in this session	för många bibliotekspaneler har öppnats under den här sessionen
