@@ -107,6 +107,10 @@ the suite) keep the agent to the folders you give it:
   The result is compared with the root by whole folder names: `/work2/x` is not inside `/work`. On
   Windows case is ignored, UNC paths (`\\server\share\…`) are resolved like drive-letter ones, and
   device names (`CON`, `NUL`, `COM1`…) are refused.
+- With `--connect`, the server makes the paths of `open_file`, `save_file`, `export` (`path` or
+  `options.path`) and `screenshot {path}` absolute against its own working directory before it sends
+  them to the app. Paths inside `run_command` and `command_batch` params go to the app as given, and the
+  app resolves them against its own working directory.
 - A refused path is an ordinary tool error the agent can read and correct, for example
   `automation path rejected: outside the write root /work/project/out: /etc/x.png` (with several,
   `outside the write roots /work/project/out, /tmp/scratch: …`) or
