@@ -3184,6 +3184,9 @@ packet (`dc:creator`, `dc:description`, `dc:subject` or `pdf:Keywords`, `xmpRigh
 `Subject`, `Keywords`, `CreationDate`, `ModDate`) give, the XMP packet's value where both give one. A value that
 `file.info` would refuse is left out, and the title is set as for any other open (the file name, or a new untitled
 name for a template).
+`document.inspect` (`inspect_document`) and the `document.open` (`open_file`) reply report the File Info title as
+`fileInfoTitle`. Their `title` is the document's tab name, which comes from the file name once the document is saved
+to or opened from a file (with ` [Converted]` or ` [Recovered]` where that applies).
 `file.new {created}` and a save to a file (`document.save` or `file.saveAs` with
 `{path, modified}`) use the given date (Unix seconds, or `null` for none) instead of now. Their journal entries always
 record the date they used, so replaying the journal makes the same document whenever it runs (an action recorded in
