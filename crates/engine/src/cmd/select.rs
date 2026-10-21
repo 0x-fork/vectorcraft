@@ -8,6 +8,7 @@ use vectorcraft_doc::{Document, Node, NodeId, NodeKind};
 
 use super::wand::{fill_of, stroke_of};
 use super::*;
+use crate::DocState;
 
 pub fn specs() -> Vec<CommandSpec> {
     vec![
@@ -663,10 +664,27 @@ fn paint_reported(d: &Document, n: &Node) -> bool {
     compound(n) || (!n.is_container() && !d.parent_of(n.id).and_then(|p| d.node(p)).is_some_and(compound))
 }
 
+/// The object Select > Same compares the others with, and whether isolation mode is inside a
+/// compound path. The object is the first selected one, or its compound path when it is a member
+/// of one; in isolation mode inside a compound path it is the member path itself.
+fn same_reference<'a>(st: &'a DocState, cmd: &str) -> Result<(&'a Node, bool)> {
+    let compound = |n: &Node| matches!(n.kind, NodeKind::Compound { .. });
+    let members = st.isolation.and_then(|i| st.doc.ancestry(i)).is_some_and(|a| a.iter().any(|i| st.doc.node(*i).is_some_and(compound)));
+    let first = st.selection.objects.first().and_then(|id| st.doc.node(*id)).ok_or_else(|| bad(cmd, "nothing selected"))?;
+    let refn = match st.doc.parent_of(first.id).and_then(|p| st.doc.node(p)) {
+        Some(p) if !members && compound(p) => p,
+        _ => first,
+    };
+    Ok((refn, members))
+}
+
+/// Select > Same: the objects `eq` matches with the object [`same_reference`] returns, among those
+/// [`paint_reported`] accepts. A compound path matches as a whole. In isolation mode inside a
+/// compound path, its member paths are matched instead.
 fn same(s: &mut Session, cmd: &str, eq: impl Fn(&Node, &Node) -> bool) -> Result<Value> {
-    let st = s.doc()?;
-    let refn = st.selection.objects.first().and_then(|id| st.doc.node(*id)).cloned().ok_or_else(|| bad(cmd, "nothing selected"))?;
-    select_where(s, cmd, &json!({}), |_, n| !n.is_container() && eq(n, &refn))
+    let (refn, members) = same_reference(s.doc()?, cmd)?;
+    let refn = refn.clone();
+    select_where(s, cmd, &json!({}), |d, n| (if members { !n.is_container() } else { paint_reported(d, n) }) && eq(n, &refn))
 }
 
 /// Select the objects [`walk_selectable`] visits that `f` accepts (not looking inside accepted
@@ -690,13 +708,8 @@ fn select_where(s: &mut Session, cmd: &str, p: &Value, f: impl Fn(&Document, &No
 fn same_graphic_style(s: &mut Session, _: &Value) -> Result<Value> {
     let cmd = "select.same.graphicStyle";
     let st = s.doc()?;
-    let id = st
-        .selection
-        .objects
-        .first()
-        .and_then(|id| super::style::linked_style(&st.doc, st.doc.node(*id)?))
-        .map(|g| g.id)
-        .ok_or_else(|| bad(cmd, "the selection has no graphic style"))?;
+    let (refn, _) = same_reference(st, cmd)?;
+    let id = super::style::linked_style(&st.doc, refn).map(|g| g.id).ok_or_else(|| bad(cmd, "the selection has no graphic style"))?;
     select_where(s, cmd, &json!({}), |d, n| n.extras().graphic_style == Some(id) && super::style::linked_style(d, n).is_some())
 }
 
@@ -709,7 +722,7 @@ enum Attribute {
 fn same_attribute(s: &mut Session, p: &Value) -> Result<Value> {
     let cmd = "select.same.appearanceAttribute";
     let st = s.doc()?;
-    let refn = st.selection.objects.first().and_then(|id| st.doc.node(*id)).ok_or_else(|| bad(cmd, "nothing selected"))?;
+    let (refn, _) = same_reference(st, cmd)?;
     let ap = &refn.appearance;
     let item = p.get("item").and_then(Value::as_u64).map(index).or(s.appearance_item());
     let attr = match (item.and_then(|i| ap.items.get(i)), ap.effects.first()) {
