@@ -689,7 +689,7 @@ fn same(s: &mut Session, cmd: &str, eq: impl Fn(&Node, &Node) -> bool) -> Result
 
 /// Select the objects [`walk_selectable`] visits that `f` accepts (not looking inside accepted
 /// ones); Select > Reselect repeats `cmd` with `p`.
-fn select_where(s: &mut Session, cmd: &str, p: &Value, f: impl Fn(&Document, &Node) -> bool) -> Result<Value> {
+pub(crate) fn select_where(s: &mut Session, cmd: &str, p: &Value, f: impl Fn(&Document, &Node) -> bool) -> Result<Value> {
     let st = s.doc()?;
     let mut ids = vec![];
     walk_selectable(&st.doc, st.isolation, |n| {
@@ -701,8 +701,10 @@ fn select_where(s: &mut Session, cmd: &str, p: &Value, f: impl Fn(&Document, &No
     });
     let from = st.selection.objects.clone();
     s.select(|_, sel| sel.set(ids.iter().copied()))?;
-    s.doc_mut()?.last_selection_cmd = Some((cmd.to_string(), p.clone(), from));
-    Ok(json!({ "count": ids.len() }))
+    let st = s.doc_mut()?;
+    st.last_selection_cmd = Some((cmd.to_string(), p.clone(), from));
+    // The objects selected, after Lock Guides has left out guide paths.
+    Ok(json!({ "count": st.selection.objects.len() }))
 }
 
 fn same_graphic_style(s: &mut Session, _: &Value) -> Result<Value> {
@@ -763,6 +765,7 @@ fn by_kind(s: &mut Session, f: fn(&Node) -> bool) -> Result<Value> {
         }
         true
     });
-    s.select(|_, sel| sel.set(ids.iter().copied()))?;
-    Ok(json!({ "count": ids.len() }))
+    s.select(|_, sel| sel.set(ids))?;
+    // The objects selected, after Lock Guides has left out guide paths.
+    Ok(json!({ "count": s.doc()?.selection.objects.len() }))
 }

@@ -4122,6 +4122,12 @@ imageTrace	Outline	Ääriviiva
 @msg	`{key}` must be between {min} and {max} (got {x})	`{key}` on oltava väliltä {min}–{max} (saatiin {x})
 @msg	`{key}` must be one of {_1}	`{key}` on oltava jokin seuraavista: {_1}
 @msg	`{key}` must be true or false	`{key}` on oltava true tai false
+@msg	`select` must be true or false	`select` on oltava true tai false
+@msg	`minAnchors` and `maxAnchors` must be whole numbers	`minAnchors` ja `maxAnchors` on oltava kokonaislukuja
+@msg	`{key}` must be a number not below 0	`{key}` on oltava luku, joka on vähintään 0
+@msg	`{key}` must be [x, y, width, height]: four finite numbers, width and height not negative	`{key}` on oltava [x, y, width, height]: neljä äärellistä lukua, joista leveys ja korkeus eivät ole negatiivisia
+@msg	`{min_key}` is greater than `{max_key}`	`{min_key}` on suurempi kuin `{max_key}`
+@msg	give at least one of `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`	anna vähintään yksi parametreista `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`
 @msg	`{k}` must be [x, y]	`{k}` on oltava [x, y]
 @msg	`{name}` has no options	`{name}`: ei asetuksia
 @msg	`{name}` is a built-in workspace; choose another name	`{name}` on sisäänrakennettu työtila; valitse toinen nimi

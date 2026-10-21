@@ -219,7 +219,8 @@ node (layers and groups too) reports `opacity` when it is below 1 and `blend` wh
 
 On a large document, drill instead of dumping: `inspect_document {depth: 0}` (or `run_command document.inspect
 {depth?, childLimit?}`, same rules) is the skeleton (artboards with top layers and counts), `run_command
-document.find {name?, kind?, text?, limit?}` locates nodes across the whole tree, and `document.node` reads the
+document.find {name?, kind?, text?, within?, intersects?, minArea?, …, select?, limit?}` locates nodes across the
+whole tree, and `document.node` reads the
 interesting ones sliced. `document.inspect` and the `doc_inspect` / `inspect_document` tools also scope the
 reply themselves: `ids: [id…]` lists just those nodes (any level, in the order given, an unknown id is an error,
 at most 10000), `kind` lists every node of one panel label (ignoring case; within the subtrees of `ids` when both
@@ -230,9 +231,21 @@ top layers (`layers` and `total`). Without these options the reply is the whole 
 `document.find` needs at least one filter and all given filters must match; matching
 ignores case, `name` is a substring of the Layers panel name, `text` a substring of type content and `kind` the
 exact panel label (`Layer`, `Group`, `Clip Group`, `Path`, `Compound Path`, `Type`, `Image`, `Rectangle`, ...).
+The geometric filters read each object's geometric bounds, in the document points `document.inspect` reports
+(groups included; layers, sublayers and a node without bounds do not match): `within: [x, y, width, height]` keeps
+objects inside that rectangle (edges included), `intersects: [x, y, width, height]` objects touching or overlapping it,
+`minWidth` / `maxWidth` and `minHeight` / `maxHeight` limit the bounds' size, `minThickness` / `maxThickness`
+the smaller of width and height (thin slivers of either orientation), and `minArea` / `maxArea` width × height.
+`minAnchors` / `maxAnchors` count a path's anchor points, a compound path's members together; other nodes do not
+match them. Limits are inclusive, not negative, and a minimum above its maximum is an error. `select: true`
+also selects the matches, leaving out hidden and locked ones, those inside another match, and a compound path's
+members unless the compound path is isolated; Select › Reselect repeats the find, and an action being recorded
+records it as a step (a find without `select` is not recorded). For example,
+`document.find {maxThickness: 1, kind: "path", select: true}` followed by `edit.clear` deletes hairline slivers.
 It answers `{matches: [{id, name, kind, path}], total}` top of the stack first, where `path` is the ancestor
-chain (layer first) and `limit` caps `matches` (default 100; `0` only counts). `document.json` stays whole: it is
-the fidelity path, not the way to look around.
+chain (layer first) and `limit` caps `matches` (default 100; `0` only counts); with `select` the reply adds
+`selected`, the number of objects selected. `document.json` stays whole: it is the fidelity path, not the way to
+look around.
 
 ### Completions
 
