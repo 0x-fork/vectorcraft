@@ -45,9 +45,13 @@ pub mod graphic_style_options;
 pub mod halftone;
 pub mod hyphenation;
 pub mod import_pdf;
+pub mod javascript_files;
+pub mod justification;
 pub mod layer_options;
 pub mod layers_panel_options;
 pub mod liquify;
+pub mod live_paint_gaps;
+pub mod live_paint_selection;
 pub mod missing_fonts;
 pub mod missing_links;
 pub(crate) mod modal;
@@ -83,8 +87,10 @@ mod save_pdf;
 pub mod save_style_library;
 pub mod save_swatch_library;
 pub mod script_check;
+pub mod shape_builder_options;
 mod shapes;
 pub mod shortcut_import;
+pub(crate) mod simplify_slider;
 pub mod slices;
 pub mod spot_colors;
 pub(crate) mod svg_options;
@@ -97,7 +103,7 @@ pub mod text_import;
 mod tiff_bmp_tga;
 pub mod tile_edge_color;
 mod tools;
-mod transform;
+pub(crate) mod transform;
 pub mod transform_each;
 pub mod variables;
 mod warp_effect;
@@ -108,15 +114,16 @@ use serde_json::{Value, json};
 pub use color_picker::open as open_color_picker;
 pub use document_setup::open as open_document_setup;
 pub use effect::open as open_effect_dialog;
-pub(crate) use effect::{FILM_GRAIN_FIELDS, SHADES};
+pub(crate) use effect::{FILM_GRAIN_FIELDS, SHADES, shown_choices};
 pub use export_as::open as open_export_as;
 pub use export_for_screens::open as open_export_for_screens;
 pub(crate) use export_for_screens::{
     KIND as EXPORT_FOR_SCREENS, formats as screen_formats, open_assets as open_export_for_screens_assets, saved_options as screen_saved_options,
     saved_rows as screen_saved_rows,
 };
+pub(crate) use form::{humanize, number_list_text, read_number_list, unit_suffix};
 pub(crate) use new_document::preset_name;
-pub use new_document::{open as open_new_document, preset_card};
+pub use new_document::{create_without_dialog as new_document_without_dialog, open as open_new_document, preset_card};
 pub use png_options::open as open_raster_options;
 pub use save_pdf::{open as open_save_pdf, open_preset as open_pdf_preset};
 pub use tools::open_tool_dialog;
@@ -130,6 +137,15 @@ type DialogResult = Result<Value, String>;
 const MARGIN: i8 = 22;
 const EDGE_GAP: f32 = 8.0;
 
+/// An action requested by a dialog that draws its buttons inside its body.
+#[derive(Default)]
+pub(crate) enum DialogAction {
+    #[default]
+    None,
+    Confirm,
+    Cancel,
+}
+
 /// How a dialog draws and applies itself. Specs start from [`DialogSpec::FORM`] and override what
 /// differs.
 pub(crate) struct DialogSpec {
@@ -138,8 +154,12 @@ pub(crate) struct DialogSpec {
     /// The heading (and window title), in the UI language: the spec translates its own text and
     /// leaves names in it (a document's, a plug-in's) as they are.
     pub heading: fn(&Dialog) -> String,
+    /// Optional heading band inside the shared window; normal dialogs use `modal::heading`.
+    pub header: Option<fn(&mut egui::Ui, &str)>,
     /// Draws the fields. Returns true to close the dialog as Cancel would.
     pub body: fn(&mut VectorcraftApp, &mut egui::Ui, &mut Dialog) -> bool,
+    /// Optional body with inline buttons; replaces `body` and the shared footer.
+    pub body_with_actions: Option<fn(&mut VectorcraftApp, &mut egui::Ui, &mut Dialog) -> DialogAction>,
     /// OK, Enter or `ui.dialog.confirm`: applies the dialog and closes it when done.
     pub confirm: fn(&mut VectorcraftApp, &Dialog) -> DialogResult,
     /// The OK button's label. None: no OK button, Enter does nothing and Cancel reads "Close".
@@ -162,10 +182,12 @@ impl DialogSpec {
     pub const FORM: Self = Self {
         window: None,
         heading: |_| tl!("Dialog").into(),
+        header: None,
         body: |app, ui, d| {
             form::grid(ui, d, app.session.general_unit());
             false
         },
+        body_with_actions: None,
         confirm: |app, _| {
             app.ui.dialog = None;
             Ok(Value::Null)
@@ -240,10 +262,12 @@ registry! {
     SwatchOptions: [swatch_options::KIND] => swatch_options::SPEC,
     Confirm: [confirm::KIND] => confirm::SPEC,
     Message: [confirm::MESSAGE] => confirm::MESSAGE_SPEC,
+    Replace: [confirm::REPLACE] => confirm::REPLACE_SPEC,
     NewSwatch: [new_swatch::KIND] => new_swatch::SPEC,
     NewColorGroup: [new_color_group::KIND] => new_color_group::SPEC,
     GraphData: [graph_data::KIND] => graph_data::SPEC,
     GraphDesign: [graph_design::DESIGN] => graph_design::DESIGN_SPEC,
+    GraphColumn: [graph_design::COLUMN] => graph_design::COLUMN_SPEC,
     GraphMarker: [graph_design::MARKER] => graph_design::MARKER_SPEC,
     GradientStop: ["gradientStop"] => gradient_stop::SPEC,
     ColorPicker: [color_picker::KIND] => color_picker::SPEC,
@@ -264,8 +288,10 @@ registry! {
     WidthPoint: [width_point::KIND] => width_point::SPEC,
     Corners: [corners::KIND] => corners::SPEC,
     Hyphenation: [hyphenation::KIND] => hyphenation::SPEC,
+    Justification: [justification::KIND] => justification::SPEC,
     SavePdf: [save_pdf::KIND] => save_pdf::SPEC,
     SvgOptions: [svg_options::KIND] => svg_options::SPEC,
+    JavaScriptFiles: [javascript_files::KIND] => javascript_files::SPEC,
     NewDocumentMore: [new_document::MORE] => new_document::MORE_SPEC,
     Place: [place::KIND] => place::SPEC,
     RasterOptions: ["pngOptions", "jpgOptions", "webpOptions", "gifOptions", "png8Options"] => png_options::SPEC,
@@ -299,18 +325,23 @@ registry! {
     PrintPreset: [print::PRESET_KIND] => print::PRESET_SPEC,
     PrintPresets: [print_presets::KIND] => print_presets::SPEC,
     Plugin: [plugin::KIND] => plugin::SPEC,
+    PluginExport: [plugin::EXPORT_KIND] => plugin::EXPORT_SPEC,
     ScriptCheck: [script_check::KIND] => script_check::SPEC,
     VectorHalftone: [halftone::KIND] => halftone::SPEC,
+    SimplifySlider: [simplify_slider::KIND] => simplify_slider::SPEC,
     PerspectiveGrid: [perspective_grid::KIND] => perspective_grid::SPEC,
     Envelope: [envelope::WARP, envelope::MESH, envelope::OPTIONS] => envelope::SPEC,
     LiquifyOptions: [liquify::KIND] => liquify::SPEC,
     FreehandOptions: [freehand::KIND] => freehand::SPEC,
+    ShapeBuilderOptions: [shape_builder_options::KIND] => shape_builder_options::SPEC,
     FlareOptions: [flare_options::KIND] => flare_options::SPEC,
     SymbolOptions: [symbol_options::KIND] => symbol_options::SPEC,
     SymbolismOptions: [symbolism_options::KIND] => symbolism_options::SPEC,
     PerspectiveGridPresets: [perspective_presets::KIND] => perspective_presets::SPEC,
     PerspectiveGridOptions: [perspective_options::KIND] => perspective_options::SPEC,
     BlendOptions: [blend_options::KIND] => blend_options::SPEC,
+    LivePaintGaps: [live_paint_gaps::KIND] => live_paint_gaps::SPEC,
+    LivePaintSelectionOptions: [live_paint_selection::KIND] => live_paint_selection::SPEC,
     BrushOptions: [brush_options::KIND] => brush_options::SPEC,
     EditSelection: [edit_selection::KIND] => edit_selection::SPEC,
     PerspectivePlane: [perspective_plane::KIND] => perspective_plane::SPEC,
@@ -393,6 +424,8 @@ pub(crate) fn settle(app: &mut VectorcraftApp) {
 /// until Enter has been let go.
 pub(crate) const AFTER_PANEL: &str = "__afterPanel";
 
+/// Draws the active dialog and handles shared initial focus, keyboard shortcuts and actions.
+/// Inline actions and footer buttons use the same confirmation and preview rollback paths.
 pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
     about::show(app, ctx);
     settle(app);
@@ -452,17 +485,32 @@ pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
         let room = (ctx.content_rect().width() - 2.0 * (f32::from(MARGIN) + EDGE_GAP)).max(EDGE_GAP);
         ui.set_min_width(spec.min_width.min(room));
         ui.set_max_width(spec.max_width.map_or(room, |w| w.min(room)));
-        modal::heading(ui, &heading);
+        if let Some(header) = spec.header {
+            header(ui, &heading);
+        } else {
+            modal::heading(ui, &heading);
+        }
         ui.add_space(12.0);
         // Just opened: its first enabled field takes the keyboard focus, as in the reference app
         // (type a value, press Enter). Only the body's fields can take it.
         if focus_first {
             ui.data_mut(|m| m.insert_temp(widgets::dialog_focus_flag(), true));
         }
-        cancel = (spec.body)(app, ui, &mut d);
+        if let Some(body) = spec.body_with_actions {
+            match body(app, ui, &mut d) {
+                DialogAction::None => {}
+                DialogAction::Confirm => ok = true,
+                DialogAction::Cancel => cancel = true,
+            }
+        } else {
+            cancel = (spec.body)(app, ui, &mut d);
+        }
         // Taken (the flag is gone): done. Still there (the window's measuring frame): next frame.
         if focus_first && ui.data_mut(|m| m.remove_temp::<bool>(widgets::dialog_focus_flag())).is_none() {
             ui.data_mut(|m| m.remove::<bool>(focus_id));
+        }
+        if spec.body_with_actions.is_some() {
+            return;
         }
         ui.add_space(16.0);
         // The button row is as wide as the fields above it and as tall as the buttons: a
@@ -531,6 +579,10 @@ mod tests_export;
 mod tests_import_pdf;
 #[cfg(test)]
 mod tests_package;
+#[cfg(test)]
+mod tests_plugin_export;
+#[cfg(test)]
+mod tests_plugin_fields;
 #[cfg(test)]
 mod tests_raster_formats;
 #[cfg(test)]

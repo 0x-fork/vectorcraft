@@ -163,6 +163,13 @@ fn preview_mime(bytes: &[u8]) -> &'static str {
     if bytes.starts_with(&[0xff, 0xd8]) { "image/jpeg" } else { vectorcraft_doc::links::PROXY_MIME }
 }
 
+/// The JSON of a native file without the data after it (version 4 keeps images there): a
+/// complete JSON value whose `images` give each image's MIME type and where its data was, without
+/// the data.
+pub fn json_part(file: &[u8]) -> &[u8] {
+    split_tail(file).0
+}
+
 /// The JSON of a file and the data after it (v4), split at [`BLOB_MAGIC`] after the first JSON
 /// value.
 fn split_tail(text: &[u8]) -> (&[u8], &[u8]) {
@@ -549,11 +556,23 @@ pub fn load_file(bytes: &[u8]) -> Result<NativeFile, FormatError> {
     // Saved before v3: the assigned profiles move out of `unknown`.
     doc.migrate_color_profiles();
     doc.fix_next_id();
+    // Untrusted: the bleed and type proportions, within the ranges Document Setup takes.
+    doc.setup.keep_in_range();
     // Untrusted: capped, named and pointing at objects the file has.
     doc.tidy_saved_selections();
     doc.tidy_graph_designs();
+    doc.raster_effects.add_around = doc.raster_effects.add_around.clamp(0.0, vectorcraft_doc::rastersettings::MAX_ADD_AROUND);
     let mut depth_notes = vec![];
     doc.limit_depth_noting(&mut depth_notes);
+    // Untrusted: the type's sizes, leading, baseline shifts and scales, its indents and paragraph
+    // spacing, and its tab stops, each within its range (after the depth limit: the walk recurses).
+    doc.keep_type_values_in_range();
+    // Untrusted: the raster effects resolution, within 1 to 2400 ppi (72 when it isn't finite).
+    doc.raster_effects_ppi = Some(doc.raster_effects_ppi).filter(|v| v.is_finite()).unwrap_or(72.0).clamp(1.0, 2400.0);
+    // Untrusted: the superscript, subscript and small caps proportions of the type, the graph
+    // labels and the character styles, within the ranges `document.setup` takes (after the depth
+    // limit: the walk recurses).
+    doc.keep_scripts_in_range();
     let profiles = f.profiles.into_iter().filter_map(|(name, icc)| Some((name, bytes_of(&icc)?))).collect();
     Ok(NativeFile { doc, depth_notes, info: FileInfo { version: f.version, legacy: f.format == LEGACY_EXTENSION }, profiles })
 }

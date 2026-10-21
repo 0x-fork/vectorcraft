@@ -219,6 +219,7 @@ fn the_document_info_report_has_every_category() {
         "DOCUMENT",
         "OBJECTS",
         "GRAPHIC STYLES",
+        "BRUSHES",
         "SPOT COLORS",
         "PATTERN OBJECTS",
         "GRADIENT SWATCHES",
@@ -238,8 +239,10 @@ fn the_document_info_report_has_every_category() {
     assert_eq!((i["sections"].as_array().unwrap().len(), i["sections"][0]["id"].as_str()), (1, Some("linkedImages")));
     assert_eq!(i["sections"][0]["rows"].as_array().unwrap().len(), 2);
     let all = run(&mut s, "document.info", json!({}));
-    assert_eq!(all["sections"].as_array().unwrap().len(), 11);
-    assert!(s.execute("document.info", &json!({"category": "brushes"})).is_err());
+    assert_eq!(all["sections"].as_array().unwrap().len(), 12);
+    let i = run(&mut s, "document.info", json!({"category": "brushes"}));
+    assert_eq!((i["sections"].as_array().unwrap().len(), i["sections"][0]["id"].as_str()), (1, Some("brushes")));
+    assert!(s.execute("document.info", &json!({"category": "strokes"})).is_err());
     assert!(s.execute("document.info", &json!({"format": "xml"})).is_err());
     // The bundled fonts allow embedding.
     let face = vectorcraft_text::FontDb::global().face("Source Sans 3", "Regular").unwrap();

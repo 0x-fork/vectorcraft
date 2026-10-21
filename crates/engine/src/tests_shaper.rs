@@ -311,6 +311,23 @@ fn shaper_construction_taps_stay_in_the_isolated_group() {
     assert_eq!(s.doc().unwrap().isolation, Some(sources));
 }
 
+/// `object.isolate` on a Shaper Group whose source group is locked or hidden is refused, and
+/// isolation mode stays off.
+#[test]
+fn shaper_isolate_refuses_a_locked_or_hidden_source_group() {
+    for (key, on) in [("locked", true), ("visible", false)] {
+        let mut s = session();
+        rectangle(&mut s, 0.0, "#ff0000");
+        rectangle(&mut s, 50.0, "#0000ff");
+        let g = scribble(&mut s, &[[25.0, 20.0], [75.0, 35.0], [30.0, 50.0], [125.0, 65.0]]);
+        let sources = node(&s, g).children().unwrap()[0].id;
+        s.execute("object.setProps", &json!({"ids": [sources.0], key: on})).unwrap();
+        let r = s.execute("object.isolate", &json!({"id": g.0})).map_err(|e| e.to_string());
+        assert_eq!(r, Err("invalid parameters for `object.isolate`: the object is hidden or locked".into()), "{key}");
+        assert_eq!(s.doc().unwrap().isolation, None, "{key}");
+    }
+}
+
 #[test]
 fn shaper_lines_keep_free_angles_with_or_without_shift() {
     for shift in [false, true] {
@@ -385,6 +402,57 @@ fn shaper_tool_trims_both_diagonal_ends_and_only_construction_can_pick_them() {
     let p = rotate(75.0, 150.0);
     s.execute("shaper.select", &json!({"point":[p.x,p.y],"source":true})).unwrap();
     assert_eq!(s.doc().unwrap().selection.objects, vec![line]);
+}
+
+/// The Selection tool's marquee, Group Selection's E marquee and Direct Selection's marquee and
+/// clicks reach a Shaper Group only by the art it shows: none of them selects the original shape of a
+/// face the group erased, or its anchor points. In Construction mode the Selection marquee selects
+/// them, and Direct Selection's marquee and clicks select their anchor points.
+#[test]
+fn shaper_marquees_leave_the_original_shape_of_an_erased_face() {
+    let mut s = session();
+    rectangle(&mut s, 0.0, "#ff0000");
+    let b = rectangle(&mut s, 50.0, "#0000ff");
+    let g = scribble(&mut s, &[[110.0, 20.0], [140.0, 35.0], [110.0, 50.0], [140.0, 65.0], [200.0, 70.0]]);
+    assert_eq!(fill(&s, g, 125.0, 50.0), None, "the face is erased");
+    let v = ViewInfo { smart_guides: false, ..Default::default() };
+    let drag = |s: &mut Session, tool: &str, from: [f64; 2], to: [f64; 2]| {
+        s.select_tool(tool, v).unwrap();
+        for (kind, [x, y]) in [(PointerKind::Down, from), (PointerKind::Drag, to), (PointerKind::Up, to)] {
+            s.pointer(&PointerEvent::new(kind, x, y), v).unwrap();
+        }
+        s.doc().unwrap().selection.clone()
+    };
+    // Each marquee crosses the second rectangle's right side, where nothing is shown.
+    assert!(drag(&mut s, "selection", [140.0, 40.0], [160.0, 60.0]).objects.is_empty());
+    let sel = drag(&mut s, "directSelection", [140.0, -10.0], [160.0, 10.0]);
+    assert!(sel.objects.is_empty() && sel.anchors.is_empty(), "{sel:?}");
+    // Group Selection's E marquee around the whole of that rectangle leaves it out.
+    s.select_tool("groupSelection", v).unwrap();
+    s.pointer(&PointerEvent::new(PointerKind::Down, 155.0, -10.0), v).unwrap();
+    s.pointer(&PointerEvent::new(PointerKind::Drag, 45.0, 110.0), v).unwrap();
+    s.tool_key(vectorcraft_tools::ToolKey::Letter('e'), Mods::default(), v).unwrap();
+    s.pointer(&PointerEvent::new(PointerKind::Up, 45.0, 110.0), v).unwrap();
+    let sel = s.doc().unwrap().selection.clone();
+    assert!(!sel.objects.contains(&b) && !sel.anchors.contains_key(&b), "{sel:?}");
+    // A Direct Selection click on that rectangle's corner selects nothing either.
+    s.execute("select.none", &json!({})).unwrap();
+    let sel = drag(&mut s, "directSelection", [150.0, 0.0], [150.0, 0.0]);
+    assert!(sel.objects.is_empty() && sel.anchors.is_empty(), "{sel:?}");
+    // Over the shown face's left side the marquees take the group and the face's anchors.
+    assert_eq!(drag(&mut s, "selection", [-10.0, 40.0], [10.0, 60.0]).objects, vec![g]);
+    let sources = node(&s, g).children().unwrap()[0].id;
+    let sel = drag(&mut s, "directSelection", [-10.0, -10.0], [10.0, 10.0]);
+    assert!(!sel.anchors.is_empty());
+    assert!(sel.anchors.keys().all(|id| s.doc().unwrap().doc.parent_of(*id) == Some(g)), "{sel:?}");
+    // Construction mode: the original shapes are what the marquees select. These marquees start
+    // outside them and cross the second rectangle's top right corner.
+    s.execute("object.isolate", &json!({"id": g.0})).unwrap();
+    assert_eq!(s.doc().unwrap().isolation, Some(sources));
+    assert_eq!(drag(&mut s, "selection", [160.0, -10.0], [140.0, 10.0]).objects, vec![b]);
+    assert!(drag(&mut s, "directSelection", [160.0, -10.0], [140.0, 10.0]).anchors.contains_key(&b));
+    s.execute("select.none", &json!({})).unwrap();
+    assert!(drag(&mut s, "directSelection", [150.0, 0.0], [150.0, 0.0]).anchors.contains_key(&b));
 }
 
 #[test]

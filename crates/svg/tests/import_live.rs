@@ -165,6 +165,41 @@ fn an_instances_shadow_filter_and_the_art_export_cover_its_symbols_art() {
 }
 
 #[test]
+fn a_figma_blurred_shape_filter_becomes_gaussian_blur() {
+    let (d, w) = open(
+        r##"<defs><filter id="b"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur" stdDeviation="3"/></filter></defs><rect x="50" y="30" width="60" height="40" fill="#08f" filter="url(#b)"/>"##,
+    );
+    assert!(w.is_empty(), "{w:?}");
+    let fx = effects(&d);
+    assert_eq!(fx.len(), 1);
+    assert_eq!((fx[0].id.as_str(), &fx[0].params), ("blur.gaussian", &json!({"radius": 6.0})));
+}
+
+#[test]
+fn figma_blurred_shapes_inside_mask_import_with_effects_and_no_warnings() {
+    let body = r##"<mask id="m"><circle cx="50" cy="50" r="40" fill="#fff"/></mask>
+        <g mask="url(#m)">
+            <g filter="url(#b1)"><circle cx="30" cy="30" r="20" fill="#ff0"/></g>
+            <g filter="url(#b2)"><circle cx="70" cy="70" r="20" fill="#00f"/></g>
+        </g>
+        <defs>
+            <filter id="b1"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur" stdDeviation="2"/></filter>
+            <filter id="b2"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur" stdDeviation="4"/></filter>
+        </defs>"##;
+    let (d, w) = open(body);
+    assert!(w.is_empty(), "{w:?}");
+    let mut blurs = vec![];
+    d.walk(|n| {
+        for e in &n.appearance.effects {
+            if e.id == "blur.gaussian" {
+                blurs.push(e.params["radius"].as_f64().unwrap());
+            }
+        }
+    });
+    assert_eq!(blurs, vec![4.0, 8.0]);
+}
+
+#[test]
 fn a_gaussian_blur_becomes_the_effect_with_its_radius() {
     let (d, w) = open(
         r##"<defs><filter id="b"><feGaussianBlur stdDeviation="3"/></filter></defs><rect x="50" y="30" width="60" height="40" fill="#08f" filter="url(#b)"/>"##,
@@ -313,6 +348,27 @@ fn a_drop_shadow_with_darkness_exports_as_the_canvas_draws_it() {
         assert!(r.abs_diff(128) <= 2 && g <= 2 && b <= 2, "{:?}", [r, g, b]);
     }
     assert_similar(&canvas, &exported, 40.0, 0.02);
+}
+
+#[test]
+fn an_exported_outer_glow_round_faint_art_draws_as_the_canvas_does() {
+    // GUARDS: the export's glow blurs a solid silhouette like the renderer, not the art's faint alpha.
+    let mut d = Document::new(200.0, 120.0);
+    let mut n = Node::path(
+        d.alloc_id(),
+        shapes::rectangle(Rect::new(70.0, 40.0, 130.0, 80.0)),
+        Appearance::basic(Paint::solid(Color::BLACK), Paint::None, 0.0),
+    );
+    n.appearance.fill_mut().unwrap().opacity = 0.2;
+    n.appearance.effects = vec![Effect {
+        id: "stylize.outerGlow".into(),
+        params: json!({"blur": 12.0, "color": "#ff0000", "opacity": 100.0, "mode": "normal"}),
+        visible: true,
+    }];
+    let l = d.layers[0].id;
+    d.insert(Some(l), 0, n).unwrap();
+    let svg = export(&d, &ExportOptions::default());
+    assert_similar(&render_artboard(&d), &resvg_render(&svg, 200, 120), 40.0, 0.02);
 }
 
 #[test]

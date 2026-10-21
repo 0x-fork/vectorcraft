@@ -462,7 +462,8 @@ pub fn command(app: &mut VectorcraftApp, p: &Value) -> Result<Value, String> {
         Some(path) => path,
         None if app.services.open_async.is_some() => return crate::io::open_dialog(app).map(|_| Value::Null),
         None => {
-            let pick = FilePick { filters: vec![("Shortcut sets", vectorcraft_engine::cmd::shortcutset::EXTS)], ..Default::default() };
+            let pick =
+                FilePick { filters: vec![FilePick::filter("Shortcut sets", vectorcraft_engine::cmd::shortcutset::EXTS)], ..Default::default() };
             crate::picks::open(app, &pick).ok_or("cancelled")?
         }
     };
@@ -835,7 +836,7 @@ fn rows_section(ui: &mut egui::Ui, d: &mut Dialog, review: &mut Review, statuses
                 let (status, chord) = statuses.get(i).cloned().unwrap_or((Status::NeedsChoice, None));
                 let Some(r) = review.rows.get_mut(i) else { continue };
                 ui.horizontal(|ui| {
-                    if widgets::check(ui, "", r.on, true) {
+                    if widgets::check_box(ui, &r.name, r.on, true) {
                         r.on = !r.on;
                     }
                     let place = crate::i18n::fmt(tl!("Line {line}"), &[("line", &r.line.to_string())]);

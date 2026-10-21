@@ -481,7 +481,12 @@ fn a_move_dragged_onto_a_panel_reads_the_menus() {
     assert_eq!(read, 0, "the menus weren't read at any step of the drag");
     let synced = m.fake.synced();
     let panel = Pos2::new(m.app.canvas_rect.unwrap().right() + 40.0, start.y);
+    // Over a panel the move waits: the menus keep the interaction's state.
     m.frame(vec![Event::PointerMoved(panel)]);
+    assert!(m.app.session.in_interaction(), "the move waits over the panel");
+    assert_eq!(m.fake.synced(), synced, "the menus weren't read");
+    // Released over the panel, the move is dropped and the menus are read.
+    m.frame(vec![click(panel, false)]);
     assert!(!m.app.session.in_interaction(), "the move was dropped");
     assert_eq!(m.fake.synced(), synced + 1, "the menus were read");
     assert_eq!(find(&m.fake.last(), "edit.undo").label, undo);

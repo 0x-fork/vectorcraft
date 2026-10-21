@@ -599,7 +599,12 @@ fn output(ui: &mut egui::Ui, d: &mut Dialog) {
     });
     // PDF/X-1a converts to CMYK even without a conversion.
     let converting = get(d, "output.conversion") != ColorConversion::None.id() || standard.cmyk_only();
-    row(ui, tl!("Destination:"), |ui| profile_pick(ui, d, "output.destination", &names(DOCUMENT_PROFILE), 1, converting));
+    // The document's own profile (blank), the CMYK profile in effect, then every profile.
+    let destinations: Vec<&str> = std::iter::once(DOCUMENT_PROFILE)
+        .chain(std::iter::once(vectorcraft_pdf::DOCUMENT_CMYK))
+        .chain(profiles.iter().map(|p| p.name.as_str()))
+        .collect();
+    row(ui, tl!("Destination:"), |ui| profile_pick(ui, d, "output.destination", &destinations, 2, converting));
     row(ui, tl!("Profile inclusion:"), |ui| {
         // A standard decides whether colours are tagged.
         ui.add_enabled_ui(standard == Standard::None, |ui| pick::<ProfileInclusion>(ui, d, "output.profiles", 300.0, |_| true));
@@ -938,6 +943,26 @@ mod tests {
         let r = app.run("file.export.pdf", json!({"path": "/tmp/direct.pdf", "range": "2"})).unwrap();
         assert_eq!(r["path"], "/tmp/direct.pdf");
         assert!(r["warnings"].is_array());
+    }
+
+    /// A placed image whose pixel data can't be decoded is left out of the PDF, and the status bar
+    /// shows the note raster exports give.
+    #[test]
+    fn an_image_that_couldnt_be_decoded_is_named_in_the_status() {
+        let (mut app, written, _) = app();
+        // A PNG whose header reads (so it places at its size) but whose pixel data is cut short.
+        let mut cut = vec![];
+        image::RgbaImage::from_pixel(64, 32, image::Rgba([200, 30, 30, 255]))
+            .write_to(&mut std::io::Cursor::new(&mut cut), image::ImageFormat::Png)
+            .unwrap();
+        let idat = cut.windows(4).position(|w| w == b"IDAT").unwrap();
+        cut.truncate(idat + 8);
+        // The image is placed on the first artboard.
+        app.run("file.place", json!({"name": "cut.png", "dataBase64": vectorcraft_format::base64_encode(&cut), "at": [60, 50]})).unwrap();
+        app.run("ui.savePdfDialog", json!({"path": "/tmp/cut.pdf"})).unwrap();
+        super::super::confirm(&mut app).unwrap();
+        assert_eq!(app.ui.status, "Saved /tmp/cut.pdf with 1 note(s): an image couldn't be decoded and is missing from the picture");
+        assert_eq!(written.borrow().len(), 1);
     }
 
     #[test]

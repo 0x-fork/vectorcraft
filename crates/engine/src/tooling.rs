@@ -21,10 +21,14 @@ pub struct ViewInfo {
     pub snap_to_pixel: bool,
     /// View → Snap to Point: picked points (a transform's reference point) land on anchors.
     pub snap_to_point: bool,
+    /// View → Snap to Glyph: drawing snaps to live-text baselines and glyph bounds (needs Smart Guides).
+    pub snap_to_glyph: bool,
     /// View → Show Corner Widget.
     pub corner_widgets: bool,
     /// The document window (none headless): screen-fixed widgets sit in it.
     pub screen: Option<vectorcraft_tools::ScreenFrame>,
+    /// The view's active artboard (an index): artboard rulers measure from it.
+    pub artboard: usize,
 }
 
 impl Default for ViewInfo {
@@ -38,8 +42,10 @@ impl Default for ViewInfo {
             show_bbox: true,
             snap_to_pixel: false,
             snap_to_point: true,
+            snap_to_glyph: false,
             corner_widgets: true,
             screen: None,
+            artboard: 0,
         }
     }
 }
@@ -184,6 +190,7 @@ impl Session {
         let (unit, stroke_unit) = (self.general_unit(), self.stroke_unit());
         let cx = ToolContext {
             doc: &st.doc,
+            ruler_origin: st.doc.ruler_origin_for(view.artboard),
             revision: (st.uid, st.revision),
             selection: &st.selection,
             zoom: view.zoom,
@@ -198,14 +205,17 @@ impl Session {
             // wins instead of pixels quietly rounding every drag to whole points (#1816).
             snap_to_pixel: view.snap_to_pixel && !view.snap_to_grid,
             snap_to_point: view.snap_to_point,
+            snap_to_glyph: view.snap_to_glyph && view.smart_guides && !view.snap_to_grid,
             corner_widgets: view.corner_widgets,
             fill_active: self.fill_active,
             gradient_stop: self.selected_stop(),
             appearance_item: self.appearance_item(),
             constrain_angle: self.prefs.constrain_angle,
+            keyboard_increment: self.prefs.keyboard_increment,
             freeform_point: self.selected_freeform_point(),
             raster_sample: self.prefs.eyedropper.sample_size,
             preview_bounds: self.prefs.use_preview_bounds,
+            preview_memo: Some(&self.preview_memo),
             unit,
             stroke_unit,
             paste_plain_text: self.prefs.paste_text_formatting == "plain",
@@ -399,6 +409,12 @@ impl Session {
 
     pub fn overlays(&mut self, view: ViewInfo) -> Vec<Overlay> {
         let mut v = self.with_tool_cx(view, |t, cx| t.overlays(cx));
+        // The Type tools draw the overflow markers of selected type themselves.
+        if !matches!(self.tool.id(), "type" | "areaType" | "typeOnPath" | "verticalType" | "verticalAreaType" | "verticalTypeOnPath") {
+            let mut marks = std::mem::take(&mut self.overflow_marks);
+            v.extend(self.with_tool_cx(view, |_, cx| vectorcraft_tools::text::overflow_markers(&mut marks, cx)));
+            self.overflow_marks = marks;
+        }
         if let Some(g) = self.ruler_guide.take() {
             v.extend(self.with_tool_cx(view, |_, cx| g.overlays(cx)));
             self.ruler_guide = Some(g);
@@ -533,7 +549,11 @@ impl Session {
                     self.cancel_interaction()?
                 }
                 Action::Exec(cmd, p) => {
-                    self.execute(&cmd, &p)?;
+                    // A command's warning (Crop Image's when the image couldn't be decoded) goes to the
+                    // status bar too.
+                    if let Some(w) = self.execute(&cmd, &p)?.get("warning").and_then(Value::as_str) {
+                        ui.push(UiRequest::Status(w.to_string()));
+                    }
                 }
                 Action::Dialog(k, p) => ui.push(UiRequest::Dialog(k, p)),
                 Action::SwitchTool(t) => ui.push(UiRequest::SwitchTool(t)),

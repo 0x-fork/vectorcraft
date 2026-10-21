@@ -24,7 +24,8 @@
 	 from center  |  	 từ tâm  |  
 	 keeps its proportions)	 giữ nguyên tỷ lệ)
 	 near a selected pin to rotate  |  	 gần ghim đã chọn để xoay  |  
-	 on the canvas to create one	 trên vùng vẽ để tạo một cái
+	 on the canvas to create one (	 trên vùng vẽ để tạo một cái (
+	 selects several, or draws one inside an artboard)	 chọn nhiều cái hoặc tạo cái mới bên trong bảng vẽ)
 	 over paths to roughen their outlines  |  	 qua đường dẫn để làm thô đường bao  |  
 	 over paths, and hold still to keep going  |  	 qua đường dẫn và giữ yên để tiếp tục  |  
 	 right or left to zoom in or out  |  	 sang phải hoặc trái để phóng to hoặc thu nhỏ  |  
@@ -354,6 +355,7 @@
 	Bottom Left	Dưới trái
 	Bottom Right	Dưới phải
 	Bottom to Top	Dưới lên trên
+	Bottom-Justified Tab	Tab căn dưới
 	Bottom-to-Bottom Leading	Giãn dòng đáy đến đáy
 	Bottom:	Dưới:
 	Bounds	Giới hạn
@@ -425,6 +427,7 @@
 	Change Panel Layout	Thay đổi bố cục bảng
 	Change Screen Mode (F)	Thay đổi chế độ màn hình (F)
 	Change to Global Rulers	Chuyển sang thước toàn cục
+	Change to Artboard Rulers	Chuyển sang thước bảng vẽ
 	Change to Left-to-Right Layout	Đổi sang bố cục trái sang phải
 	Change to Right-to-Left Layout	Chuyển sang bố cục phải sang trái
 	Changed since the last Refresh.	Đã thay đổi kể từ lần làm mới cuối.
@@ -592,6 +595,7 @@
 	Color Model:	Mô hình màu:
 	Color Models	Các mô hình màu
 	Color Picker	Bộ chọn màu
+	Color wheel	Bánh xe màu
 	Color Picker…	Bộ chọn màu…
 	Color Reduction:	Giảm màu:
 	Color Settings	Cài đặt màu
@@ -635,6 +639,7 @@
 	Condition identifier:	Mã định danh điều kiện:
 	Conflict {n} of {count}	Xung đột {n} trong {count}
 	Connect Selected End Points	Nối các điểm cuối đã chọn
+	Connect	Nối
 	Consolidate All Windows	Hợp nhất tất cả cửa sổ
 	Constrain	Giữ tỷ lệ
 	Constrain Angle	Ràng buộc góc
@@ -738,6 +743,7 @@
 	Created:	Ngày tạo:
 	Crop	Cắt xén
 	Crop Image	Cắt xén ảnh
+	Edit Path	Sửa đường dẫn
 	Crop Marks	Dấu cắt xén
 	Crop To	Cắt xén đến
 	Crosshatch	Lưới đan
@@ -918,6 +924,7 @@
 	Document open password	Mật khẩu mở tài liệu
 	Document profile	Hồ sơ tài liệu
 	Document Raster Effects Settings	Cài đặt hiệu ứng raster tài liệu
+	Use Document Raster Effects Resolution	Dùng độ phân giải trong cài đặt hiệu ứng raster tài liệu
 	Document Raster Effects Settings Dialog	Hộp thoại cài đặt hiệu ứng raster tài liệu
 	Document Raster Effects Settings…	Cài đặt hiệu ứng raster tài liệu…
 	Document Setup	Thiết lập tài liệu
@@ -960,6 +967,7 @@
 	Drag to move	Kéo để di chuyển
 	Drag to move out of the set	Kéo để tách khỏi bộ
 	Drag to the window's left edge to dock	Kéo đến cạnh trái cửa sổ để neo
+	Step up or down	Tăng hoặc giảm một bước
 	Drag values or labels. Double-click a value to type.	Kéo giá trị hoặc nhãn. Bấm đúp vào giá trị để nhập.
 	Draw	Vẽ
 	Draw Behind	Vẽ phía sau
@@ -1237,8 +1245,17 @@
 	Fill Color	Màu tô
 	Fill Grid	Tô lưới
 	Fill new strokes	Tô nét mới
+	Alt key toggles to Smooth Tool	Phím Alt chuyển sang công cụ Làm mượt
 	Keep selected	Giữ trạng thái đã chọn
 	Merge only with selection	Chỉ hợp nhất với vùng chọn
+	Consider Open Filled Paths as Closed	Coi đường dẫn mở có tô là đường dẫn đóng
+	Pick Color From:	Lấy màu từ:
+	Artwork	Tác phẩm
+	Cursor Swatch Preview	Xem trước mẫu màu cạnh con trỏ
+	Selection:	Cách chọn:
+	Freeform	Tự do
+	Straight Line	Đường thẳng
+	Highlight:	Làm nổi bật:
 	Fill New Type Objects With Placeholder Text	Tô đối tượng chữ mới bằng văn bản giữ chỗ
 	Fill Rule	Quy tắc tô
 	Fill with Placeholder Text	Tô bằng văn bản giữ chỗ
@@ -1246,6 +1263,20 @@
 	Fill: click for swatches, Shift-click for the color mixer	Tô: bấm để xem mẫu màu, Shift-bấm để trộn màu
 	Fills	Vùng tô
 	Film Grain…	Hạt phim…
+	Cutout…	Cắt dán…
+	Cutout	Cắt dán
+	Neon Glow…	Ánh neon…
+	Neon Glow	Ánh neon
+	Poster Edges…	Viền áp phích…
+	Poster Edges	Viền áp phích
+	Levels	Số mức
+	Edge Simplicity	Độ đơn giản của cạnh
+	Edge Fidelity	Độ trung thực của cạnh
+	Glow Size	Kích thước ánh sáng
+	Glow Brightness	Độ sáng của ánh sáng
+	Edge Thickness	Độ dày cạnh
+	Edge Intensity	Cường độ cạnh
+	Posterization	Áp phích hóa
 	Find	Tìm
 	Find and Replace…	Tìm và thay thế…
 	Find Font	Tìm phông
@@ -1294,6 +1325,16 @@
 	Flatten Transparency…	Làm phẳng độ trong suốt…
 	Flattener preset:	Thiết lập sẵn làm phẳng:
 	Flattener presets	Thiết lập sẵn làm phẳng
+file-filter	All readable files	Tất cả tệp đọc được
+file-filter	All placeable files	Tất cả tệp đặt được
+file-filter	Swatch libraries	Thư viện mẫu màu
+file-filter	Flattener presets	Thiết lập sẵn làm phẳng
+file-filter	PDF presets	Thiết lập sẵn PDF
+file-filter	Print presets	Thiết lập sẵn in
+file-filter	SVG Compressed	SVG nén
+file-filter	PDF-compatible .ai	.ai tương thích PDF
+file-filter	VectorCraft Template	Mẫu VectorCraft
+file-filter	Templates	Mẫu
 	Flattener Preview	Xem trước làm phẳng
 	Flip	Lật
 	Flip Across	Lật qua
@@ -1318,6 +1359,7 @@
 	Font List	Danh sách phông
 	Font Preview Size	Cỡ xem trước phông
 	Font Size	Cỡ chữ
+	Variable Font	Phông chữ biến thiên
 	Font:	Phông:
 	Fonts	Phông chữ
 	Fonts in Document	Phông trong tài liệu
@@ -1355,6 +1397,18 @@
 	Gamut Warning	Cảnh báo ngoài dải màu
 	gap	khoảng cách
 	Gap Options…	Tùy chọn khoảng cách…
+	Gap Options	Tùy chọn khoảng cách
+	Gap Detection	Phát hiện khoảng cách
+	Paint Stops At:	Ngừng tô tại:
+	Small Gaps	Khoảng cách nhỏ
+	Medium Gaps	Khoảng cách vừa
+	Large Gaps	Khoảng cách lớn
+	Gap Preview Color:	Màu xem trước khoảng cách:
+	Close Gaps With Paths	Đóng khoảng cách bằng đường dẫn
+	Show Live Paint Gaps	Hiện khoảng cách tô trực tiếp
+	Hide Live Paint Gaps	Ẩn khoảng cách tô trực tiếp
+	Select Fills	Chọn vùng tô
+	Select Strokes	Chọn nét
 	Gaussian Blur	Mờ Gaussian
 	Gaussian Blur…	Làm mờ Gaussian…
 	General	Chung
@@ -1377,6 +1431,10 @@
 	glyph {id}	Glyph {id}
 	Glyphs	Glyph
 	Go to Artboard	Đến bảng vẽ
+	First Artboard	Bảng vẽ đầu tiên
+	Previous Artboard	Bảng vẽ trước
+	Next Artboard	Bảng vẽ tiếp theo
+	Last Artboard	Bảng vẽ cuối cùng
 	Go To Link	Đến liên kết
 	Good	Tốt
 	GPL palettes keep solid colours only, as RGB.	Bảng màu GPL chỉ lưu màu đặc theo RGB.
@@ -1401,9 +1459,19 @@
 	Grainy Dots	Chấm hạt
 	Grain…	Hạt…
 	Graph	Biểu đồ
+	Graph Column	Cột biểu đồ
 	Graph Data	Dữ liệu biểu đồ
 	Graph Design	Thiết kế biểu đồ
 	Graph Marker	Ký hiệu biểu đồ
+	Column Type:	Loại cột:
+	Vertically Scaled	Co giãn theo chiều dọc
+	Uniformly Scaled	Co giãn đều
+	Repeating	Lặp lại nhiều lần
+	Sliding	Trượt
+	Each Design Represents:	Mỗi thiết kế biểu thị:
+	For Fractions:	Với phần lẻ:
+	Chop Design	Cắt thiết kế
+	Scale Design	Co giãn thiết kế
 	Graph Type	Loại biểu đồ
 	Graphic	Đồ họa
 	Graphic Style	Kiểu đồ họa
@@ -1496,7 +1564,101 @@
 	Hindi	Hindi
 	History	Lịch sử
 	History Options…	Tùy chọn lịch sử…
+	Step Backward	Lùi một bước
+	Step Forward	Tiến một bước
+	Clear History	Xóa lịch sử
+	Set History Limit…	Đặt giới hạn lịch sử…
 	History States	Trạng thái lịch sử
+# History panel: the names of undo steps (`every_undo_label_is_translated`).
+	Apply Data Set	Áp dụng tập dữ liệu
+	Area Type	Chữ vùng
+	Bloat	Phình
+	Cancel Pattern Editing	Hủy chỉnh sửa họa tiết
+	Copy Appearance	Sao chép diện mạo
+	Copy Guide	Sao chép đường căn
+	Copy in Perspective	Sao chép theo phối cảnh
+	Create Slice from Selection	Tạo lát cắt từ vùng chọn
+	Create Slices from Guides	Tạo lát cắt từ đường căn
+	Delete All Slices	Xóa tất cả lát cắt
+	Delete Data Sets	Xóa tập dữ liệu
+	Delete Graphic Styles	Xóa kiểu đồ họa
+	Delete Guide	Xóa đường căn
+	Delete Guides	Xóa các đường căn
+	Delete Slice	Xóa lát cắt
+	Delete Style	Xóa kiểu
+	Delete Variables	Xóa biến số
+	Delete View	Xóa chế độ xem
+	Done Editing Pattern	Hoàn tất chỉnh sửa họa tiết
+	Duplicate Rows	Nhân bản hàng
+	Edit Perspective Grid	Chỉnh sửa lưới phối cảnh
+	Expand Blend	Mở rộng hòa trộn
+	Expand Envelope	Mở rộng Envelope
+	Expand Image Trace	Mở rộng vector hóa ảnh
+	Expand Live Paint	Mở rộng tô trực tiếp
+	Grid Repeat	Lặp lại dạng lưới
+	Image Trace (Make and Expand)	Vector hóa ảnh (tạo và mở rộng)
+	Live Shape	Hình dạng trực tiếp
+	Make Blend	Tạo hòa trộn
+	Make Dynamic	Tạo động
+	Make Intertwine	Tạo đan xen
+	Make Live Paint	Tạo tô trực tiếp
+	Make Pattern	Tạo họa tiết
+	Make Slice	Tạo lát cắt
+	Make Text Wrap	Tạo bao văn bản
+	Merge Live Paint	Hợp nhất tô trực tiếp
+	Mesh Point Color	Màu điểm lưới
+	Mirror Repeat	Lặp lại đối xứng
+	Move Envelope Point	Di chuyển điểm Envelope
+	Move Plane and Copy Objects	Di chuyển mặt phẳng và sao chép đối tượng
+	Move Plane and Objects	Di chuyển mặt phẳng và đối tượng
+	Move Slice	Di chuyển lát cắt
+	Move Type on a Path	Di chuyển chữ trên đường dẫn
+	New Guide	Đường căn mới
+	Pen	Bút
+	Place from Library	Đặt từ thư viện
+	Pucker	Nhíu
+	Radial Repeat	Lặp lại hướng tâm
+	Rearrange Artboards	Sắp xếp lại bảng vẽ
+	Release Blend	Giải phóng hòa trộn
+	Release Envelope	Giải phóng Envelope
+	Release Image Trace	Giải phóng vector hóa ảnh
+	Release Intertwine	Giải phóng đan xen
+	Objects on Path	Đối tượng trên đường dẫn
+	Attach	Gắn
+	Objects on Path Options	Tùy chọn đối tượng trên đường dẫn
+	Objects on Path Tool	Công cụ Đối tượng trên đường dẫn
+	Attach Objects on Path	Gắn đối tượng lên đường dẫn
+	Expand Objects on Path	Mở rộng đối tượng trên đường dẫn
+	Release Live Paint	Giải phóng tô trực tiếp
+	Release Repeat	Giải phóng lặp lại
+	Release Slice	Giải phóng lát cắt
+	Release Text Wrap	Giải phóng bao văn bản
+	Release Threaded Text	Giải phóng văn bản chuỗi
+	Rename Design	Đổi tên thiết kế
+	Rename Style	Đổi tên kiểu
+	Rename View	Đổi tên chế độ xem
+	Reorder Appearance	Sắp xếp lại diện mạo
+	Reorder Artboards	Đổi thứ tự bảng vẽ
+	Reshape Spine	Định hình lại trục
+	Resize Artboard	Đổi kích thước bảng vẽ
+	Resize Slice	Đổi kích thước lát cắt
+	Resize Type Area	Đổi kích thước vùng chữ
+	Scale in Perspective	Tỷ lệ theo phối cảnh
+	Scallop	Vỏ sò
+	Shape Builder Delete	Tạo hình dạng (xóa)
+	Sort Swatches	Sắp xếp mẫu màu
+	Symbol Screener	Lọc ký hiệu
+	Symbol Scruncher	Thu gọn ký hiệu
+	Symbol Shifter	Dịch chuyển ký hiệu
+	Symbol Sizer	Kích thước ký hiệu
+	Symbol Spinner	Xoay ký hiệu
+	Symbol Stainer	Tô màu ký hiệu
+	Symbol Styler	Tạo kiểu ký hiệu
+	Text Orientation	Hướng chữ
+	Thread Text	Xâu chuỗi văn bản
+	Twirl	Xoáy
+	Typing	Nhập chữ
+	Wrinkle	Nhăn
 	Hold	Giữ
 	Hollow	Rỗng
 	Home	Trang chủ
@@ -1637,6 +1799,7 @@
 	Inspect Object	Kiểm tra đối tượng
 	Install Plug-in	Cài đặt plug-in
 	Install Plug-in…	Cài đặt plug-in…
+	Open this setting's help page	Mở trang trợ giúp của thiết lập này
 	Installed plug-in {}	Đã cài plug-in {}
 	Intensity	Cường độ
 	Intensity:	Cường độ:
@@ -1833,6 +1996,7 @@
 	Live Paint Selection Tool	Công cụ Chọn Tô trực tiếp
 	Live Shape Properties	Thuộc tính hình dạng trực tiếp
 	Load Color Profile…	Tải hồ sơ màu…
+	Remove Color Profile…	Xóa hồ sơ màu…
 	Load Image into Clipboard	Tải ảnh vào bảng tạm
 	Load Metafile into Clipboard	Tải metafile vào bảng tạm
 	Load PDF into Clipboard	Tải PDF vào bảng tạm
@@ -1844,6 +2008,7 @@
 	Loaded Texture	Kết cấu đã tải
 	Local Libraries	Thư viện cục bộ
 	Locate Object	Xác định vị trí đối tượng
+	Locate Selected Objects	Xác định vị trí đối tượng đã chọn
 	Location	Vị trí
 	Location:	Vị trí:
 	Lock	Khóa
@@ -1853,6 +2018,7 @@
 	Lock Others	Khóa các mục khác
 	Lock Slices	Khóa lát cắt
 	Lock Station Point	Khóa điểm trạm
+	Lock Variables	Khóa biến số
 	Long Lines	Nét dài
 	Long Strokes	Nét vẽ dài
 	Longest:	Dài nhất:
@@ -1929,6 +2095,10 @@
 	Merge Selected	Hợp nhất mục đã chọn
 	Merge Swatches	Hợp nhất mẫu màu
 	Merged PRs	PR đã hợp nhất
+	PRs	PR
+	@{login}: {prs}, {commits}, +{added} / −{deleted} lines (Δ {delta}), +{binary_added} / −{binary_deleted} binary assets, {first} – {last}	@{login}: {prs}, {commits}, +{added} / −{deleted} dòng (Δ {delta}), +{binary_added} / −{binary_deleted} asset nhị phân, {first} – {last}
+@plural	{n} PR|{n} PRs	{n} PR
+@plural	{n} commit|{n} commits	{n} commit
 	Mesh Tool	Công cụ Lưới
 	Message:	Thông điệp:
 	Metadata:	Siêu dữ liệu:
@@ -1966,6 +2136,9 @@
 	Modified:	Đã sửa đổi:
 	Modify	Sửa đổi
 	Mojikumi	Mojikumi
+	Insert Kashidas	Chèn kashida
+	Long	Dài
+	Stylistic	Kiểu cách
 	Mojikumi Set	Bộ Mojikumi
 	Monitor RGB	RGB màn hình
 	Mono	Đơn sắc
@@ -2045,6 +2218,7 @@
 	New Graphic Style…	Kiểu đồ họa mới…
 	New Group	Nhóm mới
 	New Group…	Nhóm mới…
+	New Artboard Options…	Tùy chọn bảng vẽ mới…
 	New Layer Options…	Tùy chọn lớp mới…
 	New Layer…	Lớp mới…
 	New Library Group	Nhóm thư viện mới
@@ -2067,6 +2241,7 @@
 	New View	Chế độ xem mới
 	New View…	Chế độ xem mới…
 	New Window	Cửa sổ mới
+	New Without Dialog	Mới không qua hộp thoại
 	New Workspace	Không gian làm việc mới
 	New Workspace…	Không gian làm việc mới…
 	New {kind} Style…	Kiểu {kind} mới…
@@ -2244,6 +2419,8 @@
 	Open the URL in the web browser	Mở URL trong trình duyệt web
 	Opened with {} note(s): {}	Mở với {} ghi chú: {}
 	Opening it left out what VectorCraft can't read yet ({what}), so replacing it loses that for good. Save under another name to keep it.	Khi mở, những phần VectorCraft chưa đọc được ({what}) đã bị bỏ qua, nên thay thế sẽ mất chúng vĩnh viễn. Hãy lưu với tên khác để giữ lại.
+	“{name}” already exists. Replace it?	“{name}” đã tồn tại. Thay thế tệp này?
+	The name in the save panel was “{typed}”; VectorCraft added the file type's extension. Replacing the file overwrites its contents.	Tên trong bảng lưu là “{typed}”, và VectorCraft đã thêm phần mở rộng của loại tệp. Thay thế tệp sẽ ghi đè nội dung của tệp.
 	Open…	Mở…
 	Optical Margin Alignment	Căn lề quang học
 	Optimize for fast web view	Tối ưu để xem web nhanh
@@ -2288,6 +2465,7 @@
 	Output › Mode	Đầu ra › Chế độ
 	Output:	Đầu ra:
 	Outside	Bên ngoài
+	Overlap	Chồng lấp
 	Overlap:	Chồng lấp:
 	Overlapping	Chồng lấp
 	Overlay	Phủ lên
@@ -2375,6 +2553,8 @@
 	Percent:	Phần trăm:
 	Perceptual Scales	Tỷ lệ tri giác
 	Performance	Hiệu suất
+diagnostics	render	kết xuất
+diagnostics	ui	giao diện
 	Performance & Storage	Hiệu suất & Bộ nhớ
 	Permissions	Quyền
 	Permissions password:	Mật khẩu quyền:
@@ -2490,6 +2670,8 @@
 	Print Tiling Tool	Công cụ Ghép trang in
 	Printer	Máy in
 	Printer mark type:	Loại dấu máy in:
+	Roman	Kiểu La Mã
+mark-style	Japanese	Kiểu Nhật
 	Printer profile:	Hồ sơ máy in:
 	Printer Setup…	Thiết lập máy in…
 	Printer:	Máy in:
@@ -2603,6 +2785,8 @@
 	Redefine Character Style	Xác định lại kiểu ký tự
 	Redefine Graphic Style	Xác định lại kiểu đồ họa
 	Redefine Graphic Style “{name}”	Xác định lại kiểu đồ họa “{name}”
+	Apply {name}	Áp dụng kiểu “{name}”
+	Redefine {name}	Xác định lại kiểu “{name}”
 	Redefine Paragraph Style	Xác định lại kiểu đoạn văn
 	Redefine Symbol	Xác định lại ký hiệu
 	Redefine {kind} Style	Xác định lại kiểu {kind}
@@ -2726,6 +2910,7 @@
 	Reshape Spine Segment	Định hình lại đoạn trục
 	Reshape Tool	Công cụ Định hình lại
 	Reshape Type Area	Định hình lại vùng chữ
+	Resize	Thay đổi kích thước
 	Resize panel window	Thay đổi kích thước cửa sổ bảng
 	Resize panels	Thay đổi kích thước bảng
 	Resolution:	Độ phân giải:
@@ -2758,7 +2943,7 @@
 	Right Indent	Thụt lề phải
 	Right Plane	Mặt phẳng phải
 	Right to Left	Phải sang trái
-	Right-click an item to move it into this group.	Bấm chuột phải vào mục để di chuyển vào nhóm này.
+	Drag an item here, or right-click one, to put it in this group.	Kéo một mục vào đây, hoặc bấm chuột phải vào mục, để đưa vào nhóm này.
 	Right-Justified Tab	Tab căn phải
 	Right-to-Left Paragraph Direction	Hướng đoạn văn từ phải sang trái
 	Right:	Phải:
@@ -2772,6 +2957,7 @@
 	Rotate 90° CW	Xoay 90° theo chiều kim đồng hồ
 	Rotate Tool	Công cụ Xoay
 	Rotate View Tool	Công cụ Xoay chế độ xem
+	Trackpad Gesture to Rotate View	Xoay chế độ xem bằng cử chỉ trên bàn di chuột
 	Rotate…	Xoay…
 	Rotation	Góc xoay
 	Rotation relative to:	Xoay tương đối với:
@@ -2842,11 +3028,13 @@
 	Save PDF Preset	Lưu thiết lập sẵn PDF
 	Save Perspective Grid Preset	Lưu thiết lập sẵn lưới phối cảnh
 	Save Preset	Lưu thiết lập sẵn
+	Preset {number}	Thiết lập sẵn {number}
 	Save Preset…	Lưu thiết lập sẵn…
 	Save Print Preset	Lưu thiết lập sẵn in
 	Save Recovery Data	Lưu dữ liệu khôi phục
 	Save Save for Web Preset	Lưu thiết lập sẵn Lưu cho Web
 	Save selected colors as swatches	Lưu màu đã chọn thành mẫu màu
+	Save Selection	Lưu vùng chọn
 	Save Selection…	Lưu vùng chọn…
 	Update Selection	Cập nhật vùng chọn
 	Save Swatch Library	Lưu thư viện mẫu màu
@@ -3113,6 +3301,8 @@
 	Show Note	Hiện ghi chú
 	Show Options	Hiện tùy chọn
 	Show Original Path	Hiện đường dẫn gốc
+	Open this dialog with these settings next time	Lần sau mở hộp thoại này với các cài đặt này
+	Auto-Simplify	Tự động đơn giản hóa
 	Color Panel Options	Tùy chọn bảng màu
 	Show Package	Hiện gói
 	Show Panel	Hiện bảng
@@ -3205,6 +3395,7 @@
 	Snap to Pixel	Hút vào pixel
 	Precise Cursors	Con trỏ chính xác
 	Snap to Point	Hút vào điểm
+	Snap to Unit	Hút vào đơn vị
 	Snapping Tolerance	Dung sai hút
 	Social Square Post 1080×1080	Bài đăng vuông mạng xã hội 1080×1080
 	Soft	Mềm
@@ -3318,6 +3509,16 @@
 	Superscript:	Chỉ số trên:
 	SVG Filters	Bộ lọc SVG
 	SVG Interactivity	Tương tác SVG
+	Event:	Sự kiện:
+	JavaScript:	JavaScript:
+	Add Event	Thêm sự kiện
+	Remove Selected Entry	Gỡ mục đã chọn
+	Clear Events	Xóa sự kiện
+	Link JavaScript Files…	Liên kết tệp JavaScript…
+	JavaScript Files	Tệp JavaScript
+	File or URL:	Tệp hoặc URL:
+	Add JavaScript File	Thêm tệp JavaScript
+	Remove JavaScript File	Gỡ tệp JavaScript
 	SVG Options	Tùy chọn SVG
 	SVG Profile:	Hồ sơ SVG:
 	Swap Fill and Stroke	Đổi màu tô và nét
@@ -3388,6 +3589,7 @@
 	Texturizer…	Texturizer…
 	Thai	Tiếng Thái
 	The bounds of the visible art.	Vùng giới hạn của đối tượng hiển thị.
+	The plug-in writes the whole document.	Plug-in xuất toàn bộ tài liệu.
 	The cell shows the type object's text as HTML.	Ô hiển thị văn bản của đối tượng chữ dưới dạng HTML.
 	The dialog was closed before its file dialog answered	Hộp thoại đã đóng trước khi hộp thoại tệp phản hồi
 	The document has no colour swatches.	Tài liệu không có mẫu màu.
@@ -3455,10 +3657,12 @@
 	Top Left	Trên trái
 	Top Right	Trên phải
 	Top to Bottom	Trên xuống dưới
+	Top-Justified Tab	Tab căn trên
 	Top-to-Top Leading	Giãn dòng đỉnh đến đỉnh
 	Top:	Trên:
 	Total Width:	Tổng chiều rộng:
 	Total:	Tổng:
+	Touch Type	Chạm để nhập chữ
 	Touch Type Tool	Công cụ Chạm để nhập chữ
 	Trace	Vector hóa
 	Trace the image with the Default preset	Vector hóa ảnh với thiết lập sẵn mặc định
@@ -3558,6 +3762,7 @@
 	Unlock All Layers	Mở khóa tất cả lớp
 	Unlock Grid	Mở khóa lưới
 	Unlock Guides	Mở khóa đường căn
+	Unlock Variables	Mở khóa biến số
 	Unnamed Objects	Đối tượng chưa đặt tên
 	Unprintable margin:	Lề không in được:
 	Unsharp Mask	Tăng độ sắc nét
@@ -3704,6 +3909,8 @@
 	Workspace {i}	Không gian làm việc {i}
 	Wrinkle Tool	Công cụ nhăn
 	Write Layers	Ghi các lớp
+	X11 (XWayland) When a Pen Is Attached	X11 (XWayland) khi có bút được kết nối
+	If a drawing tablet's pen doesn't draw, choose an X11 (XWayland) option.	Nếu bút của bảng vẽ không vẽ được, hãy chọn một tùy chọn X11 (XWayland).
 	X11 (XWayland)	X11 (XWayland)
 	XML ID	XML ID
 	Yards	Yard
@@ -3729,6 +3936,7 @@
 	{folders} folder(s) and {files} file(s) searched	Đã tìm kiếm {folders} thư mục và {files} tệp
 	{format} Options	Tùy chọn {format}
 	{kind} Gradient	Chuyển sắc {kind}
+gradient-kind	Radial	Hướng tâm
 	{kind} Style Options…	Tùy chọn kiểu {kind}…
 	{kind}, {model}	{kind}, {model}
 	{name} (spot)	{name} (màu chuyên biệt)
@@ -3793,8 +4001,11 @@ theme	Appearance	Giao diện
 @msg	`{id}` has no envelope dialog	`{id}` không có hộp thoại Envelope
 @msg	`{keep}` is not a side of this axis	`{keep}` không phải là một cạnh của trục này
 @msg	`{key}` must be `auto` or a language code such as `en` or `zh-hant`	`{key}` phải là `auto` hoặc mã ngôn ngữ như `en` hoặc `zh-hant`
+@msg	`{key}` must be a #rrggbb color	`{key}` phải là màu #rrggbb
 @msg	`{key}` must be a #rrggbb colour	`{key}` phải là màu #rrggbb
 @msg	`{key}` must be a number	`{key}` phải là một số
+@msg	`{key}` must be a number, not {v}	`{key}` phải là một số, không phải {v}
+@msg	{key} must be Unix seconds (an integer) or null	{key} phải là thời gian Unix tính bằng giây (số nguyên) hoặc null
 @msg	`{key}` must be a string	`{key}` phải là một chuỗi
 @msg	`{key}` must be a whole number	`{key}` phải là số nguyên
 @msg	`{key}` must be a whole number between {min} and {max} (got {x})	`{key}` phải là số nguyên từ {min} đến {max} (nhận được {x})
@@ -3827,6 +4038,7 @@ theme	Appearance	Giao diện
 @msg	a freeform gradient keeps at least one point	chuyển sắc tự do cần giữ ít nhất một điểm
 @msg	a gradient needs at least two stops	chuyển sắc cần ít nhất hai điểm dừng
 @msg	a graphic style named `{to}` already exists	đã có kiểu đồ họa tên `{to}`
+@msg	a key object sits on that point	có đối tượng khóa nằm trên điểm đó
 @msg	a layer couldn't be read	một lớp không thể đọc được
 @msg	a page is missing	thiếu một trang
 @msg	a page out of range	trang vượt ngoài phạm vi
@@ -3839,8 +4051,29 @@ theme	Appearance	Giao diện
 @msg	a PostScript error ({name} in `{op}`: {at})	lỗi PostScript ({name} trong `{op}`: {at})
 @msg	a PostScript error ({name} in `{op}`: {at}), in {procs}	lỗi PostScript ({name} trong `{op}`: {at}), trong {procs}
 @msg	a PostScript error ({name})	lỗi PostScript ({name})
+@msg	a PostScript error ({name} in `{op}`; {meaning})	lỗi PostScript ({name} trong `{op}`; {meaning})
+@msg	a PostScript error ({name} in `{op}`; {meaning}), in {procs}	lỗi PostScript ({name} trong `{op}`; {meaning}), trong {procs}
+@msg	a PostScript error ({name} in `{op}`: {at}; {meaning})	lỗi PostScript ({name} trong `{op}`: {at}; {meaning})
+@msg	a PostScript error ({name} in `{op}`: {at}; {meaning}), in {procs}	lỗi PostScript ({name} trong `{op}`: {at}; {meaning}), trong {procs}
+@msg	a PostScript error ({name}; {meaning})	lỗi PostScript ({name}; {meaning})
+@msg	the program ends a dictionary it didn't begin	chương trình kết thúc một từ điển mà nó chưa bắt đầu
+@msg	the program opens a file, which the reader can't do	chương trình mở một tệp, việc mà trình đọc PostScript không làm được
+@msg	the program restores a saved state that was already restored	chương trình khôi phục một trạng thái đã lưu vốn đã được khôi phục
+@msg	data the program reads is damaged or cut short, or the program asks for a position in a file that has none	dữ liệu chương trình đọc bị hỏng hoặc bị cắt cụt, hoặc chương trình yêu cầu vị trí trong một tệp không có vị trí
+@msg	the program goes past one of the reader's limits	chương trình vượt quá một giới hạn của trình đọc PostScript
+@msg	the path has no point to continue from	đường dẫn không có điểm để tiếp tục
+@msg	a value is outside the range the operator takes	một giá trị nằm ngoài phạm vi mà toán tử chấp nhận
+@msg	the operator needs more values than the stack holds	toán tử cần nhiều giá trị hơn số có trong ngăn xếp
+@msg	part of the program isn't valid PostScript text	một phần chương trình không phải là văn bản PostScript hợp lệ
+@msg	a value has the wrong type for the operator	một giá trị có kiểu không phù hợp với toán tử
+@msg	the program runs, deletes or renames a file, which the reader can't do	chương trình chạy, xóa hoặc đổi tên một tệp, việc mà trình đọc PostScript không làm được
+@msg	the program asks for a resource that isn't defined	chương trình yêu cầu một tài nguyên chưa được định nghĩa
+@msg	a calculation has no result, as in a division by zero	một phép tính không có kết quả, như khi chia cho không
+@msg	the operator looks for a mark on the stack and finds none	toán tử tìm một dấu mốc trên ngăn xếp nhưng không thấy
 @msg	a preset named `{_1}` exists	đã có thiết lập sẵn tên `{_1}`
+@msg	a swatch or color group named `{n}` exists	đã có mẫu màu hoặc nhóm màu tên `{n}`
 @msg	a slice size must be a positive number of points	kích thước lát cắt phải là số điểm dương
+@msg	a spine keeps at least two points	trục phải giữ ít nhất hai điểm
 @msg	a stream runs past the end	luồng dữ liệu vượt qua cuối
 @msg	a stream's length is wrong	độ dài luồng dữ liệu sai
 @msg	a stream's length isn't a number	độ dài luồng dữ liệu không phải là số
@@ -3870,6 +4103,7 @@ theme	Appearance	Giao diện
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	background {other}: transparent, white, black hoặc màu như "#ff8800"
 @msg	bad color {v}	màu không hợp lệ {v}
 @msg	the Color Picker is not open	Bộ chọn màu chưa được mở
+@msg	the Simplify slider is not open	Thanh trượt Đơn giản hóa chưa được mở
 @msg	the screen color sampler is already open	công cụ lấy mẫu màu trên màn hình đã được mở
 @msg	this system has no screen color sampler	hệ thống này không có công cụ lấy mẫu màu trên màn hình
 @msg	bad colour `{hex}` (#rrggbb)	màu không hợp lệ `{hex}` (#rrggbb)
@@ -3968,6 +4202,7 @@ theme	Appearance	Giao diện
 @msg	gradient “{name}” isn't defined in the file: a plain colour stands in for it	chuyển sắc “{name}” không được định nghĩa trong tệp: một màu đơn thay thế
 @msg	group must be true or false	group phải là true hoặc false
 @msg	guides are locked	đường căn bị khóa
+@msg	handle must be in or out	handle phải là in hoặc out
 @msg	image '{key}' has no pixels and was left out	ảnh '{key}' không có pixel và bị bỏ qua
 @msg	image data `{_1}` is missing	dữ liệu ảnh `{_1}` bị thiếu
 @msg	image is empty	ảnh trống
@@ -3977,6 +4212,7 @@ theme	Appearance	Giao diện
 @msg	Imported {what}: {_1}	Đã nhập {what}: {_1}
 @msg	index must be a number or first, previous, next or last	chỉ mục phải là số hoặc first, previous, next hoặc last
 @msg	index must be a number or first, previous, next or last, not `{other}`	chỉ mục phải là số hoặc first, previous, next hoặc last, không phải `{other}`
+@msg	index must be ≥ 0	chỉ mục không được âm
 @msg	Installed plug-in {_1}	Đã cài đặt plug-in {_1}
 @msg	installing from a path is not available on the web; pass the module as `dataBase64`	cài đặt từ đường dẫn không khả dụng trên web; hãy truyền mô-đun dưới dạng `dataBase64`
 @msg	internal error in `{cmd}`: {msg} (the document was left as it was before; please report this bug)	lỗi nội bộ trong `{cmd}`: {msg} (tài liệu được giữ nguyên; vui lòng báo cáo lỗi này)
@@ -4005,6 +4241,11 @@ theme	Appearance	Giao diện
 @msg	its editing data doesn't say where its artboard is	dữ liệu chỉnh sửa không cho biết vị trí bảng vẽ
 @msg	its editing data has no layers	dữ liệu chỉnh sửa không có lớp
 @msg	its editing data is damaged	dữ liệu chỉnh sửa bị hỏng
+@msg	its editing data is for a {w} × {h} pt page, not the file's {pw} × {ph} pt page	dữ liệu chỉnh sửa dành cho trang {w} × {h} pt, không phải trang {pw} × {ph} pt của tệp
+@msg	its editing data is for a {w} × {h} pt page, the file's {pw} × {ph} pt page at {scale}	dữ liệu chỉnh sửa dành cho trang {w} × {h} pt, tức trang {pw} × {ph} pt của tệp ở tỷ lệ {scale}
+@msg	its zlib compression is damaged	phần nén zlib của chúng bị hỏng
+@msg	its Zstandard compression is damaged	phần nén Zstandard của chúng bị hỏng
+@msg	it decompresses to more than {_1} MB	giải nén ra hơn {_1} MB
 @msg	its editing data is for a different page	dữ liệu chỉnh sửa dành cho trang khác
 @msg	its layers use {_1}, which aren't read yet	các lớp của nó dùng {_1}, chưa đọc được
 @msg	its objects are nested too deeply	các đối tượng của nó lồng nhau quá sâu
@@ -4028,6 +4269,8 @@ theme	Appearance	Giao diện
 @msg	missing `name`	thiếu `name`
 @msg	missing `tool`	thiếu `tool`
 @msg	missing index	thiếu chỉ mục
+@msg	missing number `{key}`	thiếu số `{key}`
+@msg	missing integer `{key}`	thiếu số nguyên `{key}`
 @msg	missing panel layout	thiếu bố cục bảng
 @msg	move requires a destination panel	move cần bảng đích
 @msg	move requires an existing destination panel	move cần bảng đích tồn tại
@@ -4117,6 +4360,8 @@ theme	Appearance	Giao diện
 @msg	no such recent font	không có phông chữ gần đây như vậy
 @msg	no such saved selection	không có vùng chọn đã lưu như vậy
 @msg	no such segment	không có đoạn như vậy
+@msg	no such spine point	không có điểm trục như vậy
+@msg	no such spine segment	không có đoạn trục như vậy
 @msg	no such subpath	không có nhánh con như vậy
 @msg	no such user library	không có thư viện người dùng như vậy
 @msg	no such view	không có chế độ xem như vậy
@@ -4129,6 +4374,7 @@ theme	Appearance	Giao diện
 @msg	no user library folder here	không có thư mục thư viện người dùng ở đây
 @msg	no user workspace `{from}`	không có không gian làm việc người dùng `{from}`
 @msg	node {_1} is not text	nút {_1} không phải là văn bản
+@msg	not a blend	không phải đối tượng hòa trộn
 @msg	not a DXF drawing	không phải bản vẽ DXF
 @msg	not a file	không phải tệp
 @msg	not a font file	không phải tệp phông chữ
@@ -4153,9 +4399,13 @@ theme	Appearance	Giao diện
 @msg	nothing to redo	không có gì để làm lại
 @msg	nothing to save: the document has no visible art	không có gì để lưu: tài liệu không có tác phẩm hiển thị
 @msg	nothing to undo	không có gì để hoàn tác
+@msg	no history to clear	không có lịch sử để xóa
 @msg	nothing to warp	không có gì để biến dạng
 @msg	nothing to wrap	không có gì để bọc
 @msg	object ids are non-negative integers, not {v}	id đối tượng là số nguyên không âm, không phải {v}
+@msg	{key} must be an array of non-negative integer object ids	{key} phải là một mảng id đối tượng là số nguyên không âm
+@msg	invalid object id {value}: expected a non-negative integer	id đối tượng {value} không hợp lệ: cần một số nguyên không âm
+@msg	no such object id {value}	không có đối tượng nào có id {value}
 @msg	object {0} cannot have children	đối tượng {0} không thể có phần tử con
 @msg	object {id} is not a path	đối tượng {id} không phải là đường dẫn
 @msg	object {id} is not a selected top-level object	đối tượng {id} không phải là đối tượng cấp cao nhất đã chọn
@@ -4171,6 +4421,7 @@ theme	Appearance	Giao diện
 @msg	Packaged {n} file(s){note}	Đã đóng gói {n} tệp{note}
 @msg	page size {w} × {h}	kích thước trang {w} × {h}
 @msg	page {0} does not exist (the PDF has {1})	trang {0} không tồn tại (PDF có {1} trang)
+@msg	thumbnail: no page {n} (the file has 1)	thumbnail: trang {n} không tồn tại (tệp có 1 trang)
 @msg	panel group is empty	nhóm bảng trống
 @msg	panel must name a registered panel	panel phải đặt tên bảng đã đăng ký
 @msg	paste unavailable	dán không khả dụng
@@ -4215,6 +4466,8 @@ theme	Appearance	Giao diện
 @msg	the SVG's elements are nested more than {0} deep	các phần tử SVG lồng nhau sâu quá {0} cấp
 @msg	Save for Web: the image is empty	Lưu cho Web: ảnh trống
 @msg	Save writes {_1}, not {_2}: use document.export for other formats	Lưu ghi {_1}, không phải {_2}: dùng document.export cho các định dạng khác
+@msg	Save writes {_1}, not {_2}: use file.saveAsTemplate to write it	Lưu ghi {_1}, không phải {_2}: dùng file.saveAsTemplate để ghi định dạng này
+@msg	aiVersion 7 writes legacy .ai files; a .ait template is always PDF-compatible	aiVersion 7 ghi tệp .ai cũ; mẫu .ait luôn tương thích PDF
 @msg	saved panel layout is invalid; reset the workspace first	bố cục bảng đã lưu không hợp lệ; hãy đặt lại không gian làm việc trước
 @msg	Saved recovery data for {title}	Đã lưu dữ liệu phục hồi cho {title}
 @msg	Saved to User Defined: {_1}	Đã lưu vào Người dùng tùy chỉnh: {_1}
@@ -4229,12 +4482,18 @@ theme	Appearance	Giao diện
 @msg	searching a folder isn't available on the web	tìm kiếm trong thư mục không khả dụng trên web
 @msg	select (or target) objects whose appearance isn't basic	chọn (hoặc đặt mục tiêu) đối tượng có diện mạo không cơ bản
 @msg	select a blend	hãy chọn một đối tượng hòa trộn
+@msg	select a blend or give `id`	hãy chọn một đối tượng hòa trộn hoặc cung cấp `id`
 @msg	select a clip group	hãy chọn nhóm cắt
 @msg	select a gradient mesh	hãy chọn lưới chuyển sắc
 @msg	select a linked image: an embedded one has no file	hãy chọn ảnh liên kết: ảnh nhúng không có tệp
 @msg	select a Live Paint group	hãy chọn nhóm tô trực tiếp
 @msg	select a repeat	hãy chọn một đối tượng lặp
 @msg	select an Intertwine group	hãy chọn một nhóm đan xen
+@msg	select an Objects on Path group	hãy chọn một nhóm đối tượng trên đường dẫn
+@msg	a path inside a compound path, blend, envelope, repeat or Intertwine group can't take objects	không thể gắn đối tượng lên một đường dẫn nằm trong đường dẫn phức, đối tượng hòa trộn, Envelope, đối tượng lặp hoặc nhóm đan xen
+@msg	a clipping path can't take objects	không thể gắn đối tượng lên đường dẫn cắt
+@msg	objects inside a blend, envelope, repeat or Intertwine group can't be attached to a path	không thể gắn các đối tượng nằm trong đối tượng hòa trộn, Envelope, đối tượng lặp hoặc nhóm đan xen lên đường dẫn
+@msg	a clipping path can't be attached to a path	không thể gắn đường dẫn cắt lên đường dẫn
 @msg	select a stroke with a variable width	hãy chọn nét có chiều rộng biến đổi
 @msg	select a symbol instance	hãy chọn đối tượng ký hiệu
 @msg	select an envelope	hãy chọn một Envelope
@@ -4269,6 +4528,7 @@ theme	Appearance	Giao diện
 @msg	stop {i} needs a valid `color`	điểm dừng {i} cần `color` hợp lệ
 @msg	stop {i}: `{k}` must be a number	điểm dừng {i}: `{k}` phải là số
 @msg	SVG parse error: {0}	Lỗi phân tích SVG: {0}
+@msg	t, dx and dy must be finite	t, dx và dy phải là số hữu hạn
 @msg	Targa files are RGB: colorModel rgb	Tệp Targa là RGB: colorModel rgb
 @msg	Text Wrap: select a wrap object	Bọc chữ: hãy chọn đối tượng bọc
 @msg	that document is no longer open	tài liệu đó không còn mở
@@ -4282,6 +4542,7 @@ theme	Appearance	Giao diện
 @msg	the file's layers weren't read from its editing data ({_1}): they come from its PDF part	không đọc được các lớp của tệp từ dữ liệu chỉnh sửa ({_1}): chúng được lấy từ phần PDF
 @msg	the artboard to fit must be a positive size up to {_1} pt	bảng vẽ cần khớp phải có kích thước dương tối đa {_1} pt
 @msg	the background worker stopped	tiến trình nền đã dừng
+@msg	the blend has no spine	đối tượng hòa trộn không có trục
 @msg	the compressed file unpacks to more than VectorCraft reads ({_1} MB of document, {_2} MB per image)	tệp nén giải nén ra nhiều hơn VectorCraft đọc ({_1} MB tài liệu, {_2} MB mỗi ảnh)
 @msg	the compressed file unpacks to more than {_1} MB	tệp nén giải nén ra hơn {_1} MB
 @msg	the document has never been saved	tài liệu chưa bao giờ được lưu
@@ -4346,6 +4607,7 @@ theme	Appearance	Giao diện
 @msg	the selection has no URL (or they differ)	vùng chọn không có URL (hoặc chúng khác nhau)
 @msg	the selection isn't in perspective	vùng chọn không ở trong phối cảnh
 @msg	The shape is too complex for a 3D effect	Hình dạng quá phức tạp cho hiệu ứng 3D
+@msg	the spine has no segments	trục không có đoạn nào
 @msg	the stroke has no weight	nét không có độ dày
 @msg	the target layer is locked or hidden	lớp đích bị khóa hoặc ẩn
 @msg	the thumbnail image is malformed	ảnh thu nhỏ bị sai định dạng
@@ -4394,6 +4656,7 @@ theme	Appearance	Giao diện
 @msg	unsupported: {0}	không được hỗ trợ: {0}
 @msg	Updated {_1} image(s)	Đã cập nhật {_1} ảnh
 @msg	Updated {_1} linked file(s) changed on disk	Đã cập nhật {_1} tệp liên kết đã thay đổi trên đĩa
+@msg	variables are locked	biến số bị khóa
 @msg	VectorCraft doesn't search other apps' or the system's folders: {path}	VectorCraft không tìm kiếm trong thư mục của ứng dụng khác hoặc hệ thống: {path}
 @msg	VectorCraft doesn't search the Shared or Public folder in Users: {path}	VectorCraft không tìm kiếm thư mục Shared hoặc Public trong Users: {path}
 @msg	VectorCraft failed to start: {e}	VectorCraft khởi động thất bại: {e}
@@ -4401,6 +4664,7 @@ theme	Appearance	Giao diện
 @msg	version {0} files can't be compressed: only version {COMPRESSED_SINCE} and later open compressed files	tệp phiên bản {0} không thể nén: chỉ phiên bản {COMPRESSED_SINCE} trở lên mới mở tệp nén
 @msg	width and height are at least 1 pixel	chiều rộng và chiều cao phải ít nhất 1 pixel
 @msg	workspace name can't be empty	tên không gian làm việc không được để trống
+@msg	x and y must be finite	x và y phải là số hữu hạn
 @msg	x and y must be provided together	x và y phải được cung cấp cùng nhau
 @msg	x and y must both be numbers	x và y đều phải là số
 @msg	Your unsaved changes are kept in this browser: reload the page to get them back.	Các thay đổi chưa lưu được giữ trong trình duyệt này: tải lại trang để lấy lại.
@@ -4410,9 +4674,11 @@ theme	Appearance	Giao diện
 @msg	{_1} failed: {e}	{_1} thất bại: {e}
 @msg	{_1} files	{_1} tệp
 @msg	{_1} files can be opened but not written (see document.formats)	tệp {_1} có thể mở nhưng không thể ghi (xem document.formats)
+@msg	{_1} files are written by file.saveAsTemplate	tệp {_1} được ghi bằng file.saveAsTemplate
 @msg	{_1} font families available	{_1} họ phông chữ khả dụng
 @msg	{_1} has no {_2} style	{_1} không có kiểu {_2}
 @msg	{_1} is a live effect (Effect › Plug-ins)	{_1} là hiệu ứng trực tiếp (Hiệu ứng › Plug-ins)
+@msg	{_1} is an exporter (File › Export › Export As…)	{_1} là plug-in xuất (Tệp › Xuất › Xuất thành…)
 @msg	{_1} is already used by {_2}	{_1} đã được dùng bởi {_2}
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} tệp liên kết không thể đọc ở đây: bản xem trước được hiển thị
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} ảnh liên kết đã thay đổi trên đĩa: Cập nhật liên kết hiển thị phiên bản mới
@@ -4466,6 +4732,11 @@ theme	Appearance	Giao diện
 	Softness	Độ mềm
 	Ambient Light	Ánh sáng môi trường
 	Light behind the object	Ánh sáng phía sau đối tượng
+# 3D light management.
+	Lights	Danh sách đèn
+	Add Light	Thêm đèn
+	Delete Light	Xóa đèn
+3d	Light	Đèn
 	Registration:	Điểm đăng ký:
 # Dimension tool and Object › Dimensions (dimension groups, their dialog and messages).
 	Dimension	Kích thước
@@ -4534,6 +4805,7 @@ theme	Appearance	Giao diện
 @msg	choose a destination folder	hãy chọn thư mục đích
 @msg	choose a source folder	hãy chọn thư mục nguồn
 @msg	open a document with data sets	hãy mở một tài liệu có tập dữ liệu
+@msg	nothing in data set {name} was applied: no object is bound to a variable it has a value for	không có gì trong tập dữ liệu {name} được áp dụng: không có đối tượng nào được gắn với biến số mà tập dữ liệu có giá trị
 @msg	the action has no steps	hành động không có bước nào
 
 # User Interface › Accent Color
@@ -4556,3 +4828,84 @@ theme	Appearance	Giao diện
 	Movie Clip	Clip phim
 @msg	name is empty	tên trống
 @msg	no symbol named `{n}`	không có biểu tượng nào tên `{n}`
+	Smudge Stick…	Bút chì xóa mờ…
+	Smudge Stick	Bút chì xóa mờ
+	Sponge…	Bọt biển…
+	Sponge	Bọt biển
+	Watercolor…	Màu nước…
+	Watercolor	Màu nước
+	Brush Size	Kích thước cọ
+	Definition	Độ nét
+	Brush Detail	Chi tiết cọ
+	Shadow Intensity	Cường độ bóng
+	Bas Relief…	Chạm nổi…
+	Bas Relief	Chạm nổi
+	Charcoal…	Than củi…
+	Charcoal	Than củi
+	Photocopy…	Bản photocopy…
+	Photocopy	Bản photocopy
+	Stamp…	Con dấu…
+	Stamp	Con dấu
+	Thickness	Độ dày
+	Detail	Chi tiết
+	Light/Dark Balance	Cân bằng sáng/tối
+# Links and Attributes: files and URLs handed to other apps.
+@msg	Edit Original opens image and document files only; “{name}” is not one	Chỉnh sửa bản gốc chỉ mở tệp hình ảnh và tài liệu; “{name}” không thuộc loại đó
+@msg	only http, https and mailto URLs open in the browser, not “{url}”	chỉ URL http, https và mailto mới được mở trong trình duyệt, không mở “{url}”
+@msg	{id} opens another app: only the person at the keyboard can run it	{id} mở một ứng dụng khác: chỉ người đang ở bàn phím mới chạy được lệnh này
+@msg	“{name}” is not a file	“{name}” không phải là tệp
+	Enable Guides for 9-Slice Scaling	Bật đường dẫn cho co giãn 9-slice
+@msg	a mask has more than one art block	mặt nạ có nhiều hơn một khối đồ họa
+@msg	mask art ends outside a mask dictionary	đồ họa mặt nạ kết thúc bên ngoài từ điển mặt nạ
+@msg	cancelled; nothing was changed	đã hủy; không có gì thay đổi
+@msg	a linked image can't become a gradient mesh: embed it first	không thể biến ảnh liên kết thành lưới chuyển sắc: hãy nhúng ảnh trước
+@msg	the image has no usable size or position	ảnh không có kích thước hoặc vị trí dùng được
+@msg	the image's pixels can't be read	không đọc được các điểm ảnh của ảnh
+	Persistent	Lưu giữ
+	Library Panel Options	Tùy chọn bảng thư viện
+@msg	Persistent libraries not found: {files}	Không tìm thấy thư viện lưu giữ: {files}
+@msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` không phải là bảng thư viện (xem window.swatchLibrary)
+@msg	library panel `{given}` isn't open	bảng thư viện `{given}` chưa được mở
+@msg	too many library panels were opened in this session	đã mở quá nhiều bảng thư viện trong phiên này
+@msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	Ảnh có kích thước {_1} × {_2} điểm ảnh, hơn {LARGE_TRACE_SIDE} ở một cạnh: ảnh vẫn được dò, nhưng chậm hơn. Một thiết lập sẵn có độ trung thực thấp hơn hoặc một bản sao nhỏ hơn của ảnh sẽ dò nhanh hơn.
+@msg	The image was traced at {_1} × {_2} pixels, scaled down from {_3} × {_4} ({_5} megapixels at most).	Ảnh đã được dò ở {_1} × {_2} điểm ảnh, thu nhỏ từ {_3} × {_4} (tối đa {_5} megapixel).
+	Artboard {n} of {total}	Bảng vẽ {n} / {total}
+	Encoding and writing the file…	Đang mã hóa và ghi tệp…
+@plural	{n} more export waiting|{n} more exports waiting	Còn {n} lượt xuất đang chờ
+	Continue in Background	Tiếp tục trong nền
+	Cancel Export	Hủy xuất
+@msg	Export cancelled	Đã hủy xuất
+# Paragraph panel menu › Justification…
+	Desired	Mong muốn
+	Word Spacing:	Khoảng cách từ:
+	Letter Spacing:	Khoảng cách chữ:
+	Glyph Scaling:	Tỷ lệ glyph:
+	Auto Leading:	Khoảng cách dòng tự động:
+	Single Word Justification:	Căn đều một từ:
+	Full Justify	Căn đều hoàn toàn
+	Minimum must not exceed Desired, nor Desired Maximum.	Giá trị tối thiểu không được vượt quá giá trị mong muốn, và giá trị mong muốn không được vượt quá tối đa.
+	Minimum	Tối thiểu
+	Justification	Căn đều
+@msg	the file's variables and data sets weren't read (variables: {variables}, data sets: {data_sets}): the Variables panel doesn't list them	các biến và tập dữ liệu của tệp chưa được đọc (biến: {variables}, tập dữ liệu: {data_sets}): bảng Biến không liệt kê chúng
+# Select by Color (select.color)
+	Select by Color	Chọn theo màu
+	Move Anchor Point	Di chuyển điểm neo
+@msg	{label} keeps 1 of the document's {n} artboards: the file reopens with one. Turn on Preserve Editing Capabilities to keep them all.	{label} chỉ giữ 1 trong {n} bảng vẽ của tài liệu: tệp sẽ mở lại với một bảng vẽ. Bật Bảo lưu khả năng chỉnh sửa để giữ tất cả.
+	Chalk & Charcoal…	Phấn và than…
+	Chalk & Charcoal	Phấn và than
+	Graphic Pen…	Bút đồ họa…
+	Graphic Pen	Bút đồ họa
+	Reticulation…	Lưới hạt…
+	Reticulation	Lưới hạt
+	Plastic Wrap…	Màng bọc nhựa…
+	Plastic Wrap	Màng bọc nhựa
+	Chrome…	Crôm…
+	Chrome	Crôm
+	Drop here to take it out of its group	Thả vào đây để đưa ra khỏi nhóm
+	Move Library Group	Di chuyển nhóm thư viện
+	Plaster…	Thạch cao…
+	Plaster	Thạch cao
+	Note Paper…	Giấy ghi chú…
+	Note Paper	Giấy ghi chú
+	Water Paper…	Giấy ướt…
+	Water Paper	Giấy ướt

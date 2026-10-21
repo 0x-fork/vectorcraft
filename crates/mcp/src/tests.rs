@@ -240,6 +240,13 @@ fn headless_end_to_end() {
     assert_eq!(skel["artboards"], doc["artboards"]);
     assert_eq!(call(&mut s, 42, "inspect_document", json!({"depth": -1}))["isError"], true);
 
+    // Scoping reaches the command: one node by id equals its part of the full tree;
+    // an unknown id is a tool error.
+    let r = call(&mut s, 43, "doc_inspect", json!({"ids": [id]}));
+    let one: Value = serde_json::from_str(&text_of(&r)).unwrap();
+    assert_eq!(one["nodes"], json!([rect]), "{one}");
+    assert_eq!(call(&mut s, 44, "doc_inspect", json!({"ids": [999_999]}))["isError"], true);
+
     // Screenshot returns image content (base64 PNG) and text.
     let shot_path = tmp("shot.png");
     let r = call(&mut s, 5, "screenshot", json!({"path": shot_path.to_str().unwrap()}));
@@ -1072,6 +1079,21 @@ fn show_font_names_in_english_does_not_change_font_list_for_agents() {
     assert!(families.iter().any(|f| f.as_str() == Some("Source Sans 3")), "{families:?}");
 }
 
+/// Preferences › Type › Highlight Alternate Glyphs (#394): off by default so the canvas stays
+/// clear until an agent (or the Preferences dialog) turns it on. Headless MCP has no canvas.
+#[test]
+fn highlight_alternate_glyphs_pref_round_trips_for_agents() {
+    let mut s = server();
+    let r = call(&mut s, 1, "run_command", json!({"command": "prefs.get", "params": {"key": "highlightAlternateGlyphs"}}));
+    assert_eq!(r["isError"], false, "{r}");
+    assert_eq!(serde_json::from_str::<Value>(&text_of(&r)).unwrap(), json!(false));
+    let r = call(&mut s, 2, "run_command", json!({"command": "prefs.set", "params": {"key": "highlightAlternateGlyphs", "value": true}}));
+    assert_eq!(r["isError"], false, "{r}");
+    let r = call(&mut s, 3, "run_command", json!({"command": "prefs.get", "params": {"key": "highlightAlternateGlyphs"}}));
+    assert_eq!(r["isError"], false, "{r}");
+    assert_eq!(serde_json::from_str::<Value>(&text_of(&r)).unwrap(), json!(true));
+}
+
 /// Type preferences reach agents (#394): type the Type tool places starts with placeholder text,
 /// selected; Alt+→ tracks it by Tracking and Cmd+Shift+. steps its size by Size/Leading.
 #[test]
@@ -1160,6 +1182,31 @@ fn cmd_shift_x_resets_horizontal_scale_for_agents() {
     let runs = serde_json::from_str::<Value>(&text_of(&r)).unwrap()["runs"].clone();
     assert_eq!(runs.as_array().unwrap().len(), 1, "{runs}");
     assert_eq!(runs[0]["style"]["h_scale"], json!(100.0), "{runs}");
+}
+
+/// `press_key` runs Cmd+/ and Cmd+Alt+/ for agents: a new fill and then a new stroke go on top of
+/// the selected rectangle's appearance stack.
+#[test]
+fn cmd_slash_and_cmd_alt_slash_add_a_fill_and_a_stroke_for_agents() {
+    let mut s = server();
+    let r = call(&mut s, 1, "run_command", json!({"command": "shape.rectangle", "params": {"x": 10, "y": 10, "width": 100, "height": 100}}));
+    let id = serde_json::from_str::<Value>(&text_of(&r)).unwrap()["id"].as_u64().unwrap();
+    let r = call(&mut s, 2, "run_command", json!({"command": "select.set", "params": {"ids": [id]}}));
+    assert_eq!(r["isError"], false, "{r}");
+    let kinds = |s: &mut Server, n: u64| {
+        let r = call(s, n, "run_command", json!({"command": "effect.list", "params": {}}));
+        let items = serde_json::from_str::<Value>(&text_of(&r)).unwrap()["applied"][0]["items"].clone();
+        items.as_array().unwrap().iter().map(|it| it["kind"].as_str().unwrap().to_string()).collect::<Vec<_>>()
+    };
+    assert_eq!(kinds(&mut s, 3), ["fill", "stroke"]);
+    let r = call(&mut s, 4, "press_key", json!({"key": "/", "mods": {"cmd": true}}));
+    assert_eq!(r["isError"], false, "{r}");
+    assert_eq!(serde_json::from_str::<Value>(&text_of(&r)).unwrap()["command"], "appearance.addFill", "{r}");
+    assert_eq!(kinds(&mut s, 5), ["fill", "stroke", "fill"]);
+    let r = call(&mut s, 6, "press_key", json!({"key": "/", "mods": {"cmd": true, "alt": true}}));
+    assert_eq!(r["isError"], false, "{r}");
+    assert_eq!(serde_json::from_str::<Value>(&text_of(&r)).unwrap()["command"], "appearance.addStroke", "{r}");
+    assert_eq!(kinds(&mut s, 7), ["fill", "stroke", "fill", "stroke"]);
 }
 
 /// The drawing tools snap to Smart Guides over MCP as with the mouse (#506): a Rectangle drawn

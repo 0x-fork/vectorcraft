@@ -4,8 +4,9 @@
 //! selection and the paint defaults (`appearance.copyFrom`); Alt-click: the selection's attributes
 //! onto the clicked object (`reverse`); Shift+Alt-click: add the clicked object's appearance to the
 //! selection's (`append`). Shift-click: sample only the colour under the cursor into the active
-//! fill/stroke (`paint.sampleColor`, keeping the colour's model). Clicking an image samples its
-//! pixels (averaged over the options' raster sample size).
+//! fill/stroke (`paint.sampleColor`; in a CMYK document an RGB color is stored as CMYK). Clicking
+//! an image samples its pixels (averaged over the options' raster sample size; a CMYK image gives
+//! its ink amounts).
 //!
 //! The Gradient panel's eyedropper sets the `stop` option (the tool to return to): the next click
 //! samples the colour under the cursor into the selected gradient stop (`paint.sampleColor
@@ -50,15 +51,24 @@ fn paint_sample(n: &Node, on_stroke: bool, p: Point) -> Option<Color> {
     paint_color_at(paint, Some(bounds), p)
 }
 
-/// The colour of image `n`'s pixels at `p`, averaged over the raster sample size.
+/// The color of image `n`'s pixels at `p`, averaged over the raster sample size: a CMYK image's
+/// ink amounts as they are, other images' sRGB pixels in the working RGB space (the color that
+/// shows as that pixel).
 fn image_color_at(cx: &ToolContext, n: &Node, p: Point) -> Option<Color> {
     let NodeKind::Image(im) = &n.kind else { return None };
     if im.xf.determinant().abs() < 1e-12 {
         return None;
     }
     let px = im.xf.inverse() * p;
-    let [r, g, b, _] = cx.doc.images.get(&im.key)?.sample_object(px.x, px.y, (im.width, im.height), cx.raster_sample)?;
-    Some(Color::rgb8(r, g, b))
+    let blob = cx.doc.images.get(&im.key)?;
+    let object = (im.width, im.height);
+    if let Some(inks) = blob.sample_cmyk_object(px.x, px.y, object, cx.raster_sample) {
+        let [c, m, y, k] = inks.map(|v| f32::from(v) / 255.0);
+        return Some(Color::cmyk(c, m, y, k));
+    }
+    let [r, g, b, _] = blob.sample_object(px.x, px.y, object, cx.raster_sample)?;
+    let [r, g, b] = vectorcraft_color::cms::active().srgb_to_rgb([r, g, b].map(|v| f32::from(v) / 255.0));
+    Some(Color::rgb(r, g, b))
 }
 
 impl Tool for EyedropperTool {
@@ -134,6 +144,27 @@ mod tests {
         let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 100.0, 150.0).with_mods(shift));
         assert_eq!(a, vec![Action::Exec("paint.sampleColor".into(), json!({"color": color_json(&Color::BLACK)}))]);
         assert!(t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 400.0, 400.0)).is_empty());
+    }
+
+    /// On a clip group's mask edge, where the art it clips lies over it, the eyedropper copies the
+    /// art's appearance, not the unpainted clipping path's (the selection tools take the path there).
+    #[test]
+    fn on_a_masks_edge_the_eyedropper_copies_the_art() {
+        let (d, _, _, art) = doc_with_masked_square();
+        let (s, p) = (Selection::default(), paint());
+        let a = EyedropperTool::default().pointer(&cx(&d, &s, &p), &PointerEvent::new(PointerKind::Down, 498.5, 450.0));
+        assert_eq!(a, vec![Action::Exec("appearance.copyFrom".into(), json!({"source": art.0}))]);
+    }
+
+    /// The tools that act on what is drawn hit with options that don't take a clipping path on
+    /// its outline; only the selection tools' do.
+    #[test]
+    fn only_the_selection_options_take_clipping_paths_on_their_outline() {
+        let (d, _) = doc_with_rect();
+        let (s, p) = (Selection::default(), paint());
+        let cx = cx(&d, &s, &p);
+        assert!(!cx.hit_options().clip_outlines);
+        assert!(cx.selection_hit_options().clip_outlines);
     }
 
     #[test]
@@ -228,6 +259,42 @@ mod tests {
         assert_eq!(sampled_hex(&EyedropperTool::default().pointer(&crate::testutil::cx(&d, &s, &p), &click)), "#00ff00");
         d.node_mut(l).unwrap().visible = false;
         assert!(EyedropperTool::default().pointer(&crate::testutil::cx(&d, &s, &p), &click).is_empty());
+    }
+
+    /// #2276: a CMYK image gives its ink amounts as they are, not the RGB its decoder shows.
+    #[test]
+    fn clicking_a_cmyk_image_samples_its_inks() {
+        use vectorcraft_doc::cmyk::Inks;
+        use vectorcraft_doc::{Document, ImageBlob, ImageObject, Node, NodeKind};
+        let mut d = Document::new(500.0, 500.0);
+        let l = d.layers[0].id;
+        let id = d.alloc_id();
+        // Two pixels, 10 pt each: C10 M20 Y30 K40 (in bytes), then K100.
+        let inks = Inks::new(2, 1, vec![26, 51, 77, 102, 0, 0, 0, 255]).unwrap();
+        d.images.insert("ink".into(), ImageBlob::cmyk_tiff(&inks).unwrap());
+        let im = ImageObject {
+            key: "ink".into(),
+            width: 2,
+            height: 1,
+            xf: vectorcraft_geom::Affine::scale(10.0),
+            link: None,
+            placement: Default::default(),
+        };
+        d.insert(Some(l), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
+        let (s, p) = (Selection::default(), paint());
+        let mut cx = cx(&d, &s, &p);
+        let ink = |v: [u8; 4]| {
+            let [c, m, y, k] = v.map(|b| f32::from(b) / 255.0);
+            json!({ "color": color_json(&Color::cmyk(c, m, y, k)) })
+        };
+        let click = PointerEvent::new(PointerKind::Down, 5.0, 5.0);
+        assert_eq!(EyedropperTool::default().pointer(&cx, &click), vec![Action::Exec("paint.sampleColor".into(), ink([26, 51, 77, 102]))]);
+        cx.raster_sample = 3;
+        assert_eq!(
+            EyedropperTool::default().pointer(&cx, &click),
+            vec![Action::Exec("paint.sampleColor".into(), ink([13, 26, 39, 179]))],
+            "3 x 3 average of both pixels"
+        );
     }
 
     #[test]

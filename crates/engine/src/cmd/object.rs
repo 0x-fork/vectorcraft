@@ -10,6 +10,7 @@ use vectorcraft_doc::corners::set_corners;
 use vectorcraft_doc::{Appearance, Document, Knockout, LiveCorners, LiveShape, Node, NodeId, NodeKind, OrientedBox, Scaling};
 use vectorcraft_geom::shapes::CornerKind;
 use vectorcraft_geom::{Affine, FillRule, PathData, Point, Rect, Vec2};
+use vectorcraft_render::effects;
 
 use super::edit::{duplicate_in, outermost, selected_roots, selected_roots_to_transform};
 use super::opacitymask::percent;
@@ -227,7 +228,15 @@ pub fn specs() -> Vec<CommandSpec> {
             has_selection,
             |s, _| clip_edit(s, true)
         ),
-        cmd!("object.isolate", "Enter Isolation Mode", [], None, "{id}", has_doc, isolate),
+        cmd!(
+            "object.isolate",
+            "Enter Isolation Mode",
+            [],
+            None,
+            "{id?} isolate a group, a layer or a single object (default: the first selected object); type, a hidden or locked object, an object in a hidden or locked group or layer, and a guide path while Lock Guides is on are refused",
+            has_doc,
+            isolate
+        ),
         cmd!("object.exitIsolation", "Exit Isolation Mode", [], None, "{}", has_doc, exit_isolation),
         cmd!(
             "object.setProps",
@@ -243,7 +252,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Align",
             ["Window", "Align"],
             None,
-            "{horizontal?: \"left\"|\"center\"|\"right\", vertical?: \"top\"|\"center\"|\"bottom\", to?: \"selection\"|\"artboard\"|\"key\" (default: the key object when the selection has one, select.key, else the selection), artboard?: index (0-based; with to: \"artboard\", the artboard to align to; the app passes the active one; default: the artboard under the center of the selection, else the first), bounds?: \"preview\"|\"geometric\" (default: the Use Preview Bounds preference; preview bounds take in strokes), patterns?: bool (Transform Patterns: pattern fills and strokes transform with the art; default: prefs transformPatternTiles)} With anchor points selected (Direct Selection), the points align instead: to their own bounds, or to the artboard (#1180)",
+            "{horizontal?: \"left\"|\"center\"|\"right\", vertical?: \"top\"|\"center\"|\"bottom\", to?: \"selection\"|\"artboard\"|\"key\" (default: the key object when the selection has one, select.key, else the selection; a key guide, select.key {guide}, stays put and the objects line up on its line: a vertical guide sets where left, center and right go and vertical alignment leaves them, a horizontal one the other way round; aligning to the key, the other selected ruler guides move too: a vertical guide to the key's left edge, center or right edge, a horizontal one to its top, center or bottom), artboard?: index (0-based; with to: \"artboard\", the artboard to align to; the app passes the active one; default: the artboard under the center of the selection, else the first), bounds?: \"preview\"|\"geometric\" (default: the Use Preview Bounds preference; preview bounds take in strokes), patterns?: bool (Transform Patterns: pattern fills and strokes transform with the art; default: prefs transformPatternTiles)} With anchor points selected (Direct Selection), the points align instead: to their own bounds, or to the artboard (#1180)",
             has_selection,
             align
         ),
@@ -252,7 +261,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Distribute",
             ["Window", "Align"],
             None,
-            "{horizontal?: \"left\"|\"center\"|\"right\", vertical?: \"top\"|\"center\"|\"bottom\", spacing?: pt (used with a key object, select.key: the key object stays put and the lines are placed this far apart, outward from its line, in their order on that line; 0 puts them all on its line; not used without a key object or with anchor points selected), to?: \"selection\"|\"artboard\"|\"key\" (default: the selection; \"key\" distributes as \"selection\" does; not used with anchor points selected, or with spacing and a key object), artboard?: index (0-based; with to: \"artboard\", the artboard to distribute across; the app passes the active one; default: as object.align's), bounds?: \"preview\"|\"geometric\" (default: the Use Preview Bounds preference; preview bounds take in strokes), patterns?: bool (Transform Patterns: pattern fills and strokes transform with the art; default: prefs transformPatternTiles)} space the objects' left edges, centers or right edges (top edges, centers or bottom edges) in their order on that line: without spacing and a key object they are spaced evenly, the first and last objects stay put, and fewer than three objects don't move; with spacing and a key object, see spacing (two objects are enough); with to: \"artboard\", the first one's left (top) edge goes to the artboard's left (top) edge, the last one's right (bottom) edge goes to the artboard's right (bottom) edge, and two objects are enough. With anchor points selected (Direct Selection), the points are spaced evenly between the first and the last along the axis instead (#1636)",
+            "{horizontal?: \"left\"|\"center\"|\"right\", vertical?: \"top\"|\"center\"|\"bottom\", spacing?: pt (used with a key, select.key: the key object, or the key guide, select.key {guide}, stays put and the lines are placed this far apart, outward from its line, in their order on that line; 0 puts them all on its line; a key guide along the axis leaves everything where it is; not used without a key or with anchor points selected), to?: \"selection\"|\"artboard\"|\"key\" (default: the key while there is one, else the selection; \"key\" without spacing distributes as \"selection\" does; not used with anchor points selected, or with spacing and a key object; with a key guide, \"selection\" or \"artboard\" distributes without it as the key), artboard?: index (0-based; with to: \"artboard\", the artboard to distribute across; the app passes the active one; default: as object.align's), bounds?: \"preview\"|\"geometric\" (default: the Use Preview Bounds preference; preview bounds take in strokes), patterns?: bool (Transform Patterns: pattern fills and strokes transform with the art; default: prefs transformPatternTiles)} space the selected objects' left edges, centers or right edges (top edges, centers or bottom edges) in their order on that line, with the selected ruler guides across the axis (vertical ones for horizontal; #1597): a guide has no size, so its edges and center are its line, and guides along the axis stay. Without spacing and a key they are spaced evenly, the first and last stay put, and fewer than three don't move; with spacing and a key, see spacing (two are enough); with to: \"artboard\", the first one's left (top) edge goes to the artboard's left (top) edge, the last one's right (bottom) edge goes to the artboard's right (bottom) edge, and two are enough. With anchor points selected (Direct Selection), the points are spaced evenly between the first and the last along the axis instead (#1636)",
             can_distribute,
             distribute
         ),
@@ -261,7 +270,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Distribute Spacing",
             ["Window", "Align"],
             None,
-            "{axis: \"horizontal\"|\"vertical\", spacing?: pt (the key object, select.key, stays put and the others are spaced from it), to?: \"selection\"|\"artboard\"|\"key\" (used without spacing and without anchor points selected; default: the selection; \"key\" spaces as \"selection\" does), artboard?: index (0-based; with to: \"artboard\", the artboard to space across; the app passes the active one; default: as object.align's), bounds?: \"preview\"|\"geometric\" (default: the Use Preview Bounds preference; preview bounds take in strokes), patterns?: bool (Transform Patterns: pattern fills and strokes transform with the art; default: prefs transformPatternTiles)} without spacing, make the gaps between the objects equal, in the order of their left (top) edges: the first object's left (top) edge and the last one's right (bottom) edge stay put, or with to: \"artboard\" go to the artboard's left (top) and right (bottom) edges. With anchor points selected (Direct Selection), the points are spaced evenly along the axis instead, or `spacing` apart from the first (#1636)",
+            "{axis: \"horizontal\"|\"vertical\", spacing?: pt (the key object, select.key, or the key guide, select.key {guide}, stays put and the others are spaced from it; a key guide along the axis leaves everything where it is), to?: \"selection\"|\"artboard\"|\"key\" (used without spacing and without anchor points selected, and with a key guide; default: the key while there is one, else the selection; \"key\" without spacing spaces as \"selection\" does), artboard?: index (0-based; with to: \"artboard\", the artboard to space across; the app passes the active one; default: as object.align's), bounds?: \"preview\"|\"geometric\" (default: the Use Preview Bounds preference; preview bounds take in strokes), patterns?: bool (Transform Patterns: pattern fills and strokes transform with the art; default: prefs transformPatternTiles)} without spacing, make the gaps between the selected objects equal, in the order of their left (top) edges, with the selected ruler guides across the axis as items with no size (#1597; guides along the axis stay): the first item's left (top) edge and the last one's right (bottom) edge stay put, or with to: \"artboard\" go to the artboard's left (top) and right (bottom) edges. With anchor points selected (Direct Selection), the points are spaced evenly along the axis instead, or `spacing` apart from the first (#1636)",
             can_distribute,
             distribute_spacing
         ),
@@ -294,7 +303,7 @@ fn origin_of(s: &Session, p: &Value, ids: &[NodeId]) -> Result<Point> {
     // Direct-selected anchors transform alone (see [`apply_transform`]), about their own centre.
     let st = s.doc()?;
     if !bool_or(p, "copy", false)
-        && let Some(b) = st.selection.anchor_bounds(&st.doc, s.prefs.use_preview_bounds)
+        && let Some(b) = effects::preview::anchor_bounds(&st.selection, &st.doc, s.prefs.use_preview_bounds)
     {
         return Ok(b.center());
     }
@@ -305,10 +314,16 @@ fn origin_of(s: &Session, p: &Value, ids: &[NodeId]) -> Result<Point> {
 /// its `strokes` and `corners` params, else the preferences. The values join the command's journal
 /// entry, so replaying it scales the same way whatever the preferences are then.
 pub(crate) fn scaling(s: &mut Session, p: &Value) -> Scaling {
+    let sc = scaling_options(s, p);
+    s.note_journal("strokes", json!(sc.strokes));
+    s.note_journal("corners", json!(!sc.keep_corners));
+    sc
+}
+
+/// [`scaling`] without noting the values in the journal.
+fn scaling_options(s: &Session, p: &Value) -> Scaling {
     let strokes = bool_or(p, "strokes", s.prefs.scale_strokes);
     let corners = bool_or(p, "corners", s.prefs.scale_corners);
-    s.note_journal("strokes", json!(strokes));
-    s.note_journal("corners", json!(corners));
     Scaling {
         strokes,
         effects: strokes.then_some(vectorcraft_render::effects::scale_effect),
@@ -459,7 +474,7 @@ pub(crate) fn preview_copies(s: &mut Session, roots: &[NodeId], with_guides: boo
     if let Some(k) = &it.copies
         && Arc::ptr_eq(&k.from, &it.doc)
         && k.roots == roots
-        && (!k.selection.guides.is_empty() == has_guide_copies)
+        && (k.selection.guides.is_empty() != has_guide_copies)
     {
         return Ok(Some(k.clone()));
     }
@@ -639,18 +654,24 @@ fn arrange(s: &mut Session, how: Arrange) -> Result<Value> {
                 None => by_parent.push((par, vec![*id])),
             }
         }
-        for (par, group) in by_parent {
+        for (par, mut group) in by_parent {
+            // In a clip group or a clipping layer the bottom child is the clipping path: it stays
+            // there, and the art above it never goes below it (#3188).
+            let floor = usize::from(par.and_then(|p| d.node(p)).is_some_and(vectorcraft_doc::Node::clips));
+            if floor > 0 {
+                group.retain(|id| d.position(*id).is_some_and(|(_, idx, _)| idx >= floor));
+            }
             for (k, id) in group.iter().enumerate() {
                 let Some((_, idx, len)) = d.position(*id) else { continue };
-                if len == 0 {
+                if len <= floor {
                     continue;
                 }
                 let last = len - 1;
                 let to = match how {
-                    Arrange::Front => last.saturating_sub(k),
-                    Arrange::Back => k.min(last),
+                    Arrange::Front => last.saturating_sub(k).max(floor),
+                    Arrange::Back => (floor + k).min(last),
                     Arrange::Forward => (idx + 1).min(last.saturating_sub(k)).max(idx),
-                    Arrange::Backward => idx.saturating_sub(1).max(k.min(idx)),
+                    Arrange::Backward => idx.saturating_sub(1).max(floor + k.min(idx.saturating_sub(floor))),
                 };
                 if to != idx {
                     d.move_node(*id, par, to)?;
@@ -1047,6 +1068,7 @@ fn isolate(s: &mut Session, p: &Value) -> Result<Value> {
     let id = id_param(p, "id")
         .or_else(|| s.active().and_then(|d| d.selection.objects.first().copied()))
         .ok_or_else(|| bad("object.isolate", "missing id"))?;
+    let guides_locked = s.menu.guides_locked;
     let st = s.doc_mut()?;
     // Groups, layers and single objects (a path, a compound path, an image…); type isn't
     // isolated: a double-click on it edits its text.
@@ -1054,6 +1076,15 @@ fn isolate(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad("object.isolate", "type objects can't be isolated"));
     }
     let isolation = st.doc.node(id).filter(|n| n.extras().shaper.is_some()).and_then(|n| n.children()).and_then(|c| c.first()).map_or(id, |n| n.id);
+    // A hidden or locked object, one in a hidden or locked group or layer, and a guide path while
+    // Lock Guides is on aren't isolated either: a click with the Selection tool doesn't select them.
+    // A Shaper Group isolates its source group, so that group is the one checked.
+    if !st.doc.is_editable(isolation) {
+        return Err(bad("object.isolate", "the object is hidden or locked"));
+    }
+    if guides_locked && crate::is_guide_path(&st.doc, isolation) {
+        return Err(EngineError::Other("guides are locked".into()));
+    }
     st.isolation = Some(isolation);
     st.selection.clear();
     st.revision += 1;
@@ -1061,11 +1092,16 @@ fn isolate(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn exit_isolation(s: &mut Session, _: &Value) -> Result<Value> {
+    let guides_locked = s.menu.guides_locked;
     let st = s.doc_mut()?;
     if let Some(i) = st.isolation.take() {
         super::distortcmds::finish_edit_text(st, i);
         let target = st.doc.parent_of(i).filter(|p| st.doc.node(*p).is_some_and(|n| n.extras().shaper.is_some())).unwrap_or(i);
         st.selection.set([target]);
+        // A guide path isolated while Lock Guides is on isn't selected (#1534).
+        if guides_locked {
+            crate::deselect_guides(&st.doc, &mut st.selection);
+        }
     }
     st.revision += 1;
     ok()
@@ -1198,14 +1234,15 @@ fn set_props(s: &mut Session, p: &Value) -> Result<Value> {
 
 impl Session {
     /// The bounds of `ids` the Transform panel, the bounding box, Align and Distribute measure:
-    /// visual bounds (strokes included) with Use Preview Bounds on, else geometric bounds.
+    /// with Use Preview Bounds on, visual bounds as drawn (strokes and geometry effects included,
+    /// see [`effects::preview`]), else geometric bounds.
     pub fn transform_bounds(&self, ids: &[NodeId]) -> Option<Rect> {
-        self.doc().ok()?.doc.bounds_of(ids, self.prefs.use_preview_bounds)
+        effects::preview::bounds_of(&self.doc().ok()?.doc, ids, self.prefs.use_preview_bounds)
     }
     /// [`Session::transform_bounds`] square to the objects' own angle (their rotated bounding
     /// box, see [`Document::oriented_bounds`]).
     pub fn transform_box(&self, ids: &[NodeId]) -> Option<OrientedBox> {
-        self.doc().ok()?.doc.oriented_bounds(ids, self.prefs.use_preview_bounds)
+        effects::preview::oriented_bounds(&self.doc().ok()?.doc, ids, self.prefs.use_preview_bounds)
     }
 }
 
@@ -1241,17 +1278,22 @@ fn spacing(p: &Value, cmd: &str) -> Result<Option<f64>> {
         .transpose()
 }
 
-/// `ids` with their bounds (`preview`: visual bounds).
+/// `ids` with their bounds (`preview`: visual bounds as drawn, see [`effects::preview::bounds_of`]).
 fn items_bounds(d: &Document, ids: &[NodeId], preview: bool) -> Vec<(NodeId, Rect)> {
-    ids.iter().filter_map(|id| Some((*id, d.bounds_of(&[*id], preview)?))).collect()
+    ids.iter().filter_map(|id| Some((*id, effects::preview::bounds_of(d, &[*id], preview)?))).collect()
 }
 
-/// Move each object of `moves` by its offset, as undo step `label`; pattern tiles move too when
-/// [`transform_patterns`] says so for `ids`. When every move is a rounding error (1e-9 pt or less
-/// on both axes), the document and its undo history stay as they are.
-fn apply_moves(s: &mut Session, label: &str, p: &Value, ids: &[NodeId], moves: &[(NodeId, Vec2)]) -> Result<Value> {
+/// Move each object of `moves` by its offset and each ruler guide of `guides` (index, position)
+/// to its position, as undo step `label`; pattern tiles move too when [`transform_patterns`] says
+/// so for `ids`. When every move is a rounding error (1e-9 pt or less on both axes), the document
+/// and its undo history stay as they are.
+fn apply_moves(s: &mut Session, label: &str, p: &Value, ids: &[NodeId], moves: &[(NodeId, Vec2)], guides: &[(usize, f64)]) -> Result<Value> {
     let sc = Scaling { patterns: transform_patterns(s, p, ids)?, ..Scaling::default() };
-    if moves.iter().all(|(_, dv)| dv.x.abs() <= 1e-9 && dv.y.abs() <= 1e-9) {
+    let guides: Vec<(usize, f64)> = {
+        let d = &s.doc()?.doc;
+        guides.iter().copied().filter(|&(i, pos)| d.guides.get(i).is_some_and(|g| (g.pos - pos).abs() > 1e-9)).collect()
+    };
+    if moves.iter().all(|(_, dv)| dv.x.abs() <= 1e-9 && dv.y.abs() <= 1e-9) && guides.is_empty() {
         return ok();
     }
     s.edit(label, |d, _| {
@@ -1260,22 +1302,49 @@ fn apply_moves(s: &mut Session, label: &str, p: &Value, ids: &[NodeId], moves: &
                 n.transform(Affine::translate(*dv), sc);
             }
         }
+        for &(i, pos) in &guides {
+            if let Some(g) = d.guides.get_mut(i) {
+                g.pos = pos;
+            }
+        }
         Ok(())
     })?;
     ok()
 }
 
-/// What `object.align` aligns to: `to`, else the key object when there is one, else the
-/// selection.
+/// What `object.align` aligns to: `to`, else the key object (or key guide) when there is one,
+/// else the selection.
 fn align_to<'a>(s: &Session, p: &'a Value) -> Option<&'a str> {
-    str_param(p, "to").or_else(|| s.doc().ok()?.selection.key.map(|_| "key"))
+    str_param(p, "to").or_else(|| s.doc().ok()?.selection.has_key().then_some("key"))
+}
+
+/// The key guide `object.align` lines the objects up on (aligning to the key with one set,
+/// [`vectorcraft_doc::Selection::key_guide`]): its position, and whether it is vertical.
+fn key_guide(s: &Session, p: &Value) -> Option<(f64, bool)> {
+    let st = s.doc().ok()?;
+    let g = st.doc.guides.get(st.selection.key_guide?)?;
+    (align_to(s, p) == Some("key")).then_some((g.pos, g.vertical))
+}
+
+/// Where Align puts the objects, `r`, and the axes it moves them along (x, y): a key guide gives
+/// the line across its axis only (a vertical guide fixes x, a horizontal one y), so the other
+/// axis stays as it is.
+fn align_reference(s: &Session, p: &Value, ids: &[NodeId], preview: bool, own: Option<Rect>) -> Result<(Rect, bool, bool)> {
+    if let Some((pos, vertical)) = key_guide(s, p) {
+        return Ok((Rect::new(pos, pos, pos, pos), vertical, !vertical));
+    }
+    let r = match own {
+        Some(b) if align_to(s, p) != Some("artboard") => b,
+        _ => reference_rect(s, p, ids, preview)?,
+    };
+    Ok((r, true, true))
 }
 
 fn reference_rect(s: &Session, p: &Value, ids: &[NodeId], preview: bool) -> Result<Rect> {
     let st = s.doc()?;
     match align_to(s, p) {
         Some("artboard") => {
-            let b = st.doc.bounds_of(ids, preview).unwrap_or_default();
+            let b = effects::preview::bounds_of(&st.doc, ids, preview).unwrap_or_default();
             // Align to Artboard uses artboard `artboard` (the app passes the active one). Without
             // it, or with an index the document doesn't have, it uses the artboard under the center
             // of the selection, or the first one when no artboard is there.
@@ -1285,9 +1354,9 @@ fn reference_rect(s: &Session, p: &Value, ids: &[NodeId], preview: bool) -> Resu
         }
         Some("key") => {
             let k = st.selection.key.ok_or_else(|| EngineError::Other("no key object".into()))?;
-            st.doc.bounds_of(&[k], preview).ok_or(EngineError::NoNode(k))
+            effects::preview::bounds_of(&st.doc, &[k], preview).ok_or(EngineError::NoNode(k))
         }
-        _ => st.doc.bounds_of(ids, preview).ok_or_else(|| EngineError::Other("nothing to align".into())),
+        _ => effects::preview::bounds_of(&st.doc, ids, preview).ok_or_else(|| EngineError::Other("nothing to align".into())),
     }
 }
 
@@ -1323,7 +1392,8 @@ fn align(s: &mut Session, p: &Value) -> Result<Value> {
     if !s.doc()?.selection.anchors.is_empty() {
         return align_anchors(s, p, &ids, (h, v));
     }
-    let r = reference_rect(s, p, &ids, preview)?;
+    let (r, along_x, along_y) = align_reference(s, p, &ids, preview, None)?;
+    let (h, v) = (h.filter(|_| along_x), v.filter(|_| along_y));
     let key = key_root(s, &ids);
     let moves: Vec<(NodeId, Vec2)> = {
         let d = &s.doc()?.doc;
@@ -1347,7 +1417,35 @@ fn align(s: &mut Session, p: &Value) -> Result<Value> {
             })
             .collect()
     };
-    apply_moves(s, "Align", p, &ids, &moves)
+    let guides = guide_moves(s, p, r, h, v)?;
+    apply_moves(s, "Align", p, &ids, &moves, &guides)
+}
+
+/// The selected ruler guides that Align to the key object (or key guide) moves, and where: a
+/// vertical guide goes to the left edge, centre or right edge of `r` that `h` names, a horizontal
+/// one to the top, centre or bottom that `v` names. The key guide stays put, and so do guides
+/// when aligning to the selection or the artboard.
+fn guide_moves(s: &Session, p: &Value, r: Rect, h: Option<&str>, v: Option<&str>) -> Result<Vec<(usize, f64)>> {
+    if align_to(s, p) != Some("key") {
+        return Ok(vec![]);
+    }
+    let st = s.doc()?;
+    let at = |vertical: bool| match (vertical, h, v) {
+        (true, Some("left"), _) => Some(r.x0),
+        (true, Some("center"), _) => Some(r.center().x),
+        (true, Some("right"), _) => Some(r.x1),
+        (false, _, Some("top")) => Some(r.y0),
+        (false, _, Some("center")) => Some(r.center().y),
+        (false, _, Some("bottom")) => Some(r.y1),
+        _ => None,
+    };
+    Ok(st
+        .selection
+        .guides
+        .iter()
+        .filter(|&&i| Some(i) != st.selection.key_guide)
+        .filter_map(|&i| Some((i, at(st.doc.guides.get(i)?.vertical)?)))
+        .collect())
 }
 
 /// [`align`] of the selected anchor points (whole paths among them give all theirs): each point
@@ -1362,8 +1460,10 @@ fn align_anchors(s: &mut Session, p: &Value, ids: &[NodeId], (h, v): (Option<&st
     let Some(bounds) = pts.iter().skip(1).fold(pts.first().map(|q| Rect::from_points(*q, *q)), |b, q| b.map(|b| b.union_pt(*q))) else {
         return ok();
     };
-    // shortcut: no key anchor yet, so Align To Key Object aligns to the points' bounds as Selection does.
-    let r = if align_to(s, p) == Some("artboard") { reference_rect(s, p, ids, false)? } else { bounds };
+    // shortcut: no key anchor yet, so Align To Key Object aligns to the points' bounds as Selection does
+    // (or to a key guide).
+    let (r, along_x, along_y) = align_reference(s, p, ids, false, Some(bounds))?;
+    let (h, v) = (h.filter(|_| along_x), v.filter(|_| along_y));
     let target = |q: Point| {
         let x = match h {
             Some("left") => r.x0,
@@ -1399,10 +1499,68 @@ fn align_anchors(s: &mut Session, p: &Value, ids: &[NodeId], (h, v): (Option<&st
     ok()
 }
 
-/// Distribute needs two or more objects, or anchor points selected with Direct Selection (they
-/// may all be on one path).
+/// Distribute needs two or more objects and ruler guides, or anchor points selected with Direct
+/// Selection (they may all be on one path).
 fn can_distribute(s: &Session) -> std::result::Result<(), String> {
-    if s.active().is_some_and(|st| !st.selection.anchors.is_empty()) { Ok(()) } else { has_multi(s) }
+    if s.active().is_some_and(|st| !st.selection.anchors.is_empty() || st.selection.len() + st.selection.guides.len() >= 2) {
+        Ok(())
+    } else {
+        has_multi(s)
+    }
+}
+
+/// What Distribute and Distribute Spacing space: a selected object, or a selected ruler guide
+/// across the axis (#1597), which has no size.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Spaced {
+    Object(NodeId),
+    Guide(usize),
+}
+
+/// The selected objects `ids` with their bounds (`preview`: visual bounds), and the selected
+/// ruler guides across the axis (vertical ones when `horiz`) with their line as their bounds.
+/// Guides along the axis are left out, so they stay where they are.
+fn spaced_items(s: &Session, ids: &[NodeId], preview: bool, horiz: bool) -> Result<Vec<(Spaced, Rect)>> {
+    let st = s.doc()?;
+    let objects = items_bounds(&st.doc, ids, preview).into_iter().map(|(id, r)| (Spaced::Object(id), r));
+    let guides = st.selection.guides.iter().filter_map(|&i| {
+        let g = st.doc.guides.get(i).filter(|g| g.vertical == horiz)?;
+        Some((Spaced::Guide(i), Rect::new(g.pos, g.pos, g.pos, g.pos)))
+    });
+    Ok(objects.chain(guides).collect())
+}
+
+/// The index in `items` of what Distribute and Distribute Spacing keep in place with a spacing:
+/// the selected root that is the key object or contains it ([`key_root`]), or the key guide when
+/// aligning to the key (#2143).
+fn spaced_key(s: &Session, p: &Value, ids: &[NodeId], items: &[(Spaced, Rect)]) -> Option<usize> {
+    let key = match key_root(s, ids) {
+        Some(id) => Spaced::Object(id),
+        None => key_guide(s, p).and(s.doc().ok()?.selection.key_guide).map(Spaced::Guide)?,
+    };
+    items.iter().position(|(it, _)| *it == key)
+}
+
+/// Whether the key is a guide along the axis (a horizontal guide for a horizontal distribution),
+/// aligning to the key. It has no line there, so a spacing from it leaves everything where it
+/// is, as Align does.
+fn key_guide_along(s: &Session, p: &Value, horiz: bool) -> bool {
+    key_guide(s, p).is_some_and(|(_, vertical)| vertical != horiz)
+}
+
+/// Moves each of `deltas` that far along the axis (x when `horiz`) as undo step `label`, as
+/// [`apply_moves`] does: an object by that offset, a ruler guide to its new position.
+fn apply_spaced(s: &mut Session, label: &str, p: &Value, ids: &[NodeId], horiz: bool, deltas: &[(Spaced, f64)]) -> Result<Value> {
+    let along = |d: f64| if horiz { Vec2::new(d, 0.0) } else { Vec2::new(0.0, d) };
+    let (mut moves, mut guides) = (vec![], vec![]);
+    let d = &s.doc()?.doc;
+    for &(it, delta) in deltas {
+        match it {
+            Spaced::Object(id) => moves.push((id, along(delta))),
+            Spaced::Guide(i) => guides.extend(d.guides.get(i).map(|g| (i, g.pos + delta))),
+        }
+    }
+    apply_moves(s, label, p, ids, &moves, &guides)
 }
 
 /// [`distribute`] and [`distribute_spacing`] of the selected anchor points (whole paths among them
@@ -1456,7 +1614,6 @@ fn distribute(s: &mut Session, p: &Value) -> Result<Value> {
             (h, _) => distribute_anchors(s, "Distribute", h.is_some(), None),
         };
     }
-    let mut items = items_bounds(&s.doc()?.doc, &ids, preview);
     let (horiz, key): (bool, fn(&Rect, bool) -> f64) = match direction(p, "object.distribute")? {
         (Some(h), _) => (
             true,
@@ -1476,41 +1633,46 @@ fn distribute(s: &mut Session, p: &Value) -> Result<Value> {
         ),
         _ => return Err(bad("object.distribute", "give horizontal or vertical")),
     };
+    // The selected guides across the axis are spaced with the objects (#1597). A guide has no
+    // size, so its left edge, center and right edge are all its line.
+    let mut items = spaced_items(s, &ids, preview, horiz)?;
     items.sort_by(|a, b| key(&a.1, horiz).total_cmp(&key(&b.1, horiz)));
     let n = items.len();
-    // With a spacing, the key object (or the compound path or selected group it is in) stays where
-    // it is, and the lines are placed `spacing` apart, outward from its line, in their order.
-    // Without a key object the spacing is not used. `from_key` is the key's index in `items` and
-    // the spacing.
-    let from_key = spacing.zip(key_root(s, &ids)).and_then(|(g, k)| Some((items.iter().position(|(id, _)| *id == k)?, g)));
-    // Two objects are enough on an artboard, where they go to its edges, and when they are spaced
-    // from a key object.
+    if spacing.is_some() && key_guide_along(s, p, horiz) {
+        return ok();
+    }
+    // With a spacing, the key object (or the compound path or selected group it is in) or the key
+    // guide stays where it is, and the lines are placed `spacing` apart, outward from its line, in
+    // their order. Without a key the spacing is not used. `from_key` is the key's index in
+    // `items` and the spacing.
+    let from_key = spacing.zip(spaced_key(s, p, &ids, &items)).map(|(g, k)| (k, g));
+    // Two items are enough on an artboard, where they go to its edges, and when they are spaced
+    // from a key.
     if n < 2 || (n < 3 && board.is_none() && from_key.is_none()) {
         return ok();
     }
     let (first_box, last_box) = (&items[0].1, &items[n - 1].1);
-    // `first` and `last` are the lines that the first and last objects end on. Without an artboard
-    // the first and last objects stay where they are. On an artboard the first object moves until
-    // its left (top) edge is on the artboard's left (top) edge, and the last object moves until its
+    // `first` and `last` are the lines that the first and last items end on. Without an artboard
+    // the first and last items stay where they are. On an artboard the first item moves until
+    // its left (top) edge is on the artboard's left (top) edge, and the last item moves until its
     // right (bottom) edge is on the artboard's right (bottom) edge.
     let (first, last) = match board {
         Some(r) if horiz => (key(first_box, horiz) + r.x0 - first_box.x0, key(last_box, horiz) + r.x1 - last_box.x1),
         Some(r) => (key(first_box, horiz) + r.y0 - first_box.y0, key(last_box, horiz) + r.y1 - last_box.y1),
         None => (key(first_box, horiz), key(last_box, horiz)),
     };
-    let moves: Vec<(NodeId, Vec2)> = items
+    let deltas: Vec<(Spaced, f64)> = items
         .iter()
         .enumerate()
-        .map(|(i, (id, r))| {
+        .map(|(i, (it, r))| {
             let target = match from_key {
                 Some((k, g)) => key(&items[k].1, horiz) + g * (i as f64 - k as f64),
                 None => first + (last - first) * i as f64 / (n - 1) as f64,
             };
-            let delta = target - key(r, horiz);
-            (*id, if horiz { Vec2::new(delta, 0.0) } else { Vec2::new(0.0, delta) })
+            (*it, target - key(r, horiz))
         })
         .collect();
-    apply_moves(s, "Distribute", p, &ids, &moves)
+    apply_spaced(s, "Distribute", p, &ids, horiz, &deltas)
 }
 
 fn distribute_spacing(s: &mut Session, p: &Value) -> Result<Value> {
@@ -1522,16 +1684,21 @@ fn distribute_spacing(s: &mut Session, p: &Value) -> Result<Value> {
     if !s.doc()?.selection.anchors.is_empty() {
         return distribute_anchors(s, "Distribute Spacing", horiz, spacing);
     }
-    let mut items = items_bounds(&s.doc()?.doc, &ids, preview);
+    // The selected guides across the axis are spaced with the objects, as items with no size (#1597).
+    let mut items = spaced_items(s, &ids, preview, horiz)?;
     items.sort_by(|a, b| if horiz { a.1.x0.total_cmp(&b.1.x0) } else { a.1.y0.total_cmp(&b.1.y0) });
+    if spacing.is_some() && key_guide_along(s, p, horiz) {
+        return ok();
+    }
     let n = items.len();
     let &[(_, first), .., (_, last)] = items.as_slice() else {
-        return Err(EngineError::Other("select two or more objects to distribute".into()));
+        // Selected guides along the axis have nothing to space.
+        return if s.doc()?.selection.guides.is_empty() { Err(EngineError::Other("select two or more objects to distribute".into())) } else { ok() };
     };
     let size = |r: &Rect| if horiz { r.width() } else { r.height() };
     let start = |r: &Rect| if horiz { r.x0 } else { r.y0 };
-    // The objects start at `lo`, and without a spacing the last one ends at `hi`. These are the
-    // first object's left (top) edge and the last one's right (bottom) edge, or the artboard's
+    // The items start at `lo`, and without a spacing the last one ends at `hi`. These are the
+    // first item's left (top) edge and the last one's right (bottom) edge, or the artboard's
     // edges with Align to Artboard and no spacing.
     let (lo, hi) = match board.filter(|_| spacing.is_none()) {
         Some(r) if horiz => (r.x0, r.x1),
@@ -1545,40 +1712,75 @@ fn distribute_spacing(s: &mut Session, p: &Value) -> Result<Value> {
     };
     let mut pos = lo;
     let mut deltas = vec![];
-    for (id, r) in &items {
-        deltas.push((*id, pos - start(r)));
+    for (it, r) in &items {
+        deltas.push((*it, pos - start(r)));
         pos += size(r) + gap;
     }
-    // With a spacing (aligning to a key object) the key object stays where it is, with the
-    // compound path or selected group it is in: the others are spaced from it.
-    let key = key_root(s, &ids);
-    let fixed = spacing.and_then(|_| deltas.iter().find(|(id, _)| Some(*id) == key)).map_or(0.0, |k| k.1);
-    let moves: Vec<(NodeId, Vec2)> =
-        deltas.into_iter().map(|(id, d)| (id, if horiz { Vec2::new(d - fixed, 0.0) } else { Vec2::new(0.0, d - fixed) })).collect();
-    apply_moves(s, "Distribute Spacing", p, &ids, &moves)
+    // With a spacing the key stays where it is: the key object, with the compound path or
+    // selected group it is in, or the key guide (#2143). The others are spaced from it.
+    let fixed = spacing.and_then(|_| spaced_key(s, p, &ids, &items)).and_then(|k| deltas.get(k)).map_or(0.0, |k| k.1);
+    let deltas: Vec<(Spaced, f64)> = deltas.into_iter().map(|(it, d)| (it, d - fixed)).collect();
+    apply_spaced(s, "Distribute Spacing", p, &ids, horiz, &deltas)
 }
 
 fn set_bounds(s: &mut Session, p: &Value) -> Result<Value> {
+    match bounds_transform(s, p, selected_roots(s)?, 0.0)? {
+        Bounds::Anchors(ids, b) => set_anchor_bounds(s, p, ids, b),
+        Bounds::Objects(ids, xf) => apply_transform(s, "Transform", ids, xf, p, false),
+    }
+}
+
+/// What `object.setBounds` does with its values ([`bounds_transform`]).
+enum Bounds {
+    /// With anchors selected with Direct Selection: the objects and the box of the anchors that
+    /// [`set_anchor_bounds`] moves or scales.
+    Anchors(Vec<NodeId>, Rect),
+    /// The objects and the transform that gives them the values.
+    Objects(Vec<NodeId>, Affine),
+}
+
+/// A previewed `object.setBounds` that transforms objects runs as `object.transform` with the
+/// transform [`bounds_transform`] finds for it, so the interaction commits that transform (Transform
+/// Again repeats it, and the journal holds it). A bounding-box handle drag with Use Preview Bounds
+/// previews `object.setBounds`. The objects are those `object.transform` transforms (a path of a
+/// compound path selected on its own is one), and the art keeps at least 1e-4 of its width and
+/// height, as with [`vectorcraft_tools::bbox::scale_for_drag`]. `None` with anchors selected with
+/// Direct Selection and when the values are not valid.
+pub(crate) fn bounds_rewrite(s: &Session, cmd: &str, params: &Value) -> Option<(String, Value)> {
+    if cmd != "object.setBounds" {
+        return None;
+    }
+    let Ok(Bounds::Objects(_, xf)) = bounds_transform(s, params, selected_roots_to_transform(s).ok()?, 1e-4) else { return None };
+    let mut p = params.as_object().cloned().unwrap_or_default();
+    for k in ["x", "y", "width", "height", "reference", "proportional"] {
+        p.remove(k);
+    }
+    p.insert("matrix".into(), json!(xf.as_coeffs()));
+    Some(("object.transform".to_string(), Value::Object(p)))
+}
+
+/// How `object.setBounds` with params `p` changes the objects `ids`. A scale that would leave the
+/// art with a width or height below `least` of the one it has keeps `least` of it.
+fn bounds_transform(s: &Session, p: &Value, ids: Vec<NodeId>, least: f64) -> Result<Bounds> {
     check_numbers(p, &["x", "y", "width", "height"], "object.setBounds")?;
-    let ids = selected_roots(s)?;
     let st = s.doc()?;
     if transforms_objects(p)
         && !bool_or(p, "copy", false)
-        && let Some(b) = st.selection.anchor_bounds(&st.doc, s.prefs.use_preview_bounds)
+        && let Some(b) = effects::preview::anchor_bounds(&st.selection, &st.doc, s.prefs.use_preview_bounds)
     {
-        return set_anchor_bounds(s, p, ids, b);
+        return Ok(Bounds::Anchors(ids, b));
     }
     let d = &s.doc()?.doc;
     // Sizes are measured square to the bounding box, which a rotation turns with the objects:
     // the math below runs in its frame.
     let frame = d.oriented_bounds(&ids, false).ok_or_else(|| EngineError::Other("no bounds".into()))?;
     let g = frame.rect;
-    // With Use Preview Bounds the values measure the visual box, whose margins around the
+    // With Use Preview Bounds the values measure the visual box as drawn, whose margins around the
     // geometric box (left, top, right, bottom) scale with the strokes or stay. The margins of
     // `vs`, the visual box without the strokes in symbols' art, scale; those strokes keep their
     // weight when an instance scales, so the rest of the margins stay.
     let (v, vs) = if s.prefs.use_preview_bounds {
-        (d.oriented_bounds(&ids, true).map_or(g, |b| b.rect), scaling_box(d, &ids, &frame).unwrap_or(g))
+        (effects::preview::oriented_bounds(d, &ids, true).map_or(g, |b| b.rect), scaling_box(d, &ids, &frame).unwrap_or(g))
     } else {
         (g, g)
     };
@@ -1621,20 +1823,112 @@ fn set_bounds(s: &mut Session, p: &Value) -> Result<Value> {
     // leave a rounding error in it on a rotated object or with Use Preview Bounds.
     let current = |k: &str, now: f64| p.get(k).and_then(Value::as_f64).is_none_or(|x| x == now);
     if current("x", page.x) && current("y", page.y) && current("width", v.width()) && current("height", v.height()) {
-        return apply_transform(s, "Transform", ids, Affine::IDENTITY, p, false);
+        return Ok(Bounds::Objects(ids, Affine::IDENTITY));
     }
     let to = frame.to_local(Point::new(f64_or(p, "x", page.x), f64_or(p, "y", page.y)));
     // The scales and the point above can miss the size or the reference point when the margins of
     // the objects differ, the members of groups and the objects in symbols' art included, and with
     // strokes that scale, when the sizes are out of proportion. The objects are then measured one
-    // by one ([`Spans::measure`]), and the scales solved for.
-    let solved = if s.prefs.use_preview_bounds && w >= 0.0 && h >= 0.0 {
-        Spans::measure(d, &ids, &frame, strokes).refit(rp, refi, [w, h], (sx, sy, new_rp))
-    } else {
+    // by one ([`Spans::measure`]), and the scales solved for. Objects with geometry effects are
+    // measured as drawn after each scale tried instead ([`refit_drawn`]).
+    let symbols = d.symbol_boxes();
+    let drawn = || ids.iter().filter_map(|id| d.node(*id)).any(|n| effects::preview::draws_geometry(&symbols, n));
+    let solved = if !(s.prefs.use_preview_bounds && w >= 0.0 && h >= 0.0) {
         None
+    } else if transforms_objects(p) && !bool_or(p, "typeAreas", false) && drawn() {
+        let options = scaling_options(s, p);
+        let to_local = frame.to_doc().inverse();
+        let measure = |sx: f64, sy: f64| {
+            let xf = frame.conjugate(about(rp, Affine::scale_non_uniform(sx, sy)));
+            let sc = if Scaling::factor(xf).is_some() { options } else { Scaling::default() };
+            ids.iter().filter_map(|id| d.node(*id)).fold(None, |acc, n| {
+                let mut n = n.clone();
+                n.transform(xf, sc);
+                vectorcraft_geom::union_opt(acc, effects::preview::bounds_in(&symbols, &n, to_local))
+            })
+        };
+        // The scales above keep the effects' reach as a margin that stays, and give 0 for a size
+        // smaller than that reach. Strokes and effects that scale shrink the reach with the art, so
+        // the search then starts from the size wanted over the size as drawn.
+        let seed = |s: f64, size: f64, now: f64| if s <= 0.0 && size > 0.0 && now > 1e-9 { size / now } else { s };
+        refit_drawn(measure, refi, [w, h], (seed(sx, w, v.width()), seed(sy, h, v.height())), [g.width() > 1e-9, g.height() > 1e-9])
+    } else {
+        Spans::measure(d, &ids, &frame, strokes).refit(rp, refi, [w, h], (sx, sy, new_rp))
     };
-    let (scale, new_rp) = solved.map_or((scale, new_rp), |(sx, sy, at)| (about(rp, Affine::scale_non_uniform(sx, sy)), at));
-    apply_transform(s, "Transform", ids, frame.conjugate(Affine::translate(to - new_rp) * scale), p, false)
+    let (sx, sy, new_rp) = solved.unwrap_or((sx, sy, new_rp));
+    // A scale below `least` of art with a width (height) keeps `least`, and the reference point
+    // moves with the scales as above.
+    let keep = |s: f64, geo: f64| if geo > 1e-9 && (0.0..least).contains(&s) { least } else { s };
+    let (kx, ky) = (keep(sx, g.width()), keep(sy, g.height()));
+    let scale = about(rp, Affine::scale_non_uniform(kx, ky));
+    let new_rp = if (kx, ky) == (sx, sy) { new_rp } else { scale * gp + (sp - gp) * f(kx, ky) + (rp - sp) };
+    let xf = frame.conjugate(Affine::translate(to - new_rp) * scale);
+    Ok(Bounds::Objects(ids, xf))
+}
+
+/// The scales along x and y that give the box `measure` returns for them the size `size`, and point
+/// `refi` of that box: the point that goes to the reference point's place. The search starts at
+/// `start`. Each step measures how the width and the height change with each scale that `free`
+/// marks true, by measuring again with that scale moved by 1e-4 of it (at least 1e-6), and moves
+/// those scales by the least-squares solution of that linear change, never below 0. The width can
+/// change with the y scale and the height with the x scale (a geometry effect can turn the art). A
+/// scale that `free` marks false stays as it is. The search stops when both sizes are within 1e-9
+/// of the sizes wanted (of the largest of 1 and those sizes), when no scale moves, when `measure`
+/// finds no box, or after 16 steps, and returns the scales that came nearest. `None` when `measure`
+/// finds no box for `start`.
+fn refit_drawn(
+    measure: impl Fn(f64, f64) -> Option<Rect>,
+    refi: usize,
+    size: [f64; 2],
+    start: (f64, f64),
+    free: [bool; 2],
+) -> Option<(f64, f64, Point)> {
+    let [w, h] = size;
+    let tolerance = 1e-9 * w.max(h).max(1.0);
+    let miss = |b: Rect| (b.width() - w).abs() + (b.height() - h).abs();
+    let (mut sx, mut sy) = start;
+    let mut b = measure(sx, sy)?;
+    let mut best = (sx, sy, b);
+    for _ in 0..16 {
+        let f = [b.width() - w, b.height() - h];
+        if f[0].abs() <= tolerance && f[1].abs() <= tolerance {
+            break;
+        }
+        // How the width and the height change with the x scale (`a`) and the y scale (`c`).
+        let change = |x: bool| -> Option<[f64; 2]> {
+            let (on, s) = if x { (free[0], sx) } else { (free[1], sy) };
+            if !on {
+                return Some([0.0, 0.0]);
+            }
+            let ds = (s.abs() * 1e-4).max(1e-6);
+            let m = if x { measure(sx + ds, sy) } else { measure(sx, sy + ds) }?;
+            Some([(m.width() - b.width()) / ds, (m.height() - b.height()) / ds])
+        };
+        let (Some(a), Some(c)) = (change(true), change(false)) else { break };
+        let dot = |u: [f64; 2], v: [f64; 2]| u[0] * v[0] + u[1] * v[1];
+        let (aa, ac, cc, af, cf) = (dot(a, a), dot(a, c), dot(c, c), dot(a, f), dot(c, f));
+        let det = aa * cc - ac * ac;
+        let (dx, dy) = if det > 1e-12 * aa * cc && det > 0.0 {
+            ((ac * cf - cc * af) / det, (ac * af - aa * cf) / det)
+        } else if aa >= cc && aa > 0.0 {
+            (-af / aa, 0.0)
+        } else if cc > 0.0 {
+            (0.0, -cf / cc)
+        } else {
+            break;
+        };
+        let (nx, ny) = ((sx + dx).max(0.0), (sy + dy).max(0.0));
+        if !(nx.is_finite() && ny.is_finite()) || (nx == sx && ny == sy) {
+            break;
+        }
+        let Some(next) = measure(nx, ny) else { break };
+        (sx, sy, b) = (nx, ny, next);
+        if miss(b) < miss(best.2) {
+            best = (sx, sy, b);
+        }
+    }
+    let (sx, sy, b) = best;
+    Some((sx, sy, vectorcraft_geom::reference_point(b, refi)))
 }
 
 /// The `width` and `height` `object.setBounds` asks for a box now `b`: the one not given stays, or

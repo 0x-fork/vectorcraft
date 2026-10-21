@@ -21,7 +21,7 @@
 //! ```
 //!
 //! A style is *plain* when it is one fill and one stroke at most, in solid colours (a fill's gradient
-//! is the object's own), and only effects read here (Outer Glow, Drop Shadow) after them. Such
+//! is the object's own), and only effects read here (Outer Glow, Drop Shadow, Feather) after them. Such
 //! objects are read as themselves with that fill, stroke and those effects; others keep their
 //! drawn look. A fill's or stroke's style says whether it paints with `stroke fill Xd`.
 
@@ -36,9 +36,10 @@ use super::obj::V;
 use super::paint;
 
 /// The filters a plain style may chain.
-const PLAIN: [&str; 7] =
-    ["Chain Style Filter", "Stack Style Filter", "Stroke Style Filter", "Fill Style Filter", "Conduit Filter", "Blend Style Filter", GLOW];
+const PLAIN: [&str; 8] =
+    ["Chain Style Filter", "Stack Style Filter", "Stroke Style Filter", "Fill Style Filter", "Conduit Filter", "Blend Style Filter", GLOW, FEATHER];
 const GLOW: &str = "Adobe Outer Glow"; // brand-ok: the filter's name in the files
+const FEATHER: &str = "Adobe Feather"; // brand-ok: the filter's name in the files
 const SHADOW: &str = "Adobe Drop Shadow"; // brand-ok: the filter's name in the files
 
 /// A plain style's paint, as the object comes in.
@@ -307,7 +308,7 @@ fn style(filters: &[Filter]) -> ArtStyle {
         }
     }
     for (i, f) in filters.iter().enumerate() {
-        let effect = f.name == GLOW || f.name == SHADOW;
+        let effect = f.name == GLOW || f.name == FEATHER || f.name == SHADOW;
         if !PLAIN.contains(&f.name.as_str()) && f.name != SHADOW {
             plain = false;
         }
@@ -330,9 +331,14 @@ fn style(filters: &[Filter]) -> ArtStyle {
                 params: json!({"mode": mode(2), "opacity": param("opac").unwrap_or(0.75) * 100.0, "blur": 2.0 * param("blur").unwrap_or(5.0), "color": color}),
                 visible: true,
             }),
-            SHADOW if param("csrc").unwrap_or(0.0) == 0.0 => effects.push(Effect {
-                id: "stylize.dropShadow".into(),
-                params: json!({
+            // LiveEffect XML uses `radius`; art styles abbreviate it `rad` (public scripting posts on applyEffect).
+            FEATHER => effects.push(Effect {
+                id: "stylize.feather".into(),
+                params: json!({"radius": param("rad").or_else(|| param("radius")).filter(|v| v.is_finite()).unwrap_or(5.0)}),
+                visible: true,
+            }),
+            SHADOW => {
+                let mut params = json!({
                     "mode": mode(1),
                     "opacity": param("opac").unwrap_or(0.75) * 100.0,
                     "blur": 2.0 * param("blur").unwrap_or(5.0),
@@ -341,11 +347,15 @@ fn style(filters: &[Filter]) -> ArtStyle {
                     "x": param("horz").unwrap_or(7.0),
                     "y": param("vert").unwrap_or(7.0),
                     "color": color,
-                }),
-                visible: true,
-            }),
-            // A shadow darkening the object's own colors is not read as Drop Shadow's Darkness.
-            SHADOW => plain = false,
+                });
+                // A `csrc` of 1 is Darkness, the object's own colors with black added; any value other than 0 is read as
+                // Darkness. `dark` is the percent of black (0 to 100, where `opac` is a fraction), and 100 when it is missing or not finite.
+                if param("csrc").unwrap_or(0.0) != 0.0 {
+                    params["shade"] = json!("darkness");
+                    params["darkness"] = json!(param("dark").filter(|v| v.is_finite()).map_or(100.0, |v| v.clamp(0.0, 100.0)));
+                }
+                effects.push(Effect { id: "stylize.dropShadow".into(), params, visible: true });
+            }
             _ => {}
         }
     }
@@ -391,6 +401,74 @@ mod tests {
         let styles = art_styles(data);
         let [shadow] = styles["Shade"].effects.as_slice() else { panic!("{:?}", styles["Shade"]) };
         assert_eq!((shadow.params["x"].as_f64(), shadow.params["y"].as_f64()), (Some(7.0), Some(7.0)));
+    }
+
+    /// The style `Shade`: a Drop Shadow whose dictionary holds `keys`.
+    fn shadow_style(keys: &str) -> ArtStyle {
+        let data = format!(
+            "/KnownStyle :\n(Shade) /Name ,\n/ActiveStyle :\n/CompoundFilter :\n(Chain Style Filter) 0 0 /Filter ,\n1 /Visible ,\n\
+            /BasicFilter :\n(Adobe Drop Shadow) 1 0 /Filter ,\n1 /Visible ,\n/Dictionary : /NotRecorded ,\n{keys}; /Dict ;\n /Part ,\n;\n"
+        );
+        art_styles(data.as_bytes()).remove("Shade").unwrap_or_default()
+    }
+
+    #[test]
+    fn a_drop_shadow_with_darkness_reads_its_darkness() {
+        // GUARDS: a `csrc` other than 0 made the style not plain, and the object came in as its drawn look.
+        let style = shadow_style("1 /Int (blnd) ,\n0.75 /Real (opac) ,\n5 /Real (blur) ,\n1 /Int (csrc) ,\n50 /Real (dark) ,\n");
+        assert!(style.plain, "{style:?}");
+        let [shadow] = style.effects.as_slice() else { panic!("{style:?}") };
+        let p = &shadow.params;
+        assert_eq!(
+            (shadow.id.as_str(), &p["shade"], &p["darkness"], &p["opacity"], &p["blur"]),
+            ("stylize.dropShadow", &json!("darkness"), &json!(50.0), &json!(75.0), &json!(10.0))
+        );
+    }
+
+    #[test]
+    fn a_drop_shadow_darkness_is_100_percent_when_missing_and_kept_within_0_to_100() {
+        for (dark, want) in [("", 100.0), ("(fifty) /Real (dark) ,\n", 100.0), ("250 /Real (dark) ,\n", 100.0), ("-5 /Real (dark) ,\n", 0.0)] {
+            let style = shadow_style(&format!("1 /Int (csrc) ,\n{dark}"));
+            assert!(style.plain, "{dark:?}: {style:?}");
+            let [shadow] = style.effects.as_slice() else { panic!("{dark:?}: {style:?}") };
+            assert_eq!((&shadow.params["shade"], &shadow.params["darkness"]), (&json!("darkness"), &json!(want)), "{dark:?}");
+        }
+    }
+
+    #[test]
+    fn a_drop_shadow_with_color_keeps_its_params() {
+        // GUARDS: a `csrc` of 0, or none, is Color; its shadow has neither `shade` nor `darkness`.
+        for csrc in ["", "0 /Int (csrc) ,\n50 /Real (dark) ,\n"] {
+            let style = shadow_style(&format!("2 /Int (blnd) ,\n0.5 /Real (opac) ,\n{csrc}"));
+            assert!(style.plain, "{csrc:?}: {style:?}");
+            let [shadow] = style.effects.as_slice() else { panic!("{csrc:?}: {style:?}") };
+            let want = json!({"mode": "Screen", "opacity": 50.0, "blur": 10.0, "x": 7.0, "y": 7.0, "color": vectorcraft_color::Color::BLACK});
+            assert_eq!(shadow.params, want, "{csrc:?}");
+        }
+    }
+
+    #[test]
+    fn a_feather_reads_its_radius_from_rad() {
+        let data = b"/KnownStyle :\n(Soft) /Name ,\n/ActiveStyle :\n/CompoundFilter :\n(Chain Style Filter) 0 0 /Filter ,\n1 /Visible ,\n\
+            /BasicFilter :\n(Adobe Feather) 1 0 /Filter ,\n1 /Visible ,\n/Dictionary : /NotRecorded ,\n12 /Real (rad) ,\n; /Dict ;\n /Part ,\n;\n";
+        let styles = art_styles(data);
+        let [feather] = styles["Soft"].effects.as_slice() else { panic!() };
+        assert_eq!((feather.id.as_str(), feather.params["radius"].as_f64()), ("stylize.feather", Some(12.0)));
+    }
+
+    #[test]
+    fn a_feather_falls_back_to_radius_and_defaults_to_five_points() {
+        let with_name = b"/KnownStyle :\n(Soft) /Name ,\n/ActiveStyle :\n/CompoundFilter :\n(Chain Style Filter) 0 0 /Filter ,\n1 /Visible ,\n\
+            /BasicFilter :\n(Adobe Feather) 1 0 /Filter ,\n1 /Visible ,\n/Dictionary : /NotRecorded ,\n3 /Real (radius) ,\n; /Dict ;\n /Part ,\n;\n";
+        let styles = art_styles(with_name);
+        let [feather] = styles["Soft"].effects.as_slice() else { panic!() };
+        assert_eq!(feather.params["radius"].as_f64(), Some(3.0));
+
+        let bare = b"/KnownStyle :\n(Soft) /Name ,\n/ActiveStyle :\n/CompoundFilter :\n(Chain Style Filter) 0 0 /Filter ,\n1 /Visible ,\n\
+            /BasicFilter :\n(Adobe Feather) 1 0 /Filter ,\n1 /Visible ,\n/Dictionary : /NotRecorded ,\n; /Dict ;\n /Part ,\n;\n";
+        let styles = art_styles(bare);
+        let [feather] = styles["Soft"].effects.as_slice() else { panic!() };
+        assert_eq!(feather.params["radius"].as_f64(), Some(5.0));
     }
 
     #[test]

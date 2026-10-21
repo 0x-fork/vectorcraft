@@ -598,6 +598,9 @@ impl Tool for CurvatureTool {
                 curvature_extend(&mut tail, false, h, self.how(&e), false);
                 tail.to_bezpath_into(&mut bp);
                 o.push(Overlay::Path { path: bp, color: FEEDBACK, width: 1.0, dashed: false });
+                if cx.measurement_labels && e.p.distance(h) > 1e-9 {
+                    o.push(Overlay::Measure { p: h + Vec2::new(cx.tol(12.0), cx.tol(12.0)), text: cx.segment_measure_label(e.p, h) });
+                }
             }
             return o;
         }
@@ -609,6 +612,12 @@ impl Tool for CurvatureTool {
             pts.push((h, false));
             curvature_spline(&pts, false).to_bezpath_into(&mut bp);
             o.push(Overlay::Path { path: bp, color: FEEDBACK, width: 1.0, dashed: false });
+            if let Some((from, _)) = self.pts.last()
+                && cx.measurement_labels
+                && from.distance(h) > 1e-9
+            {
+                o.push(Overlay::Measure { p: h + Vec2::new(cx.tol(12.0), cx.tol(12.0)), text: cx.segment_measure_label(*from, h) });
+            }
         }
         for (i, (p, _)) in self.pts.iter().enumerate() {
             o.push(Overlay::CurvePoint { p: *p, color: FEEDBACK, filled: Some(i) == self.current, size: 6.0 });
@@ -621,7 +630,7 @@ impl Tool for CurvatureTool {
                 Some(0) if !self.closed && self.pts.len() >= 3 => Cursor::PenClose,
                 Some(_) if m.alt => Cursor::PenConvert,
                 Some(_) => Cursor::Move,
-                None => Cursor::Pen,
+                None => Cursor::Curvature,
             };
         }
         let tol = point_tol(cx);
@@ -642,7 +651,7 @@ impl Tool for CurvatureTool {
         if end.is_none() && segment_in(cx, editable_paths(cx), p, tol).is_some() {
             return Cursor::PenAdd;
         }
-        Cursor::Pen
+        Cursor::Curvature
     }
 }
 
@@ -652,6 +661,16 @@ mod tests {
     use crate::testutil::*;
     use vectorcraft_doc::{Appearance, Document, Node, Selection};
     use vectorcraft_geom::{ParamCurve, PathData};
+
+    /// The Curvature tool has its own cursor, not the Pen's start-a-path one.
+    #[test]
+    fn curvature_tool_shows_its_cursor() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        assert_eq!(CurvatureTool::default().cursor(&cx, Point::new(10.0, 10.0), Mods::default()), Cursor::Curvature);
+    }
 
     #[test]
     fn first_click_creates_then_notify_tracks_path() {
@@ -1023,7 +1042,11 @@ mod tests {
         let s = selected(id, Some(5));
         let cx = quiet(&d, &s, &p);
         t.pointer(&cx, &PointerEvent::new(PointerKind::Move, 650.0, 60.0));
-        assert!(t.overlays(&cx).iter().any(|o| matches!(o, Overlay::Path { .. })), "the rubber band shows");
+        let ovs = t.overlays(&cx);
+        assert!(ovs.iter().any(|o| matches!(o, Overlay::Path { .. })), "the rubber band shows");
+        let from = pt(550.0, 120.0);
+        let to = pt(650.0, 60.0);
+        assert!(ovs.iter().any(|o| matches!(o, Overlay::Measure { text, .. } if text == &cx.segment_measure_label(from, to))));
         let a = press(&mut t, &cx, 650.0, 60.0, true);
         assert!(matches!(edit_op(&a[0]), Some(("extend", v)) if v["from"] == "smooth"), "{a:?}");
         curvature_extend(&mut sp, false, pt(650.0, 60.0), EndCurve::Smooth, false);

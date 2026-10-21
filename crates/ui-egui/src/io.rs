@@ -3,7 +3,9 @@
 
 use serde_json::{Value, json};
 use vectorcraft_doc::SavedView;
+use vectorcraft_doc::cancel;
 use vectorcraft_engine::EngineError;
+use vectorcraft_engine::cmd::fileio::progress::{self, Progress};
 use vectorcraft_engine::cmd::fileio::{self, Format, SAVE_FORMATS, SaveMode, SavePlan, TEMPLATE_FORMATS};
 
 use crate::background::{self, Writer};
@@ -150,7 +152,9 @@ pub fn install_plugin(app: &mut VectorcraftApp, path: Option<String>) -> Result<
     let path = match path {
         Some(p) => p,
         None if app.services.open_async.is_some() => return open_dialog(app).map(|_| Value::Null),
-        None => pick_open(app, &FilePick { filters: vec![("Plug-ins", vectorcraft_engine::cmd::plugin::EXTS)], ..Default::default() })?,
+        None => {
+            pick_open(app, &FilePick { filters: vec![FilePick::filter("Plug-ins", vectorcraft_engine::cmd::plugin::EXTS)], ..Default::default() })?
+        }
     };
     let r = app.run("plugin.install", json!({ "path": path }))?;
     app.status(format!("Installed plug-in {}", r["name"].as_str().unwrap_or_default()));
@@ -163,7 +167,7 @@ pub fn open_dialog(app: &mut VectorcraftApp) -> Result<(), String> {
         f();
         return Ok(());
     }
-    let path = pick_open(app, &FilePick { filters: fileio::open_filters().collect(), ..Default::default() })?;
+    let path = pick_open(app, &FilePick { filters: FilePick::filters(fileio::open_filters()), ..Default::default() })?;
     open_reporting(app, &path).map(|_| ())
 }
 
@@ -262,7 +266,7 @@ pub fn new_from_template(app: &mut VectorcraftApp, path: Option<String>) -> Resu
         Some(p) => p,
         None if app.services.open_async.is_some() => return open_dialog(app).map(|_| Value::Null),
         None => {
-            let filters = std::iter::once(("Templates", TEMPLATE_EXTS)).chain(fileio::open_filters()).collect();
+            let filters = FilePick::filters(std::iter::once(("Templates", TEMPLATE_EXTS)).chain(fileio::open_filters()));
             pick_open(app, &FilePick { folder: fileio::templates_dialog_folder(&app.session.prefs), filters, ..Default::default() })?
         }
     };
@@ -286,14 +290,16 @@ pub(crate) fn is_web(app: &VectorcraftApp) -> bool {
     app.services.download.is_some()
 }
 
-/// Write `bytes` to `path`, else to a file picked with `name` suggested next to the document (the
-/// web downloads them as `name`) → where they went.
+/// Write `bytes` to `path`, else to a file picked in a save panel that suggests `name` next to the
+/// document and shows its file type, [`file_types`] (the web downloads them as `name`) → where
+/// they went.
 pub(crate) fn write_named(app: &mut VectorcraftApp, path: Option<String>, name: &str, bytes: &[u8]) -> Result<String, String> {
     let path = match path {
         Some(p) => p,
         None => {
             let (_, folder) = suggested(app, "");
-            pick_path(app, &FilePick { name: name.to_string(), folder, ..Default::default() })?
+            let filters = file_types(&fileio::extension(name));
+            pick_path(app, &FilePick { name: name.to_string(), folder, filters })?
         }
     };
     write_reporting(app, &path, bytes)?;
@@ -304,11 +310,26 @@ pub(crate) fn write_named(app: &mut VectorcraftApp, path: Option<String>, name: 
 /// save panel's choice, given the suggested name's extension when it names no file type (a name
 /// typed without one).
 fn pick_path(app: &mut VectorcraftApp, pick: &FilePick) -> Result<String, String> {
+    let ext = fileio::extension(&pick.name);
+    pick_finished(app, pick, |picked, _| with_extension(picked, &ext, |_| true))
+}
+
+/// The suggested name made into a path by `finish` on the web (a download), else the save panel's
+/// choice made into one, with the extension of the file type picked in the panel when it reports
+/// one ([`crate::picks::PickAnswer`]). When `finish` changed the choice (an extension added) and a
+/// file is there, which the panel did not ask about, a question asks before replacing it
+/// ([`crate::picks::ask_to_replace`]) and this answers "cancelled"; the question's OK runs what
+/// asked again.
+fn pick_finished(app: &mut VectorcraftApp, pick: &FilePick, finish: impl Fn(&str, Option<&str>) -> String) -> Result<String, String> {
     if is_web(app) {
-        return Ok(pick.name.clone());
+        return Ok(finish(&pick.name, None));
     }
-    let picked = crate::picks::save(app, pick).ok_or("cancelled")?;
-    Ok(with_extension(&picked, &fileio::extension(&pick.name), |_| true))
+    let (picked, file_type) = crate::picks::save_with_type(app, pick).ok_or("cancelled")?;
+    let path = finish(&picked, file_type.as_deref());
+    if path != picked && crate::picks::ask_to_replace(app, crate::picks::PickRequest::Save(pick.clone()), &picked, file_type.as_deref(), &path) {
+        return Err("cancelled".into());
+    }
+    Ok(path)
 }
 
 /// `path` as typed in a save panel: kept when it ends in `ext` or its extension names a format
@@ -330,14 +351,40 @@ fn suggested(app: &VectorcraftApp, ext: &str) -> (String, Option<String>) {
     (format!("{}.{ext}", fileio::file_stem(&t)), folder.filter(|f| !f.is_empty()))
 }
 
+/// The save panel's file type, `(label, extensions)`, for the files `write_named` and
+/// `target_path` write that are not a document format (`fileio::format` has those).
+const FILE_TYPES: &[(&str, &[&str])] = &[
+    ("Swatch libraries", &["vcswatches"]),
+    ("Swatch libraries", &["gpl"]),
+    ("Swatch libraries", &["ase"]),
+    ("Graphic Style Libraries", &[vectorcraft_doc::style_libs::STYLES_EXT]),
+    ("Libraries", vectorcraft_engine::cmd::library::LIBRARY_EXTS),
+    ("Flattener presets", vectorcraft_engine::cmd::flatten::PRESET_EXTS),
+    ("PDF presets", vectorcraft_engine::cmd::pdfcmds::PRESET_EXTS),
+    ("Perspective grid presets", vectorcraft_engine::cmd::perspgrid::PRESET_EXTS),
+    ("Print presets", vectorcraft_engine::cmd::printpresets::PRESET_EXTS),
+    ("CSS", &["css"]),
+    ("PostScript", &["ps"]),
+];
+
+/// The file type a save panel shows for a file with extension `ext`: its format's, else its
+/// [`FILE_TYPES`] row; none for any other extension.
+fn file_types(ext: &str) -> Vec<crate::FileFilter> {
+    if let Some(f) = fileio::format(ext) {
+        return vec![FilePick::filter(f.label, f.extensions)];
+    }
+    let ext = ext.trim_start_matches('.').to_ascii_lowercase();
+    FilePick::filters(FILE_TYPES.iter().find(|(_, exts)| exts.contains(&ext.as_str())).copied())
+}
+
 /// `path`, else one picked in a save panel (the web: the suggested name) for the active document
-/// with extension `ext`, filtered to that format when it is one.
+/// with extension `ext`, filtered to its file type when it has one ([`file_types`]).
 pub(crate) fn target_path(app: &mut VectorcraftApp, path: Option<String>, ext: &str) -> Result<String, String> {
     if let Some(p) = path {
         return Ok(p);
     }
     let (name, folder) = suggested(app, ext);
-    let filters = fileio::format(ext).map(|f| vec![(f.label, f.extensions)]).unwrap_or_default();
+    let filters = file_types(ext);
     pick_path(app, &FilePick { name, folder, filters })
 }
 
@@ -349,11 +396,29 @@ pub fn remember_view(app: &mut VectorcraftApp) {
     }
 }
 
-/// A path typed in a save panel: kept when its extension names a save format, or, for Save as
-/// Template (`mode`), when it names a template format (the panel's file type); otherwise `f`'s
-/// extension is added.
+/// A path typed in a save panel: kept when its extension names one of the panel's file types (a
+/// save format, or a template format for Save as Template, `mode`); otherwise `f`'s extension is
+/// added.
 fn with_save_extension(path: &str, f: &Format, mode: SaveMode) -> String {
-    with_extension(path, f.extensions[0], |g| SAVE_FORMATS.contains(&g.id) || (mode == SaveMode::Template && TEMPLATE_FORMATS.contains(&g.id)))
+    let formats = if mode == SaveMode::Template { TEMPLATE_FORMATS } else { SAVE_FORMATS };
+    with_extension(path, f.extensions[0], |g| formats.contains(&g.id))
+}
+
+/// [`with_save_extension`] for a save panel that reports the file type picked in it (`picked`,
+/// that type's extension; the XDG portal's panel on Linux and the BSDs), which then takes `f`'s
+/// place. A path that still ends in the extension of the name the panel suggested (`suggested`)
+/// gets the picked type's extension instead. Without a picked type, or with one the panel did not
+/// offer, [`with_save_extension`] with `f`.
+fn with_picked_type(path: &str, suggested: &str, picked: Option<&str>, f: &Format, mode: SaveMode) -> String {
+    let formats = if mode == SaveMode::Template { TEMPLATE_FORMATS } else { SAVE_FORMATS };
+    let Some(g) = picked.and_then(fileio::format).filter(|g| formats.contains(&g.id)) else {
+        return with_save_extension(path, f, mode);
+    };
+    let has = std::path::Path::new(path).extension();
+    if has.is_some() && has == std::path::Path::new(suggested).extension() {
+        return std::path::Path::new(path).with_extension(g.extensions[0]).to_string_lossy().into_owned();
+    }
+    with_save_extension(path, g, mode)
 }
 
 /// Write every file of an export (one per artboard, linked images) for the destination `path`.
@@ -377,8 +442,9 @@ fn plan(app: &VectorcraftApp, mode: SaveMode, p: &Value) -> Result<SavePlan, Str
 /// per template format for Save as Template) and the web opens the Save As dialog (file name and
 /// format). With `ask_options` and no options in `p`,
 /// a format picked that way that has options asks for them before anything is written (SVG
-/// Options, the Save PDF dialog, or the save options dialog: native and `.ai` files on Save As
-/// only), and so does Save As or Save a Copy to a given SVG path. → `{path, format, warnings…}` once written, or `{pending: <dialog kind>,
+/// Options, the Save PDF dialog, or the save options dialog: native files on Save As only, `.ai`
+/// files on Save As and Save a Copy), and so does Save As or Save a Copy to a given SVG path.
+/// → `{path, format, warnings…}` once written, or `{pending: <dialog kind>,
 /// path?}` while a dialog is open.
 pub fn save(app: &mut VectorcraftApp, mode: SaveMode, p: &Value, ask_options: bool) -> Result<Value, String> {
     remember_view(app);
@@ -397,16 +463,17 @@ pub fn save(app: &mut VectorcraftApp, mode: SaveMode, p: &Value, ask_options: bo
     if is_web(app) && ask_options {
         return Ok(open_options(app, mode.command(), first.format, &first.name, true));
     }
-    let filters = match mode {
+    let filters = FilePick::filters(match mode {
         SaveMode::Template => fileio::template_filters(first.format.id),
         _ => fileio::save_filters(first.format.id),
-    };
-    let picked = pick_path(app, &FilePick { name: first.name.clone(), folder: first.folder.clone(), filters })?;
+    });
+    let pick = FilePick { name: first.name.clone(), folder: first.folder.clone(), filters };
+    let picked = pick_finished(app, &pick, |picked, file_type| with_picked_type(picked, &first.name, file_type, first.format, mode))?;
     // The picked file type wins over a `format` param.
     let mut q = if p.is_object() { p.clone() } else { json!({}) };
     if let Some(o) = q.as_object_mut() {
         o.remove("format");
-        o.insert("path".into(), json!(with_save_extension(&picked, first.format, mode)));
+        o.insert("path".into(), json!(picked));
     }
     let chosen = plan(app, mode, &acknowledged(&q))?;
     if let Some(r) = chosen.path.as_deref().and_then(|path| ask_before_losing(app, path, save_command(mode), &q)) {
@@ -460,12 +527,14 @@ fn ask_before_losing(app: &mut VectorcraftApp, path: &str, command: &str, params
 }
 
 /// Does a save (`mode`) to a picked file of format `f` ask for its options first? Native and `.ai`
-/// files only on Save As (the options dialog after the save panel); Save, a Copy and templates
-/// reuse the remembered options or Use Compression.
+/// files on Save As (the options dialog after the save panel), and `.ai` files also on Save a Copy,
+/// so the copy is not written in the version last saved whatever the panel's `.ai` type says
+/// (#3141); Save and templates reuse the remembered options or Use Compression.
 fn asks_options(mode: SaveMode, f: &Format) -> bool {
     !f.options.is_empty()
         && match f.id {
-            "vectorcraft" | "ai" => mode == SaveMode::SaveAs,
+            "vectorcraft" => mode == SaveMode::SaveAs,
+            "ai" => matches!(mode, SaveMode::SaveAs | SaveMode::Copy),
             "template" | "ait" => false,
             _ => true,
         }
@@ -522,11 +591,16 @@ fn view_file(app: &mut VectorcraftApp, path: &str) {
 
 /// "Saved <path>", with the first of the result's warnings.
 pub(crate) fn report_saved(app: &mut VectorcraftApp, path: &str, r: &Value) {
+    app.status(saved_status(path, r));
+}
+
+/// [`report_saved`]'s message.
+fn saved_status(path: &str, r: &Value) -> String {
     let warnings: Vec<&str> = r["warnings"].as_array().map(|w| w.iter().filter_map(Value::as_str).collect()).unwrap_or_default();
-    app.status(match warnings.first() {
+    match warnings.first() {
         Some(first) => format!("Saved {path} with {} note(s): {first}", warnings.len()),
         None => format!("Saved {path}"),
-    });
+    }
 }
 
 /// Write a planned save through the services and report it in the status bar.
@@ -608,6 +682,25 @@ pub fn recent_files(app: &VectorcraftApp) -> &[String] {
     &r[..r.len().min(app.session.prefs.recent_files_count as usize)]
 }
 
+/// The status once an export was cancelled.
+pub const EXPORT_CANCELLED: &str = "Export cancelled";
+
+/// File → Cancel Export (the progress dialog's Cancel): every export running in the background
+/// stops and writes nothing more → `{cancelled: n}`.
+pub fn cancel_exports(app: &mut VectorcraftApp) -> Value {
+    let n = app.background.cancel_exports();
+    if n > 0 {
+        app.status(EXPORT_CANCELLED);
+    }
+    json!({ "cancelled": n })
+}
+
+/// The progress dialog's Continue in Background: the exports go on, shown in the status bar only
+/// → `{hidden: n}`.
+pub fn hide_exports(app: &mut VectorcraftApp) -> Value {
+    json!({ "hidden": app.background.hide_exports() })
+}
+
 /// Export the active document in `format` (default: the path's extension, else PNG) with the
 /// `document.export` options in `params` (artboard, range, useArtboards, selectedOnly, ppi, SVG
 /// options…): every file it writes (one per artboard, linked images) goes next to `path`. The
@@ -634,21 +727,38 @@ pub fn export(app: &mut VectorcraftApp, format: Option<&str>, path: Option<Strin
         Some(z) if f.id == "svg" && z.id == "svgz" => z,
         _ => f,
     };
-    // Background Export: encoded and written from this snapshot while editing goes on.
+    // Background Export: encoded and written from this snapshot while editing goes on. The
+    // encoder is told the file it writes (an exporter plug-in gets its name and extension).
     let label = format!("Exporting {}", fileio::file_name(&path));
-    let (params, target) = (params.clone(), path.clone());
+    let (mut params, target) = (params.clone(), path.clone());
+    if let Some(o) = params.as_object_mut() {
+        o.insert("path".into(), json!(path));
+    }
+    // The progress dialog's counts and Cancel: a cancelled export stops drawing and never starts
+    // writing.
+    let progress = Progress::new();
+    let (reporting, asked) = (progress.clone(), progress.clone());
     let work = move |write: Writer| {
-        let enc = fileio::encode_all(&doc, f.id, &params).map_err(|e| e.to_string())?;
-        let files = write_encoded(write, &doc, &path, &enc)?;
-        let mut out = json!({ "path": files.first().unwrap_or(&path), "warnings": enc.warnings });
-        if files.len() > 1 {
-            out["files"] = json!(files);
-        }
-        Ok(out)
+        progress::scope(&reporting, || {
+            cancel::check().map_err(|e| e.to_string())?;
+            let enc = fileio::encode_all(&doc, f.id, &params).map_err(|e| e.to_string())?;
+            cancel::check().map_err(|e| e.to_string())?;
+            let files = write_encoded(write, &doc, &path, &enc)?;
+            let mut out = json!({ "path": files.first().unwrap_or(&path), "warnings": enc.warnings });
+            if files.len() > 1 {
+                out["files"] = json!(files);
+            }
+            Ok(out)
+        })
     };
     let enabled = app.session.prefs.background_export;
     let failed = target.clone();
-    let mut r = background::run(app, enabled, label, None, work, move |app, r| {
+    let mut r = background::run_with_progress(app, enabled, label, None, Some(progress), work, move |app, r| {
+        // A file written before the Cancel arrived is reported as written.
+        if r.is_err() && asked.cancelled() {
+            app.status(EXPORT_CANCELLED);
+            return Ok(json!({ "cancelled": true }));
+        }
         let r = r.inspect_err(|e| report_write_error(app, true, &failed, e))?;
         let what = match r["files"].as_array() {
             Some(files) => format!("{} files", files.len()),
@@ -668,10 +778,11 @@ pub fn export(app: &mut VectorcraftApp, format: Option<&str>, path: Option<Strin
 }
 
 /// Run an engine command that returns `{dataBase64}` and write the bytes to a picked path
-/// (Export Selection, Save as Template).
+/// (Export Selection, Save for Office Documents, Text Export Options and the presets dialogs'
+/// Export…), reported with the first of the command's warnings ([`report_saved`]).
 pub fn save_command_output(app: &mut VectorcraftApp, id: &str, ext: &str, params: Value) -> Result<String, String> {
-    let (path, _) = run_to_file(app, id, ext, params)?;
-    app.status(format!("Saved {path}"));
+    let (path, v) = run_to_file(app, id, ext, params)?;
+    report_saved(app, &path, &v);
     Ok(path)
 }
 
@@ -783,7 +894,9 @@ pub(crate) fn open_in_app(app: &mut VectorcraftApp, path: &str) -> Result<(), St
 
 /// File → Export for Screens with `document.exportForScreens` params: the files go into `folder`;
 /// without one the web downloads them (the ZIP, or each file) and the other frontends get them
-/// back as base64. With `openLocation`, the file manager shows the first file written.
+/// back as base64. With `openLocation`, the file manager shows the first file written. When an
+/// export into a folder or a download has warnings, the status bar shows the first as
+/// [`report_saved`] shows a save's notes: "Saved <folder, ZIP or first download> with n note(s): …".
 pub fn export_for_screens(app: &mut VectorcraftApp, params: Value) -> Result<Value, String> {
     export_files(app, "document.exportForScreens", params)
 }
@@ -794,6 +907,7 @@ pub(crate) fn export_files(app: &mut VectorcraftApp, id: &str, params: Value) ->
     let folder = params.get("folder").and_then(Value::as_str).unwrap_or_default().to_string();
     let r = app.run(id, params)?;
     let count = r["files"].as_array().map_or(0, Vec::len);
+    let warned = r["warnings"].as_array().is_some_and(|w| !w.is_empty());
     // Files that came back as bytes: (name, base64).
     let returned: Vec<(&str, &str)> = match r["dataBase64"].as_str() {
         Some(zip) => vec![(r["name"].as_str().unwrap_or("Export.zip"), zip)],
@@ -804,6 +918,9 @@ pub(crate) fn export_files(app: &mut VectorcraftApp, id: &str, params: Value) ->
     if returned.is_empty() {
         let first = r["path"].as_str().or_else(|| r["files"][0].as_str());
         let mut status = format!("Exported {count} file(s) to {folder}");
+        if warned {
+            status = saved_status(r["path"].as_str().unwrap_or(&folder), &r);
+        }
         if open_location
             && let Some(first) = first
             && let Err(e) = reveal_path(app, first)
@@ -820,7 +937,10 @@ pub(crate) fn export_files(app: &mut VectorcraftApp, id: &str, params: Value) ->
             [(name, _)] => (*name).to_string(),
             files => format!("{} files", files.len()),
         };
-        app.status(format!("Downloaded {what}"));
+        match returned.first().filter(|_| warned) {
+            Some((name, _)) => report_saved(app, name, &r),
+            None => app.status(format!("Downloaded {what}")),
+        }
     }
     Ok(r)
 }

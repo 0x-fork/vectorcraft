@@ -120,3 +120,30 @@ sync_github_name = false
 real_name = "Marco Arnulfo"
 display_name = "Marco Arnulfo"
 sync_github_name = false
+
+[people.theromis]
+sync_github_name = true
+
+[people.dennismutuku2005]
+sync_github_name = true
+
+[people.krinry]
+display_name = "krinry"
+sync_github_name = true
+
+[people.makesomethingshit]
+sync_github_name = true
+
+[people.MiQ71]
+real_name = "Mirko Kerezovic"
+sync_github_name = false
+
+[people.KaboomFox]
+sync_github_name = true
+
+[people.odysseexp]
+real_name = "Harley Paiva"
+sync_github_name = true
+
+[people.addibble]
+sync_github_name = true

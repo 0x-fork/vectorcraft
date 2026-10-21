@@ -476,7 +476,11 @@ pub fn run_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<Resu
         "shortcuts.export" => {
             let v = export_json(&app.ui.shortcut_set, &app.ui.shortcut_overrides);
             let bytes = serde_json::to_vec_pretty(&v).unwrap_or_default();
-            let path = s("path").or_else(|| crate::picks::save(app, &crate::FilePick::named("VectorCraft Shortcuts.json")));
+            let pick = crate::FilePick {
+                filters: vec![crate::FilePick::filter("Shortcut sets", &["json"])],
+                ..crate::FilePick::named("VectorCraft Shortcuts.json")
+            };
+            let path = s("path").or_else(|| crate::picks::save(app, &pick));
             match path {
                 Some(path) => match app.services.write.as_mut() {
                     Some(w) => w(&path, &bytes).map(|_| json!({"path": path})),
@@ -494,7 +498,10 @@ pub fn run_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<Resu
             let data = if let Some(v) = p.get("data") {
                 Ok(v.clone())
             } else {
-                let pick = crate::FilePick { filters: vec![("Shortcut sets", crate::dialogs::shortcut_import::IMPORT_EXTS)], ..Default::default() };
+                let pick = crate::FilePick {
+                    filters: vec![crate::FilePick::filter("Shortcut sets", crate::dialogs::shortcut_import::IMPORT_EXTS)],
+                    ..Default::default()
+                };
                 let path = s("path").or_else(|| crate::picks::open(app, &pick));
                 // A `.kys` file is read by Import Shortcut Set, up to its reader's cap.
                 if let Some(path) = path.as_deref().filter(|p| crate::dialogs::shortcut_import::is_kys(p)) {
@@ -1012,5 +1019,17 @@ mod tests {
         let mut ov = BTreeMap::new();
         assert!(assign(&mut ov, "symbol.breakLink", Some("Cmd+Alt+Shift+F9"), true).is_ok());
         assert_eq!(effective_in(&ov, "symbol.breakLink").as_deref(), Some("Cmd+Alt+Shift+F9"));
+    }
+
+    /// #2991: Enter Isolation Mode has no default key but runs on the selection, so it belongs in
+    /// Edit › Keyboard Shortcuts.
+    #[test]
+    fn enter_isolation_mode_command_is_listed_and_assignable() {
+        let e = entry("object.isolate").expect("listed");
+        assert_eq!((e.label.as_str(), e.group.as_str(), e.is_tool), ("Enter Isolation Mode", "Object", false));
+        assert_eq!(default_of("object.isolate"), None);
+        let mut ov = BTreeMap::new();
+        assign(&mut ov, "object.isolate", Some("Cmd+Alt+Shift+F11"), false).unwrap();
+        assert_eq!(effective_in(&ov, "object.isolate").as_deref(), Some("Cmd+Alt+Shift+F11"));
     }
 }

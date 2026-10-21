@@ -587,12 +587,18 @@ fn even_steps(n: u32) -> Vec<f64> {
     (0..=n).map(|i| i as f64 / n as f64).collect()
 }
 
+/// The number of points of a `(rows+1)×(cols+1)` grid, `None` past `usize`: counts come from
+/// files, and u32::MAX rows and columns (65,535 on 32-bit targets) would wrap to an empty grid.
+fn grid_len(rows: u32, cols: u32) -> Option<usize> {
+    (rows as usize).checked_add(1)?.checked_mul((cols as usize).checked_add(1)?)
+}
+
 impl GradientMesh {
     pub fn idx(&self, r: usize, c: usize) -> usize {
         r * (self.cols as usize + 1) + c
     }
     pub fn is_valid(&self) -> bool {
-        self.rows >= 1 && self.cols >= 1 && self.points.len() == (self.rows as usize + 1) * (self.cols as usize + 1)
+        self.rows >= 1 && self.cols >= 1 && grid_len(self.rows, self.cols) == Some(self.points.len())
     }
 
     /// A 1×1 mesh from its four corners (bottom-left, top-left, top-right, bottom-right in u/v
@@ -730,19 +736,35 @@ impl GradientMesh {
             .to_point()
     }
 
-    /// Bilinear colour and opacity of patch (r, c) at local (u, v).
+    /// Bilinear colour and opacity of patch (r, c) at local (u, v). Corners all in CMYK (or all
+    /// grey) mix in that space, as a PDF shading mixes in its own colour space: the inks come out
+    /// exact, and a CMYK document separates no colour to draw them. Other corners mix in RGB.
     pub fn color_at(&self, r: usize, c: usize, u: f64, v: f64) -> (Color, f32) {
         let q =
             [&self.points[self.idx(r, c)], &self.points[self.idx(r, c + 1)], &self.points[self.idx(r + 1, c)], &self.points[self.idx(r + 1, c + 1)]];
         let w = [(1.0 - u) * (1.0 - v), u * (1.0 - v), (1.0 - u) * v, u * v];
-        let mut rgb = [0.0f32; 3];
-        let mut op = 0.0f32;
-        for k in 0..4 {
-            let c = q[k].color.to_rgb();
-            for (ch, x) in rgb.iter_mut().zip(c) {
-                *ch += x * w[k] as f32;
+        let op = q.iter().zip(w).map(|(p, w)| p.opacity * w as f32).sum();
+        let cmyk: Option<Vec<[f32; 4]>> =
+            q.iter().map(|p| if let Color::Cmyk { c, m, y, k } = p.color { Some([c, m, y, k]) } else { None }).collect();
+        if let Some(inks) = cmyk {
+            let mut mix = [0.0f32; 4];
+            for (ink, w) in inks.iter().zip(w) {
+                for (m, x) in mix.iter_mut().zip(ink) {
+                    *m += x * w as f32;
+                }
             }
-            op += q[k].opacity * w[k] as f32;
+            let [c, m, y, k] = mix;
+            return (Color::Cmyk { c, m, y, k }, op);
+        }
+        let grey: Option<Vec<f32>> = q.iter().map(|p| if let Color::Gray { k } = p.color { Some(k) } else { None }).collect();
+        if let Some(ks) = grey {
+            return (Color::Gray { k: ks.iter().zip(w).map(|(k, w)| k * w as f32).sum() }, op);
+        }
+        let mut rgb = [0.0f32; 3];
+        for (p, w) in q.iter().zip(w) {
+            for (ch, x) in rgb.iter_mut().zip(p.color.to_rgb()) {
+                *ch += x * w as f32;
+            }
         }
         (Color::rgb(rgb[0], rgb[1], rgb[2]), op)
     }
@@ -1010,7 +1032,8 @@ impl GradientMesh {
 
     /// Mesh tool Alt-click: delete the mesh lines through point `index` (interior lines only).
     pub fn remove_point_lines(&mut self, index: usize) -> bool {
-        if index >= self.points.len() {
+        // A mesh from a file may not have the points its rows and columns need: it is indexed below.
+        if !self.is_valid() || index >= self.points.len() {
             return false;
         }
         let w = self.cols as usize + 1;
@@ -1142,7 +1165,7 @@ fn surface_of<'a>(kind: &'a EnvelopeKind, src: Rect, frame: Affine) -> Box<dyn F
             {
                 return Box::new(move |u: f64, v: f64| mesh_at(&m, u, v));
             }
-            if *rows == 0 || *cols == 0 || points.len() as u64 != (u64::from(*rows) + 1) * (u64::from(*cols) + 1) {
+            if *rows == 0 || *cols == 0 || grid_len(*rows, *cols) != Some(points.len()) {
                 return Box::new(flat);
             }
             let (rows, cols) = (*rows as usize, *cols as usize);
@@ -1194,8 +1217,7 @@ pub fn smooth_handles(rows: u32, cols: u32, points: &[Point]) -> Vec<[Vec2; 4]> 
 /// the smooth ones, see [`smooth_handles`]) as a gradient mesh with black points: what the
 /// canvas draws and the Mesh tool and Direct Selection edit. `None` for a malformed grid.
 pub fn envelope_grid(rows: u32, cols: u32, points: &[Point], handles: &[[Vec2; 4]]) -> Option<GradientMesh> {
-    // (Counts come from files: no overflow on 32-bit targets.)
-    if rows == 0 || cols == 0 || points.len() as u64 != (u64::from(rows) + 1) * (u64::from(cols) + 1) {
+    if rows == 0 || cols == 0 || grid_len(rows, cols) != Some(points.len()) {
         return None;
     }
     let smooth;
@@ -1813,6 +1835,20 @@ mod tests {
         assert!((p.x - 37.0).abs() < 1e-6 && (p.y - 81.0).abs() < 1e-6, "{p:?}");
     }
 
+    /// A file's rows and columns can be anything: a point count too large to compute is no match
+    /// for the points (u32::MAX × u32::MAX wrapped to 0 and passed for a grid without points).
+    #[test]
+    fn a_grid_too_large_to_count_is_malformed() {
+        let m = GradientMesh { rows: u32::MAX, cols: u32::MAX, points: vec![] };
+        assert!(!m.is_valid());
+        assert_eq!((m.lines(), m.outline(), m.quads(8).len()), (PathData::default(), PathData::default(), 0));
+        assert!(envelope_grid(u32::MAX, u32::MAX, &[], &[]).is_none());
+        // A mesh envelope without handles maps through its points: malformed, it leaves art as it is.
+        let kind = EnvelopeKind::Mesh { rows: u32::MAX, cols: u32::MAX, points: vec![], handles: vec![] };
+        let p = Point::new(25.0, 50.0);
+        assert_eq!(envelope_mapper(&kind, Rect::new(0.0, 0.0, 100.0, 100.0))(p), p);
+    }
+
     #[test]
     fn mesh_insert_and_remove_lines() {
         let mut m =
@@ -1822,5 +1858,34 @@ mod tests {
         assert!(m.points[i].p.distance(Point::new(30.0, 60.0)) < 0.5, "{:?}", m.points[i].p);
         assert!(m.remove_point_lines(i));
         assert_eq!((m.rows, m.cols), (1, 1));
+    }
+
+    /// Corners all in CMYK mix in CMYK (the inks halfway), not in RGB.
+    #[test]
+    fn a_cmyk_mesh_mixes_its_inks() {
+        let cyan = Color::Cmyk { c: 1.0, m: 0.0, y: 0.0, k: 0.0 };
+        let mut m = GradientMesh::for_path(&shapes::rectangle(Rect::new(0.0, 0.0, 100.0, 100.0)), 1, 1, cyan, MeshAppearance::Flat, 0.0).unwrap();
+        m.points[0].color = Color::Cmyk { c: 0.0, m: 0.0, y: 0.0, k: 1.0 };
+        let (c, op) = m.color_at(0, 0, 0.0, 0.0);
+        assert_eq!((c, op), (Color::Cmyk { c: 0.0, m: 0.0, y: 0.0, k: 1.0 }, 1.0));
+        let Color::Cmyk { c, k, .. } = m.color_at(0, 0, 0.5, 0.5).0 else { panic!("mixed out of CMYK") };
+        assert!((c - 0.75).abs() < 1e-6 && (k - 0.25).abs() < 1e-6, "{c} {k}");
+        // A corner in another space mixes them all in RGB.
+        m.points[1].color = Color::rgb(1.0, 0.0, 0.0);
+        assert!(matches!(m.color_at(0, 0, 0.5, 0.5).0, Color::Rgb { .. }));
+    }
+
+    /// Alt-clicking a point of a mesh from a file with fewer points than its rows and columns need
+    /// deletes nothing (it indexed past the points, a panic).
+    #[test]
+    fn mesh_lines_of_a_malformed_mesh_stay() {
+        let point = |i: u32| MeshPoint { p: Point::new(f64::from(i), 0.0), color: Color::BLACK, opacity: 1.0, handles: [Vec2::ZERO; 4] };
+        // An interior row's point and an interior column's point, each with 3 of the 6 points.
+        for (rows, cols, index) in [(2, 1, 2), (1, 2, 1)] {
+            let mut m = GradientMesh { rows, cols, points: (0..3).map(point).collect() };
+            let before = m.clone();
+            assert!(!m.remove_point_lines(index), "{rows}×{cols}, point {index}");
+            assert_eq!(m, before);
+        }
     }
 }

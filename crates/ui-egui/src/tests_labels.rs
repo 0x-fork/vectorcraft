@@ -68,14 +68,27 @@ fn effect_menu_lists_outline_object_between_offset_path_and_outline_stroke() {
     );
 }
 
+/// Effect › Rasterize…, an item of its own between Pathfinder and Stylize, opens its options.
 #[test]
-fn effect_menu_lists_film_grain_in_artistic_before_blur() {
+fn effect_menu_lists_rasterize_between_pathfinder_and_stylize() {
+    let app = app();
+    let entries = menus::menu_entries(&app);
+    let at = |path: &[&str], label: Option<&str>| entries.iter().position(|e| e.path == path && label.is_none_or(|l| e.label == l)).unwrap();
+    let rasterize = at(&["Effect"], Some("Rasterize…"));
+    assert!(at(&["Effect", "Pathfinder"], None) < rasterize && rasterize < at(&["Effect", "Stylize"], None));
+    let e = &entries[rasterize];
+    assert_eq!((e.command.as_deref(), e.params["effect"].as_str()), (Some("effect.dialog"), Some("rasterize")));
+}
+
+#[test]
+fn effect_menu_lists_the_artistic_filters_before_blur() {
     let app = app();
     let entries = menus::menu_entries(&app);
     let artistic: Vec<_> = entries.iter().filter(|e| e.path == ["Effect", "Artistic"]).collect();
-    assert_eq!(artistic.len(), 1);
-    assert_eq!(artistic[0].label, "Film Grain…");
-    assert_eq!(artistic[0].command.as_deref(), Some("effect.dialog"));
+    let labels: Vec<&str> = artistic.iter().map(|e| e.label.as_str()).collect();
+    assert_eq!(labels, ["Cutout…", "Film Grain…", "Neon Glow…", "Plastic Wrap…", "Poster Edges…", "Smudge Stick…", "Sponge…", "Watercolor…"]);
+    assert!(artistic.iter().all(|e| e.command.as_deref() == Some("effect.dialog")));
+    assert_eq!(artistic[2].params, json!({"effect": "artistic.neonGlow"}));
     let at = |name: &str| entries.iter().position(|e| e.path == ["Effect", name]).unwrap();
     assert!(at("Artistic") < at("Blur"));
 }
@@ -158,18 +171,49 @@ fn effect_menu_lists_the_texture_filters_between_sharpen_and_video() {
     assert!(at("Sharpen") < at("Texture") && at("Texture") < at("Video"));
 }
 
-/// Effect › Sketch, between Sharpen and the raster Stylize: Halftone Pattern opens its dialog.
+/// Effect › Sketch, between Sharpen and the raster Stylize: the raster sketch filters open their dialogs.
 #[test]
 fn effect_menu_lists_the_sketch_filters_between_sharpen_and_stylize() {
     let app = app();
     let entries = menus::menu_entries(&app);
     let sketch: Vec<_> = entries.iter().filter(|e| e.path == ["Effect", "Sketch"]).collect();
     let labels: Vec<&str> = sketch.iter().map(|e| e.label.as_str()).collect();
-    assert_eq!(labels, ["Halftone Pattern…"]);
-    assert_eq!(sketch[0].command.as_deref(), Some("effect.dialog"));
-    assert_eq!(sketch[0].params, json!({"effect": "sketch.halftonePattern"}));
+    assert_eq!(
+        labels,
+        [
+            "Bas Relief…",
+            "Chalk & Charcoal…",
+            "Charcoal…",
+            "Chrome…",
+            "Graphic Pen…",
+            "Halftone Pattern…",
+            "Note Paper…",
+            "Photocopy…",
+            "Plaster…",
+            "Reticulation…",
+            "Stamp…",
+            "Water Paper…"
+        ]
+    );
+    assert!(sketch.iter().all(|e| e.command.as_deref() == Some("effect.dialog")));
+    assert_eq!(sketch[0].params, json!({"effect": "sketch.basRelief"}));
+    assert_eq!(sketch[1].params, json!({"effect": "sketch.chalkCharcoal"}));
+    assert_eq!(sketch[2].params, json!({"effect": "sketch.charcoal"}));
+    assert_eq!(sketch[3].params, json!({"effect": "sketch.chrome"}));
+    assert_eq!(sketch[4].params, json!({"effect": "sketch.graphicPen"}));
+    assert_eq!(sketch[5].params, json!({"effect": "sketch.halftonePattern"}));
+    assert_eq!(sketch[6].params, json!({"effect": "sketch.notePaper"}));
+    assert_eq!(sketch[7].params, json!({"effect": "sketch.photocopy"}));
+    assert_eq!(sketch[8].params, json!({"effect": "sketch.plaster"}));
+    assert_eq!(sketch[9].params, json!({"effect": "sketch.reticulation"}));
+    assert_eq!(sketch[10].params, json!({"effect": "sketch.stamp"}));
+    assert_eq!(sketch[11].params, json!({"effect": "sketch.waterPaper"}));
     let at = |label: &str| entries.iter().position(|e| e.path[0] == "Effect" && e.label == label).unwrap();
-    assert!(at("Unsharp Mask…") < at("Halftone Pattern…") && at("Halftone Pattern…") < at("Glowing Edges…"));
+    assert!(at("Unsharp Mask…") < at("Chalk & Charcoal…") && at("Chalk & Charcoal…") < at("Chrome…"));
+    assert!(at("Chrome…") < at("Graphic Pen…") && at("Graphic Pen…") < at("Halftone Pattern…"));
+    assert!(at("Halftone Pattern…") < at("Note Paper…") && at("Note Paper…") < at("Plaster…"));
+    assert!(at("Plaster…") < at("Reticulation…"));
+    assert!(at("Reticulation…") < at("Water Paper…") && at("Water Paper…") < at("Glowing Edges…"));
 }
 
 /// Effect › Stylize under Raster Effects, between Sharpen and Texture: Glowing Edges opens its

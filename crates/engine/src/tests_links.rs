@@ -157,6 +157,42 @@ fn a_linked_photoshop_document_places_and_updates() {
     assert!(near(centre_colour(&s.doc().unwrap().doc), BLUE));
 }
 
+/// An uncompressed 24-bit `w`×`h` Targa file of one color.
+fn targa(w: u16, h: u16, rgb: [u8; 3]) -> Vec<u8> {
+    let mut f = vec![0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    f.extend(w.to_le_bytes());
+    f.extend(h.to_le_bytes());
+    f.extend([24, 0]);
+    let [r, g, b] = rgb;
+    f.extend(std::iter::repeat_n([b, g, r], usize::from(w) * usize::from(h)).flatten());
+    f
+}
+
+/// A Targa file placed linked shows its pixels and updates when it changes, and a link can be
+/// relinked to one.
+#[test]
+fn a_linked_targa_file_places_updates_and_relinks() {
+    let dir = Folder::new("tga");
+    let pic = dir.file("art/photo.tga");
+    write(&pic, &targa(600, 300, RED));
+    let mut s = session();
+    let id = place(&mut s, &pic);
+    assert_eq!(image(&s, id).link.unwrap().path, pic);
+    assert!(near(centre_colour(&s.doc().unwrap().doc), RED));
+    write(&pic, &targa(400, 400, BLUE));
+    assert_eq!(s.execute("links.update", &json!({})).unwrap(), json!({"updated": [id.0], "missing": []}));
+    let im = image(&s, id);
+    assert_eq!((im.width, im.height), (400, 400));
+    assert!(near(centre_colour(&s.doc().unwrap().doc), BLUE));
+    let other = dir.file("other/red.vst");
+    write(&other, &targa(300, 100, RED));
+    let r = s.execute("links.relink", &json!({"ids": [id.0], "path": other})).unwrap();
+    assert_eq!(r, json!({"relinked": [id.0], "notFound": []}));
+    let im = image(&s, id);
+    assert_eq!((im.width, im.height, im.link.unwrap().path), (300, 100, other));
+    assert!(near(centre_colour(&s.doc().unwrap().doc), RED));
+}
+
 #[test]
 fn the_relative_path_finds_the_file_after_the_folder_moves() {
     let a = Folder::new("move-a");
@@ -411,7 +447,8 @@ fn a_placed_document_brings_its_links_with_the_files_pixels() {
 }
 
 /// The placed (linked) files of a `.ai` file come in with the preview the file keeps of them: one
-/// not found shows it, one found is read at once into the same bounds, which isn't a change.
+/// not found shows it, one found is read at once into the same bounds, which isn't a change. A copy
+/// saved without PDF compatibility, placed, reads the found file too.
 #[test]
 fn links_of_an_imported_file_are_read_where_they_are_found() {
     use vectorcraft_testkit::ai;
@@ -423,7 +460,8 @@ fn links_of_an_imported_file_are_read_where_they_are_found() {
         "%AI5_BeginPlace\n[0.1 0 0 -0.1 20 80] 0 0 600 300 4 4 0\n({pic})`\n%AI26_BeginPlacedObjectPreview\n2 1 8 32 17 \x7f\x10\x10\x60\x7f\x10\x10\x60\n%AI26_EndPlacedObjectPreview\n~\n%AI5_EndPlace\n"
     );
     let doc_path = dir.file("poster.ai");
-    write(&doc_path, &ai::ai(ai::editing_data(200.0, 100.0, &ai::layer("Art", &place)).as_bytes(), "0.56 0.56 0.87 rg 20 50 60 30 re f"));
+    let data = ai::editing_data(200.0, 100.0, &ai::layer("Art", &place));
+    write(&doc_path, &ai::ai(data.as_bytes(), "0.56 0.56 0.87 rg 20 50 60 30 re f"));
     let placed = |s: &Session| {
         let mut found = vec![];
         s.doc().unwrap().doc.visit_images(|n, im| found.push((n.geometric_bounds().unwrap(), im.clone())));
@@ -445,4 +483,11 @@ fn links_of_an_imported_file_are_read_where_they_are_found() {
     let (b, im) = placed(&s);
     assert!(in_place(b) && (im.width, im.height) == (600, 300) && im.link.as_ref().is_some_and(|l| l.hash.is_some()), "{b:?} {im:?}");
     assert!(!s.doc().unwrap().doc.images[&im.key].is_proxy());
+
+    let alone = dir.file("alone.ai");
+    write(&alone, &ai::ai(data.as_bytes(), "BT /F1 12 Tf 10 50 Td (Saved without its PDF part) Tj ET"));
+    let mut s = session();
+    s.execute("file.place", &json!({"path": alone})).unwrap();
+    let (_, im) = placed(&s);
+    assert!((im.width, im.height) == (600, 300) && !s.doc().unwrap().doc.images[&im.key].is_proxy(), "{im:?}");
 }

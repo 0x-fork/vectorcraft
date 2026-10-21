@@ -83,13 +83,18 @@ pub fn specs() -> Vec<CommandSpec> {
             "Bristle Brush Strokes",
             ["Select", "Object"],
             None,
-            "{} objects whose brush name contains \"bristle\" → {count}",
+            "{} objects whose topmost stroke has a bristle brush (type bristle in brush.list), whatever the brush is named → {count}",
             has_doc,
-            |s, _| by_kind(s, |n| n
-                .appearance
-                .stroke()
-                .and_then(|st| st.brush.as_deref())
-                .is_some_and(|b| b.to_ascii_lowercase().contains("bristle")))
+            |s, _| {
+                let brushes = vectorcraft_brush::library(&s.doc()?.doc);
+                by_kind(s, |n| {
+                    n.appearance
+                        .stroke()
+                        .and_then(|st| st.brush.as_deref())
+                        .and_then(|name| brushes.iter().find(|b| b.name == name))
+                        .is_some_and(|b| matches!(b.kind, vectorcraft_brush::BrushKind::Bristle(_)))
+                })
+            }
         ),
         cmd!(
             "select.save",
@@ -153,7 +158,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Lock Guides",
             ["View", "Guides"],
             Some("Cmd+Alt+;"),
-            "{locked?: bool} toggle (or set) the session's guide lock → {locked}",
+            "{locked?: bool} toggle (or set) the session's guide lock; locking deselects the ruler guides and guide paths in every open document → {locked}",
             has_doc,
             lock_guides
         ),
@@ -305,7 +310,7 @@ fn same_text(s: &mut Session, cmd: &str, eq: fn(&CharStyle, &CharStyle) -> bool)
     finish_same(s, cmd, ids)
 }
 
-fn by_kind(s: &mut Session, f: fn(&Node) -> bool) -> Result<Value> {
+fn by_kind(s: &mut Session, f: impl Fn(&Node) -> bool) -> Result<Value> {
     let ids = candidates(s, f)?;
     let n = ids.len();
     s.select(|_, sel| sel.set(ids))?;
@@ -601,11 +606,19 @@ fn release_guides(s: &mut Session, p: &Value) -> Result<Value> {
 fn lock_guides(s: &mut Session, p: &Value) -> Result<Value> {
     let v = p.get("locked").and_then(Value::as_bool).unwrap_or(!s.menu.guides_locked);
     s.menu.guides_locked = v;
-    // Locked guides can't stay selected, ruler guides or guide paths ([`Session::select`] lets
-    // those go).
+    // Locked guides can't stay selected, ruler guides or guide paths, in any open document
+    // ([`Session::select`] lets those go in the active one).
     let st = s.doc()?;
     if v && (!st.selection.guides.is_empty() || st.selection.objects.iter().any(|id| crate::is_guide_path(&st.doc, *id))) {
         s.select(|_, sel| sel.guides.clear())?;
+    }
+    if v {
+        let active = s.active;
+        for (i, st) in s.docs.iter_mut().enumerate() {
+            if Some(i) != active && crate::deselect_guides(&st.doc, &mut st.selection) {
+                st.revision += 1;
+            }
+        }
     }
     Ok(json!({ "locked": v }))
 }

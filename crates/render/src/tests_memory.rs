@@ -110,6 +110,29 @@ fn image_mips_are_opt_in_and_change_nothing_off() {
     assert!(Renderer::new().render(&d, 48, 48, near, &on).pixels == Renderer::new().render(&d, 48, 48, near, &off).pixels);
 }
 
+/// #2820: with mips on, an image drawn at a quarter of its size draws its kept mip in later frames
+/// without its full pixels. Those go first when the store is over budget (only the mip is marked
+/// used), and were decoded again in every frame: dragging one of 20 large photos took seconds a
+/// frame.
+#[test]
+fn kept_mips_draw_without_decoding_the_full_pixels_again() {
+    let _fonts = fonts_steady();
+    let d = doc_with_image("img", png(64, 64, 104), 64, 64);
+    let on = RenderOptions { image_mips: true, ..Default::default() };
+    let quarter = Affine::scale(0.25);
+    let mut r = Renderer::new();
+    let _ = r.render(&d, 32, 16, quarter, &on);
+    let full = r.image_pixmap(&d, "img", false, false).unwrap().0;
+    images::store().remove(&full);
+    // The image dragged 4 pt (a device pixel) right.
+    let mut moved = d.clone();
+    let id = moved.layers[0].children().unwrap()[0].id;
+    moved.node_mut(id).unwrap().transform(Affine::translate((4.0, 0.0)), false);
+    let frame = r.render(&moved, 32, 16, quarter, &on);
+    assert!(images::store().peek(&full).is_none(), "the full pixels were decoded again");
+    assert!(frame.pixels == Renderer::new().render(&moved, 32, 16, quarter, &on).pixels);
+}
+
 /// A document of `n` point type objects reading `word`, in rows.
 fn text_doc(n: usize, word: &str) -> Document {
     use vectorcraft_doc::text::{CharStyle, TextObject};
@@ -1535,7 +1558,8 @@ fn proof_previews_draw_changes_as_a_new_renderer_does() {
     // A square in spot color `Lab Spot`, defined in Lab in a color group, on its own plate.
     let lab_doc = || {
         let mut d = proof_doc();
-        let lab = Color::lab(50.0, 60.0, 40.0);
+        // Outside the press gamut, so its CMYK alternate looks different from the Lab colour.
+        let lab = Color::lab(50.0, 90.0, 70.0);
         let swatch = vectorcraft_color::Swatch { name: "Lab Spot".into(), paint: Paint::solid(lab), global: true, spot: true };
         d.swatch_groups.push(vectorcraft_color::SwatchGroup { name: "Lab".into(), swatches: vec![swatch] });
         let fill = Paint::Solid { color: lab, swatch: Some("Lab Spot".into()), tint: 1.0 };

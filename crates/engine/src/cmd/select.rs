@@ -66,7 +66,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Cancel Key Object",
             [],
             None,
-            "{id?: a selected top-level object (not a layer, a compound-path member or an object inside another selected object); one of two or more (the Selection tool: a click on one object of a selection of several; on the key again: no id)} the key object Align aligns to and Distribute Spacing spaces from; without `id` it cancels the key, as does a selection that holds only the key and objects inside it (one object, or a group key and its own members); any other id is an error that leaves the key as it was → {key} (the resulting key object, or null)",
+            "{id?: a selected top-level object (not a layer, a compound-path member or an object inside another selected object); one of two or more or the only one with ruler guides selected (the Selection tool: a click on one object of a selection of several, or of one with guides; on the key again: no id), guide?: index (a selected ruler guide, guide.list, with one or more objects selected: the Selection tool's click on a selected guide; Align lines the objects up on it and the guide stays put)} the key object Align aligns to and Distribute Spacing spaces from; without `id` or `guide` it cancels the key, as does a selection that holds only the key and objects inside it (one object, or a group key and its own members) and no ruler guide, or a key guide with no object selected or taken out of the selection; any other id or guide is an error that leaves the key as it was → {key, guide?} (the resulting key object, or null; guide: the key guide, left out without one)",
             has_doc,
             key
         ),
@@ -88,6 +88,15 @@ pub fn specs() -> Vec<CommandSpec> {
             "{items: [{id, anchors}], mode?: \"set\"|\"add\"|\"toggle\"|\"subtract\" (set by default; add: true is mode add), add?: bool (an older way to ask for mode add)}: toggle selects the anchors not selected and deselects the others, subtract deselects them; a path left with none leaves the selection",
             has_doc,
             anchors_many
+        ),
+        cmd!(
+            "select.color",
+            "Select by Color",
+            [],
+            None,
+            "{fill?: colour, stroke?: colour (as paint.setFill's color; at least one)} select the objects whose fill (and stroke) reads as that colour in #rrggbb, as document.inspect reports colours, whatever its swatch or tint; with both, the objects that match both. No object needs to be selected first; Select > Reselect repeats it → {count}",
+            has_doc,
+            select_color
         ),
         cmd!(
             "select.same.fillColor",
@@ -259,9 +268,16 @@ fn all_on_artboard(s: &mut Session, p: &Value) -> Result<Value> {
     let st = s.doc()?;
     let i = p.get("artboard").and_then(Value::as_u64).unwrap_or(0) as usize;
     let r = st.doc.artboards.get(i).map(|a| a.rect).ok_or_else(|| bad("select.allOnArtboard", "no such artboard"))?;
+    // Symbol instances are measured by their art.
+    let symbols = st.doc.symbol_boxes();
     let ids: Vec<NodeId> = selectable(&st.doc, st.isolation)
         .into_iter()
-        .filter(|id| st.doc.node(*id).and_then(|n| n.geometric_bounds()).is_some_and(|b| b.intersect(r).area() > 0.0 || r.contains(b.center())))
+        .filter(|id| {
+            st.doc
+                .node(*id)
+                .and_then(|n| n.geometric_bounds_with(&symbols))
+                .is_some_and(|b| b.intersect(r).area() > 0.0 || vectorcraft_doc::artboard_holds(r, b.center()))
+        })
         .collect();
     s.select(|_, sel| sel.set(ids.iter().copied()))?;
     ok()
@@ -352,6 +368,29 @@ fn selection_result(s: &Session) -> Result<Value> {
 
 fn key(s: &mut Session, p: &Value) -> Result<Value> {
     let id = p.get("id").map(|value| checked_id(s, value, "select.key")).transpose()?;
+    let guide = match p.get("guide").filter(|v| !v.is_null()) {
+        Some(v) => {
+            Some(v.as_u64().and_then(|i| usize::try_from(i).ok()).ok_or_else(|| bad("select.key", "`guide` must be a guide index (guide.list)"))?)
+        }
+        None => None,
+    };
+    if let Some(g) = guide {
+        let sel = &s.doc()?.selection;
+        if id.is_some() {
+            return Err(bad("select.key", "give `id` or `guide`, not both"));
+        }
+        if !sel.guides.contains(&g) {
+            return Err(bad("select.key", format!("guide {g} is not selected")));
+        }
+        if sel.is_empty() {
+            return Err(bad("select.key", "select objects to align to the guide"));
+        }
+        s.select(|_, sel| {
+            sel.key = None;
+            sel.key_guide = Some(g);
+        })?;
+        return key_result(s);
+    }
     if let Some(id) = id {
         let st = s.doc()?;
         // A selected top-level object is the only top-level object among the selected ones of
@@ -361,8 +400,21 @@ fn key(s: &mut Session, p: &Value) -> Result<Value> {
             return Err(bad("select.key", format!("object {id} is not a selected top-level object")));
         }
     }
-    s.select(|_, sel| sel.key = id)?;
-    Ok(json!({ "key": s.doc()?.selection.key }))
+    s.select(|_, sel| {
+        sel.key = id;
+        sel.key_guide = None;
+    })?;
+    key_result(s)
+}
+
+/// `{key}`, with `guide` when a guide is the key.
+fn key_result(s: &Session) -> Result<Value> {
+    let sel = &s.doc()?.selection;
+    let mut out = json!({ "key": sel.key });
+    if let Some(g) = sel.key_guide {
+        out["guide"] = json!(g);
+    }
+    Ok(out)
 }
 
 /// `[[subpath, anchor]…]` anchor references of `cmd`: a malformed entry fails rather than being
@@ -519,6 +571,29 @@ fn same_paint(a: &Paint, b: &Paint, tint: bool) -> bool {
 fn stroke_weight(n: &Node) -> f64 {
     let (paint, width) = stroke_of(n);
     if paint.is_none() { 0.0 } else { width }
+}
+
+/// Select by Color: the objects whose fill and stroke read as the colours given, compared as the
+/// `#rrggbb` `document.inspect` reports, so a script can pick art by colour without an object id.
+fn select_color(s: &mut Session, p: &Value) -> Result<Value> {
+    const C: &str = "select.color";
+    let hex = |key: &str| match p.get(key).filter(|v| !v.is_null()) {
+        None => Ok(None),
+        Some(v) => color_value(v).map(|c| Some(c.to_hex())).ok_or_else(|| bad(C, format!("`{key}`: not a colour: {v}"))),
+    };
+    let (fill, stroke) = (hex("fill")?, hex("stroke")?);
+    if fill.is_none() && stroke.is_none() {
+        return Err(bad(C, "give `fill`, `stroke` or both"));
+    }
+    let reads_as = |paint: Paint, hex: Option<&str>| hex.is_none_or(|h| paint.color().is_some_and(|c| c.to_hex() == h));
+    select_where(s, C, p, |d, n| paint_reported(d, n) && reads_as(fill_of(n), fill.as_deref()) && reads_as(stroke_of(n).0, stroke.as_deref()))
+}
+
+/// Does `document.inspect` report a fill and stroke for `n`? A compound path's are its own, though
+/// it holds its members, and its members report none.
+fn paint_reported(d: &Document, n: &Node) -> bool {
+    let compound = |n: &Node| matches!(n.kind, NodeKind::Compound { .. });
+    compound(n) || (!n.is_container() && !d.parent_of(n.id).and_then(|p| d.node(p)).is_some_and(compound))
 }
 
 fn same(s: &mut Session, cmd: &str, eq: impl Fn(&Node, &Node) -> bool) -> Result<Value> {

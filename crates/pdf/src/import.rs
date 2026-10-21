@@ -147,6 +147,36 @@ pub const OFF_ARTBOARD_NOTE: &str =
 /// Warning: art reaching past the page box was clipped to it.
 pub const PAST_PAGE_NOTE: &str = "art reaching past the page was clipped to it, as PDF viewers show it";
 
+/// Warning: glyphs were kept as outlines rather than read as type.
+pub const OUTLINED_TEXT_NOTE: &str = "text was converted to outlines";
+/// Warning: text drawn invisibly (text rendering mode 3, as a scanned page's OCR layer is) that
+/// can't come in as type (text read as outlines, or a Type 3 font) was left out: as outlines it
+/// would draw nothing (#2675).
+pub const INVISIBLE_TEXT_NOTE: &str = "invisible text (such as a scanned page's searchable OCR layer) that couldn't be read as type was left out";
+/// Warning: glyphs that differ from the installed font of their name were kept as outlines.
+pub const UNMATCHED_GLYPHS_NOTE: &str = "text whose glyphs differ from the installed font of the same name was kept as outlines";
+/// The end of the warning that glyphs whose characters the file doesn't name were kept as
+/// outlines, after "text in" and the font's name.
+pub const UNNAMED_CHARACTERS_NOTE: &str = "whose characters the file doesn't name (U+FFFD) was kept as outlines";
+
+/// Is `note` one of the warnings that glyphs were kept as outlines ([`OUTLINED_TEXT_NOTE`],
+/// [`UNMATCHED_GLYPHS_NOTE`], [`UNNAMED_CHARACTERS_NOTE`])?
+pub fn is_outlines_note(note: &str) -> bool {
+    note == OUTLINED_TEXT_NOTE || note == UNMATCHED_GLYPHS_NOTE || note.starts_with("text in ") && note.ends_with(UNNAMED_CHARACTERS_NOTE)
+}
+
+/// Is `n` glyphs kept as outlines (a path the import names `<Text Outlines>`)?
+pub fn is_glyph_outlines(n: &Node) -> bool {
+    matches!(n.kind, NodeKind::Path { .. }) && n.name.as_deref() == Some(TEXT_OUTLINES)
+}
+
+/// Does `doc` hold glyphs kept as outlines ([`is_glyph_outlines`])?
+pub fn holds_outlines(doc: &Document) -> bool {
+    let mut any = false;
+    doc.walk(|n| any |= is_glyph_outlines(n));
+    any
+}
+
 /// Import a PDF, returning the document plus warnings about content that was approximated or skipped.
 pub fn import_with_report(bytes: &[u8], opts: &ImportOptions) -> Result<ImportReport, PdfError> {
     // The interpreter draws forms, patterns, glyphs and masks inside one another by recursion, in
@@ -361,6 +391,7 @@ fn read_with_reader_options(bytes: &[u8], opts: &ImportOptions, reader: &craft_p
             rect: ab,
             show_center_mark: false,
             show_cross_hairs: false,
+            color: None,
         });
         let page_layer = |b: &mut Builder<'_>, art: Vec<Arc<Node>>, shown: bool| {
             let name = if shown { format!("Page {}", number + 1) } else { format!("Page {} (unsorted)", number + 1) };
@@ -925,8 +956,17 @@ fn mean_scale(a: Affine) -> f64 {
     a.determinant().abs().sqrt()
 }
 
+/// Width a PDF line width of 0 imports as, points: a print hairline. In PDF `0 w` is the thinnest
+/// line the device can draw (ISO 32000-1, 8.4.3.2), not no line.
+const HAIRLINE: f64 = 0.25;
+
+/// Document width of the stroke `p` drawn at `scale`: `0 w` becomes a [`HAIRLINE`].
+fn line_width(p: &StrokeProps, scale: f64) -> f64 {
+    if p.line_width == 0.0 { HAIRLINE } else { p.line_width as f64 * scale }
+}
+
 fn stroke_layer(paint: Paint, opacity: f32, p: &StrokeProps, scale: f64) -> StrokeLayer {
-    let mut st = StrokeLayer::new(paint, p.line_width as f64 * scale);
+    let mut st = StrokeLayer::new(paint, line_width(p, scale));
     st.opacity = opacity;
     st.cap = match p.line_cap {
         kurbo::Cap::Butt => LineCap::Butt,
@@ -1615,13 +1655,14 @@ impl<'p> Builder<'p> {
     }
 
     /// Glyph `o` as type: added to the line being gathered (or starting one). `false`: it keeps
-    /// its outline (no Unicode text, mirrored, or not type mode).
+    /// its outline (no Unicode text, mirrored, or not type mode). No `paint`: invisible text,
+    /// type with neither fill nor stroke.
     fn type_glyph(
         &mut self,
         o: &craft_pdf::interpret::font::OutlineGlyph,
         m: Affine,
         scale: f64,
-        paint: &craft_pdf::interpret::Paint<'_>,
+        paint: Option<&craft_pdf::interpret::Paint<'_>>,
         stroke: Option<&StrokeProps>,
         overprint: bool,
     ) -> bool {
@@ -1653,9 +1694,10 @@ impl<'p> Builder<'p> {
             Some(BfString::Char(c)) => c.to_string(),
             Some(BfString::String(s)) => s,
             None => {
-                if o.as_unicode().is_some_and(|u| replacement(&u)) {
+                // Invisible text isn't kept as outlines: the caller says it was left out.
+                if paint.is_some() && o.as_unicode().is_some_and(|u| replacement(&u)) {
                     let name = self.font_name(key, o).family;
-                    self.warn(&format!("text in {name} whose characters the file doesn't name (U+FFFD) was kept as outlines"));
+                    self.warn(&format!("text in {name} {UNNAMED_CHARACTERS_NOTE}"));
                 }
                 return false;
             }
@@ -1679,17 +1721,19 @@ impl<'p> Builder<'p> {
         {
             let decided = match self.matched.get(&key) {
                 Some(m) => m.clone(),
-                // A glyph that can't be compared (several characters, a vertical form) decides
-                // nothing: it takes the face of its name until one that can be compared does.
-                None if comparable(&text, upright).is_none() => Some(face.clone()),
+                // A glyph that can't be compared (several characters, a vertical form) or that
+                // shows nothing (invisible text) decides nothing: it takes the face of its name
+                // until one that can be compared does.
+                None if paint.is_none() || comparable(&text, upright).is_none() => Some(face.clone()),
                 None => {
                     let m = matching_face(face, &text, o, upright);
                     self.matched.insert(key, m.clone());
                     m
                 }
             };
-            let Some(f) = decided else {
-                self.warn("text whose glyphs differ from the installed font of the same name was kept as outlines");
+            // Invisible text shows no glyphs that could differ: it keeps the face of its name.
+            let Some(f) = decided.or_else(|| paint.is_none().then(|| face.clone())) else {
+                self.warn(UNMATCHED_GLYPHS_NOTE);
                 return false;
             };
             info = FontInfo { family: f.family.clone(), style: f.style.clone(), face: Some(f) };
@@ -1706,8 +1750,14 @@ impl<'p> Builder<'p> {
             None if self.matched.contains_key(&key) => self.versions.entry(key).or_insert_with(|| named(&info.face)).clone(),
             None => named(&info.face),
         };
-        let (paint, opacity) = self.paint(paint, stroke.is_some(), self.walked(true));
-        let stroke = stroke.map(|p| (paint.clone(), p.line_width as f64 * scale));
+        let (paint, opacity) = match paint {
+            Some(p) => {
+                let (paint, opacity) = self.paint(p, stroke.is_some(), self.walked(true));
+                (Some(paint), opacity)
+            }
+            None => (None, 1.0),
+        };
+        let stroke = stroke.zip(paint.clone()).map(|(p, paint)| (paint, line_width(p, scale)));
         let look = Look {
             font: key,
             family: info.family,
@@ -1717,7 +1767,7 @@ impl<'p> Builder<'p> {
             h_scale: at.h_scale,
             overprint_fill: stroke.is_none() && overprint,
             overprint_stroke: stroke.is_some() && overprint,
-            fill: stroke.is_none().then_some(paint),
+            fill: if stroke.is_none() { paint } else { None },
             stroke,
         };
         let advance = width.map_or(at.size * 0.5, |w| w as f64 / 1000.0 * at.size * at.h_scale / 100.0);
@@ -1824,7 +1874,7 @@ impl<'a> Device<'a> for Builder<'_> {
         let (paint, opacity) = self.paint(paint, stroke, walked);
         // A gradient that doesn't extend past its ends paints only between them.
         let width = match draw_mode {
-            PathDrawMode::Stroke(p) => p.line_width as f64 * mean_scale(transform),
+            PathDrawMode::Stroke(p) => line_width(p, mean_scale(transform)),
             PathDrawMode::Fill(_) => 0.0,
         };
         let band = shading.and_then(|sp| extend_clip(sp, bp.bounding_box().inflate(width, width)));
@@ -1928,7 +1978,18 @@ impl<'a> Device<'a> for Builder<'_> {
     ) {
         self.pending = false;
         let stroke = match draw_mode {
-            GlyphDrawMode::Invisible => return,
+            // Invisible text (a scanned page's recognized text, over the scan) draws nothing but
+            // is still text: type with neither fill nor stroke, so it stays searchable.
+            GlyphDrawMode::Invisible => {
+                let typed = match glyph {
+                    Glyph::Outline(o) => self.type_glyph(o, transform * glyph_transform, mean_scale(transform), None, None, false),
+                    Glyph::Type3(_) => false,
+                };
+                if !typed {
+                    self.warn(INVISIBLE_TEXT_NOTE);
+                }
+                return;
+            }
             GlyphDrawMode::Fill => None,
             GlyphDrawMode::Stroke(p) => Some(p.clone()),
         };
@@ -1936,7 +1997,7 @@ impl<'a> Device<'a> for Builder<'_> {
             Glyph::Outline(o) => {
                 let scale = mean_scale(transform);
                 let overprint = self.glyph_overprint(stroke.is_some());
-                if self.type_glyph(o, transform * glyph_transform, scale, paint, stroke.as_ref(), overprint) {
+                if self.type_glyph(o, transform * glyph_transform, scale, Some(paint), stroke.as_ref(), overprint) {
                     return;
                 }
                 self.flush_text();
@@ -1957,7 +2018,7 @@ impl<'a> Device<'a> for Builder<'_> {
                 if let Some(r) = &mut self.glyphs {
                     r.path.extend(bp.iter());
                 }
-                self.warn("text was converted to outlines");
+                self.warn(OUTLINED_TEXT_NOTE);
             }
             Glyph::Type3(t3) => {
                 if self.nested >= MAX_NESTED {
