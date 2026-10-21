@@ -484,6 +484,9 @@ pub struct TraceResult {
     /// option). Each path drawn together with those inside it, in the order they have here, paints
     /// what `paths` paints in its order.
     pub parents: Vec<Option<usize>>,
+    /// Flat Logo: the size in pixels the image was traced at when it was averaged down first;
+    /// `None` when it was traced at its own size.
+    pub worked_at: Option<(u32, u32)>,
 }
 
 impl TraceResult {

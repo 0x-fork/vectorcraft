@@ -4976,6 +4976,7 @@ effect	Soft	Weich
 	Snap to Perpendicular	An Senkrechter ausrichten
 @msg	unknown snap option `{key}` (use {options})	unbekannte Einrastoption `{key}` (möglich: {options})
 	Gap Length:	Lückenlänge:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Der Modus „Flaches Logo“ hat das Bild mit {_1} × {_2} Pixeln nachgezeichnet, durch Mittelung verkleinert von {_3} × {_4}.
 	Artboard {n} of {total}	Zeichenfläche {n} von {total}
 	File {n} of {total}	Datei {n} von {total}
 	Encoding and writing the file…	Datei wird codiert und geschrieben…

@@ -591,6 +591,20 @@ mod tests {
     }
 
     #[test]
+    fn a_large_image_traced_as_a_flat_logo_shows_the_size_it_was_traced_at() {
+        let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 100, "height": 100})).unwrap();
+        let img = image::RgbaImage::from_fn(1602, 1602, |x, _| image::Rgba(if x < 800 { [0, 0, 0, 255] } else { [255, 255, 255, 255] }));
+        let mut png = vec![];
+        img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+        let data = vectorcraft_format::base64_encode(&png);
+        app.run("file.place", json!({"name": "logo.png", "dataBase64": data, "link": false})).unwrap();
+        trace_with(&mut app, "Flat Logo");
+        assert!(target(&app).2.is_some(), "the image is traced: {}", app.ui.status);
+        assert_eq!(app.ui.status, "Flat Logo traced the image at 801 × 801 pixels, averaged down from 1602 × 1602.");
+    }
+
+    #[test]
     fn sketch_quick_trace_reveals_all_adjustments_and_keeps_the_source() {
         let mut app = traced_app();
         app.run("imageTrace.release", json!({})).unwrap();

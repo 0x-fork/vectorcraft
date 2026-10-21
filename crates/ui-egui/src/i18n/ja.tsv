@@ -5050,6 +5050,7 @@ lighting	Light	ライト
 	Snap to Perpendicular	垂線にスナップ
 @msg	unknown snap option `{key}` (use {options})	不明なスナップオプション `{key}` ({options} を使用してください)
 	Gap Length:	ギャップの長さ:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	フラットロゴモードは画像を {_3} × {_4} から平均化して縮小した {_1} × {_2} ピクセルでトレースしました。
 	Artboard {n} of {total}	アートボード {n} / {total}
 	File {n} of {total}	ファイル {n} / {total}
 	Encoding and writing the file…	ファイルをエンコードして書き込み中…

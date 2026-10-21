@@ -5006,6 +5006,7 @@ lighting	Light	Свет
 	Snap to Perpendicular	Привязать к перпендикуляру
 @msg	unknown snap option `{key}` (use {options})	неизвестный параметр привязки `{key}` (допустимо: {options})
 	Gap Length:	Длина зазора:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Режим «Плоский логотип» трассировал изображение в размере {_1} × {_2} пикселей, уменьшенное усреднением с {_3} × {_4}.
 	Artboard {n} of {total}	Монтажная область {n} из {total}
 	File {n} of {total}	Файл {n} из {total}
 	Encoding and writing the file…	Кодирование и запись файла…

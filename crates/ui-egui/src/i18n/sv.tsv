@@ -5353,6 +5353,7 @@ theme	Appearance	Utseende
 	Snap to Perpendicular	Fäst mot vinkelrät
 @msg	unknown snap option `{key}` (use {options})	okänt fästalternativ `{key}` (använd {options})
 	Gap Length:	Lucklängd:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Läget Platt logotyp vektoriserade bilden vid {_1} × {_2} pixlar, nedskalad genom medelvärdesbildning från {_3} × {_4}.
 	Artboard {n} of {total}	Rityta {n} av {total}
 	File {n} of {total}	Fil {n} av {total}
 	Encoding and writing the file…	Kodar och skriver filen…

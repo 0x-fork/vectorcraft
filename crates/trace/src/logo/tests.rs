@@ -219,6 +219,31 @@ fn a_large_image_is_traced_at_reduced_size_and_scaled_back() {
     }
 }
 
+/// A light square inset 50 px with slanted 2 px black lines across it, on a transparent background.
+fn lined_square(n: u32) -> Raster {
+    Raster::from_fn(n, n, |x, y| {
+        if !(50..n - 50).contains(&x) || !(50..n - 50).contains(&y) {
+            [0, 0, 0, 0]
+        } else if (i64::from(x) - i64::from(y) / 8).rem_euclid(40) < 2 {
+            [0, 0, 0, 255]
+        } else {
+            [240, 240, 220, 255]
+        }
+    })
+}
+
+#[test]
+fn a_trace_averaged_down_says_the_size_it_worked_at() {
+    let named = TraceParams { logo_colors: vec!["#000000".into(), "#F0F0DC".into()], ..logo_params() };
+    // 1025 px is over the working size: averaged down by 2, to 513 px.
+    let res = trace(&lined_square(1025), &named);
+    assert!(!res.paths.is_empty());
+    assert_eq!(res.worked_at, Some((513, 513)));
+    let res = trace(&lined_square(1024), &named);
+    assert!(!res.paths.is_empty());
+    assert_eq!(res.worked_at, None);
+}
+
 /// Every anchor of every path is finite and inside (a small margin around) the image.
 fn assert_sane(res: &TraceResult, w: u32, h: u32) {
     for t in &res.paths {
