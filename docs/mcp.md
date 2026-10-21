@@ -1655,7 +1655,10 @@ patterns out. The Blend commands also grade gradient meshes, which keep their sh
 Recolor Artwork keys colours by identity, not hex: `recolor.colors` lists each colour's `key` (`"rgb 255 0 0"`,
 `"cmyk 0 100 100 0"`, `"gray 40"`, `"lab 55 60 -40"`; RGB in 0–255 levels, CMYK and Gray in percent), so CMYK,
 Lab and RGB colours that look alike stay apart, and every colour parameter also accepts a key.
-`recolor.reduce {colors?, method?, preserve?, limitTo?}` groups the selection's colours into rows of similar colours (k-means in Lab, weighted by use;
+`recolor.colors` and `recolor.reduce` read the objects in `ids`, else the selection. With nothing selected they read
+the objects `select.all` takes, which leaves out hidden and locked art, and the selection is left unchanged; hidden
+and locked objects inside a group are left out too, also in isolation mode.
+`recolor.reduce {colors?, method?, preserve?, limitTo?, ids?}` groups those colours into rows of similar colours (k-means in Lab, weighted by use;
 tints of a global swatch share its row; White and Black are preserved by default) and returns a map of rows
 `[{from: [keys], to: key}]` to edit and pass to `recolor.apply {map, method?, model?, limitTo?, group?, groupColors?, rename?}`.
 For scripts and MCP, `model` selects the replacement color model: `keep` (default) retains each
