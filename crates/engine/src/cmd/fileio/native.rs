@@ -146,10 +146,13 @@ pub(super) struct Extras {
 /// are left to [`encode`]).
 pub(super) fn save_options(cmd: &str, f: &Format, doc: &Document, p: &Value) -> Result<(SaveOptions, Extras)> {
     let o: NativeOptions = super::encode::options(f, p)?;
-    let mut so = SaveOptions::for_doc(doc);
-    so.compress = o.compress.unwrap_or(false);
-    so.version = o.version.unwrap_or(vectorcraft_format::VERSION);
-    so.include_linked = o.include_linked;
+    // Pretty or compact is decided by [`encode_to`] on the document it writes.
+    let mut so = SaveOptions {
+        compress: o.compress.unwrap_or(false),
+        version: o.version.unwrap_or(vectorcraft_format::VERSION),
+        include_linked: o.include_linked,
+        ..SaveOptions::default()
+    };
     if o.embed_profiles.unwrap_or(true) {
         so.profiles = embedded_profiles(doc);
     }
@@ -190,6 +193,7 @@ pub(super) fn encode_to(cmd: &str, f: &Format, doc: &Document, p: &Value, w: imp
         }
         other => other,
     };
+    so.pretty = so.pretty_fits(&native);
     vectorcraft_format::save_to(&native, &so, w).map_err(|e| bad(cmd, e.to_string()))
 }
 
