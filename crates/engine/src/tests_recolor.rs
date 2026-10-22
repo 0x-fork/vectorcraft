@@ -379,6 +379,65 @@ fn edit_group_relinks_art_and_apply_rewrites_the_group_with_the_art() {
     assert_eq!(g.swatches.iter().map(|w| w.paint.color().unwrap()).collect::<Vec<_>>(), [Color::rgb8(1, 2, 3), Color::cmyk(0.0, 0.0, 0.0, 0.2)]);
 }
 
+/// Art linked to a global swatch of the group that `recolor.apply` rewrites stays linked when the
+/// swatch takes its row's new color: it shows that color at its tint and follows later edits.
+#[test]
+fn apply_with_a_group_keeps_art_linked_to_its_global_swatches() {
+    let mut s = session();
+    run(&mut s, "swatch.newGroup", json!({"name": "Brand", "colors": ["#2878f0"]}));
+    let name = s.doc().unwrap().doc.swatch_groups.iter().find(|g| g.name == "Brand").unwrap().swatches[0].name.clone();
+    run(&mut s, "swatch.edit", json!({"name": name, "global": true}));
+    let full = rect(&mut s, json!("#000000"));
+    let tint = rect(&mut s, json!("#000000"));
+    run(&mut s, "paint.setFill", json!({"ids": [full.0], "swatch": name}));
+    run(&mut s, "paint.setFill", json!({"ids": [tint.0], "swatch": name, "tint": 50}));
+    let link = |s: &Session, id: NodeId| match s.doc().unwrap().doc.node(id).unwrap().appearance.fill_paint() {
+        vectorcraft_color::Paint::Solid { color, swatch, tint } => (color, swatch, tint),
+        p => panic!("{p:?}"),
+    };
+    let swatch_hex = |s: &Session| s.doc().unwrap().doc.swatch(&name).unwrap().paint.color().unwrap().to_hex();
+    let orange = Color::from_hex("#ff6a00").unwrap();
+    select_all(&mut s);
+    let undo = s.doc().unwrap().history.undo.len();
+    // The 50% tint is not in the row: it follows the swatch.
+    let r = run(&mut s, "recolor.apply", json!({"map": {"#2878f0": "#ff6a00"}, "group": "Brand"}));
+    assert_eq!(r["relinked"], 1, "{r}");
+    assert_eq!(link(&s, full), (orange, Some(name.clone()), 1.0), "the recolored art stays linked");
+    let (c, w, t) = link(&s, tint);
+    assert!(w.as_deref() == Some(name.as_str()) && t == 0.5 && close(c, orange.tinted(0.5)), "{c:?} {w:?} {t}");
+    assert_eq!(swatch_hex(&s), "#ff6a00");
+    assert_eq!(s.doc().unwrap().history.undo.len(), undo + 1, "one undo step");
+    // A later edit of the swatch reaches the art.
+    let r = run(&mut s, "swatch.edit", json!({"name": name, "color": "#00ff00"}));
+    assert_eq!(r["relinked"], 2, "{r}");
+    assert_eq!(fill(&s, full).to_hex(), "#00ff00");
+    assert!(close(fill(&s, tint), Color::from_hex("#00ff00").unwrap().tinted(0.5)));
+    run(&mut s, "edit.undo", json!({}));
+    run(&mut s, "edit.undo", json!({}));
+    assert_eq!(swatch_hex(&s), "#2878f0");
+    assert_eq!(link(&s, full), (Color::from_hex("#2878f0").unwrap(), Some(name.clone()), 1.0), "undo restores the art");
+    // A row holding the tint too (as recolor.reduce gives it): the tint keeps its tint and its link.
+    select_all(&mut s);
+    let tint_key = vectorcraft_color::recolor::ColorKey::of(&fill(&s, tint)).to_string();
+    let rows = json!([{"from": ["rgb 40 120 240", tint_key], "to": "#ff6a00"}]);
+    run(&mut s, "recolor.apply", json!({"map": rows, "method": "scaleTints", "group": "Brand"}));
+    let (c, w, t) = link(&s, tint);
+    assert!(w.as_deref() == Some(name.as_str()) && (t - 0.5).abs() < 0.01 && close(c, orange.tinted(t)), "{c:?} {w:?} {t}");
+    assert_eq!(link(&s, full), (orange, Some(name.clone()), 1.0));
+    // A swatch rewritten with another color than its art's row: that art takes the row's color, unlinked.
+    run(&mut s, "edit.undo", json!({}));
+    select_all(&mut s);
+    run(&mut s, "recolor.apply", json!({"map": {"#2878f0": "#ff6a00"}, "group": "Brand", "groupColors": ["#123456"]}));
+    assert_eq!(link(&s, full), (orange, None, 1.0));
+    assert_eq!(swatch_hex(&s), "#123456");
+    // Without a group the swatch is unchanged, so the art takes the new color unlinked.
+    run(&mut s, "edit.undo", json!({}));
+    select_all(&mut s);
+    run(&mut s, "recolor.apply", json!({"map": {"#2878f0": "#ff6a00"}}));
+    assert_eq!(link(&s, full), (orange, None, 1.0));
+    assert_eq!(swatch_hex(&s), "#2878f0");
+}
+
 #[test]
 fn edit_group_refuses_to_change_built_in_swatches() {
     let mut s = session();

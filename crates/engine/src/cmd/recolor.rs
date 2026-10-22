@@ -31,7 +31,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Recolor Artwork",
             ["Edit", "Edit Colors"],
             None,
-            "{map: rows [{from: [colour keys (recolor.colors) or \"#rrggbb\" (every colour shown as that hex)], to: colour (hex, key, {c,m,y,k} or {l,a,b}) | null, exclude?: false (the row's colours are kept)}] | {\"key or #rrggbb\": colour, …} (one row per colour), method?: \"exact\" (default)|\"preserveTints\"|\"scaleTints\"|\"tintsShades\"|\"hueShift\" (how a row's colours take its new colour, relative to the row's darkest, average or most saturated colour), limitTo?: swatch library id or name; or \"document\" (the document's swatches): new colours snap to its nearest colour, group?: colour group to rewrite, groupColors?: [colour] (what `group` is rewritten with; default: the rows' new colours, in order, excluded rows left out), rename?: the group's new name, includeImages?: true, includePatterns?: true} recolour the selection (gradients, text, meshes, image pixels and pattern tiles included; each new colour keeps the model of the one it replaces (model?: \"keep\" default | \"new\" (the new colour's own model, so a CMYK colour replacing RGB art gives CMYK art) | \"document\" (the document's colour mode)), except a library swatch's with limitTo: art takes the swatch itself, linked to a global or spot colour at its tints, and the swatch joins the document's swatches) and the group, as one undo step → {changed, swatches: [names added to the document's swatches], note?: set when a colour kept a model other than its new colour's (see model)}",
+            "{map: rows [{from: [colour keys (recolor.colors) or \"#rrggbb\" (every colour shown as that hex)], to: colour (hex, key, {c,m,y,k} or {l,a,b}) | null, exclude?: false (the row's colours are kept)}] | {\"key or #rrggbb\": colour, …} (one row per colour), method?: \"exact\" (default)|\"preserveTints\"|\"scaleTints\"|\"tintsShades\"|\"hueShift\" (how a row's colours take its new colour, relative to the row's darkest, average or most saturated colour), limitTo?: swatch library id or name; or \"document\" (the document's swatches): new colours snap to its nearest colour, group?: colour group to rewrite, groupColors?: [colour] (what `group` is rewritten with; default: the rows' new colours, in order, excluded rows left out), rename?: the group's new name, includeImages?: true, includePatterns?: true} recolour the selection (gradients, text, meshes, image pixels and pattern tiles included; each new colour keeps the model of the one it replaces (model?: \"keep\" default | \"new\" (the new colour's own model, so a CMYK colour replacing RGB art gives CMYK art) | \"document\" (the document's colour mode)), except a library swatch's with limitTo: art takes the swatch itself, linked to a global or spot colour at its tints, and the swatch joins the document's swatches; art linked to a global swatch of `group` that is rewritten with its row's new color stays linked to it, at its tint; other recolored art loses its swatch link) and the group, as one undo step → {changed, swatches: [names added to the document's swatches], relinked?: with group, the other paints linked to its global swatches that took their new colors, note?: set when a colour kept a model other than its new colour's (see model)}",
             has_doc,
             apply
         ),
@@ -291,11 +291,23 @@ struct Link {
     color: Color,
 }
 
+/// A global swatch of the color group `recolor.apply` rewrites: its name, the color it is
+/// rewritten with and the color art linked to it shows afterwards.
+struct GroupSwatch {
+    name: String,
+    color: Color,
+    shown: Color,
+}
+
 /// A parsed map ready to recolour: the row of each current colour, and the swatch of each row's
 /// new colour.
 struct ColorMap {
     rows: Vec<RowMap>,
     links: Vec<Option<Link>>,
+    /// The new color of each of `rows`.
+    tos: Vec<Color>,
+    /// The global swatches of the color group being rewritten.
+    group: Vec<GroupSwatch>,
     keys: HashMap<ColorKey, usize>,
     hexes: HashMap<String, usize>,
     /// Set when a colour took a new colour of another model in its own model.
@@ -303,14 +315,17 @@ struct ColorMap {
 }
 
 impl ColorMap {
-    /// `links`: the swatch of each of `rows`' new colours (as many as `rows`, or none).
-    fn new(rows: &[Row], method: Method, own_model: bool, links: &[Option<Link>]) -> Self {
-        let mut out = Self { rows: vec![], links: vec![], keys: HashMap::new(), hexes: HashMap::new(), converted: Default::default() };
+    /// `links`: the swatch of each of `rows`' new colours (as many as `rows`, or none); `group`: the
+    /// global swatches of the color group being rewritten.
+    fn new(rows: &[Row], method: Method, own_model: bool, links: &[Option<Link>], group: Vec<GroupSwatch>) -> Self {
+        let mut out =
+            Self { rows: vec![], links: vec![], tos: vec![], group, keys: HashMap::new(), hexes: HashMap::new(), converted: Default::default() };
         for (n, r) in rows.iter().enumerate().filter(|(_, r)| !r.from.is_empty()) {
             let Some(to) = r.new_color() else { continue };
             let i = out.rows.len();
             let colors: Vec<Color> = r.from.iter().map(Match::color).collect();
             out.rows.push(RowMap::new(method, &colors, to).with_own_model(own_model));
+            out.tos.push(to);
             out.links.push(links.get(n).cloned().flatten());
             for m in &r.from {
                 match m {
@@ -337,11 +352,23 @@ impl ColorMap {
 
     /// Recolour a colour that can link to a swatch: a row whose new colour is a global or spot
     /// swatch links its colours to it (at their tints; shades and other hues stay unlinked), a
-    /// process swatch gives its colour in its own model; other rows map the colour, which loses its
-    /// link when it changes. True when anything changed.
+    /// process swatch gives its colour in its own model; a color linked to a global swatch of the
+    /// rewritten group that takes the row's new color keeps its link (at its tint in the row);
+    /// other rows map the colour, which loses its link when it changes. True when anything changed.
     fn map_link(&self, c: &mut Color, link: &mut Option<String>, tint: &mut f32) -> bool {
         let Some(i) = self.row_of(*c) else { return false };
         let (Some(row), Some(l)) = (self.rows.get(i), self.links.get(i)) else { return false };
+        if l.is_none()
+            && let Some(g) = link.as_deref().and_then(|n| self.group.iter().find(|g| g.name == n))
+            && self.tos.get(i) == Some(&g.color)
+            && let Some(t) = row.tint(*c)
+        {
+            let t = t.clamp(0.0, 1.0);
+            let shown = g.shown.tinted(t);
+            let changed = *tint != t || *c != shown;
+            (*c, *tint) = (shown, t);
+            return changed;
+        }
         let new = match (l, row.tint(*c)) {
             (Some(l), Some(t)) if l.global => {
                 let t = t.clamp(0.0, 1.0);
@@ -448,17 +475,31 @@ fn apply(s: &mut Session, p: &Value) -> Result<Value> {
                 Some(Link { name, global: w.global, color })
             })
             .collect();
-        let map = ColorMap::new(&rows, method, own_model, &links);
+        // The group's global swatches that its rewrite gives a color: art linked to one of them
+        // whose row's new color is that color stays linked.
+        let kept: Vec<GroupSwatch> = group
+            .and_then(|g| d.swatch_groups.iter().find(|x| x.name == g))
+            .map(|g| {
+                g.swatches
+                    .iter()
+                    .zip(&new)
+                    .filter(|(w, _)| w.global && !w.is_reserved())
+                    .map(|(w, c)| GroupSwatch { name: w.name.clone(), color: *c, shown: d.linked_color(*c, w.spot) })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let map = ColorMap::new(&rows, method, own_model, &links, kept);
         let f = |c: Color| map.map(c);
         let lf = |c: &mut Color, link: &mut Option<String>, tint: &mut f32| map.map_link(c, link, tint);
         let changed = Recolor::with_links(scope, &f, &lf).run(d, &ids);
         let edit = group.map(|g| super::swatch::rewrite_group(d, g, &new, rename, C)).transpose()?;
         Ok((changed, edit, added, map.converted.get()))
     })?;
+    let mut out = json!({ "changed": changed, "swatches": added });
     if let Some(e) = edit {
         e.defaults(s);
+        out["relinked"] = json!(e.relinked());
     }
-    let mut out = json!({ "changed": changed, "swatches": added });
     if converted {
         out["note"] = json!(
             "some colours kept their own colour model, so the new colour was converted into it and may look different; \
