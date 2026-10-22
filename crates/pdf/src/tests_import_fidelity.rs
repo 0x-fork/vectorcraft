@@ -491,6 +491,76 @@ fn a_shading_with_an_exponent_keeps_its_curve() {
     assert!((v - 0.5f32.powf(1.4234)).abs() < 0.01, "{v}");
 }
 
+/// A 100 × 100 square filled with a function-based shading (type 1) over `domain`, placed by
+/// `matrix`, whose PostScript calculator function is `program` (x y → r g b).
+fn function_shading(domain: &str, matrix: &str, program: &str) -> ImportReport {
+    let f = first_extra(1);
+    let resources = format!(
+        "/Pattern << /P0 << /PatternType 2 /Shading << /ShadingType 1 /ColorSpace /DeviceRGB /Domain [{domain}] /Matrix [{matrix}] /Function {f} 0 R >> >> >>"
+    );
+    let function = stream(&format!("/FunctionType 4 /Domain [{domain}] /Range [0 1 0 1 0 1]"), program);
+    open_with(&one_page("/Pattern cs /P0 scn 0 0 100 100 re f", &resources, &[&function]), |_| {})
+}
+
+/// A browser writes a repeating linear gradient as a function-based shading whose colour changes
+/// along one axis only: it comes in as a linear gradient with hard stops, red and white as in the
+/// file, not as a flat grey (#3621).
+#[test]
+fn a_function_based_shading_along_one_axis_becomes_a_linear_gradient() {
+    // Four stripes of red, then white, across the square (x 0..4 over 100 pt).
+    let r = function_shading("0 4 0 1", "25 0 0 100 0 0", "{ pop dup truncate sub 0.5 le { 1 0 0 } { 1 1 1 } ifelse }");
+    assert!(!r.warnings.iter().any(|w| w.contains("flat")), "{:?}", r.warnings);
+    let g = all(&r.document)
+        .into_iter()
+        .find_map(|n| match n.appearance.fill().map(|f| &f.paint) {
+            Some(Paint::Gradient(g)) => Some(g.clone()),
+            _ => None,
+        })
+        .expect("a gradient fill");
+    assert_eq!(g.gradient.kind, GradientKind::Linear);
+    let (red, white) = ([1.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
+    assert!(g.gradient.stops.iter().all(|s| s.color.to_rgb() == red || s.color.to_rgb() == white), "{:?}", g.gradient.stops);
+    let geom = g.geom.as_ref().unwrap();
+    assert!((geom.start.x - 0.0).abs() < 0.01 && (geom.end.x - 100.0).abs() < 0.01, "across the square: {geom:?}");
+    for (t, want) in [(0.06, red), (0.19, white), (0.31, red), (0.44, white), (0.56, red), (0.94, white)] {
+        assert_eq!(g.gradient.sample(t).0.to_rgb(), want, "at {t}");
+    }
+    // The colour changes where the file's does (x = 0.5, 1 … 3.5, and at x = 4 itself, red
+    // again): hard stops, not ramps.
+    let edges: Vec<f32> =
+        g.gradient.stops.windows(2).filter(|w| (w[0].offset - w[1].offset).abs() < 1e-4 && w[0].color != w[1].color).map(|w| w[0].offset).collect();
+    assert_eq!(edges.len(), 8, "{:?}", g.gradient.stops);
+    for (k, e) in edges.iter().take(7).enumerate() {
+        assert!((e - (k + 1) as f32 / 8.0).abs() < 1e-4, "change {k} at {e}");
+    }
+}
+
+/// A function-based shading paints only over its domain: a square filled with one whose domain
+/// covers its left half is clipped to that half; one whose domain covers it all isn't clipped.
+#[test]
+fn a_function_based_shading_paints_only_over_its_domain() {
+    let clips = |matrix: &str| -> Vec<Node> {
+        let r = function_shading("0 1 0 1", matrix, "{ pop 0 0 }");
+        all(&r.document).into_iter().filter(|n| matches!(n.kind, NodeKind::Group { clip: true, .. })).collect()
+    };
+    let half = clips("50 0 0 100 0 0");
+    let [c] = half.as_slice() else { panic!("one clip group: {half:?}") };
+    let b = c.geometric_bounds().unwrap();
+    assert!(b.x0.abs() < 0.01 && (b.x1 - 50.0).abs() < 0.01 && b.y0.abs() < 0.01 && (b.y1 - 100.0).abs() < 0.01, "{b:?}");
+    assert!(clips("100 0 0 100 0 0").is_empty());
+}
+
+/// A function-based shading whose colour changes along both axes has no gradient: it comes in as
+/// the colour it averages to, never as a grey that isn't in it.
+#[test]
+fn a_function_based_shading_along_both_axes_becomes_its_average_colour() {
+    // r = g = x·y, b = 0 over the unit square: averages to (0.25, 0.25, 0).
+    let r = function_shading("0 1 0 1", "100 0 0 100 0 0", "{ mul dup 0 }");
+    let c = all(&r.document).iter().find_map(fill_color).expect("a flat fill").to_rgb();
+    assert!((c[0] - 0.25).abs() < 0.03 && (c[1] - 0.25).abs() < 0.03 && c[2].abs() < 1e-6, "{c:?}");
+    assert!(r.warnings.iter().any(|w| w.contains("average")), "{:?}", r.warnings);
+}
+
 /// A diamond (10–90 × 10–90) clipping `paint`, which fills its bounds: how a shape filled with a
 /// gradient is written (`W n`, then `sh`).
 fn clipped_diamond(paint: &str) -> Document {

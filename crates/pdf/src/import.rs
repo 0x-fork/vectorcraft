@@ -24,7 +24,7 @@ use vectorcraft_geom::{FillRule, PathData};
 use crate::import_color::{Colors, Native};
 use crate::import_mask::{MaskSpec, contains, is_rectangle, luminance, mask_spec, white_cover};
 use crate::import_scan::{FontNames, MAX_NESTING, Ocgs, Scan, TextOverprint, Walked, all_on, hides_forms, scan_page, tag_key};
-use crate::import_shading::{clipped, extend_clip, fold_stop_opacity, gradient_shape, mesh_shading, shading_gradient};
+use crate::import_shading::{clipped, extend_clip, fold_stop_opacity, function_average, gradient_shape, mesh_shading, shading_gradient};
 use crate::import_text::{Families, LineFacts, Look, Placement, TextLine, Upright};
 use crate::{CropTo, ImportOptions, ImportReport, PdfError, TextAs};
 
@@ -1435,10 +1435,16 @@ impl<'p> Builder<'p> {
             craft_pdf::interpret::Paint::Pattern(pat) => match pat.as_ref() {
                 Pattern::Shading(sp) => match shading_gradient(sp, &mut self.colors, inks) {
                     Some((g, _)) => (Paint::Gradient(Box::new(g)), sp.opacity),
-                    None => {
-                        self.warn("function-based shadings (and very large meshes) are imported as a flat colour");
-                        (Paint::solid(Color::rgb(0.5, 0.5, 0.5)), sp.opacity)
-                    }
+                    None => match function_average(sp) {
+                        Some(c) => {
+                            self.warn("function-based shadings whose colour changes in two directions are imported as their average colour");
+                            (Paint::solid(c), sp.opacity)
+                        }
+                        None => {
+                            self.warn("very large meshes are imported as a flat colour");
+                            (Paint::solid(Color::rgb(0.5, 0.5, 0.5)), sp.opacity)
+                        }
+                    },
                 },
                 Pattern::Tiling(t) => match self.tiling(t, stroke) {
                     Some(paint) => (paint, 1.0),
