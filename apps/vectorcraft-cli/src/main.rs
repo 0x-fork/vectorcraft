@@ -104,7 +104,7 @@ USAGE:
       --replace-lossy is given.       --editing-data opens a .ai or an EPS with editing data from its editing copy
       even where that draws differently from its PDF part or page (which can be older), as long as
       it can be read. A PDF OUT omits the embedded native document unless --preserve-editing is
-      given (Save As PDF in the app still defaults to keeping it). With --preserve-editing the
+      given (the app's Save As PDF still defaults to keeping it). With --preserve-editing the
       result's warnings say the attachment was written.
       The result has the export's warnings, and importWarnings for what reading IN left out.
       --ai-version 7 writes a .ai as the legacy version 7 (layers, groups and type kept; one file
