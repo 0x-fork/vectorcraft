@@ -195,6 +195,11 @@ impl Headless {
             let ev = PointerEvent { kind, pos: Point::new(x, y), mods, pressure: PointerEvent::json_pressure(e) };
             let reqs = self.session.pointer(&ev, self.view).map_err(|e| e.to_string())?;
             self.apply_ui_requests(reqs, &mut requests)?;
+            // With no frames to show the highlight in later, a hover waits for the work the tool
+            // runs on another thread.
+            if kind == PointerKind::Move && self.session.tool_waiting() {
+                self.session.tool_poll(self.view, true).map_err(|e| e.to_string())?;
+            }
             let hold = PointerEvent::json_hold(e);
             if hold > 0.0 {
                 let reqs = self.session.tool_tick(hold, self.view).map_err(|e| e.to_string())?;

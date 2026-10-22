@@ -410,6 +410,26 @@ fn headless_path_gesture_undo() {
     assert_eq!(&std::fs::read(tmp("x.png")).unwrap()[..4], b"\x89PNG");
 }
 
+/// A hover's reply comes once the tool's highlight is ready, also when the tool finds it on another
+/// thread (the Shape Builder's map of a large selection).
+#[test]
+fn headless_hover_waits_for_the_shape_builder_map() {
+    let mut h = Headless::with_document();
+    let run = |h: &mut Headless, command: &str, params: Value| {
+        let r = crate::call_tool(h, "run_command", &json!({"command": command, "params": params}));
+        assert!(!r.is_error, "{command}: {r:?}");
+    };
+    for k in 0..40 {
+        run(&mut h, "shape.rectangle", json!({"x": 100 + k * 10, "y": 100, "width": 20, "height": 20}));
+    }
+    run(&mut h, "select.all", json!({}));
+    run(&mut h, "tool.select", json!({"tool": "shapeBuilder"}));
+    let r = crate::call_tool(&mut h, "pointer_gesture", &json!({"events": [{"kind": "move", "x": 115, "y": 110}]}));
+    assert!(!r.is_error, "{r:?}");
+    assert!(!h.session.tool_waiting());
+    assert!(!h.session.overlays(h.view).is_empty(), "the region under the pointer is highlighted");
+}
+
 /// inspect_document reads back the paint type's characters show, as add_text and set_paint give it.
 #[test]
 fn inspect_document_reports_the_paint_of_type() {
