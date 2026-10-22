@@ -479,10 +479,11 @@ impl BuilderMap {
         [m + off, m - off].map(|q| self.region_at(q))
     }
 
-    /// Does line piece `i` run between two of `regions` (an edge that merging or deleting them
-    /// removes)?
+    /// Does line piece `i` run between two different regions of `regions` (an edge that merging or
+    /// deleting them removes)? A piece with the same region on both sides, such as the end of a
+    /// line inside a shape, bounds nothing and stays.
     pub fn line_between(&self, i: usize, regions: &[usize]) -> bool {
-        self.lines.get(i).is_some_and(|(l, _)| self.sides(l).iter().all(|r| r.is_some_and(|r| regions.contains(&r))))
+        self.lines.get(i).is_some_and(|(l, _)| matches!(self.sides(l), [Some(a), Some(b)] if a != b && regions.contains(&a) && regions.contains(&b)))
     }
 
     /// The edges `touched` deletes: those that bound none of its regions (deleting a region takes

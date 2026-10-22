@@ -505,6 +505,27 @@ fn shape_builder_click_on_a_side_of_a_line_splits_the_shape() {
     assert_eq!(open_paths(&s, &out), vec![(2, Rect::new(50.0, -20.0, 50.0, 120.0))]);
 }
 
+/// A line that ends inside a shape has the same region on both sides there: a click or a drag
+/// across it, or deleting the region, leaves it whole.
+#[test]
+fn shape_builder_merge_keeps_a_line_that_ends_inside_the_shape() {
+    let mut s = session();
+    let a = rect(&mut s, 0.0, 0.0, 100.0, 100.0);
+    set_fill(&mut s, a, Color::rgb(1.0, 0.0, 0.0));
+    let l = line(&mut s, (50.0, -20.0), (50.0, 99.0));
+    s.execute("select.set", &json!({"ids": [a.0, l.0]})).unwrap();
+    let mut lines = vec![];
+    for params in [json!({"points": [[25, 50]]}), json!({"points": [[25, 50], [75, 50]]}), json!({"points": [[25, 50]], "erase": true})] {
+        let r = s.execute("shapeBuilder.merge", &params).unwrap();
+        assert_eq!(r["regions"], 1, "{params}");
+        let merged = r["merged"].as_u64().map(|m| (area(&s, NodeId(m)) - 10000.0).abs() < 1.0);
+        assert_eq!(merged, params["erase"].is_null().then_some(true), "{params}");
+        lines.push(open_paths(&s, &ids(&r)));
+        s.execute("edit.undo", &json!({})).unwrap();
+    }
+    assert_eq!(lines, vec![vec![(2, Rect::new(50.0, -20.0, 50.0, 99.0))]; 3]);
+}
+
 #[test]
 fn shape_builder_merge_across_a_line_removes_the_piece_between() {
     let mut s = session();
