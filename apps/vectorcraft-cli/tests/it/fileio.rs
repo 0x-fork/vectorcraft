@@ -46,7 +46,6 @@ fn info(file: &str) -> Value {
     serde_json::from_str(&ok(&["info", file])).unwrap()
 }
 
-#[test]
 /// #3627: `convert` to PDF omits the embedded native document unless asked.
 #[test]
 fn convert_pdf_omits_editing_data_unless_preserve_editing() {
@@ -60,10 +59,7 @@ fn convert_pdf_omits_editing_data_unless_preserve_editing() {
     let r: Value = serde_json::from_str(&ok(&["convert", &pdf, &kept, "--preserve-editing"])).unwrap();
     let bytes = std::fs::read(&kept).unwrap();
     assert!(bytes.windows(b"vectorcraft-editing.vectorcraft".len()).any(|w| w == b"vectorcraft-editing.vectorcraft"), "{r}");
-    assert!(
-        r["warnings"].as_array().is_some_and(|w| w.iter().any(|w| w.as_str().is_some_and(|s| s.contains("preserveEditing")))),
-        "{r}"
-    );
+    assert!(r["warnings"].as_array().is_some_and(|w| w.iter().any(|w| w.as_str().is_some_and(|s| s.contains("preserveEditing")))), "{r}");
 }
 
 #[test]
