@@ -675,6 +675,19 @@ impl ParaList {
             ..first.clone()
         }
     }
+
+    /// The list that the Type tool starts when `typed` and a space are typed at the start of a
+    /// paragraph: "1." or "1)" starts a numbered list in 1, 2, 3, "A." or "A)" starts one in A, B,
+    /// C, and "*", "#", ">" or "+" starts a bulleted list with the filled dot. Any other text starts
+    /// none.
+    pub fn typed(typed: &str) -> Option<ParaList> {
+        match typed {
+            "1." | "1)" => Some(Self::numbered(NumberStyle::Arabic)),
+            "A." | "A)" => Some(Self::numbered(NumberStyle::UpperLetters)),
+            "*" | "#" | ">" | "+" => Some(Self::bulleted(Bullet::Dot)),
+            _ => None,
+        }
+    }
 }
 
 /// The left and first-line indents (pt) a list gives a paragraph whose indents are both 0: the
@@ -1888,6 +1901,17 @@ impl TextObject {
         let index = |byte: usize| text.as_bytes().get(..byte).map_or(0, |s| s.iter().filter(|&&c| c == b'\n').count());
         index(a)..index(b) + 1
     }
+    /// The list that the characters before byte `at` start ([`ParaList::typed`]) with the byte
+    /// where their paragraph starts: when the plain text from the start of the paragraph up to
+    /// `at` is a list's start followed by a space, and the paragraph is in no list. None otherwise.
+    pub fn typed_list_at(&self, at: usize) -> Option<(usize, ParaList)> {
+        let text = self.plain_text();
+        let before = text.get(..at)?;
+        let start = before.rfind('\n').map_or(0, |i| i + 1);
+        let list = ParaList::typed(before[start..].strip_suffix(' ')?)?;
+        let index = before.bytes().filter(|&b| b == b'\n').count();
+        self.para_at(index).list.is_none().then_some((start, list))
+    }
     /// Apply `f` to the attributes of paragraphs `range` (indices; None = every paragraph).
     pub fn edit_paras(&mut self, range: Option<std::ops::Range<usize>>, mut f: impl FnMut(&mut ParaStyle)) {
         match range {
@@ -2326,6 +2350,34 @@ mod tests {
             serde_json::to_value(ParaList::numbered(NumberStyle::LowerRoman)).unwrap(),
             serde_json::json!({"bullet": "dot", "number": "lowerRoman"})
         );
+    }
+
+    /// Typed list detection: "1.", "1)", "A." and "A)" and a space at the start of a paragraph
+    /// start a numbered list, and "*", "#", ">" and "+" and a space start a bulleted list with the
+    /// filled dot. Other text, the same characters later in a paragraph or without the space, and
+    /// a paragraph already in a list start nothing.
+    #[test]
+    fn typed_list_starts_are_found_at_a_paragraphs_start() {
+        let (arabic, letters, dot) =
+            (ParaList::numbered(NumberStyle::Arabic), ParaList::numbered(NumberStyle::UpperLetters), ParaList::bulleted(Bullet::Dot));
+        let typed = ["1.", "1)", "A.", "A)", "*", "#", ">", "+"].map(ParaList::typed);
+        assert_eq!(typed, [arabic, arabic, letters, letters, dot, dot, dot, dot].map(Some));
+        for other in ["", "2.", "a.", "a)", "I.", "1", "A", "1:", "-", "•", "1.)", " 1.", "*1", "１."] {
+            assert_eq!(ParaList::typed(other), None, "{other:?}");
+        }
+        let mut t = TextObject::point(Point::ZERO, "Fruit\n1. Apples\nA) x * y\n+ ", CharStyle::default());
+        assert_eq!(t.typed_list_at(9), Some((6, arabic)));
+        assert_eq!(t.typed_list_at(19), Some((16, letters)));
+        assert_eq!(t.typed_list_at(27), Some((25, dot)));
+        // Not at the paragraph's start, not right after the space, or past the end.
+        for at in [0, 5, 8, 10, 15, 23, 25, 26, 99] {
+            assert_eq!(t.typed_list_at(at), None, "{at}");
+        }
+        let mut styles = t.paragraph_styles();
+        styles[1].list = Some(ParaList::bulleted(Bullet::Square));
+        t.set_paragraph_styles(styles);
+        assert_eq!(t.typed_list_at(9), None, "a list paragraph stays as it is");
+        assert_eq!(t.typed_list_at(19), Some((16, letters)));
     }
 
     #[test]
