@@ -95,6 +95,7 @@
 #![forbid(unsafe_code)]
 
 mod css;
+mod entities;
 mod export;
 mod glyph;
 mod import;
@@ -378,7 +379,7 @@ pub struct Editing {
 /// The native document an SVG carries, if any, and whether the SVG was edited since.
 pub fn editing(svg: &str) -> Option<Editing> {
     // (An SVG nested too deep for the XML reader carries none: it isn't one of ours.)
-    if !svg.contains(EDITING_NS) || import::xml_too_deep(svg) {
+    if !svg.contains(EDITING_NS) || import::xml_too_deep(svg) || entities::expansion_too_large(svg) {
         return None;
     }
     let opts = usvg::roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() };
