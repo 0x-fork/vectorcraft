@@ -889,7 +889,7 @@ fn gradient_mesh_from_images_with_junk_params() {
                 d.images.insert("pic".into(), ImageBlob::png(bytes.clone()));
                 let id = d.alloc_id();
                 let link = linked.then(|| LinkInfo { path: "/nonexistent/pic.png".into(), ..Default::default() });
-                let im = ImageObject { key: "pic".into(), width: *w, height: *h, xf: *xf, link, placement: Default::default() };
+                let im = ImageObject { key: "pic".into(), width: *w, height: *h, xf: *xf, link, placement: Default::default(), pixels: None };
                 d.insert(d.default_layer(), 0, Node::new(id, NodeKind::Image(Box::new(im))))?;
                 sel.set([id]);
                 Ok(())

@@ -833,7 +833,7 @@ fn images_take_their_nearest_pixel_without_smoothing() {
     let mut d = Document::new(40.0, 20.0);
     d.images.insert("bw".into(), ImageBlob::new("image/png", png));
     let id = d.alloc_id();
-    let im = ImageObject { key: "bw".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default() };
+    let im = ImageObject { key: "bw".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default(), pixels: None };
     d.insert(Some(d.layers[0].id), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     // How many pixels across the image are neither black nor white.
     let greys = |smooth_images| {
@@ -905,7 +905,8 @@ fn a_gray_image_draws_its_gray_levels() {
     let mut d = Document::new(40.0, 20.0);
     d.images.insert("gray".into(), ImageBlob::new("image/png", png));
     let id = d.alloc_id();
-    let im = ImageObject { key: "gray".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default() };
+    let im =
+        ImageObject { key: "gray".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default(), pixels: None };
     d.insert(Some(d.layers[0].id), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     let r = Renderer::new().render(&d, 40, 20, Affine::IDENTITY, &RenderOptions { smooth_images: false, ..Default::default() });
     assert_eq!((r.pixel(5, 10), r.pixel(35, 10)), ([40, 40, 40, 255], [200, 200, 200, 255]));

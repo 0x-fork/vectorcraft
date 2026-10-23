@@ -42,6 +42,7 @@ fn image_node(d: &mut Document, key: &str) -> Node {
             xf: Affine::IDENTITY,
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     )
 }

@@ -917,7 +917,7 @@ impl<'a> Scene<'a> {
             self.warn(NO_IMAGES);
             return;
         }
-        let Some(i) = self.image_def(&im.key) else { return };
+        let Some(i) = self.image_def(im) else { return };
         let Some((dw, dh)) = self.images.get(i).map(|d| (f64::from(d.size.0), f64::from(d.size.1))) else { return };
         let (w, h) = (f64::from(im.width.max(1)), f64::from(im.height.max(1)));
         let map = self.to_dxf * im.xf;
@@ -959,12 +959,13 @@ impl<'a> Scene<'a> {
         }
     }
 
-    /// The image file for image `key`, encoded once in the chosen format (`None`: left out).
-    fn image_def(&mut self, key: &str) -> Option<usize> {
+    /// The image file for image `im`, encoded once in the chosen format (`None`: left out).
+    fn image_def(&mut self, im: &ImageObject) -> Option<usize> {
+        let key = im.key.as_str();
         if let Some(i) = self.by_key.get(key) {
             return *i;
         }
-        let made = self.encode_image(key);
+        let made = self.encode_image(im);
         let i = match made {
             Ok((file, size)) => {
                 let handle = self.handle();
@@ -981,9 +982,9 @@ impl<'a> Scene<'a> {
         i
     }
 
-    /// Image `key` as a file in the chosen format, and its size in pixels.
-    fn encode_image(&self, key: &str) -> Result<(DxfImage, (u32, u32)), String> {
-        let blob = self.doc.images.get(key).filter(|b| !b.bytes.is_empty()).ok_or_else(|| "an image has no pixels and was left out".to_string())?;
+    /// Image `im` as a file in the chosen format, and its size in pixels.
+    fn encode_image(&self, im: &ImageObject) -> Result<(DxfImage, (u32, u32)), String> {
+        let blob = self.doc.image_blob(im).filter(|b| !b.bytes.is_empty()).ok_or_else(|| "an image has no pixels and was left out".to_string())?;
         let img = image::load_from_memory(&blob.bytes).map_err(|_| UNDECODED.to_string())?;
         let size = (img.width(), img.height());
         let mut bytes = vec![];

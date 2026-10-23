@@ -1274,7 +1274,15 @@ impl Builder {
         let sy = img.height as f64 / f64::from(r.height.max(1));
         let xf = to_doc * affine(img.transform) * Affine::scale_non_uniform(sx, sy);
         self.doc.images.entry(r.key.clone()).or_insert(r.blob);
-        Some(NodeKind::Image(Box::new(ImageObject { key: r.key, width: r.width, height: r.height, xf, link: None, placement: Default::default() })))
+        Some(NodeKind::Image(Box::new(ImageObject {
+            key: r.key,
+            width: r.width,
+            height: r.height,
+            xf,
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        })))
     }
 }
 

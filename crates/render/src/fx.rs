@@ -2964,8 +2964,15 @@ mod tests {
         let mut d = Document::new(100.0, 100.0);
         // A PNG signature with nothing after it.
         d.images.insert("cut".into(), ImageBlob::new("image/png", b"\x89PNG\r\n\x1a\n".to_vec()));
-        let im =
-            ImageObject { key: "cut".into(), width: 40, height: 40, xf: Affine::translate((30.0, 30.0)), link: None, placement: Default::default() };
+        let im = ImageObject {
+            key: "cut".into(),
+            width: 40,
+            height: 40,
+            xf: Affine::translate((30.0, 30.0)),
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        };
         let mut n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
         n.appearance.effects = vec![Effect { id: "blur.gaussian".into(), params: json!({"radius": 4.0}), visible: true }];
         d.insert(Some(d.layers[0].id), 0, n).unwrap();
@@ -2989,8 +2996,15 @@ mod tests {
         let mut d = Document::new(100.0, 100.0);
         // A PNG signature with nothing after it.
         d.images.insert("cut".into(), ImageBlob::new("image/png", b"\x89PNG\r\n\x1a\n".to_vec()));
-        let im =
-            ImageObject { key: "cut".into(), width: 40, height: 40, xf: Affine::translate((30.0, 30.0)), link: None, placement: Default::default() };
+        let im = ImageObject {
+            key: "cut".into(),
+            width: 40,
+            height: 40,
+            xf: Affine::translate((30.0, 30.0)),
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        };
         let mut n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
         n.appearance.effects = [
             ("rasterize", json!({"background": "white"})),

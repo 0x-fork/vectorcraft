@@ -1949,10 +1949,14 @@ impl Document {
     pub fn pattern_mut(&mut self, name: &str) -> Option<&mut PatternDef> {
         self.patterns.iter_mut().find(|p| p.name == name)
     }
-    /// Deep-clone `node` with fresh ids for it and all descendants.
+    /// Deep-clone `node` with fresh ids for it and all descendants, its images' own pixels taken
+    /// in ([`Self::adopt_pixels`]).
     pub fn reid(&mut self, node: &Node) -> Node {
         let mut n = node.clone();
         n.id = self.alloc_id();
+        if let NodeKind::Image(im) = &mut n.kind {
+            self.adopt_image_pixels(im);
+        }
         // A copied annotation must never bind its source ids to unrelated art in a different
         // document. Keep the measured geometry; new measurements can be linked after pasting.
         if let Some(e) = n.extras_if_any()
@@ -1977,6 +1981,48 @@ impl Document {
 }
 
 impl Document {
+    /// The pixels image `im` shows: its own ([`ImageObject::pixels`]) or this document's.
+    pub fn image_blob<'a>(&'a self, im: &'a ImageObject) -> Option<&'a ImageBlob> {
+        im.pixels.as_deref().or_else(|| self.images.get(&im.key))
+    }
+
+    /// Take the pixels the images in `n` (its opacity masks' art included) hold themselves (art
+    /// made outside a document) into [`Self::images`]: under the image's key, or a free one when
+    /// the key shows other pixels.
+    pub fn adopt_pixels(&mut self, n: &mut Node) {
+        // Only what holds such pixels is copied out of the art it shares.
+        fn holds(n: &Node) -> bool {
+            matches!(&n.kind, NodeKind::Image(im) if im.pixels.is_some())
+                || n.extras().mask.as_ref().is_some_and(|m| holds(&m.art))
+                || n.children().into_iter().flatten().any(|c| holds(c))
+        }
+        if let NodeKind::Image(im) = &mut n.kind {
+            self.adopt_image_pixels(im);
+        }
+        if let Some(m) = n.extras_if_any().and_then(|e| e.mask.as_deref_mut())
+            && holds(&m.art)
+        {
+            self.adopt_pixels(Arc::make_mut(&mut m.art));
+        }
+        for c in n.children_mut().into_iter().flatten() {
+            if holds(c) {
+                self.adopt_pixels(Arc::make_mut(c));
+            }
+        }
+    }
+
+    fn adopt_image_pixels(&mut self, im: &mut ImageObject) {
+        let Some(blob) = im.pixels.take() else { return };
+        let mut key = im.key.clone();
+        let mut i = 1;
+        while self.images.get(&key).is_some_and(|b| b.bytes != blob.bytes) {
+            i += 1;
+            key = format!("{}-{i}", im.key);
+        }
+        self.images.entry(key.clone()).or_insert_with(|| (*blob).clone());
+        im.key = key;
+    }
+
     /// Saved selections as a file gives them, made safe to list and recall: at most
     /// [`SavedSelection::MAX`], each with a clean, unique name and naming objects this document
     /// has, each once. (An id it doesn't have would select whatever object takes that id later.)

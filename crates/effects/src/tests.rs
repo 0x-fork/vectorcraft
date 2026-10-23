@@ -262,6 +262,7 @@ fn stacked_transform_copies_stay_within_the_image_budget() {
                 xf: Affine::translate((10.0, 0.0)),
                 link: None,
                 placement: Default::default(),
+                pixels: None,
             })),
         )
     };
@@ -458,6 +459,7 @@ fn transform_on_a_group_moves_and_copies_its_images() {
             xf: Affine::translate((10.0, 0.0)),
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     );
     let mut g = Node::group(id, vec![Arc::new(sq), Arc::new(image)]);
@@ -479,6 +481,7 @@ fn transform_on_a_group_moves_and_copies_its_images() {
                 xf: Affine::translate((10.0, 0.0)),
                 link: None,
                 placement: Default::default(),
+                pixels: None,
             })),
         ))],
     );
@@ -531,6 +534,7 @@ fn images_and_symbol_instances_share_the_copy_budget() {
             xf: Affine::translate((10.0, 0.0)),
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     );
     let instance = Node::new(id, NodeKind::SymbolInstance { symbol: "s".into(), xf: Affine::IDENTITY });
@@ -560,6 +564,7 @@ fn transform_copies_of_images_stop_at_the_reach_limit() {
             xf: Affine::translate((10.0, 0.0)),
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     );
     let mut g = Node::group(id, vec![Arc::new(image)]);

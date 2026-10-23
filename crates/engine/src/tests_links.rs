@@ -462,6 +462,7 @@ fn relative_paths_are_written_against_the_saved_file() {
         xf: Default::default(),
         link: Some(LinkInfo::new(format!("{root}{sep}art{sep}a.png"))),
         placement: Default::default(),
+        pixels: None,
     };
     d.insert(Some(lid), 0, vectorcraft_doc::Node::new(nid, NodeKind::Image(Box::new(im)))).unwrap();
     let rel = |dest: String| {

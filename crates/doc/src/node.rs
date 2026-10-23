@@ -433,6 +433,11 @@ pub struct ImageObject {
     /// Links panel → Placement Options: how a file read again takes this image's place.
     #[serde(default, skip_serializing_if = "crate::skip::is_default")]
     pub placement: crate::links::PlacementOptions,
+    /// The pixels of an image in art made outside a document (type's outlines, a glyph's art),
+    /// which has no [`crate::Document::images`] to keep them in. A document takes them in
+    /// ([`crate::Document::adopt_pixels`]): no image in one holds its own.
+    #[serde(skip)]
+    pub pixels: Option<Arc<crate::ImageBlob>>,
 }
 
 /// Written with its `type` first, then its fields (an internally tagged enum); read by
@@ -2543,7 +2548,8 @@ mod tests {
     /// A group holding a path, a compound, an image and a nested group, as a file writes it.
     fn nested_group() -> Node {
         let path = |id| Node::path(NodeId(id), shapes::rectangle(Rect::new(0.0, 0.0, 10.0, 10.0)), Appearance::default_art());
-        let image = ImageObject { key: "k".into(), width: 2, height: 3, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+        let image =
+            ImageObject { key: "k".into(), width: 2, height: 3, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
         let inner = Node::new(NodeId(5), NodeKind::Group { children: vec![Arc::new(path(6))], clip: true });
         let compound = Node::new(NodeId(3), NodeKind::Compound { children: vec![Arc::new(path(4))], rule: FillRule::EvenOdd });
         let kids = vec![Arc::new(path(2)), Arc::new(compound), Arc::new(Node::new(NodeId(7), NodeKind::Image(Box::new(image)))), Arc::new(inner)];

@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use serde_json::{Value, json};
-use vectorcraft_doc::{AreaFit, Document, ImageObject, Justify, Node, NodeId, NodeKind, RubyAlign, RubyPosition, RubySpan, TextObject};
+use vectorcraft_doc::{AreaFit, Document, Justify, Node, NodeId, NodeKind, RubyAlign, RubyPosition, RubySpan, TextObject};
 use vectorcraft_geom::{Affine, PathData, Vec2};
 
 use super::edit::selected_roots;
@@ -559,18 +559,10 @@ fn create_outlines(s: &mut Session, _: &Value) -> Result<Value> {
                     children.push(Arc::new(Node::new(id, NodeKind::SymbolInstance { symbol: art.symbol.clone(), xf })));
                     continue;
                 }
-                // Colour bitmap glyphs (emoji) become embedded images, in place; glyphs that show
-                // the same image share its pixels, under a key of their own if another image has
-                // taken theirs.
-                if let Some((image, to_text)) = g.placed_image() {
-                    let mut key = format!("glyph-{}", image.blob.content_key());
-                    if d.images.get(&key).is_some_and(|b| b.bytes != image.blob.bytes) {
-                        key = super::menucmds::unique_key(d, "glyph");
-                    }
-                    d.images.entry(key.clone()).or_insert_with(|| image.blob.clone());
-                    let im =
-                        ImageObject { key, width: image.width, height: image.height, xf: t.xf * to_text, link: None, placement: Default::default() };
-                    children.push(Arc::new(Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)))));
+                // Colour bitmap glyphs (emoji) become embedded images, in place, their pixels taken
+                // into the document: glyphs that show the same image share them.
+                if let Some(image) = g.placed_image_node(t.xf) {
+                    children.push(Arc::new(d.reid(&image)));
                     continue;
                 }
                 // COLR glyphs become groups of their layers, in place, with ids of the document's.

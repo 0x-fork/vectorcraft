@@ -558,10 +558,12 @@ pub(crate) fn expand_node(d: &mut Document, id: NodeId, brushes: &[vectorcraft_b
     let mut listed = vec![];
     let m = expanded_node(d, n, brushes, &mut listed);
     out.extend(listed.into_iter().map(|(id, _)| id));
-    if let Some(m) = m
-        && let Some(slot) = d.node_mut(id)
-    {
-        *slot = m;
+    if let Some(mut m) = m {
+        // Art made from type takes its emoji's pixels into the document.
+        d.adopt_pixels(&mut m);
+        if let Some(slot) = d.node_mut(id) {
+            *slot = m;
+        }
     }
 }
 

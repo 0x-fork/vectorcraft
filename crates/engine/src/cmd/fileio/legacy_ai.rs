@@ -215,7 +215,8 @@ fn flatten_images(d: &mut Document, images: &[(usize, NodeId)]) -> Result<()> {
             let png = flat.png;
             let key = super::super::menucmds::unique_key(d, "flattened");
             d.images.insert(key.clone(), ImageBlob::new("image/png", png));
-            let image = ImageObject { key, width: flat.width, height: flat.height, xf: flat.xf, link: None, placement: Default::default() };
+            let image =
+                ImageObject { key, width: flat.width, height: flat.height, xf: flat.xf, link: None, placement: Default::default(), pixels: None };
             let image = Node::new(d.alloc_id(), NodeKind::Image(Box::new(image)));
             let mut group = super::super::rasterfx::clip_group(d, flat.clip, FillRule::NonZero, image);
             group.name = src.node(id).and_then(|n| n.name.clone());

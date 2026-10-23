@@ -1173,7 +1173,7 @@ mod tests {
         d.insert(Some(l), 0, Node::path(path, shapes::rectangle(Rect::new(20.0, 20.0, 60.0, 60.0)), Appearance::default_art())).unwrap();
         // 100×50 pixels, scaled to 100×100 and moved to (10, 10): over the whole path.
         let xf = vectorcraft_geom::Affine::translate((10.0, 10.0)) * vectorcraft_geom::Affine::scale_non_uniform(1.0, 2.0);
-        let im = crate::ImageObject { key: "k".into(), width: 100, height: 50, xf, link: None, placement: Default::default() };
+        let im = crate::ImageObject { key: "k".into(), width: 100, height: 50, xf, link: None, placement: Default::default(), pixels: None };
         d.insert(Some(l), 1, Node::new(image, NodeKind::Image(Box::new(im)))).unwrap();
         let path_only = HitOptions { path_only: true, ..Default::default() };
         let hit = |p: Point, opt| hit_test(&d, p, opt).map(|h| h.leaf);

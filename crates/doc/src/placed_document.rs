@@ -146,7 +146,7 @@ impl PlacedDocument {
     pub fn preview_image(&self, bytes: &[u8]) -> Option<ImageObject> {
         let (w, h) = image_size(bytes).filter(|(w, h)| *w > 0 && *h > 0)?;
         let px = Affine::scale_non_uniform(self.width / w as f64, self.height / h as f64);
-        Some(ImageObject { key: self.key.clone(), width: w, height: h, xf: self.xf * px, link: None, placement: Default::default() })
+        Some(ImageObject { key: self.key.clone(), width: w, height: h, xf: self.xf * px, link: None, placement: Default::default(), pixels: None })
     }
 }
 
@@ -444,7 +444,7 @@ fn read_preview(p: &PlacedDocument, bytes: &Arc<Vec<u8>>) -> Option<Arc<ReadDocu
     let mime = if bytes.starts_with(&[0xff, 0xd8]) { "image/jpeg" } else { "image/png" };
     doc.images.insert("preview".into(), ImageBlob { mime: mime.into(), bytes: bytes.clone(), proxy: None });
     let xf = Affine::scale_non_uniform(frame.width() / w as f64, frame.height() / h as f64);
-    let im = ImageObject { key: "preview".into(), width: w, height: h, xf, link: None, placement: Default::default() };
+    let im = ImageObject { key: "preview".into(), width: w, height: h, xf, link: None, placement: Default::default(), pixels: None };
     let art = Node::new(art_id(), NodeKind::Group { children: vec![Arc::new(Node::new(art_id(), NodeKind::Image(Box::new(im))))], clip: false });
     let e = Arc::new(ReadDocument { key: p.key.clone(), preview: true, bytes: bytes.clone(), frame, art: Arc::new(art), doc: Arc::new(doc) });
     cache().insert(e.clone());
@@ -637,6 +637,7 @@ mod tests {
                 xf: Affine::IDENTITY,
                 link: None,
                 placement: Default::default(),
+                pixels: None,
             })),
         );
         d.symbols.push(Symbol { name: "Star".into(), art: Arc::new(art) });

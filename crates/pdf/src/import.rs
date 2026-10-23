@@ -1569,7 +1569,7 @@ impl<'p> Builder<'p> {
         let xf = transform * Affine::scale_non_uniform(f64::from(w) / f64::from(mw.max(1)), f64::from(h) / f64::from(mh.max(1)));
         let art = Node::new(
             self.id(),
-            NodeKind::Image(Box::new(ImageObject { key: k, width: mw, height: mh, xf, link: None, placement: Default::default() })),
+            NodeKind::Image(Box::new(ImageObject { key: k, width: mw, height: mh, xf, link: None, placement: Default::default(), pixels: None })),
         );
         Some(OpacityMask::new(art, true))
     }
@@ -1589,8 +1589,10 @@ impl<'p> Builder<'p> {
             (k, w, h)
         };
         let id = self.id();
-        let mut n =
-            Node::new(id, NodeKind::Image(Box::new(ImageObject { key: k, width: w, height: h, xf, link: None, placement: Default::default() })));
+        let mut n = Node::new(
+            id,
+            NodeKind::Image(Box::new(ImageObject { key: k, width: w, height: h, xf, link: None, placement: Default::default(), pixels: None })),
+        );
         n.extras_mut().mask = mask.map(Box::new);
         self.push_node(n);
     }

@@ -70,7 +70,15 @@ fn group_effects_bake_into_the_members_and_filter_the_group() {
 fn a_group_transform_copies_its_images() {
     let mut d = Document::new(200.0, 100.0);
     d.images.insert("red".into(), ImageBlob::new("image/png", vec![1, 2, 3]));
-    let im = ImageObject { key: "red".into(), width: 20, height: 20, xf: Affine::translate((20.0, 20.0)), link: None, placement: Default::default() };
+    let im = ImageObject {
+        key: "red".into(),
+        width: 20,
+        height: 20,
+        xf: Affine::translate((20.0, 20.0)),
+        link: None,
+        placement: Default::default(),
+        pixels: None,
+    };
     let image = Arc::new(Node::new(d.alloc_id(), NodeKind::Image(Box::new(im))));
     let black = Appearance::basic(Paint::solid(Color::BLACK), Paint::None, 0.0);
     let square = Arc::new(Node::path(d.alloc_id(), shapes::rectangle(Rect::new(20.0, 60.0, 30.0, 70.0)), black));

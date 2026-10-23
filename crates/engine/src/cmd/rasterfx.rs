@@ -225,7 +225,15 @@ pub(crate) fn effect_image(out: &mut Document, whole: &Node, knockout: Option<&N
     let xf = Affine::translate(region.origin().to_vec2()) * Affine::scale(1.0 / scale);
     let mut image = Node::new(
         id,
-        NodeKind::Image(Box::new(ImageObject { key, width: img.width, height: img.height, xf, link: None, placement: Default::default() })),
+        NodeKind::Image(Box::new(ImageObject {
+            key,
+            width: img.width,
+            height: img.height,
+            xf,
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        })),
     );
     image.name = Some("Raster effect".into());
     Some(image)

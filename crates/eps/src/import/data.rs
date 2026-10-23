@@ -1225,7 +1225,7 @@ impl Interp<'_> {
     fn add_image(&mut self, blob: ImageBlob, w: u32, h: u32, xf: Affine, mask: Option<OpacityMask>) -> Res {
         let key = blob.content_key();
         self.out.doc.images.entry(key.clone()).or_insert(blob);
-        let im = ImageObject { key, width: w, height: h, xf, link: None, placement: Default::default() };
+        let im = ImageObject { key, width: w, height: h, xf, link: None, placement: Default::default(), pixels: None };
         let clips = self.g.clips.clone();
         self.out.push(Node::new(NodeId(0), NodeKind::Image(Box::new(im))).with_mask(mask.map(Box::new)), &clips);
         Ok(())
@@ -1242,7 +1242,7 @@ impl Interp<'_> {
         let blob = ImageBlob::new("image/png", png);
         let key = blob.content_key();
         self.out.doc.images.entry(key.clone()).or_insert(blob);
-        let im = ImageObject { key, width: w, height: h, xf, link: None, placement: Default::default() };
+        let im = ImageObject { key, width: w, height: h, xf, link: None, placement: Default::default(), pixels: None };
         Some(OpacityMask::new(Node::new(self.out.doc.alloc_id(), NodeKind::Image(Box::new(im))), true))
     }
 }

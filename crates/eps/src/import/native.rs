@@ -1634,6 +1634,7 @@ mod tests {
                 xf: Affine::scale(1.0 / 1.6),
                 link: None,
                 placement: Default::default(),
+                pixels: None,
             })),
         );
         page.insert(Some(page.layers[0].id), usize::MAX, image).unwrap();

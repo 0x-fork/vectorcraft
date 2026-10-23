@@ -1136,7 +1136,15 @@ fn raster_node(d: &mut Document, r: Raster) -> Node {
     d.images.insert(key.clone(), r.blob);
     let image = Node::new(
         d.alloc_id(),
-        NodeKind::Image(Box::new(ImageObject { key, width: r.width, height: r.height, xf: r.xf, link: None, placement: Default::default() })),
+        NodeKind::Image(Box::new(ImageObject {
+            key,
+            width: r.width,
+            height: r.height,
+            xf: r.xf,
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        })),
     );
     let Some(path) = r.clip else { return image };
     super::rasterfx::clip_group(d, path, FillRule::NonZero, image)

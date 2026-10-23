@@ -598,6 +598,7 @@ fn rich_doc() -> Document {
         xf: Affine::new([10.0, 0.0, 0.0, 10.0, 110.0, 110.0]),
         link: None,
         placement: Default::default(),
+        pixels: None,
     };
     let n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
     add(&mut d, n);

@@ -222,6 +222,7 @@ fn placed_images_are_separated_not_blackened() {
             xf: Affine::IDENTITY,
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     );
     add(&mut d, n);
@@ -256,7 +257,7 @@ fn rich_black_shows_black_ink_alone_as_rgb_black() {
     let mut png = vec![];
     img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
     d.images.insert("red".into(), ImageBlob::new("image/png", png));
-    let im = ImageObject { key: "red".into(), width: 20, height: 20, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+    let im = ImageObject { key: "red".into(), width: 20, height: 20, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
     let n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
     add(&mut d, n);
     assert_eq!(centre_with(&d, true), centre_with(&d, false), "an image shows as it is");

@@ -546,7 +546,7 @@ impl Writer<'_> {
     /// missing), else its bytes. `None` when it has neither.
     fn image_href(&mut self, im: &vectorcraft_doc::ImageObject) -> Option<String> {
         let (doc, link) = (self.doc, self.opts.images == ImageMode::Link);
-        match (im.link.as_ref().filter(|_| link), doc.images.get(&im.key)) {
+        match (im.link.as_ref().filter(|_| link), doc.image_blob(im)) {
             (Some(l), _) => Some(l.path.clone()),
             (None, Some(b)) if !b.bytes.is_empty() => Some(self.blob_href(&web_image(b))),
             _ => im.link.as_ref().map(|l| l.path.clone()),
@@ -556,17 +556,16 @@ impl Writer<'_> {
     /// Images drawn more than once in `art` (the pieces of a distorted image) go into the defs
     /// once; each piece then draws them with `<use>`.
     fn share_images(&mut self, art: &Node) {
-        let mut seen: HashMap<(String, u32, u32), usize> = HashMap::new();
+        // Each image's count and its first piece, which shows what they all show.
+        let mut seen: HashMap<(String, u32, u32), (usize, vectorcraft_doc::ImageObject)> = HashMap::new();
         art.walk(&mut |c| {
             if let NodeKind::Image(im) = &c.kind {
-                *seen.entry((im.key.clone(), im.width, im.height)).or_default() += 1;
+                seen.entry((im.key.clone(), im.width, im.height)).or_insert_with(|| (0, (**im).clone())).0 += 1;
             }
         });
-        let mut repeated: Vec<_> = seen.into_iter().filter(|(k, n)| *n > 1 && !self.shared_images.contains_key(k)).map(|(k, _)| k).collect();
-        repeated.sort();
-        for (key, width, height) in repeated {
-            let link = self.linked_of(art, &key);
-            let im = vectorcraft_doc::ImageObject { key: key.clone(), width, height, xf: Affine::IDENTITY, link, placement: Default::default() };
+        let mut repeated: Vec<_> = seen.into_iter().filter(|(k, (n, _))| *n > 1 && !self.shared_images.contains_key(k)).collect();
+        repeated.sort_by(|a, b| a.0.cmp(&b.0));
+        for ((key, width, height), (_, im)) in repeated {
             let Some(href) = self.image_href(&im) else { continue };
             let id = self.fresh_id("image");
             self.def(
@@ -578,20 +577,6 @@ impl Writer<'_> {
             );
             self.shared_images.insert((key, width, height), id);
         }
-    }
-
-    /// The link of the first image with blob `key` in `art`.
-    fn linked_of(&self, art: &Node, key: &str) -> Option<vectorcraft_doc::LinkInfo> {
-        let mut link = None;
-        art.walk(&mut |c| {
-            if let NodeKind::Image(im) = &c.kind
-                && im.key == key
-                && link.is_none()
-            {
-                link = im.link.clone();
-            }
-        });
-        link
     }
 
     fn fresh_id(&mut self, prefix: &str) -> String {

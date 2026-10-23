@@ -62,8 +62,15 @@ fn sample() -> Document {
     let blob = ImageBlob::new("image/png", png);
     let key = blob.content_key();
     doc.images.insert(key.clone(), blob);
-    let im =
-        ImageObject { key, width: 2, height: 1, xf: Affine::new([10.0, 0.0, 0.0, 10.0, 170.0, 70.0]), link: None, placement: Default::default() };
+    let im = ImageObject {
+        key,
+        width: 2,
+        height: 1,
+        xf: Affine::new([10.0, 0.0, 0.0, 10.0, 170.0, 70.0]),
+        link: None,
+        placement: Default::default(),
+        pixels: None,
+    };
     let im = Node::new(doc.alloc_id(), NodeKind::Image(Box::new(im)));
     doc.insert(Some(front), usize::MAX, im).unwrap();
     if let Some(l) = doc.layers.get_mut(1) {
@@ -114,7 +121,15 @@ fn as_printed(doc: &Document, o: &LegacyAiOptions) -> Document {
             let Some((image, to_text)) = g.placed_image() else { continue };
             let key = image.blob.content_key();
             images.insert(key.clone(), image.blob.clone());
-            let im = ImageObject { key, width: image.width, height: image.height, xf: t.xf * to_text, link: None, placement: Default::default() };
+            let im = ImageObject {
+                key,
+                width: image.width,
+                height: image.height,
+                xf: t.xf * to_text,
+                link: None,
+                placement: Default::default(),
+                pixels: None,
+            };
             nodes.push(Arc::new(Node::new(vectorcraft_doc::NodeId(0), NodeKind::Image(Box::new(im)))));
         }
         // COLR glyphs: their layers.
@@ -264,8 +279,10 @@ fn a_rotated_image_keeps_its_place() {
     doc.images.insert(key.clone(), blob);
     // Turned 90° clockwise on the page: the pixel rows run down, the next row is to the left.
     let xf = Affine::new([0.0, 10.0, -10.0, 0.0, 100.0, 40.0]);
-    let im =
-        Node::new(doc.alloc_id(), NodeKind::Image(Box::new(ImageObject { key, width: 2, height: 1, xf, link: None, placement: Default::default() })));
+    let im = Node::new(
+        doc.alloc_id(),
+        NodeKind::Image(Box::new(ImageObject { key, width: 2, height: 1, xf, link: None, placement: Default::default(), pixels: None })),
+    );
     doc.layers.clear();
     let layer = doc.add_layer(Some("Art"));
     doc.insert(Some(layer), usize::MAX, im).unwrap();
@@ -297,7 +314,10 @@ fn picture(doc: &mut Document, r: Rect) -> Node {
     let key = blob.content_key();
     doc.images.insert(key.clone(), blob);
     let xf = Affine::new([r.width() / 16.0, 0.0, 0.0, r.height() / 16.0, r.x0, r.y0]);
-    Node::new(doc.alloc_id(), NodeKind::Image(Box::new(ImageObject { key, width: 16, height: 16, xf, link: None, placement: Default::default() })))
+    Node::new(
+        doc.alloc_id(),
+        NodeKind::Image(Box::new(ImageObject { key, width: 16, height: 16, xf, link: None, placement: Default::default(), pixels: None })),
+    )
 }
 
 /// A layer `Below` holding a clipping group (a circle clipping an image, as in #2692), a group
@@ -411,7 +431,7 @@ fn empty_images_get_the_size_note_and_undecodable_ones_the_decode_note() {
         let blob = ImageBlob::new("image/png", bytes);
         let key = blob.content_key();
         doc.images.insert(key.clone(), blob);
-        let im = ImageObject { key, width: 4, height: 2, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+        let im = ImageObject { key, width: 4, height: 2, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
         let node = Node::new(doc.alloc_id(), NodeKind::Image(Box::new(im)));
         doc.insert(Some(layer), usize::MAX, node).unwrap();
         let out = export_legacy_ai(&doc, &LegacyAiOptions::default()).unwrap();

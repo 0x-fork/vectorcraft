@@ -1849,11 +1849,12 @@ impl Exporter<'_> {
         font
     }
 
-    /// Image `key` placed `size` points wide and high, resampled and compressed as the Compression
+    /// Image `im` placed `size` points wide and high, resampled and compressed as the Compression
     /// settings say ([`crate::images::recode`], [`crate::images::recode_cmyk`] for CMYK images);
     /// cached by key (and size when images are resampled). `None`, with [`UNDECODED`] among the
     /// warnings, for an image that is missing, can't be decoded or is in [`Self::left_out`].
-    fn load_image(&mut self, key: &str, size: (f64, f64)) -> Option<Image> {
+    fn load_image(&mut self, im: &vectorcraft_doc::ImageObject, size: (f64, f64)) -> Option<Image> {
+        let key = im.key.as_str();
         let c = self.compression;
         let sized = [c.color.downsample, c.gray.downsample, c.mono.downsample].iter().any(|d| *d != crate::Downsample::None);
         let cache = if sized { format!("{key}\u{0}{:.3}x{:.3}", size.0, size.1) } else { key.to_string() };
@@ -1863,7 +1864,7 @@ impl Exporter<'_> {
         let interpolate = self.interpolate;
         let doc = self.doc;
         let out = self.out.clone();
-        let img = doc.images.get(key).filter(|_| !self.left_out.contains(key)).and_then(|blob| {
+        let img = doc.image_blob(im).filter(|_| !self.left_out.contains(key)).and_then(|blob| {
             let cmyk_image = blob.is_cmyk();
             if !cmyk_image && self.convert && doc.color_mode == vectorcraft_doc::ColorMode::Cmyk {
                 self.rgb_in_cmyk.images.insert(key.to_string());
@@ -1904,8 +1905,8 @@ impl Exporter<'_> {
             return i.clone();
         }
         let doc = self.doc;
-        let img = doc.images.get(&im.key).filter(|b| b.is_cmyk()).and_then(|blob| {
-            let alpha = crate::images::mask_alpha(doc.images.get(&mi.key)?, im.width, im.height, m.clip)?;
+        let img = doc.image_blob(im).filter(|b| b.is_cmyk()).and_then(|blob| {
+            let alpha = crate::images::mask_alpha(doc.image_blob(mi)?, im.width, im.height, m.clip)?;
             let r = crate::images::recode_cmyk(blob, size, self.compression, self.interpolate, self.out.cmyk_pixels(), Some(alpha));
             if let (Some(w), Some(_)) = (r.warning, &r.image) {
                 self.warn(w);
@@ -1922,7 +1923,7 @@ impl Exporter<'_> {
         if !writable(s, im.xf, Rect::new(0.0, 0.0, im.width.max(1).into(), im.height.max(1).into())) {
             return;
         }
-        let Some(img) = img.or_else(|| self.load_image(&im.key, placed_size(im))) else { return };
+        let Some(img) = img.or_else(|| self.load_image(im, placed_size(im))) else { return };
         let Some(size) = Size::from_wh(im.width.max(1) as f32, im.height.max(1) as f32) else { return };
         s.push_transform(&xf(im.xf));
         s.draw_image(img, size);
