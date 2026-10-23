@@ -5430,6 +5430,12 @@ axis	Y Axis	Y ос
 	The plug-in is computing…	Приставката изчислява…
 	Inspect Plug-in	Проверка на приставка
 	Cancel Plug-in Run	Отказ от изпълнението на приставката
+# Actions panel: action sets (#3712).
+	New Set…	Нов набор…
+	New Set	Нов набор
+	Set Options…	Опции на набора…
+	Set Options	Опции на набора
+	Create New Set	Създаване на нов набор
 	Stop Global Edit	Край на глобалното редактиране
 	Global Edit Options	Опции за глобално редактиране
 	Match	Съвпадение
