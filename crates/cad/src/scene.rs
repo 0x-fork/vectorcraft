@@ -168,12 +168,32 @@ fn subpaths(bp: &BezPath) -> Vec<Sub> {
     out
 }
 
+/// The most pixels of an image written (it is held decoded, as RGBA and encoded at once).
+const MAX_IMAGE_PIXELS: u64 = 64 << 20;
+
+/// The most entities (handles) a drawing is written with.
+const MAX_ENTITIES: u32 = 10_000_000;
+
+/// The largest x or y a path may have to be flattened, and the most points its polygons keep.
+const MAX_COORD: f64 = 1e9;
+const MAX_POINTS: usize = 4_000_000;
+
 /// `bp` flattened into polygons (each closing implicitly), consecutive repeats dropped.
 fn polygons(bp: &BezPath) -> Vec<Vec<Point>> {
+    // Far outside any drawing, a curve flattens to millions of points at this tolerance.
+    let b = bp.control_box();
+    if !matches!(
+        b.x0.abs().max(b.x1.abs()).max(b.y0.abs()).max(b.y1.abs()).partial_cmp(&MAX_COORD),
+        Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)
+    ) {
+        return vec![];
+    }
     let mut out: Vec<Vec<Point>> = vec![];
     let mut cur: Vec<Point> = vec![];
-    let push = |p: Point, cur: &mut Vec<Point>| {
-        if cur.last().is_none_or(|q| q.distance(p) > 1e-9) {
+    let mut points = 0usize;
+    let mut push = |p: Point, cur: &mut Vec<Point>| {
+        if points < MAX_POINTS && cur.last().is_none_or(|q| q.distance(p) > 1e-9) {
+            points += 1;
             cur.push(p);
         }
     };
@@ -208,21 +228,37 @@ fn symbol_name(name: &str, long: bool) -> String {
     s.trim().to_string()
 }
 
-/// `base` made unique among `taken` (any case) by `_2`, `_3`…, within `max` characters.
-fn unique(base: &str, taken: &[&str], max: usize) -> String {
-    let base = if base.is_empty() { "Layer".to_string() } else { base.to_string() };
-    let free = |n: &str| !taken.iter().any(|t| t.eq_ignore_ascii_case(n));
-    if free(&base) {
-        return base;
+/// The names a DXF table holds (compared in any case), and the next suffix to try for each base,
+/// so identical names don't each search the suffixes before.
+#[derive(Default)]
+struct Names {
+    taken: std::collections::HashSet<String>,
+    next: HashMap<String, usize>,
+}
+
+impl Names {
+    /// Names that are there already.
+    fn with(names: &[&str]) -> Self {
+        Self { taken: names.iter().map(|n| n.to_lowercase()).collect(), next: HashMap::new() }
     }
-    (2..)
-        .map(|i| {
-            let suffix = format!("_{i}");
+
+    /// `base` made unique by `_2`, `_3`…, within `max` characters; the name is taken from now on.
+    fn unique(&mut self, base: &str, max: usize) -> String {
+        let base = if base.is_empty() { "Layer".to_string() } else { base.to_string() };
+        if self.taken.insert(base.to_lowercase()) {
+            return base;
+        }
+        let next = self.next.entry(base.to_lowercase()).or_insert(2);
+        loop {
+            let suffix = format!("_{next}");
+            *next += 1;
             let keep: String = base.chars().take(max.saturating_sub(suffix.len())).collect();
-            format!("{keep}{suffix}")
-        })
-        .find(|n| free(n))
-        .unwrap_or(base)
+            let name = format!("{keep}{suffix}");
+            if self.taken.insert(name.to_lowercase()) {
+                return name;
+            }
+        }
+    }
 }
 
 fn overlaps(a: Rect, b: Rect) -> bool {
@@ -251,12 +287,14 @@ pub(crate) struct Scene<'a> {
     e: Codes,
     next: u32,
     layers: Vec<Layer>,
+    layer_names: Names,
     /// The DXF layer art goes on, and its flags.
     layer: String,
     flags: LayerFlags,
     linetypes: Vec<LineType>,
     /// (style name, font family).
     styles: Vec<(String, String)>,
+    style_names: Names,
     images: Vec<ImageDef>,
     files: Vec<DxfImage>,
     /// Image keys → index into `images` (`None`: left out).
@@ -283,10 +321,12 @@ impl<'a> Scene<'a> {
             e: Codes::new(o.version),
             next: fixed::FIRST_FREE,
             layers: vec![],
+            layer_names: Names::with(&["0", "Defpoints"]),
             layer: "0".into(),
             flags: LayerFlags { off: false, locked: false, plot: true },
             linetypes: vec![],
             styles: vec![],
+            style_names: Names::with(&[crate::writer::STANDARD_STYLE]),
             images: vec![],
             files: vec![],
             by_key: HashMap::new(),
@@ -348,6 +388,12 @@ impl<'a> Scene<'a> {
 
     fn node(&mut self, n: &Node, force: bool) {
         if let NodeKind::Layer { template: true, .. } = n.kind {
+            return;
+        }
+        // Symbols that hold symbols are written in full for each instance: depth alone doesn't
+        // bound how many entities that is.
+        if self.next.saturating_sub(fixed::FIRST_FREE) > MAX_ENTITIES {
+            self.warn("the drawing is too large for DXF: what follows 10 million entities was left out");
             return;
         }
         // Hidden layers are written, switched off.
@@ -452,9 +498,7 @@ impl<'a> Scene<'a> {
     fn add_layer(&mut self, n: &Node) -> String {
         let long = self.o.version.r2000();
         let base = symbol_name(n.name.as_deref().unwrap_or("Layer"), long);
-        let mut taken: Vec<&str> = self.layers.iter().map(|l| l.name.as_str()).collect();
-        taken.extend(["0", "Defpoints"]);
-        let name = unique(&base, &taken, if long { 255 } else { 31 });
+        let name = self.layer_names.unique(&base, if long { 255 } else { 31 });
         let aci = match n.kind {
             NodeKind::Layer { color, .. } => nearest_aci(color.rgb(), ColorDepth::Aci256),
             _ => 7,
@@ -904,9 +948,7 @@ impl<'a> Scene<'a> {
             return name.clone();
         }
         let long = self.o.version.r2000();
-        let mut taken: Vec<&str> = self.styles.iter().map(|(n, _)| n.as_str()).collect();
-        taken.push(crate::writer::STANDARD_STYLE);
-        let name = unique(&symbol_name(family, long), &taken, if long { 255 } else { 31 });
+        let name = self.style_names.unique(&symbol_name(family, long), if long { 255 } else { 31 });
         self.styles.push((name.clone(), family.to_string()));
         name
     }
@@ -985,6 +1027,15 @@ impl<'a> Scene<'a> {
     /// Image `im` as a file in the chosen format, and its size in pixels.
     fn encode_image(&self, im: &ImageObject) -> Result<(DxfImage, (u32, u32)), String> {
         let blob = self.doc.image_blob(im).filter(|b| !b.bytes.is_empty()).ok_or_else(|| "an image has no pixels and was left out".to_string())?;
+        // The pixels it converts to (RGBA, 4 bytes each) are read from its header before decoding.
+        let (w, h) = image::ImageReader::new(Cursor::new(blob.bytes.as_slice()))
+            .with_guessed_format()
+            .ok()
+            .and_then(|r| r.into_dimensions().ok())
+            .ok_or_else(|| UNDECODED.to_string())?;
+        if u64::from(w) * u64::from(h) > MAX_IMAGE_PIXELS {
+            return Err("an image is too large for DXF and was left out".to_string());
+        }
         let img = image::load_from_memory(&blob.bytes).map_err(|_| UNDECODED.to_string())?;
         let size = (img.width(), img.height());
         let mut bytes = vec![];

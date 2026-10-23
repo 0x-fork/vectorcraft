@@ -377,7 +377,8 @@ impl<'d, 'a> Build<'d, 'a> {
         let k = self.d.header.ltscale * p.ltscale * scale;
         // Dashes (positive), gaps (negative) and dots (0), merged into dash, gap, dash, gap…
         let mut out: Vec<f64> = vec![];
-        for v in pattern {
+        // (A linetype has a few elements; every path keeps its own copy of the dashes.)
+        for v in pattern.iter().take(64) {
             let dash = *v >= 0.0;
             let len = v.abs() * k;
             match out.len().is_multiple_of(2) {
