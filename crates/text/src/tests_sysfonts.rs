@@ -8,6 +8,48 @@ use crate::fontdb::fonts_outside;
 
 const FAMILY: &str = "Sysfont Sans3";
 
+/// Concurrent first use must not report a missing glyph just because another lookup loaded it.
+#[test]
+fn concurrent_fallback_lookups_all_find_the_installed_face() {
+    const C: char = '\u{F0000}';
+    let dir = std::env::temp_dir().join(format!("vc-sysfonts-{}-concurrent-fallback", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let base = named(&[(3, EN, 1, "Concurrent Sans"), (3, EN, 2, "Regular"), (3, EN, 6, "ConcurrentSans-Regular")]);
+    let font = skrifa::FontRef::new(&base).unwrap();
+    let mut builder = write_fonts::FontBuilder::new();
+    builder.add_raw(write_fonts::types::Tag::new(b"cmap"), crate::embed::cmap(&[(C as u32, 1)]).unwrap());
+    for r in font.table_directory.table_records() {
+        let tag = write_fonts::types::Tag::new(&r.tag().to_be_bytes());
+        if !builder.contains(tag) {
+            builder.add_raw(tag, font.table_data(r.tag()).unwrap().as_bytes());
+        }
+    }
+    std::fs::write(dir.join("Concurrent.ttf"), builder.build()).unwrap();
+    for _ in 0..4 {
+        let db = FontDb::with_font_dirs(vec![dir.clone()]);
+        assert_eq!(db.load_system_fonts(), 1);
+        let start = std::sync::Barrier::new(16);
+        let faces = std::thread::scope(|scope| {
+            let workers: Vec<_> = (0..16)
+                .map(|_| {
+                    scope.spawn(|| {
+                        start.wait();
+                        db.face_covering(C)
+                    })
+                })
+                .collect();
+            workers.into_iter().map(|worker| worker.join().unwrap()).collect::<Vec<_>>()
+        });
+        assert!(
+            faces.iter().all(|face| face.as_ref().is_some_and(|face| face.family == "Concurrent Sans")),
+            "{} of 16 lookups missed the installed face",
+            faces.iter().filter(|face| face.is_none()).count()
+        );
+    }
+    std::fs::remove_file(dir.join("Concurrent.ttf")).unwrap();
+    std::fs::remove_dir(dir).unwrap();
+}
+
 /// A bundled Source Sans 3 file renamed [`FAMILY`] (as long as the original name).
 fn renamed(file: &str) -> Vec<u8> {
     renamed_to(file, FAMILY)
