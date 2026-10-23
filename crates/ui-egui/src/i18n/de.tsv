@@ -3971,7 +3971,7 @@ theme	Appearance	Erscheinungsbild
 @msg	missing index	der Index fehlt
 @msg	missing number `{key}`	die Zahl `{key}` fehlt
 @msg	missing integer `{key}`	die ganze Zahl `{key}` fehlt
-@msg	multiple windows land with M11.5	mehrere Fenster kommen mit M11.5
+@msg	New Window isn't available yet: a document opens in one window	Neues Fenster ist noch nicht verfügbar: ein Dokument öffnet sich in einem Fenster
 @msg	name the file	benennen Sie die Datei
 @msg	no CSS to copy: select objects with CSS of their own	kein CSS zum Kopieren: Wählen Sie Objekte mit eigenem CSS aus
 @msg	no Live Paint edge near that point	keine Interaktiv-malen-Kante in der Nähe dieses Punkts

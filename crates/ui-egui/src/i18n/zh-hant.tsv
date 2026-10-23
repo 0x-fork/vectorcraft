@@ -2150,7 +2150,7 @@ file-filter	Templates	範本
 @msg	missing `name`	未提供 `name`
 @msg	missing `tool`	未提供 `tool`
 @msg	missing index	未提供 index
-@msg	multiple windows land with M11.5	多個視窗將於 M11.5 推出
+@msg	New Window isn't available yet: a document opens in one window	新增視窗尚無法使用：文件會在一個視窗中開啟
 @msg	no PNG encoder	沒有 PNG 編碼器
 @msg	no document open	沒有開啟的文件
 @msg	no effect applied yet	尚未套用任何效果

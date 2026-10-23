@@ -4081,7 +4081,7 @@ imageTrace	Outline	Contour
 @msg	missing `name`	`name` ontbreekt
 @msg	missing `tool`	`tool` ontbreekt
 @msg	missing index	index ontbreekt
-@msg	multiple windows land with M11.5	meerdere vensters komen binnen met M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nieuw venster is nog niet beschikbaar: een document opent in één venster
 @msg	name the file	geef het bestand een naam
 @msg	no CSS to copy: select objects with CSS of their own	geen CSS om te kopiëren: selecteer objecten met eigen CSS
 @msg	no Live Paint edge near that point	geen Live Paint-rand bij dat punt

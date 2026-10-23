@@ -4083,7 +4083,7 @@ axis	Both	Оба
 @msg	missing index	отсутствует index
 @msg	missing number `{key}`	отсутствует число `{key}`
 @msg	missing integer `{key}`	отсутствует целое число `{key}`
-@msg	multiple windows land with M11.5	несколько окон появятся в M11.5
+@msg	New Window isn't available yet: a document opens in one window	Новое окно пока недоступно: документ открывается в одном окне
 @msg	name the file	дайте файлу имя
 @msg	no CSS to copy: select objects with CSS of their own	нет CSS для копирования: выделите объекты с собственным CSS
 @msg	no Live Paint edge near that point	рядом с этой точкой нет границы быстрой заливки

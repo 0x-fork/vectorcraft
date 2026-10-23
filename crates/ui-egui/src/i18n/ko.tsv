@@ -4379,7 +4379,7 @@ theme	Appearance	외관
 @msg	missing index	index가 없습니다
 @msg	missing number `{key}`	숫자 `{key}`이(가) 없습니다
 @msg	missing integer `{key}`	정수 `{key}`이(가) 없습니다
-@msg	multiple windows land with M11.5	여러 창은 M11.5에서 지원됩니다
+@msg	New Window isn't available yet: a document opens in one window	새 창은 아직 사용할 수 없습니다: 문서는 하나의 창에서 열립니다
 @msg	no PNG encoder	PNG 인코더가 없습니다
 @msg	no document open	열린 문서가 없습니다
 @msg	no effect applied yet	아직 적용된 효과가 없습니다

@@ -4172,7 +4172,7 @@ imageTrace	Outline	Kontur
 @msg	missing index	brak indeksu
 @msg	missing number `{key}`	brak liczby `{key}`
 @msg	missing integer `{key}`	brak liczby całkowitej `{key}`
-@msg	multiple windows land with M11.5	wiele okien pojawi się w M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nowe okno nie jest jeszcze dostępne: dokument otwiera się w jednym oknie
 @msg	name the file	nadaj nazwę plikowi
 @msg	no CSS to copy: select objects with CSS of their own	brak CSS do skopiowania: zaznacz obiekty z własnym CSS
 @msg	no Live Paint edge near that point	brak krawędzi aktywnego malowania w pobliżu tego punktu

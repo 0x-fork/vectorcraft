@@ -4169,7 +4169,7 @@ imageTrace	Outline	轮廓
 @msg	missing `name`	缺少 `name`
 @msg	missing `tool`	缺少 `tool`
 @msg	missing index	缺少 index
-@msg	multiple windows land with M11.5	多窗口将在 M11.5 中提供
+@msg	New Window isn't available yet: a document opens in one window	新建窗口尚不可用：文档在一个窗口中打开
 @msg	no PNG encoder	没有 PNG 编码器
 @msg	no document open	没有打开的文档
 @msg	no effect applied yet	尚未应用任何效果

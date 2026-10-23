@@ -4357,7 +4357,7 @@ theme	Appearance	Giao diện
 @msg	move requires a destination panel	move cần bảng đích
 @msg	move requires an existing destination panel	move cần bảng đích tồn tại
 @msg	Multichannel PSD files can't be read: save it in RGB, CMYK or Grayscale mode	Tệp PSD đa kênh không thể đọc: lưu ở chế độ RGB, CMYK hoặc Thang xám
-@msg	multiple windows land with M11.5	nhiều cửa sổ sẽ có trong M11.5
+@msg	New Window isn't available yet: a document opens in one window	Cửa sổ mới chưa khả dụng: tài liệu mở trong một cửa sổ
 @msg	name the file	hãy đặt tên tệp
 @msg	no active document	không có tài liệu đang hoạt động
 @msg	no active perspective plane	không có mặt phẳng phối cảnh đang hoạt động
