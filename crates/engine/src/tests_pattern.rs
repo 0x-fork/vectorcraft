@@ -419,15 +419,63 @@ fn svg_export_writes_pattern_def() {
     assert!(svg[start..end].contains("<path"));
 }
 
+/// A pattern fill is written as a PDF tiling pattern, which PDF import reads back as a pattern
+/// swatch: a rotated hatch over a long bar (#3849) stays one object with one pattern fill, in a few
+/// kilobytes, instead of hundreds of tiles.
 #[test]
-fn pdf_export_expands_pattern_fills() {
-    let mut s = session();
-    make_dots(&mut s);
-    let big = rect(&mut s, 100.0, 100.0, 50.0, 50.0);
-    s.execute("paint.setFill", &json!({"ids": [big.0], "swatch": "Dots"})).unwrap();
-    let rep = vectorcraft_pdf::export_with_report(doc(&s), &Default::default()).unwrap();
+fn pdf_export_writes_pattern_fills_as_tiling_patterns() {
+    let svg = r##"<svg xmlns="http://www.w3.org/2000/svg" width="2812" height="300" viewBox="0 0 2812 300">
+  <defs>
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)">
+      <rect width="12" height="24" fill="#EB003C"/>
+      <rect x="12" width="12" height="24" fill="#FFFFFF"/>
+    </pattern>
+  </defs>
+  <rect x="80" y="80" width="2650" height="140" fill="url(#hatch)" stroke="#EB003C" stroke-width="4"/>
+</svg>"##;
+    let d = vectorcraft_svg::import(svg).unwrap();
+    let rep = vectorcraft_pdf::export_with_report(&d, &Default::default()).unwrap();
     assert!(rep.warnings.iter().all(|w| !w.contains("pattern")), "{:?}", rep.warnings);
-    assert!(rep.bytes.len() > 500);
+    assert!(rep.bytes.len() < 8_000, "{} bytes", rep.bytes.len());
+    let plain = vectorcraft_pdf::export(&d, &vectorcraft_pdf::PdfOptions::uncompressed()).unwrap();
+    assert!(String::from_utf8_lossy(&plain).contains("/PatternType 1"));
+    let back = vectorcraft_pdf::import(&rep.bytes).unwrap();
+    assert_eq!(back.patterns.len(), 1);
+    assert_eq!(back.patterns[0].art.len(), 2, "the hatch's two stripes");
+    let mut leaves = vec![];
+    back.walk(|n| {
+        if !n.is_container() {
+            leaves.push(n.appearance.fill_paint());
+        }
+    });
+    assert!(leaves.len() <= 2, "{leaves:?}");
+    assert!(leaves.iter().any(|p| matches!(p, Paint::Pattern { pattern, .. } if *pattern == back.patterns[0].name)), "{leaves:?}");
+}
+
+/// A pattern fill nested more than four patterns deep is written as its tiles, and the export says so.
+#[test]
+fn pdf_export_writes_patterns_nested_too_deep_as_tiles_with_a_warning() {
+    use std::sync::Arc;
+    use vectorcraft_doc::pattern::{PatternDef, pattern_paint};
+    use vectorcraft_doc::{Appearance, Document};
+    let square = |paint: Paint| {
+        Node::path(NodeId(0), vectorcraft_geom::shapes::rectangle(Rect::new(0.0, 0.0, 10.0, 10.0)), Appearance::basic(paint, Paint::None, 0.0))
+    };
+    let mut d = Document::new(100.0, 100.0);
+    d.patterns.push(PatternDef::new("P0", vec![Arc::new(square(Paint::solid(vectorcraft_color::Color::rgb(1.0, 0.0, 0.0))))]));
+    for i in 1..=4 {
+        d.patterns.push(PatternDef::new(&format!("P{i}"), vec![Arc::new(square(pattern_paint(&format!("P{}", i - 1))))]));
+    }
+    // P3 nests four tiling patterns (P3 to P0); P4 one more, which is written as its tiles.
+    for (top, tiles) in [("P3", false), ("P4", true)] {
+        let mut d = d.clone();
+        let mut n = square(pattern_paint(top));
+        n.id = d.alloc_id();
+        let layer = d.layers[0].id;
+        d.insert(Some(layer), 0, n).unwrap();
+        let rep = vectorcraft_pdf::export_with_report(&d, &Default::default()).unwrap();
+        assert_eq!(rep.warnings.iter().any(|w| w.contains("are written as their tiles")), tiles, "{top}: {:?}", rep.warnings);
+    }
 }
 
 #[test]
