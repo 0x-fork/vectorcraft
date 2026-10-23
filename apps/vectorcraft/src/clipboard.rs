@@ -143,6 +143,8 @@ fn copied_file(paths: Vec<PathBuf>, mimes: &[&'static str]) -> Option<Flavour> {
             Some(p) if p.ends_with('\r') => PathBuf::from(p.trim_end_matches('\r')),
             _ => path,
         };
+        // A paste sent by automation reads only what its roots allow.
+        vectorcraft_engine::file_access::check_read(&path.to_string_lossy()).ok()?;
         let mut head = Vec::with_capacity(FILE_HEAD);
         std::fs::File::open(&path).ok()?.take(FILE_HEAD as u64).read_to_end(&mut head).ok()?;
         let mime = file_flavour(&path.to_string_lossy(), &head, mimes)?;

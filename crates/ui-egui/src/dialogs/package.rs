@@ -204,7 +204,12 @@ fn package_status_note(missing: usize, fonts: &str) -> String {
 
 /// `file.showPackage {folder}`: show a package folder in the file manager.
 pub fn show_package(app: &mut VectorcraftApp, p: &Value) -> Result<Value, String> {
+    app.refuse_automation("file.showPackage")?;
     let folder = p.get("folder").and_then(Value::as_str).ok_or("missing `folder`")?.to_string();
+    // A package is a folder: an executable, shortcut or app bundle would run, not be shown.
+    if !std::path::Path::new(&folder).is_dir() || folder.to_ascii_lowercase().ends_with(".app") {
+        return Err(format!("{folder} is not a package folder"));
+    }
     io::open_in_app(app, &folder)?;
     Ok(json!({ "folder": folder }))
 }

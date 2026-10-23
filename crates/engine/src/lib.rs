@@ -1486,6 +1486,12 @@ impl Session {
         // Placed documents are read by the native format's loader.
         vectorcraft_doc::placed_document::set_loader(cmd::place::document::read_document);
         vectorcraft_doc::placed_document::set_file_reader(cmd::place::document::read_file_again);
+        vectorcraft_doc::placed_document::set_read_check(|path| file_access::check_read(path).is_ok());
+        // The background workers of placed documents read files in the scope that asked.
+        vectorcraft_render::placed_document::set_scope_capture(|| {
+            let scope = file_access::ScopeHandle::capture();
+            Box::new(move |f: &mut dyn FnMut()| scope.run(|| f()))
+        });
         // Clicks find an image's own fills and strokes where their effects draw them.
         vectorcraft_doc::hit::set_image_paint(vectorcraft_render::effects::image_paint);
         // OpenType SVG glyphs are drawn as the SVG importer reads their documents.
