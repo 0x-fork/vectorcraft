@@ -562,14 +562,17 @@ impl PerspectiveGrid {
             s
         };
         let (su, sv) = (step(w), step(h_len));
-        // Counted, not summed: a count in whole lines (at most 121 a way).
-        for i in 0..=((w + 1e-9) / su).floor() as usize {
+        // Counted, not summed: a count in whole lines (at most 121 a way). The fixed 1e-9
+        // tolerance can inflate the count when the whole domain is far smaller than it, so the
+        // bound is capped on its own, before any loop runs.
+        let count = |len: f64, s: f64| ((len + 1e-9) / s).floor().clamp(0.0, 120.0) as usize;
+        for i in 0..=count(w, su) {
             let u = i as f64 * su;
             if let (Some(a), Some(b)) = (h.apply(Point::new(u, 0.0)), h.apply(Point::new(u, h_len))) {
                 out.push((a, b));
             }
         }
-        for i in 0..=((h_len + 1e-9) / sv).floor() as usize {
+        for i in 0..=count(h_len, sv) {
             let v = i as f64 * sv;
             if let (Some(a), Some(b)) = (h.apply(Point::new(0.0, v)), h.apply(Point::new(w, v))) {
                 out.push((a, b));
