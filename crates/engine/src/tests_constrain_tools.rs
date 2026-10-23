@@ -152,3 +152,28 @@ fn constrain_angle_whole_turns_nudge_as_zero() {
     set_pref(&mut s, "constrainAngle", json!(90));
     assert_eq!(moved(&mut s, 1, 0), Vec2::new(0.0, -10.0));
 }
+
+/// General › Constrain Angle turns only the art's arrow-key axes: ruler guides selected with the
+/// art keep to the page's axes. At 90°, → moves the art straight up, a vertical guide 10 right and
+/// a horizontal guide not at all; ↓ moves the horizontal guide 10 down. Copies alike.
+#[test]
+fn constrain_angle_keeps_guides_selected_with_art_on_the_page_axes() {
+    let mut s = new_doc();
+    let id = rect(&mut s, 100.0, 100.0);
+    set_pref(&mut s, "keyboardIncrement", json!(10));
+    set_pref(&mut s, "constrainAngle", json!(90));
+    let v = s.execute("guide.add", &json!({"vertical": true, "pos": 50})).unwrap()["index"].as_u64().unwrap() as usize;
+    let h = s.execute("guide.add", &json!({"vertical": false, "pos": 50})).unwrap()["index"].as_u64().unwrap() as usize;
+    s.execute("select.set", &json!({"ids": [id.0]})).unwrap();
+    s.execute("guide.select", &json!({"indexes": [v, h], "toggle": true})).unwrap();
+    let pos = |s: &Session| s.doc().unwrap().doc.guides.iter().map(|g| g.pos).collect::<Vec<_>>();
+    let at = centre(&s, id);
+    s.execute("object.nudge", &json!({"dx": 1, "dy": 0})).unwrap();
+    assert_eq!(centre(&s, id) - at, Vec2::new(0.0, -10.0), "the art moves along the turned axis");
+    assert_eq!(pos(&s), [60.0, 50.0], "→: the vertical guide moves right, the horizontal one stays");
+    s.execute("object.nudge", &json!({"dx": 0, "dy": 1})).unwrap();
+    assert_eq!(pos(&s), [60.0, 60.0], "↓: the horizontal guide moves down");
+    // With a copy, the guides' copies keep to the page too.
+    s.execute("object.nudge", &json!({"dx": 1, "dy": 0, "copy": true})).unwrap();
+    assert_eq!(pos(&s), [60.0, 60.0, 70.0, 60.0]);
+}

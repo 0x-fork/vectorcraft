@@ -380,6 +380,21 @@ pub(crate) fn transform_node(n: &mut Node, xf: Affine, sc: Scaling, objects: boo
 /// `anchors` (`ids` being the selection): with anchors selected with Direct Selection and no
 /// copy, only those anchors transform, their handles with them, and the objects selected whole.
 pub(crate) fn apply_transform(s: &mut Session, label: &str, ids: Vec<NodeId>, xf: Affine, p: &Value, anchors: bool) -> Result<Value> {
+    apply_transform_moving_guides(s, label, ids, xf, p, anchors, None)
+}
+
+/// [`apply_transform`], with the selected ruler guides moved by `guides` instead of by the
+/// translation `xf` when given (a nudge along a turned Constrain Angle moves the art along it and
+/// the guides along the page's axes).
+fn apply_transform_moving_guides(
+    s: &mut Session,
+    label: &str,
+    ids: Vec<NodeId>,
+    xf: Affine,
+    p: &Value,
+    anchors: bool,
+    guides: Option<Vec2>,
+) -> Result<Value> {
     let copy = bool_or(p, "copy", false);
     let areas = bool_or(p, "typeAreas", false);
     let objects = transforms_objects(p);
@@ -387,7 +402,7 @@ pub(crate) fn apply_transform(s: &mut Session, label: &str, ids: Vec<NodeId>, xf
     sc.patterns = transform_patterns(s, p, &ids)?;
     let c = xf.as_coeffs();
     let is_translation = (c[0] - 1.0).abs() < 1e-9 && c[1].abs() < 1e-9 && c[2].abs() < 1e-9 && (c[3] - 1.0).abs() < 1e-9;
-    let delta = Vec2::new(c[4], c[5]);
+    let delta = guides.unwrap_or(Vec2::new(c[4], c[5]));
     let with_guides = objects && ids_param(p, "ids").is_none() && is_translation;
     let has_guides = with_guides && !s.doc()?.selection.guides.is_empty();
     // A transform of ids that name no object, or an identity transform without a copy, moves
@@ -564,7 +579,7 @@ fn nudge(s: &mut Session, p: &Value) -> Result<Value> {
         return super::docmenu::guide_move(s, &json!({ "dx": gx, "dy": gy, "copy": copy }));
     }
     let ids = selected_roots_to_transform(s)?;
-    apply_transform(s, "Move", ids, Affine::translate((dx, dy)), p, true)
+    apply_transform_moving_guides(s, "Move", ids, Affine::translate((dx, dy)), p, true, Some(Vec2::new(gx, gy)))
 }
 
 fn about(o: Point, a: Affine) -> Affine {
