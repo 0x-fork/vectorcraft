@@ -1867,6 +1867,7 @@ mod area_tests {
     /// when set, each value clamped to its axis's range, and cleared by another font or style.
     #[test]
     fn variable_font_settings_are_a_character_attribute_saved_only_when_set() {
+        let _fonts = crate::adding_fonts();
         use vectorcraft_text::test_fonts::{TWO_AXIS_FAMILY as FAMILY, two_axis_font};
         vectorcraft_text::FontDb::global().add_font(two_axis_font().unwrap());
         let mut s = Session::new();

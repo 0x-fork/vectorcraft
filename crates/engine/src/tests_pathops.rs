@@ -856,6 +856,7 @@ fn create_outlines_matches_text_bounds() {
 /// share its pixels.
 #[test]
 fn create_outlines_turns_bitmap_glyphs_into_images() {
+    let _fonts = crate::adding_fonts();
     use vectorcraft_text::test_fonts::{COLOUR_CHAR, colour_bitmap_family, colour_bitmap_font};
     vectorcraft_text::FontDb::global().add_font(colour_bitmap_font(false).unwrap());
     let mut s = session();
@@ -886,6 +887,7 @@ fn create_outlines_turns_bitmap_glyphs_into_images() {
 /// A glyph image whose key another image of the document holds gets a key of its own.
 #[test]
 fn create_outlines_keeps_an_image_already_under_a_glyph_images_key() {
+    let _fonts = crate::adding_fonts();
     use vectorcraft_text::test_fonts::{COLOUR_CHAR, COLOUR_LARGE, COLOUR_PPEM, colour_bitmap_family, colour_bitmap_font, solid_png};
     vectorcraft_text::FontDb::global().add_font(colour_bitmap_font(false).unwrap());
     let mut s = session();
@@ -1078,6 +1080,7 @@ fn offset_path_that_leaves_nothing_says_so() {
 /// composite's blend mode kept, every node with an id of the document's.
 #[test]
 fn create_outlines_turns_colr_glyphs_into_layer_groups() {
+    let _fonts = crate::adding_fonts();
     use vectorcraft_text::test_fonts::{COLOUR_CHAR, colr_family, colr_font};
     vectorcraft_text::FontDb::global().add_font(colr_font(true).unwrap());
     let mut s = session();

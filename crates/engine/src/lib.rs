@@ -2356,6 +2356,15 @@ fn refresh_tree_text_bounds(n: &mut Arc<vectorcraft_doc::Node>) {
     }
 }
 
+/// Held by the tests that add fonts to the shared [`vectorcraft_text::FontDb::global`] for as long
+/// as they run: adding a font clears the database's caches, which would change how another such
+/// test's type resolves between its layout and its export.
+#[cfg(test)]
+pub(crate) fn adding_fonts() -> std::sync::MutexGuard<'static, ()> {
+    static FONTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    FONTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

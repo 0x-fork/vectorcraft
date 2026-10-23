@@ -911,6 +911,7 @@ mod tests {
     /// resets the type that uses it.
     #[test]
     fn variable_font_settings_are_captured_explicitly() {
+        let _fonts = crate::adding_fonts();
         use vectorcraft_text::test_fonts::{TWO_AXIS_FAMILY, two_axis_font};
         vectorcraft_text::FontDb::global().add_font(two_axis_font().unwrap());
         let (mut s, source) = session_with_text("Source");
@@ -934,6 +935,7 @@ mod tests {
     /// version and Variable Font settings, unless the style sets them.
     #[test]
     fn another_font_from_a_style_clears_the_old_fonts_version_and_settings() {
+        let _fonts = crate::adding_fonts();
         use vectorcraft_text::test_fonts::{TWO_AXIS_FAMILY, two_axis_font};
         vectorcraft_text::FontDb::global().add_font(two_axis_font().unwrap());
         let (mut s, id) = session_with_text("Source");
