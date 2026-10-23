@@ -866,16 +866,24 @@ fn hostile_executable_files_and_type_loops_are_refused() {
 /// Reads `body` as [`read`] does, on a thread of its own, and fails the test when reading takes
 /// more than 20 s.
 fn read_soon(body: &str) -> crate::Imported {
+    read_within(body, 20)
+}
+
+/// Reads `body` as [`read`] does, on a thread of its own, and fails the test when reading takes
+/// more than `secs` seconds.
+fn read_within(body: &str, secs: u64) -> crate::Imported {
     let (tx, rx) = std::sync::mpsc::channel();
     let ps = eps(body);
     std::thread::spawn(move || tx.send(import(&ps)).ok());
-    rx.recv_timeout(std::time::Duration::from_secs(20)).unwrap_or_else(|_| panic!("reading {body} did not finish")).unwrap()
+    rx.recv_timeout(std::time::Duration::from_secs(secs)).unwrap_or_else(|_| panic!("reading {body} did not finish")).unwrap()
 }
 
-/// Reads `body` after a square through [`read_soon`]: the square stays, and the program runs out
-/// of the operation budget.
+/// Reads `body` after a square: the square stays, and the program runs out of the operation
+/// budget. Running to the end of the budget can take over 20 s on a slow CI runner
+/// (`search_in_a_loop_runs_out_of_the_budget` searches about 3 GB, 14 s on a fast desktop), so the
+/// limit here only catches a program that never stops.
 fn runs_out_of_budget(body: &str) {
-    let r = read_soon(&format!("0 0 10 10 rectfill {body}"));
+    let r = read_within(&format!("0 0 10 10 rectfill {body}"), 120);
     assert_eq!(objects(&r.document).len(), 1, "{body}: {:?}", r.warnings);
     assert!(r.warnings.iter().any(|w| w.contains("the program runs too long")), "{body}: {:?}", r.warnings);
 }
