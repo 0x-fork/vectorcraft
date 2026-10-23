@@ -288,11 +288,23 @@ pub fn set_file_reader(f: FileReader) {
     let _ = FILE_READER.set(f);
 }
 
+/// Whether the caller may read the file at a path (`true`: it may). The engine registers one with
+/// [`set_read_check`]: the cache below is shared by every caller, and a cached file is handed out
+/// only to a caller that may read the file it came from.
+pub type ReadCheck = fn(&str) -> bool;
+
+static READ_CHECK: OnceLock<ReadCheck> = OnceLock::new();
+
+/// Register how a caller's right to read a file is checked (the first registration stays).
+pub fn set_read_check(f: ReadCheck) {
+    let _ = READ_CHECK.set(f);
+}
+
 /// The most bytes of files read again kept.
 const FULL_BYTES: usize = 512 << 20;
 
-/// Files read again, by key, the most recently read last.
-type FullFiles = Vec<(String, Arc<Vec<u8>>)>;
+/// Files read again, by key, with the path each was read from, the most recently read last.
+type FullFiles = Vec<(String, String, Arc<Vec<u8>>)>;
 
 static FULL: Mutex<FullFiles> = Mutex::new(Vec::new());
 
@@ -307,7 +319,11 @@ pub fn full_bytes_cached(p: &PlacedDocument, blob: &ImageBlob) -> Option<Arc<Vec
     if !blob.is_proxy() {
         return Some(blob.bytes.clone());
     }
-    full().iter().rev().find(|(k, _)| *k == p.key).map(|(_, b)| b.clone())
+    let allowed = |path: &str| READ_CHECK.get().is_none_or(|ok| ok(path));
+    // Copy the candidates, newest first, so the filesystem checks run without the lock.
+    let candidates: Vec<(String, Arc<Vec<u8>>)> =
+        full().iter().rev().filter(|(k, _, _)| *k == p.key).map(|(_, path, b)| (path.clone(), b.clone())).collect();
+    candidates.into_iter().find(|(path, _)| allowed(path)).map(|(_, b)| b)
 }
 
 /// The file's bytes: stored, read again already, or read again now ([`set_file_reader`]). `None`
@@ -318,10 +334,10 @@ pub fn full_bytes(p: &PlacedDocument, blob: &ImageBlob) -> Option<Arc<Vec<u8>>> 
     }
     let b = Arc::new(FILE_READER.get()?(p)?);
     let mut c = full();
-    c.push((p.key.clone(), b.clone()));
-    let mut total: usize = c.iter().map(|(_, b)| b.len()).sum();
+    c.push((p.key.clone(), p.link.path.clone(), b.clone()));
+    let mut total: usize = c.iter().map(|(_, _, b)| b.len()).sum();
     while total > FULL_BYTES && c.len() > 1 {
-        total = total.saturating_sub(c.remove(0).1.len());
+        total = total.saturating_sub(c.remove(0).2.len());
     }
     Some(b)
 }

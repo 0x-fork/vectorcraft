@@ -279,7 +279,8 @@ impl Headless {
     /// `app.open {path}`: any readable file as a new active document (`document.open`).
     pub fn open(&mut self, p: &Value) -> Result<Value, String> {
         let path = s(p, "path").ok_or("missing `path`")?;
-        self.session.execute("document.open", &json!({"path": path})).map_err(|e| e.to_string())
+        let roots = self.roots.clone();
+        file_access::confine(roots.as_ref(), || self.session.execute("document.open", &json!({"path": path}))).map_err(|e| e.to_string())
     }
 
     /// `app.save {path?, format?, options?}`: `document.save` (by default the document's own path and
@@ -289,12 +290,14 @@ impl Headless {
         if s(p, "path").is_none() && st.path.is_none() {
             return Err("missing `path` (document was never saved)".into());
         }
-        self.session.execute("document.save", p).map_err(|e| e.to_string())
+        let roots = self.roots.clone();
+        file_access::confine(roots.as_ref(), || self.session.execute("document.save", p)).map_err(|e| e.to_string())
     }
 
     /// `app.export {path?, format?, …}`: `document.export` (format defaults to the path's extension).
     pub fn export(&mut self, p: &Value) -> Result<Value, String> {
-        self.session.execute("document.export", p).map_err(|e| e.to_string())
+        let roots = self.roots.clone();
+        file_access::confine(roots.as_ref(), || self.session.execute("document.export", p)).map_err(|e| e.to_string())
     }
 }
 

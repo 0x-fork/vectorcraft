@@ -350,7 +350,12 @@ fn load_folder(folder: &str) -> Value {
         return json!({"folder": folder, "error": e});
     }
     // A file in it may be a link to one elsewhere.
-    match registry::load_folder_where(std::path::Path::new(folder), |f| crate::file_access::check_read(&f.to_string_lossy())) {
+    match registry::load_folder_where(std::path::Path::new(folder), |f| match f.to_str() {
+        Some(f) => crate::file_access::check_read(f),
+        // A lossy name would check another file than the one loaded.
+        None if crate::file_access::current().is_none() => Ok(()),
+        None => Err(format!("automation path rejected: {} isn't valid text", f.display())),
+    }) {
         Ok(r) => {
             json!({"folder": folder, "loaded": r.loaded, "failed": r.failed.iter().map(|(f, e)| json!({"file": f, "error": e})).collect::<Vec<_>>()})
         }

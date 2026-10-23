@@ -564,6 +564,13 @@ impl Session {
         if let Some(k) = p.get("key").and_then(Value::as_str) {
             values.insert(k.to_string(), p.get("value").cloned().unwrap_or(Value::Null));
         }
+        // The Place queue is read later, by a click outside any automation scope: its files must
+        // be readable now, under the roots of whoever sets it.
+        if let Some(entries) = values.get("queue").and_then(|q| q.get("entries")).and_then(Value::as_array) {
+            for path in entries.iter().filter_map(|e| e.pointer("/params/path").and_then(Value::as_str)) {
+                crate::file_access::check_read(path)?;
+            }
+        }
         if tool.unwrap_or(self.tool_id()) == "dimension" {
             if let Some(style) = values.get("style") {
                 vectorcraft_doc::dimension::DimensionOptions::from_params(style.clone())?;

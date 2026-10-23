@@ -159,7 +159,11 @@ pub(crate) fn read_document(p: &PlacedDocument, bytes: &[u8]) -> Option<(Documen
 /// `p`'s file read again, while it is the file it was read from (how the document model gets it
 /// when only the preview is stored, [`vectorcraft_doc::placed_document::set_file_reader`]).
 pub(crate) fn read_file_again(p: &PlacedDocument) -> Option<Vec<u8>> {
-    let bytes = fileio::read_file(&p.link.path).ok()?;
+    // One byte over the limit tells a file that is too big, without reading it all.
+    let bytes = fileio::read_file_head(&p.link.path, MAX_FILE + 1).ok()?;
+    if bytes.len() > MAX_FILE {
+        return None;
+    }
     if p.link.hash.as_ref().is_some_and(|h| *h != hash_bytes(&bytes)) {
         return None;
     }
@@ -186,7 +190,10 @@ pub(crate) struct Source {
 pub(crate) fn source(name: &str, bytes: &[u8], path: Option<&str>, page: u32, bounding: bool, page_box: PageBox, cmd: &str) -> Result<Source> {
     // The same document placed the same way is read once (placing it again is free).
     let key = key_for(&hash_bytes(bytes), page, bounding, page_box);
-    if let Some(s) = lock_memo().iter().find(|s| s.key == key).cloned() {
+    // Resolving its links depends on where the file is and on what the caller may read, so a hit
+    // needs the same path, and nothing is shared with or from a confined (automation) caller.
+    let confined = crate::file_access::current().is_some();
+    if !confined && let Some((_, s)) = lock_memo().iter().find(|(at, s)| s.key == key && at.as_deref() == path).cloned() {
         return Ok(s);
     }
     let a = document_art(name, bytes, path, page, bounding, page_box, cmd)?;
@@ -206,11 +213,13 @@ pub(crate) fn source(name: &str, bytes: &[u8], path: Option<&str>, page: u32, bo
     // Drawing it needn't read it again.
     vectorcraft_doc::placed_document::prime(&shown, blob.bytes.clone(), (a.doc, art, a.frame));
     let s = Source { blob, key, page_box, frame: a.frame, warnings: a.warnings };
-    let mut m = lock_memo();
-    if m.len() >= MEMO_SIZE {
-        m.remove(0);
+    if !confined {
+        let mut m = lock_memo();
+        if m.len() >= MEMO_SIZE {
+            m.remove(0);
+        }
+        m.push((path.map(str::to_string), s.clone()));
     }
-    m.push(s.clone());
     Ok(s)
 }
 
@@ -218,9 +227,9 @@ pub(crate) fn source(name: &str, bytes: &[u8], path: Option<&str>, page: u32, bo
 const MEMO_SIZE: usize = 32;
 
 /// Files read lately for placing, by key.
-static MEMO: std::sync::Mutex<Vec<Source>> = std::sync::Mutex::new(Vec::new());
+static MEMO: std::sync::Mutex<Vec<(Option<String>, Source)>> = std::sync::Mutex::new(Vec::new());
 
-fn lock_memo() -> std::sync::MutexGuard<'static, Vec<Source>> {
+fn lock_memo() -> std::sync::MutexGuard<'static, Vec<(Option<String>, Source)>> {
     // Entries are only pushed and removed: a panic while held leaves it whole.
     MEMO.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }

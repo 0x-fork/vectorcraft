@@ -979,6 +979,10 @@ fn may_write(path: &str) -> Result<()> {
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn read_file(path: &str) -> Result<Vec<u8>> {
     may_read(path)?;
+    // A device or pipe may never end: only a regular file is read to its end.
+    if !std::fs::metadata(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?.is_file() {
+        return Err(EngineError::Other(format!("{path}: not a file")));
+    }
     std::fs::read(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))
 }
 
