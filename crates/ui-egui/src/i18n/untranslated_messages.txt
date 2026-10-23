@@ -34,6 +34,7 @@ JSON recovery transport exceeds 8 MiB; use the binary adapter
 PDF content is incomplete or exceeds the reader's limits; no document was imported
 PDF flattener: {e}
 PDF options: {e}
+PDF security settings are not an object
 SVG is not UTF-8, UTF-16 or ISO 8859-1
 Save writes one artboard: name one, or export several with document.export
 Select a dimension first
@@ -73,6 +74,7 @@ Text options: {e}
 `direction` must be "auto", "leftToRight" or "rightToLeft"
 `each` is the value one design stands for, more than 0
 `ecc` must be "L", "M", "Q" or "H"
+`ends` applies to joining exactly two paths
 `event` must be one of {_1}
 `files` must be 1 to 1000 paths of font files the last text.findFontFiles search found
 `folder` must be an absolute folder path
@@ -139,6 +141,7 @@ Text options: {e}
 `starts` must be an array of anchor indices (or nulls)
 `stop` must be a stop index
 `strokeMode` applies to strokes (stroke: true)
+`subpaths` must be two integer indices
 `style` must be roman or japanese
 `symbol` must be a symbol name
 `target` must be "object" or "contents", not {v}
@@ -386,6 +389,7 @@ command must be a shape.* command
 commands[{i}]: missing `command`
 commands[{i}]: unknown command `{id}`
 composer must be "singleLine" or "everyLine"
+compound {_1} must contain exactly one open path to join
 copy needs path: the file to copy into the document's folder
 copy takes images only: relink placed documents where their files are
 copying a file isn't available on the web
@@ -952,6 +956,7 @@ select area type and closed paths (at least one area type object)
 select artwork to add its colours
 select artwork to make a group of its colours
 select artwork to recolour, or give a colour `group`
+select exactly two path ends to join
 select objects or give ids
 select objects to align to the guide
 select one Intertwine group
@@ -1003,6 +1008,8 @@ subLines contains an invalid lane
 subLines is missing
 subLines must be a list or null
 subLines must contain at most {MAX_SUB_LINES} valid lanes
+subpath {si} is not an open subpath
+subpaths required when joining the same path
 swatchConflict must be "merge" or "add", not {v}
 text must be {characterSet?, platform?, removeLineReturns?, removeParagraphReturns?, replaceSpaces?}
 text transform is collapsed or unrepresentable

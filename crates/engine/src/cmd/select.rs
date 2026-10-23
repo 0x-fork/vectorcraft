@@ -471,8 +471,10 @@ fn anchors(s: &mut Session, p: &Value) -> Result<Value> {
         if mode == "set" {
             sel.clear();
         }
-        // A path selected as a whole has every anchor selected: toggle and add start from them all.
-        let whole = sel.contains(id) && sel.partial(id).is_none();
+        // A path selected as a whole has every anchor selected: toggle and add start from them all,
+        // but only when no partial anchor selection is active and only on a single object. With
+        // several objects selected, a click picks that anchor alone, so Join can take two picked ends.
+        let whole = sel.contains(id) && sel.partial(id).is_none() && sel.anchors.is_empty() && sel.objects.len() <= 1;
         sel.add(id);
         // A segment pick's endpoints aren't selected anchors: start from none of them.
         if sel.segments.remove(&id).is_some() {
