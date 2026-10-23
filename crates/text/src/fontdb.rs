@@ -2418,10 +2418,10 @@ impl FontDb {
             return Some(f);
         }
         #[cfg(not(target_arch = "wasm32"))]
-        if self.system_fallback(c) {
-            return self.loaded_fallback(c, exclude, weight, italic);
-        }
-        None
+        self.system_fallback(c);
+        // Another lookup may have loaded the face while this one searched. Loading no new
+        // faces does not mean no face covers the character (as with `face`'s catalog lookup).
+        self.loaded_fallback(c, exclude, weight, italic)
     }
 
     /// A face that covers `c`, for text drawn outside the canvas (the app's own UI): the loaded
