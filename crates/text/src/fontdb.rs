@@ -425,8 +425,8 @@ type GlyphImages = GlyphCache<(u32, u32), Arc<GlyphImage>>;
 /// [`FontDb::glyph_colour`]'s answers by face and glyph, and the text's fill and stroke colours for
 /// glyphs that paint with them.
 type GlyphColours = GlyphCache<(u32, u32, Option<TextColours>), ColourContent>;
-/// The text's fill and stroke colours, as a cache key.
-type TextColours = ([u8; 4], Option<[u8; 4]>);
+/// The text's fill and stroke colours, as a cache key ([`Color::key`]).
+type TextColours = ([u32; 5], Option<[u32; 5]>);
 
 /// What a glyph's colour content (an image, layers) takes of memory, in bytes.
 trait Weight {
@@ -2573,7 +2573,7 @@ impl FontDb {
         let svg = svg_drawn(face, &f, gid);
         // Kept without colours, or by the text's colours it uses: the fill, and for SVG art the
         // stroke too.
-        let coloured = Some((foreground.to_rgba8(1.0), stroke.filter(|_| svg).map(|c| c.to_rgba8(1.0))));
+        let coloured = Some((foreground.key(), stroke.filter(|_| svg).map(|c| c.key())));
         {
             let cache = self.colours.lock().unwrap_or_else(|e| e.into_inner());
             if let Some(c) = [None, coloured].iter().find_map(|k| cache.kept.get(&(face.id, gid, *k))) {
