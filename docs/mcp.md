@@ -4145,6 +4145,14 @@ numbers and a `before` that isn't true or false.
 {"name":"run_command","arguments":{"command":"text.thread.add","params":{"from":42,"at":[300,120]}}}
 ```
 
+`type.createOutlines` (Type › Create Outlines) and `effect.expandAppearance` (when it outlines type, as Expand
+Appearance describes) take an outlined frame of threaded text out of its thread with the text it shows, and the other
+frames keep the text they hold. When the thread's last frame is outlined, the text it has no room for, which its
+outlines do not draw, goes after the text of the last frame that stays. A thread left with one frame is no longer a
+thread. When `effect.expandAppearance` keeps a frame as type in a group (type with no fills or strokes of its own whose only
+effects are shadows, outer glows or Crop Marks), the type stays in the thread in the frame's place. Object › Expand
+(`object.expand`) outlines type with these two commands.
+
 ## Converting between point type and area type
 
 With the Selection tool, a single selected point or area type object shows the type widget: a small circle beside

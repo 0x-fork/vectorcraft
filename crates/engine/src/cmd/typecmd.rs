@@ -30,7 +30,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Create Outlines",
             ["Type"],
             Some("Cmd+Shift+O"),
-            "{} convert the selected text to groups of compound paths (one per glyph) → {ids}",
+            "{} convert the selected text to groups of compound paths (one per glyph); a frame of threaded text leaves its thread with the text it shows → {ids}",
             has_selection,
             create_outlines
         ),
@@ -544,6 +544,7 @@ fn create_outlines(s: &mut Session, _: &Value) -> Result<Value> {
         }
         let mut new_sel: Vec<NodeId> = roots.iter().copied().filter(|r| !texts.contains(r)).collect();
         let mut out = vec![];
+        let threaded = super::threads::frames(d);
         for tid in texts {
             let Some(n) = d.node(tid).cloned() else { continue };
             let NodeKind::Text(t) = &n.kind else { continue };
@@ -602,6 +603,8 @@ fn create_outlines(s: &mut Session, _: &Value) -> Result<Value> {
                 new_sel.push(gid);
             }
         }
+        // Outlined frames of threaded text leave their threads with the text they show.
+        super::threads::leave_threads(d, &threaded);
         sel.set(new_sel);
         Ok(out)
     })?;
