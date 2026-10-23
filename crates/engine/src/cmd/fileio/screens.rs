@@ -793,7 +793,12 @@ fn encode_and_write(export: ScreenExport, writer: &mut dyn FnMut(&str, &[u8]) ->
                         Arc::new(d)
                     })
                     .clone();
-                write(&d, r.format.id, &r.options_for(item.region, None)?)?
+                let mut options = r.options_for(item.region, None)?;
+                // An EPS page is the artboard, not its art's bounds: an artboard without art still writes.
+                if r.format.id == "eps" {
+                    options["useArtboards"] = json!(true);
+                }
+                write(&d, r.format.id, &options)?
             } else {
                 write(&item.doc, r.format.id, &r.options_for(item.region, item.artboard)?)?
             };
