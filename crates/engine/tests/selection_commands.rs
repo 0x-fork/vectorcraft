@@ -133,3 +133,32 @@ fn select_key_and_document_inspect_report_the_key_object() {
     assert_eq!(s.execute("select.key", &json!({"id": b.0})).unwrap(), json!({"key": null}));
     assert_eq!(inspected(&mut s), Some(Value::Null));
 }
+
+#[test]
+fn select_segments_mode_toggle_and_add() {
+    let (mut s, a, _) = session();
+    // Select segment 0 with mode set
+    s.execute("select.segments", &json!({"id": a.0, "segments": [[0, 0]], "mode": "set"})).unwrap();
+    let sel = &s.active().unwrap().selection;
+    assert_eq!(sel.segments.get(&a), Some(&[(0, 0)].into()));
+    assert_eq!(sel.anchors.get(&a), Some(&[(0, 0), (0, 1)].into()));
+
+    // Toggle segment 1 on (add)
+    s.execute("select.segments", &json!({"id": a.0, "segments": [[0, 1]], "mode": "toggle"})).unwrap();
+    let sel = &s.active().unwrap().selection;
+    assert_eq!(sel.segments.get(&a), Some(&[(0, 0), (0, 1)].into()));
+    assert_eq!(sel.anchors.get(&a), Some(&[(0, 0), (0, 1), (0, 2)].into()));
+
+    // Toggle segment 0 off
+    s.execute("select.segments", &json!({"id": a.0, "segments": [[0, 0]], "mode": "toggle"})).unwrap();
+    let sel = &s.active().unwrap().selection;
+    assert_eq!(sel.segments.get(&a), Some(&[(0, 1)].into()));
+    assert_eq!(sel.anchors.get(&a), Some(&[(0, 1), (0, 2)].into()));
+
+    // Toggle segment 1 off -> clears selection for this path
+    s.execute("select.segments", &json!({"id": a.0, "segments": [[0, 1]], "mode": "toggle"})).unwrap();
+    let sel = &s.active().unwrap().selection;
+    assert!(!sel.contains(a));
+    assert!(sel.segments.is_empty());
+    assert!(sel.anchors.is_empty());
+}
