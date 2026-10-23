@@ -138,6 +138,21 @@ impl PositionedGlyph {
     pub fn placed_image(&self) -> Option<(&Arc<GlyphImage>, Affine)> {
         self.image.as_ref().map(|i| (i, self.xf * i.xf))
     }
+    /// The glyph's colour bitmap as an image object placed through `to_doc` (text space → where it
+    /// goes), holding its pixels ([`vectorcraft_doc::ImageObject::pixels`]), without an id.
+    pub fn placed_image_node(&self, to_doc: Affine) -> Option<vectorcraft_doc::Node> {
+        let (image, to_text) = self.placed_image()?;
+        let im = vectorcraft_doc::ImageObject {
+            key: image.blob.content_key(),
+            width: image.width,
+            height: image.height,
+            xf: to_doc * to_text,
+            link: None,
+            placement: Default::default(),
+            pixels: Some(Arc::new(image.blob.clone())),
+        };
+        Some(vectorcraft_doc::Node::new(vectorcraft_doc::NodeId(u64::MAX), vectorcraft_doc::NodeKind::Image(Box::new(im))))
+    }
     /// The glyph's colour art placed through `to_doc` (text space → where they go): a copy of
     /// [`Self::colour`], transformed, its nodes without ids.
     pub fn placed_colour(&self, to_doc: Affine) -> Option<vectorcraft_doc::Node> {

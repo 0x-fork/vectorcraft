@@ -285,6 +285,7 @@ fn image_doc(effects: Vec<Effect>) -> Document {
             xf: Affine::translate((20.0, 20.0)),
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     );
     n.appearance.effects = effects;

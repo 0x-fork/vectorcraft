@@ -17,7 +17,7 @@ fn doc_with_image(key: &str, len: usize) -> Document {
     d.images.insert(key.into(), ImageBlob::new("image/png", bytes));
     let l = d.layers[0].id;
     let id = d.alloc_id();
-    let im = ImageObject { key: key.into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+    let im = ImageObject { key: key.into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
     d.insert(Some(l), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     d
 }

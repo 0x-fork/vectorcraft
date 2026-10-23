@@ -678,7 +678,7 @@ impl<'a> Writer<'a> {
             }
             NodeKind::Image(im) => {
                 self.lock(locked);
-                self.image(self.doc.images.get(&im.key), im.width, im.height, im.xf);
+                self.image(self.doc.image_blob(im), im.width, im.height, im.xf);
             }
             NodeKind::SymbolInstance { symbol, xf } => {
                 self.warn(LIVE);

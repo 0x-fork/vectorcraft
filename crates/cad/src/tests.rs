@@ -536,6 +536,7 @@ fn images_link_png_or_jpeg_files() {
             xf: Affine::translate((10.0, 20.0)) * Affine::scale(5.0),
             link: None,
             placement: Default::default(),
+            pixels: None,
         };
         vec![Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)))]
     });
@@ -569,7 +570,15 @@ fn images_without_pixels_are_left_out_with_one_note() {
         ["raster-1", "raster-2"]
             .into_iter()
             .map(|key| {
-                let im = ImageObject { key: key.into(), width: 4, height: 2, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+                let im = ImageObject {
+                    key: key.into(),
+                    width: 4,
+                    height: 2,
+                    xf: Affine::IDENTITY,
+                    link: None,
+                    placement: Default::default(),
+                    pixels: None,
+                };
                 Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)))
             })
             .collect()

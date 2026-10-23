@@ -621,7 +621,8 @@ mod tests {
         let mut d = doc_with_pattern(TileType::Grid);
         // A PNG signature with nothing after it.
         d.images.insert("cut".into(), ImageBlob::new("image/png", b"\x89PNG\r\n\x1a\n".to_vec()));
-        let im = ImageObject { key: "cut".into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+        let im =
+            ImageObject { key: "cut".into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
         d.patterns[0].art = vec![Arc::new(Node::new(NodeId(901), NodeKind::Image(Box::new(im))))];
         let mut r = Renderer::new();
         let start = tiles_rasterized();

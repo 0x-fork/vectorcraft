@@ -410,7 +410,8 @@ mod tests {
         let mut d = Document::new_with_mode(20.0, 10.0, ColorMode::Cmyk);
         d.images.insert("img".into(), ImageBlob::cmyk_tiff(&Inks::new(2, 2, ink.repeat(4)).unwrap()).unwrap());
         let l = d.layers[0].id;
-        let im = ImageObject { key: "img".into(), width: 2, height: 2, xf: Affine::scale(5.0), link: None, placement: Default::default() };
+        let im =
+            ImageObject { key: "img".into(), width: 2, height: 2, xf: Affine::scale(5.0), link: None, placement: Default::default(), pixels: None };
         let n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
         d.insert(Some(l), 0, n).unwrap();
         // The same inks as a fill beside it.

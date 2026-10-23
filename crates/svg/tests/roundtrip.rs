@@ -347,6 +347,7 @@ fn image_roundtrip() {
             xf: Affine::translate((10.0, 20.0)) * Affine::scale(10.0),
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     );
     let mut d = doc_with(vec![n]);

@@ -268,6 +268,7 @@ fn png_doc() -> Document {
         xf: Affine::translate((10.0, 10.0)) * Affine::scale(10.0),
         link: None,
         placement: Default::default(),
+        pixels: None,
     };
     let n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
     let layer = d.layers[0].id;

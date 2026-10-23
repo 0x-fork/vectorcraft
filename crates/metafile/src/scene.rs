@@ -433,19 +433,20 @@ impl<'a> Scene<'a> {
 
     /// A placed image, decoded once per image.
     fn image(&mut self, im: &ImageObject) {
-        let Some(img) = self.decoded(&im.key) else { return };
+        let Some(img) = self.decoded(im) else { return };
         let (dw, dh) = (f64::from(img.width), f64::from(img.height));
         let xf = im.xf * Affine::scale_non_uniform(f64::from(im.width.max(1)) / dw, f64::from(im.height.max(1)) / dh);
         self.ops.push(Op::Image { image: img, xf, opacity: self.opacity.clamp(0.0, 1.0) });
     }
 
-    /// Image `key`'s pixels (scaled down to what a metafile stores), `None` with a warning when it
+    /// Image `im`'s pixels (scaled down to what a metafile stores), `None` with a warning when it
     /// has none or can't be decoded.
-    fn decoded(&mut self, key: &str) -> Option<Arc<Rgba>> {
+    fn decoded(&mut self, im: &ImageObject) -> Option<Arc<Rgba>> {
+        let key = im.key.as_str();
         if let Some(i) = self.images.get(key) {
             return i.clone();
         }
-        let blob = self.doc.images.get(key).filter(|b| !b.bytes.is_empty());
+        let blob = self.doc.image_blob(im).filter(|b| !b.bytes.is_empty());
         let img = blob
             .and_then(|b| image::load_from_memory(&b.bytes).ok())
             .map(|i| Rgba::fitted(i.to_rgba8()))

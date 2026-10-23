@@ -30,6 +30,7 @@ fn linked_doc() -> Document {
         xf: Affine::IDENTITY,
         link: Some(LinkInfo::new("/art/photo.png")),
         placement: Default::default(),
+        pixels: None,
     };
     d.insert(Some(layer), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     let mut blob = ImageBlob::new("image/png", vec![1, 2, 3, 4, 5, 6]);

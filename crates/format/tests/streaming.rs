@@ -20,7 +20,8 @@ fn doc_with(images: &[(&str, &str, usize)]) -> Document {
         let bytes: Vec<u8> = (0..len).map(|i| ((i * 7 + n * 13) % 251) as u8).collect();
         d.images.insert(key.into(), ImageBlob::new(mime, bytes));
         let id = d.alloc_id();
-        let im = ImageObject { key: key.into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+        let im =
+            ImageObject { key: key.into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
         d.insert(Some(l), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     }
     d

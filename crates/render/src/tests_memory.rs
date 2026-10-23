@@ -26,7 +26,7 @@ fn doc_with_image(key: &str, bytes: Vec<u8>, w: u32, h: u32) -> Document {
     let mut d = Document::new(w as f64, h as f64);
     d.images.insert(key.into(), ImageBlob::new("image/png", bytes));
     let (id, layer) = (d.alloc_id(), d.layers[0].id);
-    let im = ImageObject { key: key.into(), width: w, height: h, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+    let im = ImageObject { key: key.into(), width: w, height: h, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
     d.insert(Some(layer), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     d
 }
@@ -39,16 +39,16 @@ fn renderers_share_one_decode_of_an_image() {
     // Another document holding the same image under another key (its own copy of the bytes).
     let b = doc_with_image("photo", bytes, 16, 16);
     let (mut r1, mut r2) = (Renderer::new(), Renderer::new());
-    let (k1, p1) = r1.image_pixmap(&a, "img", false, true).unwrap();
-    let (k2, p2) = r2.image_pixmap(&b, "photo", false, true).unwrap();
+    let (k1, p1) = r1.image_pixmap(&a, "img", None, false, true).unwrap();
+    let (k2, p2) = r2.image_pixmap(&b, "photo", None, false, true).unwrap();
     assert_eq!(k1, k2);
     assert!(Arc::ptr_eq(&p1, &p2), "decoded once for both renderers");
     // Drawing goes through the store too: the pixels stay the ones decoded.
     let _ = r2.render(&b, 16, 16, Affine::IDENTITY, &RenderOptions::default());
-    assert!(Arc::ptr_eq(&r1.image_pixmap(&b, "photo", false, true).unwrap().1, &p1));
+    assert!(Arc::ptr_eq(&r1.image_pixmap(&b, "photo", None, false, true).unwrap().1, &p1));
     // A document using the same key for other pixels gets its own.
     let c = doc_with_image("img", png(16, 16, 102), 16, 16);
-    let (k3, p3) = r1.image_pixmap(&c, "img", false, true).unwrap();
+    let (k3, p3) = r1.image_pixmap(&c, "img", None, false, true).unwrap();
     assert!(k3 != k1 && !Arc::ptr_eq(&p3, &p1));
     assert!(
         r1.render(&c, 16, 16, Affine::IDENTITY, &RenderOptions::default()).pixels
@@ -102,7 +102,7 @@ fn image_mips_are_opt_in_and_change_nothing_off() {
     // On, the quarter-size image samples the quarter-size mip: close to the full pixels' average
     // but not the same pixels.
     assert!(mipped.pixels != cold.pixels);
-    let (key, _) = warm.image_pixmap(&d, "img", false, true).unwrap();
+    let (key, _) = warm.image_pixmap(&d, "img", None, false, true).unwrap();
     let mip = images::store().peek(&images::ImageKey { mip: 2, ..key }).expect("quarter mip kept");
     assert_eq!((mip.width(), mip.height()), (16, 16));
     // Above half size, mips on draw the full pixels.
@@ -122,7 +122,7 @@ fn kept_mips_draw_without_decoding_the_full_pixels_again() {
     let quarter = Affine::scale(0.25);
     let mut r = Renderer::new();
     let _ = r.render(&d, 32, 16, quarter, &on);
-    let full = r.image_pixmap(&d, "img", false, false).unwrap().0;
+    let full = r.image_pixmap(&d, "img", None, false, false).unwrap().0;
     images::store().remove(&full);
     // The image dragged 4 pt (a device pixel) right.
     let mut moved = d.clone();
@@ -475,7 +475,15 @@ fn art_placed_again_in_every_frame_keeps_one_outline_per_stroke() {
     let mut d = Document::new(200.0, 100.0);
     d.images.insert("dot".into(), ImageBlob::new("image/png", png(4, 4, 108)));
     let mut art = symbol_art(&mut d);
-    let im = ImageObject { key: "dot".into(), width: 4, height: 4, xf: Affine::translate((-2.0, -2.0)), link: None, placement: Default::default() };
+    let im = ImageObject {
+        key: "dot".into(),
+        width: 4,
+        height: 4,
+        xf: Affine::translate((-2.0, -2.0)),
+        link: None,
+        placement: Default::default(),
+        pixels: None,
+    };
     let image = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
     if let Some(c) = art.children_mut() {
         c.push(Arc::new(image));
@@ -1476,7 +1484,7 @@ fn blurred_image_doc(key: &str, seed: u8) -> Document {
     let mut d = Document::new(200.0, 100.0);
     d.images.insert(key.into(), ImageBlob::new("image/png", png(16, 16, seed)));
     let xf = Affine::translate((20.0, 10.0)) * Affine::scale(5.0);
-    let im = ImageObject { key: key.into(), width: 16, height: 16, xf, link: None, placement: Default::default() };
+    let im = ImageObject { key: key.into(), width: 16, height: 16, xf, link: None, placement: Default::default(), pixels: None };
     let mut n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
     n.appearance.effects.push(effect("blur.gaussian", serde_json::json!({"radius": 1.0})));
     with_art(d, vec![n])

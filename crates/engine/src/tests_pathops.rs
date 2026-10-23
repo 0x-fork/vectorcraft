@@ -890,7 +890,7 @@ fn create_outlines_keeps_an_image_already_under_a_glyph_images_key() {
     vectorcraft_text::FontDb::global().add_font(colour_bitmap_font(false).unwrap());
     let mut s = session();
     let glyph = vectorcraft_doc::ImageBlob::png(solid_png(COLOUR_PPEM.into(), COLOUR_LARGE));
-    let taken = format!("glyph-{}", glyph.content_key());
+    let taken = glyph.content_key();
     let other = vectorcraft_doc::ImageBlob::png(solid_png(4, [0, 255, 0, 255]));
     std::sync::Arc::make_mut(&mut s.doc_mut().unwrap().doc).images.insert(taken.clone(), other.clone());
     s.execute("text.create", &json!({"x": 10, "y": 50, "text": COLOUR_CHAR.to_string(), "size": 32, "font": colour_bitmap_family(false)})).unwrap();

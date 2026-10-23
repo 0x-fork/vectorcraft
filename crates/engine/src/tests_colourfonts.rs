@@ -168,3 +168,63 @@ fn the_canvas_draws_svg_glyphs_as_their_art() {
     assert_eq!(img.pixel(14, 40), [255, 0, 0, 255], "its own red");
     assert_eq!(img.pixel(22, 40), [0, 0, 0, 255], "the type's black fill");
 }
+
+/// Expand Appearance of type with an effect keeps its emoji as images, their pixels taken into
+/// the document; the PDF of the type before expanding draws them too.
+#[test]
+fn expand_appearance_keeps_the_emoji_of_type_with_effects() {
+    use vectorcraft_text::test_fonts::{COLOUR_CHAR, COLOUR_LARGE, COLOUR_PPEM, colour_bitmap_family, colour_bitmap_font, solid_png};
+    vectorcraft_text::FontDb::global().add_font(colour_bitmap_font(false).unwrap());
+    let mut s = session();
+    let r = s
+        .execute("text.create", &json!({"x": 10, "y": 50, "text": format!("{COLOUR_CHAR}F"), "size": 32, "font": colour_bitmap_family(false)}))
+        .unwrap();
+    let t = NodeId(r["id"].as_u64().unwrap());
+    // Turned, not only moved: type that a Transform only moves stays type in exports.
+    s.execute("effect.apply", &json!({"ids": [t.0], "effect": "distort.transform", "params": {"rotate": 10}})).unwrap();
+    let pdf = vectorcraft_pdf::export_with_report(&s.doc().unwrap().doc, &vectorcraft_pdf::PdfOptions::uncompressed()).unwrap();
+    assert!(pdf.warnings.is_empty(), "{:?}", pdf.warnings);
+    assert!(pdf.bytes.windows(14).any(|w| w == b"/Subtype/Image"), "the emoji, in the PDF");
+    let r = ids(&s.execute("effect.expandAppearance", &json!({})).unwrap());
+    let mut images = vec![];
+    for id in r {
+        node(&s, id).walk(&mut |n| {
+            if let NodeKind::Image(im) = &n.kind {
+                images.push((**im).clone());
+            }
+        });
+    }
+    let d = &s.doc().unwrap().doc;
+    let glyph = vectorcraft_doc::ImageBlob::png(solid_png(COLOUR_PPEM.into(), COLOUR_LARGE));
+    assert_eq!(images.len(), 1, "the emoji");
+    assert!(images[0].pixels.is_none(), "the document holds them");
+    assert_eq!(d.images[&images[0].key].bytes, glyph.bytes);
+    vectorcraft_testkit::invariants::check_document(d).unwrap();
+}
+
+/// Emoji type in a warp envelope: SVG export writes each emoji's pixels once for all the warp's
+/// pieces, and Object › Expand takes them into the document.
+#[test]
+fn an_envelope_shares_and_expands_the_emoji_of_its_type() {
+    use vectorcraft_text::test_fonts::{COLOUR_CHAR, colour_bitmap_family, colour_bitmap_font};
+    vectorcraft_text::FontDb::global().add_font(colour_bitmap_font(false).unwrap());
+    let mut s = session();
+    let r = s
+        .execute("text.create", &json!({"x": 10, "y": 50, "text": COLOUR_CHAR.to_string(), "size": 32, "font": colour_bitmap_family(false)}))
+        .unwrap();
+    s.execute("select.set", &json!({"ids": [r["id"]]})).unwrap();
+    let e = NodeId(s.execute("object.envelope.makeWithWarp", &json!({"style": "arch", "bend": 50})).unwrap()["id"].as_u64().unwrap());
+    let svg = vectorcraft_svg::export_full(&s.doc().unwrap().doc, &Default::default(), None).svg;
+    assert_eq!(svg.matches("data:image/png").count(), 1, "one copy of the pixels");
+    s.execute("object.envelope.expand", &json!({})).unwrap();
+    let mut images = vec![];
+    node(&s, e).walk(&mut |n| {
+        if let NodeKind::Image(im) = &n.kind {
+            images.push((**im).clone());
+        }
+    });
+    let d = &s.doc().unwrap().doc;
+    assert!(images.len() > 1, "the warp's pieces");
+    assert!(images.iter().all(|im| im.pixels.is_none() && d.images.contains_key(&im.key)), "the document holds them");
+    vectorcraft_testkit::invariants::check_document(d).unwrap();
+}
