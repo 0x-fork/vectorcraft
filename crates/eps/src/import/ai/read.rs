@@ -2009,6 +2009,18 @@ impl<'a> Reader<'a> {
             return Ok(());
         }
         let gs = self.gs.clone();
+        // One mesh where the patches join up into the grid they say they make; else each patch is
+        // a mesh of its own, in a group.
+        match m.one_mesh() {
+            Ok(one) => {
+                let mut node = self.new_node(NodeKind::Mesh(one), &gs);
+                node.opacity = gs.opacity;
+                node.blend = gs.blend;
+                return self.add(node, hidden);
+            }
+            Err(super::mesh::NotOne::Unjoined) => self.warn("a gradient mesh whose patches don't join up comes in as a group of its patches"),
+            Err(super::mesh::NotOne::Unplaced) => {}
+        }
         let mut patches: Vec<Node> = m.patches.into_iter().map(|p| self.new_node(NodeKind::Mesh(p), &gs)).collect();
         let mut node = match patches.len() {
             1 => patches.pop().unwrap_or_else(|| self.new_node(NodeKind::Group { children: vec![], clip: false }, &gs)),
