@@ -385,15 +385,19 @@ fn separate_boards(cmd: &str, f: &Format, doc: &Document, p: &Value) -> Result<V
 pub(super) fn artboard_doc(doc: &Document, i: usize) -> Document {
     let mut d = doc.clone();
     let Some(a) = doc.artboards.get(i) else { return d };
-    let r = a.rect;
     d.artboards = vec![a.clone()];
-    // It opens fitted to its artboard, not at the master file's view.
+    keep_art_on(&mut d, a.rect);
+    d
+}
+
+/// Reduce `d` to the objects touching `r`, in their layers (resources are kept), opening
+/// fitted to its artboard rather than at the master file's view.
+pub(super) fn keep_art_on(d: &mut Document, r: vectorcraft_geom::Rect) {
     d.last_view = None;
     d.layers_open = None;
     for layer in &mut d.layers {
         keep_on(layer, r);
     }
-    d
 }
 
 /// Keep in layer `n` (and its sublayers) only the objects touching `r`.

@@ -784,7 +784,15 @@ fn encode_and_write(export: ScreenExport, writer: &mut dyn FnMut(&str, &[u8]) ->
                 write(all, "pdf", &options)?
             } else if r.whole_document() && item.artboard.is_some() {
                 let b = item.artboard.unwrap_or(0);
-                let d = board_docs.entry(b).or_insert_with(|| Arc::new(single_artboard(&item.doc, item.region, &item.name))).clone();
+                // That artboard alone, as Save's separateArtboards writes it: its art, not the others' (#3868).
+                let d = board_docs
+                    .entry(b)
+                    .or_insert_with(|| {
+                        let mut d = single_artboard(&item.doc, item.region, &item.name);
+                        super::save::keep_art_on(&mut d, item.region);
+                        Arc::new(d)
+                    })
+                    .clone();
                 write(&d, r.format.id, &r.options_for(item.region, None)?)?
             } else {
                 write(&item.doc, r.format.id, &r.options_for(item.region, item.artboard)?)?
