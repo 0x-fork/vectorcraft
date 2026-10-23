@@ -29,6 +29,8 @@ const SAME_COLOUR: f64 = 12.0;
 const MAX_COLOURS: usize = 10;
 /// Neighbouring colours overlap by this many working pixels so no hairline gap can open.
 const OVERLAP: f64 = 0.06;
+/// A traced outline whose area (in source pixels squared) is below this paints nothing.
+const NO_AREA: f64 = 1e-6;
 
 /// The raster as premultiplied RGBA, averaged down so its longest side is at most [`WORK_MAX_SIDE`].
 fn working_copy(img: &Raster, at_least: usize) -> (Vec<Px>, usize, usize, usize) {
@@ -262,11 +264,36 @@ fn to_subpath(segs: &[Cubic], map: &ToSource) -> Option<SubPath> {
     anchors.iter().all(|a| finite(a.p) && finite(a.h_in) && finite(a.h_out)).then(|| SubPath::new(anchors, true))
 }
 
+/// The area `sp` paints, summed about its first anchor. A subpath of one anchor has no segment and
+/// paints nothing.
+fn painted_area(sp: &SubPath) -> f64 {
+    use kurbo::ParamCurveArea;
+    let Some(origin) = sp.anchors.first().map(|a| a.p.to_vec2()) else { return 0.0 };
+    (0..sp.segment_count()).map(|i| (kurbo::Affine::translate(-origin) * sp.segment(i)).signed_area()).sum()
+}
+
 struct Shape {
     class: usize,
     area: f64,
     outer: Vec<Cubic>,
     holes: Vec<Vec<Cubic>>,
+}
+
+/// The subpaths of `s` in source pixels: its outline, then its holes. The fit of a thin outline
+/// can have no area: two anchors whose segments run along one line, or a single anchor, which has
+/// no segment. Such an outline paints nothing and is left out with its holes, and a hole with no
+/// area is left out too.
+fn shape_subpaths(s: &Shape, map: &ToSource) -> Vec<SubPath> {
+    let outer = to_subpath(&s.outer, map);
+    if outer.as_ref().is_some_and(|sp| painted_area(sp).abs() < NO_AREA) {
+        return Vec::new();
+    }
+    let mut subs: Vec<SubPath> = Vec::new();
+    subs.extend(outer);
+    for hole in &s.holes {
+        subs.extend(to_subpath(hole, map).filter(|sp| painted_area(sp).abs() >= NO_AREA));
+    }
+    subs
 }
 
 /// A hard-edged source (a GIF, say) has no anti-aliasing to read an edge position from, and its
@@ -475,11 +502,7 @@ pub(crate) fn trace_logo(img: &Raster, params: &TraceParams, max_anchors: usize)
     let mut out = TraceResult { worked_at: (factor > 1).then_some((w as u32, h as u32)), ..TraceResult::default() };
     for s in shapes {
         let color = palette.get(s.class).copied().unwrap_or([255, 255, 255]);
-        let mut subs: Vec<SubPath> = Vec::new();
-        subs.extend(to_subpath(&s.outer, &to_source));
-        for hole in &s.holes {
-            subs.extend(to_subpath(hole, &to_source));
-        }
+        let subs = shape_subpaths(&s, &to_source);
         if subs.is_empty() {
             continue;
         }
@@ -497,4 +520,47 @@ pub(crate) fn trace_logo(img: &Raster, params: &TraceParams, max_anchors: usize)
         });
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A closed outline of straight cubics through `pts`.
+    fn polygon(pts: &[(f64, f64)]) -> Vec<Cubic> {
+        (0..pts.len())
+            .map(|i| {
+                let (a, b) = (pts[i], pts[(i + 1) % pts.len()]);
+                let (a, b) = (Point::new(a.0, a.1), Point::new(b.0, b.1));
+                [a, a, b, b]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_hole_without_area_is_left_out() {
+        let map = ToSource { factor: 1.0, work: (40, 40), source: (40, 40) };
+        let shape = Shape {
+            class: 0,
+            area: 900.0,
+            outer: polygon(&[(5.0, 5.0), (35.0, 5.0), (35.0, 35.0), (5.0, 35.0)]),
+            holes: vec![polygon(&[(10.0, 20.0), (20.0, 20.0)]), polygon(&[(20.0, 10.0), (30.0, 10.0), (30.0, 30.0)])],
+        };
+        let subs = shape_subpaths(&shape, &map);
+        let areas: Vec<f64> = subs.iter().map(painted_area).collect();
+        assert_eq!(subs.len(), 2, "areas {areas:?}");
+        assert!(areas.iter().all(|a| a.abs() >= 100.0), "areas {areas:?}");
+    }
+
+    #[test]
+    fn an_outline_without_area_is_left_out_with_its_holes() {
+        let map = ToSource { factor: 1.0, work: (40, 40), source: (40, 40) };
+        let shape = Shape {
+            class: 0,
+            area: 1.0,
+            outer: polygon(&[(5.0, 5.0), (35.0, 5.0)]),
+            holes: vec![polygon(&[(20.0, 10.0), (30.0, 10.0), (30.0, 30.0)])],
+        };
+        assert!(shape_subpaths(&shape, &map).is_empty());
+    }
 }
