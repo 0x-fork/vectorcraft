@@ -1366,15 +1366,17 @@ pub(crate) fn unique_file_names<'a>(names: impl IntoIterator<Item = (&'a str, St
 /// `names` with `-2`, `-3`… after a name already used (compared without case).
 fn distinct_names(names: impl IntoIterator<Item = String>) -> Vec<String> {
     let mut taken = std::collections::HashSet::new();
+    // The next number to try for each base: a name repeated many times doesn't search the numbers
+    // taken before it.
+    let mut next: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     names
         .into_iter()
         .map(|base| {
             let mut name = base.clone();
-            for i in 2.. {
-                if taken.insert(name.to_lowercase()) {
-                    break;
-                }
-                name = format!("{base}-{i}");
+            while !taken.insert(name.to_lowercase()) {
+                let n = next.entry(base.to_lowercase()).or_insert(1);
+                *n += 1;
+                name = format!("{base}-{n}");
             }
             name
         })
