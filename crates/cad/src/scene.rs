@@ -182,7 +182,7 @@ const MAX_POINTS: usize = 4_000_000;
 fn polygons(bp: &BezPath) -> Vec<Vec<Point>> {
     // Far outside any drawing, a curve flattens to millions of points at this tolerance.
     let b = bp.control_box();
-    if !(b.x0.abs().max(b.x1.abs()).max(b.y0.abs()).max(b.y1.abs()) <= MAX_COORD) {
+    if !matches!(b.x0.abs().max(b.x1.abs()).max(b.y0.abs()).max(b.y1.abs()).partial_cmp(&MAX_COORD), Some(std::cmp::Ordering::Less | std::cmp::Ordering::Equal)) {
         return vec![];
     }
     let mut out: Vec<Vec<Point>> = vec![];
