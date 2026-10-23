@@ -614,11 +614,20 @@ fn outline_edges(arr: &Arrangement, shapes: &[Shape]) -> Vec<Shape> {
                     })
                     .collect();
                 ts.sort_by(f64::total_cmp);
-                let start_is_junction = ts.first().is_some_and(|&t| t < 1e-9);
+                // Junctions are compared where they are, not by parameter: a shape's own anchor and
+                // a crossing computed a hair from it are one junction, and one within `reach` of an
+                // end of the segment is that end. Else a sliver piece is left between them (#3870).
+                let at = |t: f64| kurbo::ParamCurve::eval(&c, t);
+                let start_is_junction = ts.first().is_some_and(|&t| at(t).distance(c.p0) <= reach);
                 let mut cuts: Vec<f64> = vec![0.0];
-                cuts.extend(ts.into_iter().filter(|&t| t > 1e-9 && t < 1.0 - 1e-9));
+                for t in ts {
+                    let p = at(t);
+                    let last = at(cuts.last().copied().unwrap_or(0.0));
+                    if p.distance(last) > reach && p.distance(c.p3) > reach {
+                        cuts.push(t);
+                    }
+                }
                 cuts.push(1.0);
-                cuts.dedup_by(|a, b| (*a - *b).abs() < 1e-9);
                 for (k, w) in cuts.windows(2).enumerate() {
                     let sub = c.subsegment(w[0]..w[1]);
                     let seg = if line { Seg::line(sub.p0, sub.p3) } else { Seg { c: sub, line: false } };

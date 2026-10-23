@@ -219,6 +219,17 @@ fn pf_outline_edges() {
     assert!(close(len, 80.0, 1e-9));
 }
 
+/// #3870: a circle whose anchors sit on the square's edge it crosses gives the four edges of the
+/// arrangement, meeting at those anchors, and no sliver between an anchor and the crossing
+/// computed a hair from it.
+#[test]
+fn pf_outline_has_no_sliver_where_an_anchor_is_the_crossing() {
+    let s = vec![shape(rect(0.0, 0.0, 100.0, 100.0), 1), shape(circle(100.0, 100.0, 50.0), 2)];
+    let r = pathfinder(PathfinderOp::Outline, &s);
+    assert_eq!(r.len(), 4, "{r:?}");
+    assert!(r.iter().all(|s| s.path.length() > 1.0), "no sliver: {r:?}");
+}
+
 #[test]
 fn pf_outline_dedups_shared_edges() {
     // Two squares sharing an edge exactly.
