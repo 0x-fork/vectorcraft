@@ -1627,6 +1627,12 @@ pub struct TextObject {
     /// Per-paragraph attributes (see the type's docs); empty = every paragraph uses `para`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub paras: Vec<ParaStyle>,
+    /// Threaded text: the first paragraph continues from the frame before this one in its thread,
+    /// so its first line here has no first-line indent and no list marker. The engine sets it for
+    /// every frame of a thread when the story flows through them and when a file opens, and clears
+    /// it on a frame that leaves its thread and on a copy. Not saved.
+    #[serde(skip)]
+    pub first_para_continues: bool,
     /// Area Type Options (area type only).
     #[serde(default, skip_serializing_if = "crate::skip::is_default")]
     pub area: AreaOptions,
@@ -1759,6 +1765,7 @@ impl TextObject {
             ruby: Vec::new(),
             para: ParaStyle::default(),
             paras: Vec::new(),
+            first_para_continues: false,
             area: AreaOptions::default(),
             path_effect: PathEffect::default(),
             path_align: PathAlign::default(),
