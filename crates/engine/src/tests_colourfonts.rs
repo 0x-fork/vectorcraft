@@ -236,3 +236,31 @@ fn an_envelope_shares_and_expands_the_emoji_of_its_type() {
     assert!(images.iter().all(|im| im.pixels.is_none() && d.images.contains_key(&im.key)), "the document holds them");
     vectorcraft_testkit::invariants::check_document(d).unwrap();
 }
+
+/// An image in an SVG glyph's document draws on the canvas, and Create Outlines takes its pixels
+/// into the document.
+#[test]
+fn svg_glyph_images_draw_and_outline() {
+    let g = source_sans_gid(SVG_CHAR).unwrap();
+    let png = vectorcraft_text::test_fonts::solid_png(4, [0, 0, 255, 255]);
+    let doc = format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><image id="glyph{g}" y="-700" width="500" height="700" xlink:href="data:image/png;base64,{}"/></svg>"##,
+        vectorcraft_svg::base64_encode(&png)
+    );
+    let mut s = with_svg_type("Svgtest Images", &doc);
+    let opts = vectorcraft_render::RenderOptions { background: Some([255, 255, 255, 255]), ..Default::default() };
+    let img = vectorcraft_render::Renderer::new().render(&s.doc().unwrap().doc, 100, 100, vectorcraft_geom::Affine::IDENTITY, &opts);
+    // At 32 pt from x 10 on the baseline at y 50: 16 pt wide, 22.4 pt tall.
+    assert_eq!(img.pixel(18, 40), [0, 0, 255, 255], "the glyph's image");
+    let r = ids(&s.execute("type.createOutlines", &json!({})).unwrap());
+    let mut images = vec![];
+    node(&s, r[0]).walk(&mut |n| {
+        if let NodeKind::Image(im) = &n.kind {
+            images.push((**im).clone());
+        }
+    });
+    let d = &s.doc().unwrap().doc;
+    assert_eq!(images.len(), 1);
+    assert!(images[0].pixels.is_none() && d.images[&images[0].key].bytes.as_slice() == png.as_slice(), "the document holds its pixels");
+    vectorcraft_testkit::invariants::check_document(d).unwrap();
+}

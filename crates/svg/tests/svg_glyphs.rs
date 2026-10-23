@@ -75,14 +75,13 @@ fn a_view_box_is_the_em_square() {
     }
 }
 
-/// Text (which would lay type out inside type), images, embedded content and scripts are left out
-/// of a glyph, as the OpenType `SVG ` table asks.
+/// Text (which would lay type out inside type), embedded content and scripts are left out of a
+/// glyph, as the OpenType `SVG ` table asks.
 #[test]
-fn text_images_and_scripts_are_left_out() {
+fn text_and_scripts_are_left_out() {
     let doc = r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="glyph1">
       <path fill="#f00" d="M0 0h500v-500z"/>
       <text font-family="Svgtest Glyphs" font-size="500">E<tspan>F</tspan></text>
-      <image width="10" height="10" xlink:href="data:image/png;base64,iVBORw0KGgo="/>
       <script>alert(1)</script>
     </g></svg>"##;
     let art = art(doc, 1).unwrap();
@@ -90,7 +89,7 @@ fn text_images_and_scripts_are_left_out() {
     art.walk(&mut |n| kinds.push(n.kind_label()));
     assert!(art.children().is_some_and(|c| !c.is_empty()), "the path stays");
     let mut other = false;
-    art.walk(&mut |n| other |= matches!(n.kind, NodeKind::Text(_) | NodeKind::Image(_)));
+    art.walk(&mut |n| other |= matches!(n.kind, NodeKind::Text(_)));
     assert!(!other, "{kinds:?}");
 }
 
@@ -184,4 +183,31 @@ fn a_nested_glyph_keeps_the_namespaces_its_parents_declare() {
         <g id="glyph3"><use fill="#f00" l:href="#a"/></g></g>
     </svg>"##;
     assert!(art(doc, 3).is_some_and(|a| fills(&a).contains(&Paint::solid(Color::rgb8(255, 0, 0)))));
+}
+
+/// An image in a glyph's document is in its art, holding its pixels (the art has no document to
+/// keep them in), named by their content; one whose pixels don't read is left out.
+#[test]
+fn images_are_in_the_art_with_their_pixels() {
+    let png = vectorcraft_text::test_fonts::solid_png(4, [0, 0, 255, 255]);
+    let doc = format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="glyph1">
+      <image x="0" y="-500" width="500" height="500" xlink:href="data:image/png;base64,{}"/>
+      <image width="10" height="10" xlink:href="missing.png"/>
+    </g></svg>"##,
+        vectorcraft_svg::base64_encode(&png)
+    );
+    let art = art(&doc, 1).unwrap();
+    let mut images = vec![];
+    art.walk(&mut |n| {
+        if let NodeKind::Image(im) = &n.kind {
+            images.push((**im).clone());
+        }
+    });
+    assert_eq!(images.len(), 1, "the one that reads");
+    let pixels = images[0].pixels.as_ref().expect("its own pixels");
+    assert_eq!(pixels.bytes.as_slice(), png.as_slice());
+    assert_eq!(images[0].key, pixels.content_key());
+    let b = art.geometric_bounds().unwrap();
+    assert!(b.x0.abs() < 1e-6 && (b.width() - 500.0).abs() < 1e-6 && (b.y0 + 500.0).abs() < 1e-6, "in font units: {b:?}");
 }
