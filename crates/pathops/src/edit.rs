@@ -254,7 +254,17 @@ fn rdp(pts: &[Point], tol: f64) -> Vec<Point> {
     keep[0] = true;
     keep[pts.len() - 1] = true;
     let mut stack = vec![(0, pts.len() - 1)];
+    // Distances measured at most: lopsided splits (a shallow zigzag) make it quadratic. Past it,
+    // the points of the parts left are kept as they are.
+    let mut budget = pts.len().saturating_mul(64).saturating_add(1 << 20);
     while let Some((a, b)) = stack.pop() {
+        budget = match budget.checked_sub(b - a) {
+            Some(left) => left,
+            None => {
+                keep[a..=b].fill(true);
+                continue;
+            }
+        };
         let (pa, pb) = (pts[a], pts[b]);
         let chord = pb - pa;
         let len = chord.hypot();
@@ -318,6 +328,23 @@ pub fn remove_redundant_points(path: &PathData, tolerance: f64) -> PathData {
         // Drop zero-length segments.
         segs.retain(|s| !(s.c.p0.distance(s.c.p3) < 1e-9 && s.c.p1.distance(s.c.p0) < 1e-9 && s.c.p2.distance(s.c.p0) < 1e-9));
         let min_segs = if sp.closed { 2 } else { 1 };
+        // Joints are merged along the path in one pass (a merged segment is tried with the one
+        // before it, then the next); the search below then only finds what a closed path's wrap
+        // leaves. (Merging at the first joint of a dense line one at a time shifts the rest each time.)
+        let total = segs.len();
+        let mut merged = 0;
+        let mut done: Vec<Seg> = Vec::with_capacity(total);
+        for s in segs.drain(..) {
+            done.push(s);
+            while done.len() >= 2 && total - merged > min_segs {
+                let n = done.len();
+                let Some(m) = merge_pair(&done[n - 2], &done[n - 1], tol) else { break };
+                done.truncate(n - 1);
+                done[n - 2] = m;
+                merged += 1;
+            }
+        }
+        segs = done;
         let mut changed = true;
         while changed && segs.len() > min_segs {
             changed = false;
@@ -521,9 +548,12 @@ pub fn join(paths: &[PathData], tolerance: f64) -> PathData {
         return PathData::new(closed);
     }
     while open.len() > 1 {
-        // Find the closest pair of endpoints on different subpaths.
+        // Find the closest pair of endpoints on different subpaths. Past this many subpaths every
+        // pair at every merge is too much (cubic): the first one is joined to its nearest.
+        const SEARCH_ALL: usize = 200;
+        let first_only = open.len() > SEARCH_ALL;
         let mut best = (f64::INFINITY, 0, 0, false, false);
-        for i in 0..open.len() {
+        for i in 0..if first_only { 1 } else { open.len() } {
             for j in (i + 1)..open.len() {
                 for ei in [false, true] {
                     for ej in [false, true] {
