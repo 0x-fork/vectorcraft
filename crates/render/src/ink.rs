@@ -121,12 +121,12 @@ impl Renderer {
 /// The inks of `c` in the working CMYK space: CMYK as it is, grey as black ink, RGB and Lab
 /// separated with the colour settings' intent (cached: separating searches the profile).
 fn inks(c: &Color) -> [f32; 4] {
-    let key = match *c {
+    match *c {
         Color::Cmyk { c, m, y, k } => return [c, m, y, k],
         Color::Gray { k } => return [0.0, 0.0, 0.0, k],
-        Color::Rgb { r, g, b } => [0, r.to_bits(), g.to_bits(), b.to_bits()],
-        Color::Lab { l, a, b } => [1, l.to_bits(), a.to_bits(), b.to_bits()],
-    };
+        Color::Rgb { .. } | Color::Lab { .. } => {}
+    }
+    let key = c.key();
     let cms = cms::active();
     SEPARATED.with(|s| {
         let (owner, seen) = &mut *s.borrow_mut();
@@ -141,7 +141,7 @@ fn inks(c: &Color) -> [f32; 4] {
 }
 
 /// Separated colours, for the colour settings they were separated with.
-type Separated = (Option<Arc<Cms>>, HashMap<[u32; 4], [f32; 4]>);
+type Separated = (Option<Arc<Cms>>, HashMap<[u32; 5], [f32; 4]>);
 
 thread_local! {
     static SEPARATED: RefCell<Separated> = RefCell::default();

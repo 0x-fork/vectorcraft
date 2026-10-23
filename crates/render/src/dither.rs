@@ -20,7 +20,6 @@ use vectorcraft_geom::{Affine, Rect};
 use vello_cpu::peniko::{Extend, ImageQuality, ImageSampler};
 use vello_cpu::{Pixmap, RenderContext};
 
-use crate::freeform::hash_color;
 use crate::ink::Ink;
 use crate::lru::{self, FrameCache};
 
@@ -60,7 +59,7 @@ fn key(g: &GradientPaint, b: Rect, cols: u16, rows: u16, win: &[Range<u16>; 2], 
     (gr.kind as u8, gr.dither, gr.method as u8).hash(&mut h);
     for s in &gr.stops {
         (s.offset.to_bits(), s.opacity.to_bits(), s.midpoint.to_bits()).hash(&mut h);
-        hash_color(&s.color, &mut h);
+        s.color.key().hash(&mut h);
     }
     let geom = g.resolve(b);
     (geom.start.x.to_bits(), geom.start.y.to_bits(), geom.end.x.to_bits(), geom.end.y.to_bits(), geom.aspect.to_bits()).hash(&mut h);
