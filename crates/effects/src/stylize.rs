@@ -189,7 +189,7 @@ pub fn scribble(path: &PathData, b: Rect, p: &Value) -> PathData {
     // would never move it.
     while row <= 2001 {
         let y = y0 + step / 2.0 + row as f64 * step;
-        if !(y < y1) {
+        if y.partial_cmp(&y1) != Some(std::cmp::Ordering::Less) {
             break;
         }
         let mut xs: Vec<f64> = vec![];
