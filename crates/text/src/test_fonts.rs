@@ -658,10 +658,37 @@ pub fn colr_font(v1: bool) -> Option<Vec<u8>> {
 
 /// The bundled Source Sans 3 Regular as `family` with `colr` and [`colr_font`]'s palette.
 pub fn colr_font_with(family: &str, colr: &write_fonts::tables::colr::Colr) -> Option<Vec<u8>> {
-    use write_fonts::tables::cpal::{ColorRecord, Cpal};
-    let font = skrifa::FontRef::new(SOURCE_SANS).ok()?;
+    with_colr(SOURCE_SANS, family_names(family, &[])?, colr)
+}
+
+/// The family of [`colr_variable_font`].
+pub const COLR_VARIABLE_FAMILY: &str = "Colrtest Variable";
+
+/// [`variable_font`] as family [`COLR_VARIABLE_FAMILY`], with a `COLR` (v0) table in which
+/// [`COLOUR_CHAR`] is the outline of `l` (one of [`VARIABLE_CHARS`]) in red, so its layer widens
+/// with the weight. `None` when it can't be built.
+pub fn colr_variable_font() -> Option<Vec<u8>> {
+    use write_fonts::tables::colr::{BaseGlyph, Colr, Layer};
+    use write_fonts::types::GlyphId16;
+    let [base, l] = source_sans_gids([COLOUR_CHAR, 'l'])?;
+    let colr = Colr::new(1, Some(vec![BaseGlyph::new(GlyphId16::new(base), 0, 1)]), Some(vec![Layer::new(GlyphId16::new(l), 0)]), 1);
+    let axis_names = [(256, "Weight"), (257, "Normal"), (258, "SemiBold"), (259, "Bold")];
+    with_colr(&variable_font()?, family_names(COLR_VARIABLE_FAMILY, &axis_names)?, &colr)
+}
+
+/// A `name` table for Regular of `family`, with `more` records.
+fn family_names(family: &str, more: &[(u16, &str)]) -> Option<Vec<u8>> {
     let ps = family.replace(' ', "");
-    let name = name_table(&[(1, family), (2, "Regular"), (4, &format!("{family} Regular")), (6, &format!("{ps}-Regular"))])?;
+    let (full, postscript) = (format!("{family} Regular"), format!("{ps}-Regular"));
+    let mut records = vec![(1, family), (2, "Regular"), (4, full.as_str()), (6, postscript.as_str())];
+    records.extend_from_slice(more);
+    name_table(&records)
+}
+
+/// Font `base` with the `name` table `name`, `colr` and [`colr_font`]'s palette.
+fn with_colr(base: &[u8], name: Vec<u8>, colr: &write_fonts::tables::colr::Colr) -> Option<Vec<u8>> {
+    use write_fonts::tables::cpal::{ColorRecord, Cpal};
+    let font = skrifa::FontRef::new(base).ok()?;
     let records = [COLR_RED, COLR_BLUE, COLR_GREEN].map(|[r, g, b, a]| ColorRecord::new(b, g, r, a)).to_vec();
     let cpal = Cpal::new(3, 1, 3, Some(records), vec![0]);
     let mut builder = FontBuilder::new();

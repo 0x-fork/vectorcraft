@@ -151,3 +151,20 @@ fn expand_appearance_keeps_the_colour_glyphs_of_type_with_effects() {
     assert!(gradients > 0, "the colour glyph's gradient layers");
     vectorcraft_testkit::invariants::check_document(&s.doc().unwrap().doc).unwrap();
 }
+
+/// The canvas draws an SVG glyph as its art: its own colours, and the type's fill where it uses
+/// `currentColor`.
+#[test]
+fn the_canvas_draws_svg_glyphs_as_their_art() {
+    let g = source_sans_gid(SVG_CHAR).unwrap();
+    // The left half of a 500 by 700 box red, the right half in the text's colour.
+    let doc = format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg"><g id="glyph{g}"><path fill="#f00" d="M0 0h250v-700h-250z"/><path fill="currentColor" d="M250 0h250v-700h-250z"/></g></svg>"##
+    );
+    let s = with_svg_type("Svgtest Canvas", &doc);
+    let opts = vectorcraft_render::RenderOptions { background: Some([255, 255, 255, 255]), ..Default::default() };
+    let img = vectorcraft_render::Renderer::new().render(&s.doc().unwrap().doc, 100, 100, vectorcraft_geom::Affine::IDENTITY, &opts);
+    // At 32 pt from x 10 on the baseline at y 50: 16 pt wide, 22.4 pt tall.
+    assert_eq!(img.pixel(14, 40), [255, 0, 0, 255], "its own red");
+    assert_eq!(img.pixel(22, 40), [0, 0, 0, 255], "the type's black fill");
+}
