@@ -392,6 +392,10 @@ impl ToolContext<'_> {
     pub fn size_label(&self, w: f64, h: f64) -> String {
         format!("W: {}\nH: {}", self.len(w), self.len(h))
     }
+    /// Star tool drag: outer (R1) and inner (R2) radii from the centre to the pointer.
+    pub fn star_radii_label(&self, outer: f64, inner: f64) -> String {
+        format!("R1: {}\nR2: {}", self.len(outer), self.len(inner))
+    }
     /// A move label: `dX: …` over `dY: …`.
     pub fn offset_label(&self, dx: f64, dy: f64) -> String {
         format!("dX: {}\ndY: {}", self.len(dx), self.len(dy))

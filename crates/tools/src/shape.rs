@@ -308,15 +308,24 @@ impl Tool for ShapeTool {
                 cx.segment_measure_label(s, self.last)
             } else {
                 // A box's size as drawn (from its centre with Alt, square with Shift).
-                let (w, h) = match self.id {
-                    "polygon" | "star" => ((self.last - s).x.abs(), (self.last - s).y.abs()),
-                    _ => {
-                        // Along the Constrain Angle's axes, as the box is drawn (`command_at`).
-                        let (r, _) = turned_box(s, self.last, self.mods, cx.constrain_angle);
-                        (r.width(), r.height())
+                match self.id {
+                    "star" => {
+                        let outer = (self.last - s).hypot().max(0.01);
+                        let ratio = if self.mods.alt { straight_ratio(self.points).unwrap_or(self.star_ratio) } else { self.star_ratio };
+                        let inner = self.inner.unwrap_or(outer * ratio);
+                        cx.star_radii_label(outer, inner)
                     }
-                };
-                cx.size_label(w, h)
+                    _ => {
+                        let (w, h) = match self.id {
+                            "polygon" => ((self.last - s).x.abs(), (self.last - s).y.abs()),
+                            _ => {
+                                let (r, _) = turned_box(s, self.last, self.mods, cx.constrain_angle);
+                                (r.width(), r.height())
+                            }
+                        };
+                        cx.size_label(w, h)
+                    }
+                }
             };
             o.push(Overlay::Measure { p, text });
         }
@@ -394,6 +403,28 @@ mod tests {
         t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 80.0, 50.0));
         let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 90.0, 60.0).with_mods(space));
         assert!(matches!(a.last(), Some(Action::Preview(_, v)) if v["cx"] == 60.0 && v["cy"] == 60.0), "{a:?}");
+    }
+
+    #[test]
+    fn star_drag_measure_label_shows_outer_and_inner_radii() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = ToolContext { measurement_labels: true, smart_guides: false, ..cx(&d, &s, &p) };
+        let mut t = ShapeTool::new("star");
+        t.star_ratio = 0.5;
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 10.0, 10.0));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 50.0, 10.0));
+        let want = cx.star_radii_label(40.0, 20.0);
+        let label = t
+            .overlays(&cx)
+            .into_iter()
+            .find_map(|o| match o {
+                Overlay::Measure { text, .. } => Some(text),
+                _ => None,
+            })
+            .unwrap_or_default();
+        assert_eq!(label, want, "{label}");
     }
 
     /// During a star drag, Ctrl/Cmd keeps the inner radius while the outer one follows the pointer
