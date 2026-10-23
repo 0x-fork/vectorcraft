@@ -154,7 +154,10 @@ pub(crate) fn warnings(set: &PdfSettings) -> Vec<String> {
         out.push(format!("{} encryption covers the metadata too: plaintext metadata needs PDF 1.5 or later", set.compatibility.label()));
     }
     if s.protected() && set.compatibility == Compatibility::Pdf13 {
-        out.push(format!("{} encrypts with a 40-bit key, which can be searched in minutes: choose PDF 1.6 or later for stronger protection", set.compatibility.label()));
+        out.push(format!(
+            "{} encrypts with a 40-bit key, which can be searched in minutes: choose PDF 1.6 or later for stronger protection",
+            set.compatibility.label()
+        ));
     }
     out
 }
