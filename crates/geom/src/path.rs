@@ -561,8 +561,25 @@ impl PathData {
     }
     /// Total length of all segments.
     pub fn length(&self) -> f64 {
-        self.to_bezpath().segments().map(|s| kurbo::ParamCurveArclen::arclen(&s, 1e-6)).sum()
+        self.to_bezpath().segments().map(|s| measured_arclen(&s, 1e-6)).sum()
     }
+}
+
+/// The largest x or y, in size, of a segment's control points for which its length is measured.
+/// Document coordinates are far inside it; past it (or not finite) the integrator's arithmetic
+/// overflows and it subdivides without end.
+const MEASURE_LIMIT: f64 = 1e9;
+
+/// The length of `seg` to `accuracy`; 0 for a segment whose control points are not finite or past
+/// [`MEASURE_LIMIT`].
+pub(crate) fn measured_arclen(seg: &PathSeg, accuracy: f64) -> f64 {
+    let ok = |p: Point| p.x.is_finite() && p.y.is_finite() && p.x.abs() <= MEASURE_LIMIT && p.y.abs() <= MEASURE_LIMIT;
+    let fits = match seg {
+        PathSeg::Line(l) => ok(l.p0) && ok(l.p1),
+        PathSeg::Quad(q) => ok(q.p0) && ok(q.p1) && ok(q.p2),
+        PathSeg::Cubic(c) => ok(c.p0) && ok(c.p1) && ok(c.p2) && ok(c.p3),
+    };
+    if fits { kurbo::ParamCurveArclen::arclen(seg, accuracy) } else { 0.0 }
 }
 
 /// The largest x or y, in size, of a segment's control points for which [`segment_bounds`]

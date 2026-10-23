@@ -388,7 +388,8 @@ fn subdivide(sp: &mut SubPath, prm: &LiquifyParams, c: Point, spacing: f64) {
             continue;
         }
         let len = cub.arclen(1e-3);
-        let k = (len / spacing).ceil() as usize;
+        // (No more pieces than the anchors left under the ceiling.)
+        let k = ((len / spacing).ceil() as usize).min(MAX_ANCHORS.saturating_sub(sp.anchors.len()) + 1);
         if k <= 1 {
             seg += 1;
             continue;
