@@ -621,6 +621,8 @@ pub(crate) struct Exporter<'a> {
     /// Inline graphics being drawn inside inline graphics (text in a symbol shown inline in
     /// text…): deeper ones are left out.
     inline_depth: u32,
+    /// Tiling patterns being drawn inside tiling patterns ([`Self::tiling`]).
+    pattern_depth: u32,
     /// Keys of the images left out because the writer couldn't decode them
     /// ([`leaving_out_undecodable`]).
     pub left_out: HashSet<String>,
@@ -628,6 +630,9 @@ pub(crate) struct Exporter<'a> {
 
 /// How deep inline graphics nest before they are left out.
 const MAX_INLINE_DEPTH: u32 = 4;
+
+/// How deep tiling patterns nest: deeper pattern fills are written as their tiles.
+const MAX_PATTERN_DEPTH: u32 = 4;
 
 /// The warning for an image left out because it can't be decoded: the note raster exports give
 /// (`vectorcraft-engine`'s `rasterfx::undecoded_warning`).
@@ -664,6 +669,7 @@ impl<'a> Exporter<'a> {
             overprinted: false,
             invisible: false,
             inline_depth: 0,
+            pattern_depth: 0,
             left_out: HashSet::new(),
         }
     }
@@ -1304,9 +1310,9 @@ impl Exporter<'_> {
 
     /// Paint the area `clip` (filled by `rule`; bounds `area`) with `p` at `transparency` (opacity,
     /// blend mode) when it is an [area paint](Self::area_paint) of a fill (`fill`) or a stroke: a
-    /// pattern's tile instances covering it, or an image of a gradient drawn as pixels placed on
-    /// `bounds` (the painted object's box, as on the canvas), clipped to it. False (nothing drawn)
-    /// for other paints.
+    /// pattern's [tiling pattern](Self::tiling) (else its tile instances covering it), or an image
+    /// of a gradient drawn as pixels placed on `bounds` (the painted object's box, as on the
+    /// canvas), clipped to it. False (nothing drawn) for other paints.
     #[allow(clippy::too_many_arguments)]
     fn area(
         &mut self,
@@ -1323,31 +1329,82 @@ impl Exporter<'_> {
             return false;
         }
         let (opacity, mode) = transparency;
+        let tiling = match p {
+            Paint::Pattern { pattern, xf } => self.tiling(s, pattern, *xf),
+            _ => None,
+        };
         let mut pushes = 0;
         if mode != BlendMode::Normal {
             s.push_blend_mode(blend(mode));
             pushes += 1;
         }
-        s.push_clip_path(clip, &rule);
-        pushes += 1;
-        if opacity < 1.0 {
-            s.push_opacity(norm(opacity));
+        if let Some(paint) = tiling {
+            s.set_stroke(None);
+            s.set_fill(Some(Fill { paint, opacity: norm(opacity), rule }));
+            s.draw_path(clip);
+            s.set_fill(None);
+        } else {
+            s.push_clip_path(clip, &rule);
             pushes += 1;
-        }
-        let doc = self.doc;
-        match p {
-            Paint::Pattern { pattern, xf } => {
-                for inst in doc.pattern(pattern).map(|def| def.instances_in(*xf, area)).unwrap_or_default() {
-                    self.node(s, &inst, area, true);
-                }
+            if opacity < 1.0 {
+                s.push_opacity(norm(opacity));
+                pushes += 1;
             }
-            Paint::Gradient(g) => self.field_image(s, g, bounds, area, fill),
-            _ => {}
+            let doc = self.doc;
+            match p {
+                Paint::Pattern { pattern, xf } => {
+                    if let Some(def) = doc.pattern(pattern) {
+                        self.warn("pattern fills nested more than 4 patterns deep, or with tiles too large for PDF, are written as their tiles");
+                        for inst in def.instances_in(*xf, area) {
+                            self.node(s, &inst, area, true);
+                        }
+                    }
+                }
+                Paint::Gradient(g) => self.field_image(s, g, bounds, area, fill),
+                _ => {}
+            }
         }
         for _ in 0..pushes {
             s.pop();
         }
         true
+    }
+
+    /// Pattern swatch `name` placed by `at` (pattern space → the current space) as a PDF tiling
+    /// pattern (ISO 32000-1, 8.7.3.1): one period of the tiling ([`vectorcraft_doc::PatternDef::period`],
+    /// what the canvas repeats too) with every tile instance reaching into it, in paint order, so
+    /// brick and hex tilings and overlapping tiles repeat as they are; clipped to the period when
+    /// art reaches out of it. `None` for a pattern nested deeper than [`MAX_PATTERN_DEPTH`], a period
+    /// or placement beyond [`MAX_COORD`] or a placement that flattens the tiles.
+    fn tiling(&mut self, s: &mut Surface, name: &str, at: Affine) -> Option<krilla::paint::Paint> {
+        let doc = self.doc;
+        let def = doc.pattern(name)?;
+        let (pw, ph) = def.period();
+        if self.pattern_depth >= MAX_PATTERN_DEPTH || !in_range(&[pw, ph]) || !in_range(&at.as_coeffs()) || at.determinant().abs() <= 1e-12 {
+            return None;
+        }
+        let cell = Rect::new(0.0, 0.0, pw, ph);
+        let tiles = def.instances_in(Affine::IDENTITY, cell);
+        let mut sb = s.stream_builder();
+        let mut cs = sb.surface();
+        let reaches_out = tiles.iter().any(|t| t.visual_bounds().is_some_and(|b| cell.intersect(b) != b));
+        let clip = reaches_out.then(|| to_path(&cs, &cell.to_path(0.1))).flatten();
+        if let Some(c) = &clip {
+            cs.push_clip_path(c, &krilla::paint::FillRule::NonZero);
+        }
+        // Pattern art is a picture of its own: it takes no part in a knockout group around the object.
+        let knockout = std::mem::take(&mut self.knockout);
+        self.pattern_depth += 1;
+        for t in &tiles {
+            self.node(&mut cs, t, cell, true);
+        }
+        self.pattern_depth -= 1;
+        self.knockout = knockout;
+        if clip.is_some() {
+            cs.pop();
+        }
+        cs.finish();
+        Some(krilla::paint::Pattern { stream: sb.finish(), transform: xf(at), width: pw as f32, height: ph as f32 }.into())
     }
 
     /// Draw gradient `g`, placed on `bounds`, as an image over `area`, sampled at the document's
