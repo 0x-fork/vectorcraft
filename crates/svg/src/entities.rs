@@ -33,7 +33,9 @@ fn declared(svg: &str) -> HashMap<&str, &str> {
 fn references(text: &str) -> impl Iterator<Item = &str> {
     text.match_indices('&').filter_map(|(at, _)| {
         let rest = text.get(at + 1..)?;
-        let name = rest.get(..rest.find(';')?)?;
+        // Look no further than the longest name: a file of `&`s without `;` would be read quadratically.
+        let end = rest.bytes().take(257).position(|b| b == b';')?;
+        let name = rest.get(..end)?;
         (!name.is_empty() && name.len() <= 256 && !name.starts_with('#') && !name.contains(char::is_whitespace)).then_some(name)
     })
 }
@@ -88,5 +90,10 @@ mod tests {
         let ns = "<!DOCTYPE svg [<!ENTITY ns_svg \"http://www.w3.org/2000/svg\">]><svg xmlns=\"&ns_svg;\"/>";
         assert!(!expansion_too_large(ns));
         assert!(!expansion_too_large("<svg a=\"&amp;&#10;\"/>"));
+        // Many `&`s with no `;` after them are read in linear time.
+        let ampersands = format!("<!DOCTYPE svg [<!ENTITY a \"x\">]><svg id=\"{}\"/>", "&".repeat(1 << 20));
+        let start = std::time::Instant::now();
+        assert!(!expansion_too_large(&ampersands));
+        assert!(start.elapsed() < std::time::Duration::from_secs(5), "{:?}", start.elapsed());
     }
 }
