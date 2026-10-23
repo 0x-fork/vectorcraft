@@ -38,7 +38,7 @@ pub fn export(doc: &Document, opts: &PdfOptions) -> Result<Vec<u8>, PdfError> {
 /// Like [`export`], also returning warnings: options accepted but not applied yet (see
 /// [`crate::PdfSettings::warnings`]) and features approximated or dropped.
 pub fn export_with_report(doc: &Document, opts: &PdfOptions) -> Result<ExportReport, PdfError> {
-    write::guard(|| leaving_out_undecodable(|left_out| export_with_report_inner(doc, opts, left_out)))
+    write::guard(|| leaving_out_undecodable(doc, |left_out| export_with_report_inner(doc, opts, left_out)))
 }
 
 /// Run `write` (a whole PDF written by a [`Writer`]), and run it again each time it fails on an
@@ -46,12 +46,21 @@ pub fn export_with_report(doc: &Document, opts: &PdfOptions) -> Result<ExportRep
 /// adds the image's key to the set `write` is given, and the exporters leave out the images it
 /// holds. The writer reports such an image (a PNG, GIF or WebP kept as it is, whose header reads)
 /// only when it finishes the file. Each repeated run leaves out at least one more image.
-pub(crate) fn leaving_out_undecodable<T>(mut write: impl FnMut(&mut HashSet<String>) -> Result<T, PdfError>) -> Result<T, PdfError> {
+pub(crate) fn leaving_out_undecodable<T>(doc: &Document, mut write: impl FnMut(&mut HashSet<String>) -> Result<T, PdfError>) -> Result<T, PdfError> {
+    // The most runs repeated: each is a whole export, and a document of many images that don't
+    // decode would make them quadratic. Past it, one last run leaves out every image of `doc`, so
+    // the export still finishes (the images left out are reported).
+    const MAX_RETRIES: usize = 16;
     let mut left_out = HashSet::new();
+    let mut retries = 0;
     loop {
         let known = left_out.len();
         match write(&mut left_out) {
-            Err(_) if left_out.len() > known => {}
+            Err(_) if left_out.len() > known && retries < MAX_RETRIES => retries += 1,
+            Err(_) if left_out.len() > known && retries == MAX_RETRIES => {
+                left_out.extend(doc.images.keys().cloned());
+                retries += 1;
+            }
             done => return done,
         }
     }
