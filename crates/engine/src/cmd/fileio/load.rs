@@ -454,6 +454,11 @@ fn open_loaded(s: &mut Session, loaded: Loaded, links: Resolved, path: Option<St
     let st = s.doc_mut()?;
     if saves_back {
         st.format = format.id;
+        // An SVG that reopened as the full document saves as one again: Save keeps Preserve
+        // Editing, as it would after a save of this session (#3867).
+        if restored && matches!(format.id, "svg" | "svgz") {
+            st.save_options.insert("preserveEditing".into(), json!(true));
+        }
     }
     st.converted = converted;
     st.imported_from = source_path;
