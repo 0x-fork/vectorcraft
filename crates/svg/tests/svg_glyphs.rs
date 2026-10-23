@@ -211,3 +211,22 @@ fn images_are_in_the_art_with_their_pixels() {
     let b = art.geometric_bounds().unwrap();
     assert!(b.x0.abs() < 1e-6 && (b.width() - 500.0).abs() < 1e-6 && (b.y0 + 500.0).abs() < 1e-6, "in font units: {b:?}");
 }
+
+/// An image whose data is an SVG document is left out, as the `SVG ` table asks: a glyph draws no
+/// documents inside it.
+#[test]
+fn svg_images_are_left_out() {
+    let inner = r##"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#f00"/></svg>"##;
+    let doc = format!(
+        r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="glyph1">
+      <path fill="#00f" d="M0 0h500v-500z"/>
+      <image width="500" height="500" xlink:href="data:image/svg+xml;base64,{}"/>
+      <image width="500" height="500" href=" DATA:image/SVG+xml;utf8,{}"/>
+    </g></svg>"##,
+        vectorcraft_svg::base64_encode(inner.as_bytes()),
+        vectorcraft_svg::xml_escape(&inner.replace('#', "%23"))
+    );
+    let fills = fills(&art(&doc, 1).unwrap());
+    assert!(fills.contains(&Paint::solid(Color::rgb8(0, 0, 255))), "the glyph's own art");
+    assert!(!fills.contains(&Paint::solid(Color::rgb8(255, 0, 0))), "not the images' documents: {fills:?}");
+}

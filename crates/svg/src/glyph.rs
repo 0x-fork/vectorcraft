@@ -17,7 +17,7 @@ use crate::ImportOptions;
 const MAX_SVG_GLYPH_BYTES: u64 = 1 << 20;
 
 /// Elements left out of a glyph, as the `SVG ` table rules them out: text (type inside type),
-/// embedded content and scripts.
+/// embedded content and scripts (and images of SVG documents, in [`glyph`]).
 const LEFT_OUT: [&str; 3] = ["text", "foreignObject", "script"];
 
 /// Glyph `gid`'s art from its SVG `document` (possibly gzipped), in a font of `upem` units per em:
@@ -98,7 +98,14 @@ fn glyph(svg: &str, id: &str, color: &str) -> Option<Glyph> {
     let at = target.range();
     // Edits: byte ranges to cut and what to put in their place, in order.
     let mut edits: Vec<(Range<usize>, String)> = vec![];
-    for n in root.descendants().filter(|n| n.is_element() && LEFT_OUT.contains(&n.tag_name().name())) {
+    // Cut with the left-out elements: images of SVG documents, as the table asks (a glyph draws no
+    // documents inside it).
+    let svg_image = |n: &roxmltree::Node| {
+        n.tag_name().name() == "image"
+            && n.attributes()
+                .any(|a| a.name() == "href" && a.value().trim_start().get(..14).is_some_and(|v| v.eq_ignore_ascii_case("data:image/svg")))
+    };
+    for n in root.descendants().filter(|n| n.is_element() && (LEFT_OUT.contains(&n.tag_name().name()) || svg_image(n))) {
         edits.push((n.range(), String::new()));
     }
     for a in root.attributes().filter(|a| matches!(a.name(), "width" | "height" | "color")) {
