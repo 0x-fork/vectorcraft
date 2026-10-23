@@ -51,7 +51,8 @@ A request the app hasn't answered after **60 s** gets `{"ok": false, "error": "t
 app had not started it (it was busy, or its window wasn't being drawn), the request is withdrawn
 and never runs, and the error says "will not run": retrying is safe. If the app was already
 running it, the error says "still running": it may yet complete, so check the document before
-retrying.
+retrying. On macOS the app keeps itself out of App Nap while the control channel is on, so it keeps
+answering with its window hidden, minimized or covered, or with the screen locked.
 
 ## Confining file access
 
