@@ -320,7 +320,10 @@ pub fn full_bytes_cached(p: &PlacedDocument, blob: &ImageBlob) -> Option<Arc<Vec
         return Some(blob.bytes.clone());
     }
     let allowed = |path: &str| READ_CHECK.get().is_none_or(|ok| ok(path));
-    full().iter().rev().find(|(k, path, _)| *k == p.key && allowed(path)).map(|(_, _, b)| b.clone())
+    // Copy the candidates, newest first, so the filesystem checks run without the lock.
+    let candidates: Vec<(String, Arc<Vec<u8>>)> =
+        full().iter().rev().filter(|(k, _, _)| *k == p.key).map(|(_, path, b)| (path.clone(), b.clone())).collect();
+    candidates.into_iter().find(|(path, _)| allowed(path)).map(|(_, b)| b)
 }
 
 /// The file's bytes: stored, read again already, or read again now ([`set_file_reader`]). `None`

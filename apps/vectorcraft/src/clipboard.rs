@@ -144,7 +144,12 @@ fn copied_file(paths: Vec<PathBuf>, mimes: &[&'static str]) -> Option<Flavour> {
             _ => path,
         };
         // A paste sent by automation reads only what its roots allow.
-        vectorcraft_engine::file_access::check_read(&path.to_string_lossy()).ok()?;
+        match path.to_str() {
+            Some(p) => vectorcraft_engine::file_access::check_read(p).ok()?,
+            // A lossy name would check another file than the one opened.
+            None if vectorcraft_engine::file_access::current().is_none() => {}
+            None => return None,
+        }
         let mut head = Vec::with_capacity(FILE_HEAD);
         std::fs::File::open(&path).ok()?.take(FILE_HEAD as u64).read_to_end(&mut head).ok()?;
         let mime = file_flavour(&path.to_string_lossy(), &head, mimes)?;
