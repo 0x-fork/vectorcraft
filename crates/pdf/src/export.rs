@@ -1353,9 +1353,11 @@ impl Exporter<'_> {
             let doc = self.doc;
             match p {
                 Paint::Pattern { pattern, xf } => {
-                    self.warn("pattern fills nested more than 4 patterns deep, or with tiles too large for PDF, are written as their tiles");
-                    for inst in doc.pattern(pattern).map(|def| def.instances_in(*xf, area)).unwrap_or_default() {
-                        self.node(s, &inst, area, true);
+                    if let Some(def) = doc.pattern(pattern) {
+                        self.warn("pattern fills nested more than 4 patterns deep, or with tiles too large for PDF, are written as their tiles");
+                        for inst in def.instances_in(*xf, area) {
+                            self.node(s, &inst, area, true);
+                        }
                     }
                 }
                 Paint::Gradient(g) => self.field_image(s, g, bounds, area, fill),
