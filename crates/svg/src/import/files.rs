@@ -116,7 +116,7 @@ fn target(h: &str, folder: Option<&str>) -> (String, Option<String>) {
     });
     match craft_docpath::resolve(&stored, document.as_deref()) {
         Ok(path) => {
-            let file = path.is_absolute().then(|| path.to_string_lossy().into_owned());
+            let file = craft_docpath::resolve_absolute(&stored, document.as_deref()).ok().map(|p| p.to_string_lossy().into_owned());
             let as_written = !file_url && craft_docpath::resolve(&stored, None).as_ref() == Ok(&path);
             let link = if as_written { stored } else { path.to_string_lossy().into_owned() };
             (link, file)

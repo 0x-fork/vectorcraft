@@ -1184,7 +1184,7 @@ pub(crate) fn document_path_with(
 ) -> std::result::Result<String, craft_docpath::Refused> {
     use craft_docpath::Refused;
     let document = document.map(absolute_path);
-    let resolve = |document: Option<&str>| craft_docpath::resolve(stored, document.map(std::path::Path::new));
+    let resolve = |document: Option<&str>| craft_docpath::resolve_absolute(stored, document.map(std::path::Path::new));
     let path = match resolve(document.as_deref()) {
         Err(Refused::Network) => {
             let share = document.as_deref().and_then(share).ok_or(Refused::Network)?;
@@ -1192,9 +1192,6 @@ pub(crate) fn document_path_with(
         }
         path => path?,
     };
-    if !path.is_absolute() {
-        return Err(Refused::Invalid);
-    }
     path.into_os_string().into_string().map_err(|_| Refused::Invalid)
 }
 
