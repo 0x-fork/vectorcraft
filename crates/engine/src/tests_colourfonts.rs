@@ -60,6 +60,7 @@ fn with_svg_type(family: &str, document: &str) -> Session {
 /// session registers.
 #[test]
 fn create_outlines_turns_svg_glyphs_into_groups() {
+    let _fonts = crate::adding_fonts();
     let g = source_sans_gid(SVG_CHAR).unwrap();
     let doc = format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="a"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#00f"/></linearGradient></defs><g id="glyph{g}"><path fill="url(#a)" d="M0 0h500v-700h-500z"/></g></svg>"##
@@ -81,6 +82,7 @@ fn create_outlines_turns_svg_glyphs_into_groups() {
 /// draws nothing itself, and its art is drawn where it sits: no outline of the font's covers it.
 #[test]
 fn pdf_real_text_draws_svg_glyphs_as_art_and_keeps_their_characters() {
+    let _fonts = crate::adding_fonts();
     let g = source_sans_gid(SVG_CHAR).unwrap();
     let doc = format!(r##"<svg xmlns="http://www.w3.org/2000/svg"><g id="glyph{g}"><path fill="#f00" d="M0 0h500v-700h-500z"/></g></svg>"##);
     let s = with_svg_type("Svgtest Pdf", &doc);
@@ -110,6 +112,7 @@ fn pdf_real_text_draws_svg_glyphs_as_art_and_keeps_their_characters() {
 /// text draws nothing, as SVG glyphs' do).
 #[test]
 fn pdf_real_text_draws_the_outline_of_an_svg_glyph_without_art() {
+    let _fonts = crate::adding_fonts();
     let doc = r##"<svg xmlns="http://www.w3.org/2000/svg"><g id="glyph1"/></svg>"##;
     let s = with_svg_type("Svgtest Bare Pdf", doc);
     let d = s.doc().unwrap().doc.clone();
@@ -122,6 +125,7 @@ fn pdf_real_text_draws_the_outline_of_an_svg_glyph_without_art() {
 /// In a font that may not be embedded, an SVG glyph's art is drawn once.
 #[test]
 fn pdf_draws_an_svg_glyphs_art_once_when_its_font_cant_be_embedded() {
+    let _fonts = crate::adding_fonts();
     let g = source_sans_gid(SVG_CHAR).unwrap();
     let doc = format!(r##"<svg xmlns="http://www.w3.org/2000/svg"><g id="glyph{g}"><path fill="#f00" d="M0 0h500v-700h-500z"/></g></svg>"##);
     let mut s = session();
@@ -137,6 +141,7 @@ fn pdf_draws_an_svg_glyphs_art_once_when_its_font_cant_be_embedded() {
 /// colour glyphs, as their art.
 #[test]
 fn expand_appearance_keeps_the_colour_glyphs_of_type_with_effects() {
+    let _fonts = crate::adding_fonts();
     use vectorcraft_text::test_fonts::{COLOUR_CHAR, colr_family, colr_font};
     vectorcraft_text::FontDb::global().add_font(colr_font(true).unwrap());
     let mut s = session();
@@ -156,6 +161,7 @@ fn expand_appearance_keeps_the_colour_glyphs_of_type_with_effects() {
 /// `currentColor`.
 #[test]
 fn the_canvas_draws_svg_glyphs_as_their_art() {
+    let _fonts = crate::adding_fonts();
     let g = source_sans_gid(SVG_CHAR).unwrap();
     // The left half of a 500 by 700 box red, the right half in the text's colour.
     let doc = format!(
@@ -173,6 +179,7 @@ fn the_canvas_draws_svg_glyphs_as_their_art() {
 /// the document; the PDF of the type before expanding draws them too.
 #[test]
 fn expand_appearance_keeps_the_emoji_of_type_with_effects() {
+    let _fonts = crate::adding_fonts();
     use vectorcraft_text::test_fonts::{COLOUR_CHAR, COLOUR_LARGE, COLOUR_PPEM, colour_bitmap_family, colour_bitmap_font, solid_png};
     vectorcraft_text::FontDb::global().add_font(colour_bitmap_font(false).unwrap());
     let mut s = session();
@@ -206,6 +213,7 @@ fn expand_appearance_keeps_the_emoji_of_type_with_effects() {
 /// pieces, and Object › Expand takes them into the document.
 #[test]
 fn an_envelope_shares_and_expands_the_emoji_of_its_type() {
+    let _fonts = crate::adding_fonts();
     use vectorcraft_text::test_fonts::{COLOUR_CHAR, colour_bitmap_family, colour_bitmap_font};
     vectorcraft_text::FontDb::global().add_font(colour_bitmap_font(false).unwrap());
     let mut s = session();
