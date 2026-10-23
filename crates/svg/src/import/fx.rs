@@ -83,7 +83,16 @@ enum V {
     Stack(Vec<V>),
 }
 
+/// The most layers a filter result may stack: a result combined with itself again and again
+/// would otherwise double each time. A filter past it is left as it is (not editable).
+const MAX_LAYERS: usize = 64;
+
 impl V {
+    /// `layers` stacked, `None` past [`MAX_LAYERS`].
+    fn stack(layers: Vec<V>) -> Option<V> {
+        (layers.len() <= MAX_LAYERS).then_some(V::Stack(layers))
+    }
+
     fn layers(self) -> Vec<V> {
         match self {
             V::Stack(l) => l,
@@ -207,7 +216,7 @@ fn eval(f: &Filter, k: f64) -> Option<V> {
                 } else if transparent(&a) {
                     b_in
                 } else if b.mode() == usvg::BlendMode::Normal {
-                    V::Stack(b_in.layers().into_iter().chain(a.layers()).collect())
+                    V::stack(b_in.layers().into_iter().chain(a.layers()).collect())?
                 } else {
                     return None;
                 }
@@ -223,7 +232,7 @@ fn eval(f: &Filter, k: f64) -> Option<V> {
                         } else if transparent(&a) {
                             b
                         } else {
-                            V::Stack(b.layers().into_iter().chain(a.layers()).collect())
+                            V::stack(b.layers().into_iter().chain(a.layers()).collect())?
                         }
                     }
                     _ => return None,
@@ -242,7 +251,7 @@ fn eval(f: &Filter, k: f64) -> Option<V> {
                 match layers.len() {
                     0 => return None,
                     1 => layers.remove(0),
-                    _ => V::Stack(layers),
+                    _ => V::stack(layers)?,
                 }
             }
             Kind::ColorMatrix(c) => match c.kind() {

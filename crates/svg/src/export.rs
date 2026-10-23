@@ -54,6 +54,8 @@ fn write(doc: &Document, opts: &ExportOptions, native: Option<&[u8]>, id_prefix:
         classes: Vec::new(),
         class_ids: HashMap::new(),
         used_ids: HashSet::new(),
+        next_suffix: HashMap::new(),
+        linked_names: HashSet::new(),
         names: HashMap::new(),
         depth: 1,
         patterns: HashMap::new(),
@@ -304,6 +306,10 @@ struct Writer<'a> {
     /// 1-based class/entity number by declaration; avoids a linear scan for each style.
     class_ids: HashMap<String, usize>,
     used_ids: HashSet<String>,
+    /// The next suffix to try for a base name, so a repeated name doesn't probe the ones taken again.
+    next_suffix: HashMap<String, usize>,
+    /// The names in `linked`.
+    linked_names: HashSet<String>,
     names: HashMap<NodeId, String>,
     depth: usize,
     /// `<pattern>` def ids by pattern name + placement.
@@ -601,14 +607,17 @@ impl Writer<'_> {
     /// `base` (with the unique prefix) if free, else `base-2`, `base-3`…
     fn unique_id(&mut self, base: &str) -> String {
         let base = format!("{}{base}", self.id_prefix);
-        let mut cand = base.clone();
-        for i in 2.. {
-            if self.used_ids.insert(cand.clone()) {
-                break;
-            }
-            cand = format!("{base}-{i}");
+        if self.used_ids.insert(base.clone()) {
+            return base;
         }
-        cand
+        let next = self.next_suffix.entry(base.clone()).or_insert(2);
+        loop {
+            let cand = format!("{base}-{next}");
+            *next += 1;
+            if self.used_ids.insert(cand.clone()) {
+                return cand;
+            }
+        }
     }
 
     /// Reserve ids for every named object up front so generated def ids never collide with them.
@@ -1584,7 +1593,7 @@ impl Writer<'_> {
             return format!("data:{};base64,{}", b.mime, base64_encode(&b.bytes));
         }
         let name = format!("{}.{}", b.content_key(), image_ext(&b.mime));
-        if !self.linked.iter().any(|l| l.name == name) {
+        if self.linked_names.insert(name.clone()) {
             self.linked.push(LinkedImage { name: name.clone(), bytes: b.bytes.clone() });
         }
         name

@@ -90,6 +90,10 @@ struct Glyph {
 /// size (the em square is its frame) and in the text's colour `color`. `None` when it doesn't read
 /// or has no element `id`.
 fn glyph(svg: &str, id: &str, color: &str) -> Option<Glyph> {
+    // Before the XML reader: it nests by recursion and expands entities without a total limit.
+    if crate::import::xml_too_deep(svg) || crate::entities::expansion_too_large(svg) {
+        return None;
+    }
     let xml = roxmltree::Document::parse_with_options(svg, roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() }).ok()?;
     let root = xml.root_element();
     let whole = root.attribute("id") == Some(id);
