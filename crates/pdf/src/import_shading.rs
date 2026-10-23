@@ -1,8 +1,8 @@
 //! Shadings: axial and radial ones become gradients (their stops sampled from the shading
 //! function in its own colour model; an end that doesn't extend clips the painted area), a
 //! function-based one whose colour changes along one axis a linear gradient (else its average
-//! colour), patch
-//! and triangle meshes become gradient meshes, a gradient drawn through a luminosity mask that is
+//! colour; all of them within one budget of function evaluations per import), patch and triangle
+//! meshes become gradient meshes, a gradient drawn through a luminosity mask that is
 //! the same gradient in grey (how stop opacity is written) gets its opacity stops back, and a shape
 //! clipping a gradient that fills it becomes one path with the gradient.
 
@@ -28,7 +28,7 @@ const MAX_PATCHES: usize = 4096;
 /// its end. `inks`: the colorant names of its space, from the page's walk ([`Colors::solid`]).
 pub(crate) fn shading_gradient(sp: &ShadingPattern, colors: &mut Colors<'_>, inks: Option<&[String]>) -> Option<(GradientPaint, [bool; 2])> {
     let ShadingType::RadialAxial { coords, domain, function, axial, extend } = sp.shading.shading_type.as_ref() else {
-        return function_gradient(sp, colors, inks);
+        return None;
     };
     let m = sp.matrix;
     let cs = &sp.shading.color_space;
@@ -109,6 +109,68 @@ const MAX_FUNCTION_STOPS: usize = 2048;
 /// Grid points per side, sampling a function-based shading's domain (to tell along which axis its
 /// colour changes, or to average it).
 const FUNCTION_GRID: usize = 16;
+/// Samples across the axis a function-based shading's colour changes along, through the middle
+/// of its domain, that must all be one colour (what the grid can't tell from a periodic one).
+const FUNCTION_ACROSS: usize = 256;
+/// The function evaluations function-based shadings may take in one import, together: a file
+/// can fill any number of paths with them, each a function of any length.
+pub(crate) const MAX_FUNCTION_EVALUATIONS: usize = 200_000;
+/// What averaging a function-based shading takes ([`function_average`]).
+const AVERAGE_EVALUATIONS: usize = (FUNCTION_GRID + 1) * (FUNCTION_GRID + 1);
+
+/// The function evaluations function-based shadings took (tests; imports read on threads of
+/// their own, so tests that count hold `tests_import_fidelity::SHADINGS`).
+#[cfg(test)]
+pub(crate) static EVALUATIONS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// What is left of one import's function evaluations ([`MAX_FUNCTION_EVALUATIONS`]).
+pub(crate) struct FunctionBudget(std::cell::Cell<usize>);
+
+impl FunctionBudget {
+    pub(crate) fn new() -> Self {
+        Self(std::cell::Cell::new(MAX_FUNCTION_EVALUATIONS))
+    }
+
+    /// Take one evaluation, leaving at least `reserve`: `false` when there isn't one.
+    fn take(&self, reserve: usize) -> bool {
+        let left = self.0.get();
+        if left <= reserve {
+            return false;
+        }
+        self.0.set(left - 1);
+        #[cfg(test)]
+        EVALUATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        true
+    }
+}
+
+/// What a function-based shading comes in as ([`function_paint`]).
+pub(crate) enum FunctionPaint {
+    /// Its colour changes along one axis: a linear gradient.
+    Gradient(Box<GradientPaint>),
+    /// It has no gradient: the colour it averages to.
+    Average(Color),
+    /// Its function can't be read, or the import's budget is spent.
+    Unread,
+}
+
+/// Function-based shading `sp` as a gradient, else its average colour, its function evaluated
+/// within `budget` (a gradient leaves enough of it to average another shading). `None` for other
+/// shadings.
+pub(crate) fn function_paint(
+    sp: &ShadingPattern,
+    colors: &mut Colors<'_>,
+    inks: Option<&[String]>,
+    budget: &FunctionBudget,
+) -> Option<FunctionPaint> {
+    if !matches!(sp.shading.shading_type.as_ref(), ShadingType::FunctionBased { .. }) {
+        return None;
+    }
+    Some(match function_gradient(sp, colors, inks, budget) {
+        Some(g) => FunctionPaint::Gradient(Box::new(g)),
+        None => function_average(sp, budget).map_or(FunctionPaint::Unread, FunctionPaint::Average),
+    })
+}
 
 /// RGB colours closer than this in every component are the same colour.
 fn same_rgb(a: [f32; 3], b: [f32; 3]) -> bool {
@@ -123,10 +185,16 @@ fn function_domain(sp: &ShadingPattern) -> Option<(&ShadingFunction, [f32; 4])> 
     (domain.iter().all(|v| v.is_finite()) && x1 > x0 && y1 > y0).then_some((function, *domain))
 }
 
+/// The value of function-based shading function `function` at point (`x`, `y`) of its domain, one
+/// evaluation of `budget` leaving `reserve`.
+fn function_value(function: &ShadingFunction, x: f32, y: f32, budget: &FunctionBudget, reserve: usize) -> Option<smallvec::SmallVec<[f32; 4]>> {
+    budget.take(reserve).then(|| function.eval(&smallvec::smallvec![x, y]))?
+}
+
 /// The RGB of function-based shading `sp` (its function `function`) at point (`x`, `y`) of its
-/// domain.
-fn function_rgb(sp: &ShadingPattern, function: &ShadingFunction, x: f32, y: f32) -> Option<[f32; 3]> {
-    let [r, g, b, _] = sp.shading.color_space.to_rgba(&function.eval(&smallvec::smallvec![x, y])?, 1.0, false).components();
+/// domain, as [`function_value`].
+fn function_rgb(sp: &ShadingPattern, function: &ShadingFunction, x: f32, y: f32, budget: &FunctionBudget, reserve: usize) -> Option<[f32; 3]> {
+    let [r, g, b, _] = sp.shading.color_space.to_rgba(&function_value(function, x, y, budget, reserve)?, 1.0, false).components();
     Some([r, g, b])
 }
 
@@ -139,31 +207,52 @@ fn grid_at(i: usize) -> f32 {
 /// A function-based shading (type 1) whose colour changes along one axis of its domain only (how
 /// a browser writes a repeating linear gradient) as a linear gradient across its domain: stops
 /// sampled along that axis, each hard colour change two stops at one offset. `None` when the
-/// colour changes along both axes, or would take more than [`MAX_FUNCTION_STOPS`] stops.
-fn function_gradient(sp: &ShadingPattern, colors: &mut Colors<'_>, inks: Option<&[String]>) -> Option<(GradientPaint, [bool; 2])> {
+/// colour changes along both axes, would take more than [`MAX_FUNCTION_STOPS`] stops, or `budget`
+/// runs out (leaving [`AVERAGE_EVALUATIONS`] for [`function_average`]).
+fn function_gradient(sp: &ShadingPattern, colors: &mut Colors<'_>, inks: Option<&[String]>, budget: &FunctionBudget) -> Option<GradientPaint> {
     let ShadingType::FunctionBased { matrix, .. } = sp.shading.shading_type.as_ref() else { return None };
     let (function, [x0, x1, y0, y1]) = function_domain(sp)?;
-    let rgb = |x: f32, y: f32| function_rgb(sp, function, x, y);
+    let rgb = |x: f32, y: f32| function_rgb(sp, function, x, y, budget, AVERAGE_EVALUATIONS);
     let lerp = |a: f32, b: f32, t: f32| a + (b - a) * t;
     let grid: Vec<Vec<[f32; 3]>> = (0..=FUNCTION_GRID)
         .map(|j| (0..=FUNCTION_GRID).map(|i| rgb(lerp(x0, x1, grid_at(i)), lerp(y0, y1, grid_at(j)))).collect())
         .collect::<Option<_>>()?;
     let first = grid.first()?;
-    // Each row as the first: the colour changes along x. Each row one colour: along y.
+    // Each row as the first: the colour may change along x only. Each row one colour: along y.
     let along_x = grid.iter().all(|row| row.iter().zip(first).all(|(a, b)| same_rgb(*a, *b)));
     let along_y = grid.iter().all(|row| row.first().is_some_and(|c0| row.iter().all(|c| same_rgb(*c, *c0))));
-    if !along_x && !along_y {
-        return None;
-    }
+    // The grid can miss a change that repeats in step with it: across the middle of the domain,
+    // densely, the colour must not change along the other axis. Both left (a grid of one colour),
+    // the axis it changes along is the one, if any, it changes along there.
+    let steady = |x_axis: bool| -> Option<bool> {
+        let at = |k: usize| k as f32 / FUNCTION_ACROSS as f32;
+        let probe = |k: usize| if x_axis { rgb(lerp(x0, x1, at(k)), lerp(y0, y1, 0.5)) } else { rgb(lerp(x0, x1, 0.5), lerp(y0, y1, at(k))) };
+        let c0 = probe(0)?;
+        for k in 1..=FUNCTION_ACROSS {
+            if !same_rgb(probe(k)?, c0) {
+                return Some(false);
+            }
+        }
+        Some(true)
+    };
+    let along_x = match (along_x, along_y) {
+        (false, false) => return None,
+        (true, false) if steady(false)? => true,
+        (false, true) if steady(true)? => false,
+        (true, true) if steady(false)? => true,
+        (true, true) if steady(true)? => false,
+        _ => return None,
+    };
     let point = |s: f32| if along_x { (lerp(x0, x1, s), lerp(y0, y1, 0.5)) } else { (lerp(x0, x1, 0.5), lerp(y0, y1, s)) };
     let color_of = |s: f32| {
         let (x, y) = point(s);
         rgb(x, y)
     };
     // Pieces of the axis between hard colour changes: (offset, where its colour is read, RGB).
-    let mut pieces: Vec<Vec<(f32, f32, [f32; 3])>> = vec![vec![(0.0, 0.0, color_of(0.0)?)]];
+    let start = color_of(0.0)?;
+    let mut pieces: Vec<Vec<(f32, f32, [f32; 3])>> = vec![vec![(0.0, 0.0, start)]];
     let mut stops = 1;
-    let mut last = (0.0, color_of(0.0)?);
+    let mut last = (0.0, start);
     for k in 1..=FUNCTION_SAMPLES {
         let s = k as f32 / FUNCTION_SAMPLES as f32;
         let c = color_of(s)?;
@@ -194,9 +283,10 @@ fn function_gradient(sp: &ShadingPattern, colors: &mut Colors<'_>, inks: Option<
             return None;
         }
     }
+    // A stop's colour in the shading's own model (RGB when that can't be read).
     let value = |s: f32| {
         let (x, y) = point(s);
-        function.eval(&smallvec::smallvec![x, y])
+        function_value(function, x, y, budget, AVERAGE_EVALUATIONS)
     };
     let space = colors.shading_space(&sp.shading.color_space, value(0.0)?.len(), inks);
     let mut out = vec![];
@@ -224,17 +314,17 @@ fn function_gradient(sp: &ShadingPattern, colors: &mut Colors<'_>, inks: Option<
     let mut g = GradientPaint::new(Gradient::new(GradientKind::Linear, out));
     g.geom = Some(geom);
     // It paints only over its domain ([`extend_clip`]).
-    Some((g, [false, false]))
+    Some(g)
 }
 
 /// The colour a function-based shading averages to over its domain, for one that has no gradient
-/// ([`shading_gradient`]); `None` for other shadings.
-pub(crate) fn function_average(sp: &ShadingPattern) -> Option<Color> {
+/// ([`function_gradient`]); `None` for other shadings, or when `budget` runs out.
+fn function_average(sp: &ShadingPattern, budget: &FunctionBudget) -> Option<Color> {
     let (function, [x0, x1, y0, y1]) = function_domain(sp)?;
     let mut sum = [0.0f32; 3];
     for j in 0..=FUNCTION_GRID {
         for i in 0..=FUNCTION_GRID {
-            let c = function_rgb(sp, function, x0 + (x1 - x0) * grid_at(i), y0 + (y1 - y0) * grid_at(j))?;
+            let c = function_rgb(sp, function, x0 + (x1 - x0) * grid_at(i), y0 + (y1 - y0) * grid_at(j), budget, 0)?;
             sum.iter_mut().zip(c).for_each(|(s, v)| *s += v);
         }
     }
