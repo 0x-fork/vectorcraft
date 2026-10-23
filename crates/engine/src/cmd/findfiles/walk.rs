@@ -498,7 +498,9 @@ impl Shared {
             queue.push((path, depth + 1));
         }
         // The home folder is added by a rule, not picked: it needs the picked folder's authority.
-        let home = rules.home_below(&listed).filter(|h| !rules.is_refused(h) && self.scope.clone().run(|| crate::file_access::check_read(&h.to_string_lossy())).is_ok());
+        let home = rules
+            .home_below(&listed)
+            .filter(|h| !rules.is_refused(h) && self.scope.clone().run(|| crate::file_access::check_read(&h.to_string_lossy())).is_ok());
         {
             let mut w = self.lock();
             w.files += files;

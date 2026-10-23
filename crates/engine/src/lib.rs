@@ -1490,7 +1490,7 @@ impl Session {
         // The background workers of placed documents read files in the scope that asked.
         vectorcraft_render::placed_document::set_scope_capture(|| {
             let scope = file_access::ScopeHandle::capture();
-            Box::new(move |f: &mut dyn FnMut()| scope.run(|| f()))
+            Box::new(move |f: &mut dyn FnMut()| scope.run(f))
         });
         // Clicks find an image's own fills and strokes where their effects draw them.
         vectorcraft_doc::hit::set_image_paint(vectorcraft_render::effects::image_paint);
