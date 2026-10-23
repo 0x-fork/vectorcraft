@@ -396,7 +396,7 @@ pub fn plan<'a>(doc: &'a Document, opts: &PrintOptions) -> Result<PrintPlan<'a>,
 
 /// Print `doc` to a PDF as `opts` say.
 pub fn print(doc: &Document, opts: &PrintOptions) -> Result<PrintReport, PdfError> {
-    craft_pdf::write::guard(|| leaving_out_undecodable(|left_out| print_inner(doc, opts, left_out)))
+    craft_pdf::write::guard(|| leaving_out_undecodable(doc, |left_out| print_inner(doc, opts, left_out)))
 }
 
 fn print_inner(doc: &Document, opts: &PrintOptions, left_out: &mut HashSet<String>) -> Result<PrintReport, PdfError> {
