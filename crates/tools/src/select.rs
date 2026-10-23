@@ -53,6 +53,9 @@ enum State {
     /// Pressed on an object; becomes Moving after the drag threshold.
     Moving {
         start: Point,
+        /// Where the pointer went down: the drag threshold counts from there, not from `start`,
+        /// which may be an anchor or centre the press grabbed a few pixels away (#3716).
+        press: Point,
         /// The point that snaps, moving with the pointer: `start`, or where a press on a path's
         /// stroke or beside its edge took hold of the path ([`hold_point`]).
         hold: Point,
@@ -734,7 +737,7 @@ impl Tool for SelectionTool {
                     && cx.select_behind
                     && let Some(behind) = object_behind(cx, p)
                 {
-                    self.state = State::Moving { start: p, hold: p, began: false, deselect: None, key: None };
+                    self.state = State::Moving { start: p, press: p, hold: p, began: false, deselect: None, key: None };
                     return vec![Action::Exec("select.set".into(), json!({ "ids": [behind.0] }))];
                 }
                 match hit_test(cx.doc, p, cx.selection_hit_options()) {
@@ -758,7 +761,7 @@ impl Tool for SelectionTool {
                         // Grabbed by no anchor or centre, a press on a path's stroke or beside its
                         // edge holds the path there, and that point of it snaps (#3701).
                         let hold = if grabbed.is_some() { grab } else { hold_point(cx, &h, p) };
-                        self.state = State::Moving { start: grab, hold, began: false, deselect, key };
+                        self.state = State::Moving { start: grab, press: p, hold, began: false, deselect, key };
                         out
                     }
                     None => {
@@ -767,10 +770,10 @@ impl Tool for SelectionTool {
                     }
                 }
             }
-            (PointerKind::Drag, State::Moving { start, hold, began, .. }) => {
+            (PointerKind::Drag, State::Moving { start, press, hold, began, .. }) => {
                 let mut out = vec![];
                 if !began {
-                    if p.distance(start) < Self::drag_threshold(cx) {
+                    if p.distance(press) < Self::drag_threshold(cx) {
                         return out;
                     }
                     out.push(Action::Begin(if m.alt { "Copy".into() } else { "Move".into() }));
@@ -783,7 +786,7 @@ impl Tool for SelectionTool {
                 }
                 // Shift has already constrained `d`: any change is a snap.
                 self.snapped = (d - unsnapped).hypot() > 1e-9;
-                self.state = State::Moving { start, hold, began: true, deselect: None, key: None };
+                self.state = State::Moving { start, press, hold, began: true, deselect: None, key: None };
                 self.measure = cx.measurement_labels.then(|| (p, cx.offset_label(d.x, d.y)));
                 out.push(Action::Preview("object.transform".into(), json!({ "matrix": matrix_json(Affine::translate(d)), "copy": m.alt })));
                 out
@@ -1102,6 +1105,31 @@ mod tests {
         let Some(Action::Preview(_, v)) = a.get(1) else { panic!("{a:?}") };
         let (x, y) = (v["matrix"][4].as_f64().unwrap(), v["matrix"][5].as_f64().unwrap());
         assert!((200.0 + x - 350.3).abs() < 1e-9 && (200.0 + y - 250.0).abs() < 1e-9, "the corner lands at ({}, {})", 200.0 + x, 200.0 + y);
+    }
+
+    /// #3716: a press a few pixels from an anchor grabs the object by that anchor, but the drag
+    /// threshold counts from where the pointer went down. A click that wobbles by a pixel selects
+    /// the object without moving it, instead of jumping the anchor onto the pointer.
+    #[test]
+    fn a_click_near_an_anchor_selects_without_moving() {
+        let (d, id) = doc_with_rect();
+        let (none, mut picked) = (Selection::default(), Selection::default());
+        picked.add(id);
+        let p = paint();
+        let mut t = SelectionTool::default();
+        // 5.7 px from the corner (200, 200): within reach of it, beyond the drag threshold.
+        let a = t.pointer(&cx(&d, &none, &p), &ev(PointerKind::Down, 196.0, 196.0));
+        assert!(a.iter().any(|a| matches!(a, Action::Exec(c, v) if c == "select.set" && v["ids"] == json!([id.0]))), "{a:?}");
+        let a = t.pointer(&cx(&d, &picked, &p), &ev(PointerKind::Drag, 197.0, 196.0));
+        assert!(a.is_empty(), "a 1 px wobble moves the object: {a:?}");
+        let a = t.pointer(&cx(&d, &picked, &p), &ev(PointerKind::Up, 197.0, 196.0));
+        assert!(!a.iter().any(|a| matches!(a, Action::Commit)), "{a:?}");
+        // A drag past the threshold from the press still moves it by the corner (#812).
+        let mut t = SelectionTool::default();
+        t.pointer(&cx(&d, &none, &p), &ev(PointerKind::Down, 196.0, 196.0));
+        let a = t.pointer(&cx(&d, &picked, &p), &ev(PointerKind::Drag, 230.0, 196.0));
+        let Some(Action::Preview(_, v)) = a.get(1) else { panic!("{a:?}") };
+        assert_eq!((v["matrix"][4].as_f64(), v["matrix"][5].as_f64()), (Some(30.0), Some(-4.0)), "the corner follows the pointer: {a:?}");
     }
 
     /// A corner-radius drag is a transform, so the sharp selection box hides while the radius changes.
