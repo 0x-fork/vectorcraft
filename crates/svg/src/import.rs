@@ -1533,7 +1533,7 @@ impl Importer {
         } else {
             self.named(p.id(), NodeKind::Path { path, rule: r, live: None, clipping: false, guide: false })
         };
-        n.appearance = appearance.into();
+        n.appearance = appearance;
         Some(n)
     }
 
