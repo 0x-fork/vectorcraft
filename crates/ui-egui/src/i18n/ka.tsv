@@ -3828,7 +3828,7 @@ font-technology	Variable	ცვლადი
 @msg	missing `name`	აკლია `name`
 @msg	missing `tool`	აკლია `tool`
 @msg	missing index	ინდექსი აკლია
-@msg	multiple windows land with M11.5	რამდენიმე ფანჯარა M11.5-ში დაემატება
+@msg	New Window isn't available yet: a document opens in one window	ახალი ფანჯარა ჯერ მიუწვდომელია: დოკუმენტი ერთ ფანჯარაში იხსნება
 @msg	name the file	მიუთითეთ ფაილის სახელი
 @msg	no CSS to copy: select objects with CSS of their own	კოპირებისთვის CSS არ არის: მონიშნეთ საკუთარი CSS-ის მქონე ობიექტები
 @msg	no Live Paint edge near that point	ამ წერტილთან ცოცხალი შეღებვის კიდე არ არის

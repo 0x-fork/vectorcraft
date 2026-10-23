@@ -1681,7 +1681,7 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             }
             None => Err("brightness must be dark|mediumDark|mediumLight|light".into()),
         },
-        "window.newWindow" => Err("multiple windows land with M11.5".into()),
+        "window.newWindow" => Err("New Window isn't available yet: a document opens in one window".into()),
         "tool.select" => match s("tool") {
             Some(t) if vectorcraft_tools::tool_info(&t).is_some() => {
                 app.select_tool(&t);
@@ -2574,6 +2574,8 @@ pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
             app.session.active().is_some() && crate::dialogs::perspective_presets::slot_preset(app, id).is_some()
         }
         "ui.perspectivePlane" => app.session.active().is_some(),
+        // Only one window per document so far: greyed out, as Window › Arrange's items are (#3724).
+        "window.newWindow" => false,
         _ => true,
     }
 }
@@ -4965,5 +4967,16 @@ mod tests {
         let tall = rect(3000.0);
         assert!(tall.height() > short.height() + 100.0, "{} vs {}", tall.height(), short.height());
         assert!(tall.bottom() < 3000.0);
+    }
+
+    /// #3724: Window › New Window is greyed out until VectorCraft can open a second window on a
+    /// document, instead of being enabled and answering with an internal milestone note.
+    #[test]
+    fn new_window_is_disabled_until_it_opens_a_window() {
+        let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
+        assert!(!enabled(&app, "window.newWindow"), "New Window is enabled but opens no window");
+        let e = app.run("window.newWindow", json!({})).unwrap_err();
+        assert!(!e.contains("M11.5"), "a user-facing message, not a milestone: {e}");
     }
 }

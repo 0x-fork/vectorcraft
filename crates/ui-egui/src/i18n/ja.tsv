@@ -4447,7 +4447,7 @@ swatch	Bright Violet	ビビッドバイオレット
 @msg	missing index	index が指定されていません
 @msg	missing number `{key}`	数値 `{key}` が指定されていません
 @msg	missing integer `{key}`	整数 `{key}` が指定されていません
-@msg	multiple windows land with M11.5	複数ウィンドウは M11.5 で対応予定です
+@msg	New Window isn't available yet: a document opens in one window	新規ウィンドウはまだ使用できません: ドキュメントは 1 つのウィンドウで開きます
 @msg	no PNG encoder	PNG エンコーダーがありません
 @msg	no document open	ドキュメントが開かれていません
 @msg	no effect applied yet	まだ効果を適用していません

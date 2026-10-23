@@ -4069,7 +4069,7 @@ imageTrace	Outline	Kontur
 @msg	missing index	indeks mangler
 @msg	missing number `{key}`	tallet `{key}` mangler
 @msg	missing integer `{key}`	heltallet `{key}` mangler
-@msg	multiple windows land with M11.5	flere vinduer lander med M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nyt vindue er ikke tilgængeligt endnu: et dokument åbnes i ét vindue
 @msg	name the file	giv filen et navn
 @msg	no CSS to copy: select objects with CSS of their own	ingen CSS at kopiere: markér objekter med deres egen CSS
 @msg	no Live Paint edge near that point	ingen Live Paint-kant i nærheden af det punkt

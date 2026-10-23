@@ -3824,7 +3824,7 @@ axis	Both	Her İkisi
 @msg	missing `name`	"isim" eksik
 @msg	missing `tool`	'araç' eksik
 @msg	missing index	eksik dizin
-@msg	multiple windows land with M11.5	M11.5 ile birden fazla pencere açılır
+@msg	New Window isn't available yet: a document opens in one window	Yeni Pencere henüz kullanılamıyor: bir belge tek pencerede açılır
 @msg	name the file	dosyayı adlandırın
 @msg	no CSS to copy: select objects with CSS of their own	kopyalanacak CSS yok: kendilerine ait CSS'ye sahip nesneleri seçin
 @msg	no Live Paint edge near that point	bu noktanın yakınında Canlı Boyama kenarı yok

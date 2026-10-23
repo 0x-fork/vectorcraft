@@ -3957,7 +3957,7 @@ axis	Both	И двете
 @msg	missing index	липсва индекс
 @msg	missing number `{key}`	липсва число `{key}`
 @msg	missing integer `{key}`	липсва цяло число `{key}`
-@msg	multiple windows land with M11.5	множество прозорци се зареждат с M11.5
+@msg	New Window isn't available yet: a document opens in one window	Нов прозорец още не е наличен: документът се отваря в един прозорец
 @msg	name the file	именувайте файла
 @msg	no CSS to copy: select objects with CSS of their own	няма CSS за копиране: изберете обекти със собствен CSS
 @msg	no Live Paint edge near that point	няма ръб за интерактивно оцветяване близо до тази точка

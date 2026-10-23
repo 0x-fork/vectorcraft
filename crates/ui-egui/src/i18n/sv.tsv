@@ -3962,7 +3962,7 @@ axis	Both	Båda
 @msg	missing index	index saknas
 @msg	missing number `{key}`	talet `{key}` saknas
 @msg	missing integer `{key}`	heltalet `{key}` saknas
-@msg	multiple windows land with M11.5	flera fönster kommer med M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nytt fönster är inte tillgängligt än: ett dokument öppnas i ett fönster
 @msg	name the file	namnge filen
 @msg	no CSS to copy: select objects with CSS of their own	ingen CSS att kopiera: markera objekt som har egen CSS
 @msg	no Live Paint edge near that point	ingen Live Paint-kant nära den punkten

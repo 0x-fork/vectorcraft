@@ -4069,7 +4069,7 @@ imageTrace	Outline	Kontur
 @msg	missing index	indeks tidak ada
 @msg	missing number `{key}`	angka `{key}` tidak ada
 @msg	missing integer `{key}`	bilangan bulat `{key}` tidak ada
-@msg	multiple windows land with M11.5	beberapa jendela hadir bersama M11.5
+@msg	New Window isn't available yet: a document opens in one window	Jendela baru belum tersedia: dokumen dibuka dalam satu jendela
 @msg	name the file	beri nama file
 @msg	no CSS to copy: select objects with CSS of their own	tidak ada CSS untuk disalin: pilih objek yang memiliki CSS sendiri
 @msg	no Live Paint edge near that point	tidak ada tepi Live Paint di dekat titik itu

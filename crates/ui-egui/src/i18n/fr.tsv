@@ -4044,7 +4044,7 @@ axis	Both	Les deux
 @msg	missing index	index manquant
 @msg	missing number `{key}`	nombre `{key}` manquant
 @msg	missing integer `{key}`	nombre entier `{key}` manquant
-@msg	multiple windows land with M11.5	les fenêtres multiples arrivent avec M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nouvelle fenêtre n’est pas encore disponible : un document s’ouvre dans une seule fenêtre
 @msg	name the file	nommez le fichier
 @msg	no CSS to copy: select objects with CSS of their own	aucun CSS à copier : sélectionnez des objets ayant leur propre CSS
 @msg	no Live Paint edge near that point	aucun bord de peinture dynamique près de ce point

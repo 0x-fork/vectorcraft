@@ -4263,7 +4263,7 @@ imageTrace	Outline	Ääriviiva
 @msg	missing index	indeksi puuttuu
 @msg	missing number `{key}`	luku `{key}` puuttuu
 @msg	missing integer `{key}`	kokonaisluku `{key}` puuttuu
-@msg	multiple windows land with M11.5	useat ikkunat tulevat versiossa M11.5
+@msg	New Window isn't available yet: a document opens in one window	Uusi ikkuna ei ole vielä käytettävissä: asiakirja avautuu yhteen ikkunaan
 @msg	name the file	anna tiedostolle nimi
 @msg	no CSS to copy: select objects with CSS of their own	ei kopioitavaa CSS:ää: valitse objekteja, joilla on oma CSS
 @msg	no Live Paint edge near that point	pisteen lähellä ei ole elävän maalauksen reunaa

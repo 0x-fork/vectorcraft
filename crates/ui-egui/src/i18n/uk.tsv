@@ -4071,7 +4071,7 @@ axis	Both	Обидві
 @msg	missing index	відсутня index
 @msg	missing number `{key}`	відсутнє число `{key}`
 @msg	missing integer `{key}`	відсутнє ціле число `{key}`
-@msg	multiple windows land with M11.5	кілька вікон з’являться в M11.5
+@msg	New Window isn't available yet: a document opens in one window	Нове вікно поки недоступне: документ відкривається в одному вікні
 @msg	name the file	дайте файлу ім’я
 @msg	no CSS to copy: select objects with CSS of their own	ні CSS для копіювання: виділіть об’єкти з власним CSS
 @msg	no Live Paint edge near that point	поряд з цією точкою немає межі швидкої заливки
