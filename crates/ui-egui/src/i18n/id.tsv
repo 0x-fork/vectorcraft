@@ -5446,6 +5446,12 @@ axis	Y Axis	Sumbu Y
 	The plug-in is computing…	Plug-in sedang menghitung…
 	Inspect Plug-in	Periksa plug-in
 	Cancel Plug-in Run	Batalkan jalannya plug-in
+# Actions panel: action sets (#3712).
+	New Set…	Set baru…
+	New Set	Set baru
+	Set Options…	Opsi set…
+	Set Options	Opsi set
+	Create New Set	Buat set baru
 	Stop Global Edit	Hentikan edit global
 	Global Edit Options	Opsi edit global
 	Match	Cocokkan
