@@ -181,7 +181,9 @@ fn css_comment(s: &str) -> String {
 
 fn write_css(lib: &SwatchLibrary, keep: impl Fn(&&Swatch) -> bool) -> String {
     let mut out = format!("/* {} */\n:root {{\n", css_comment(&lib.name));
-    let mut taken: Vec<String> = vec![];
+    let mut taken: HashSet<String> = HashSet::new();
+    // The next number to try for each base, so repeated names don't search the ones used before.
+    let mut next: HashMap<String, usize> = HashMap::new();
     let mut props = |out: &mut String, list: &[Swatch]| {
         for w in list.iter().filter(&keep) {
             let value = match &w.paint {
@@ -198,8 +200,18 @@ fn write_css(lib: &SwatchLibrary, keep: impl Fn(&&Swatch) -> bool) -> String {
             };
             // Names differing only in case or punctuation map to one property: number the others.
             let base = css_property(&w.name);
-            let name = (1..).map(|i| if i == 1 { base.clone() } else { format!("{base}-{i}") }).find(|n| !taken.contains(n)).unwrap_or(base);
-            taken.push(name.clone());
+            let name = if taken.insert(base.clone()) {
+                base
+            } else {
+                let n = next.entry(base.clone()).or_insert(1);
+                loop {
+                    *n += 1;
+                    let name = format!("{base}-{n}");
+                    if taken.insert(name.clone()) {
+                        break name;
+                    }
+                }
+            };
             let note = if w.spot { " /* spot */" } else { "" };
             out.push_str(&format!("  {name}: {value};{note}\n"));
         }
