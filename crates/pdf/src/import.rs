@@ -483,6 +483,10 @@ fn read_with_reader_options(bytes: &[u8], opts: &ImportOptions, reader: &craft_p
         let list = b.missing_fonts.join(", ");
         b.warn(&format!("fonts that aren't available show in the fallback font until they are: {list}"));
     }
+    // Before anything walks the tree by recursion (`fix_next_id` does): nested clips can be deeper
+    // than the stack goes.
+    let mut depth_notes = vec![];
+    doc.limit_depth_noting(&mut depth_notes);
     doc.fix_next_id();
     doc.reserve_ids(b.next);
 
@@ -494,7 +498,7 @@ fn read_with_reader_options(bytes: &[u8], opts: &ImportOptions, reader: &craft_p
             }
         }
     }
-    doc.limit_depth_noting(&mut warnings);
+    warnings.extend(depth_notes);
     let user_unit = picked.first().and_then(|&n| pages.get(n)).map_or(1.0, |page| f64::from(page.user_unit()));
     Ok(ImportReport { document: doc, warnings, native: crate::editing::editing_in(&pdf), only_text, user_unit })
 }
@@ -982,11 +986,15 @@ fn stroke_layer(paint: Paint, opacity: f32, p: &StrokeProps, scale: f64) -> Stro
         kurbo::Join::Bevel => LineJoin::Bevel,
     };
     st.miter_limit = p.miter_limit as f64;
-    let dash = Dash { pattern: p.dash_array.iter().map(|v| *v as f64 * scale).collect(), offset: p.dash_offset as f64 * scale, align_corners: false };
+    // (Every stroke keeps its own copy: a dash array has a few entries, and one with thousands is cut.)
+    let dash = Dash { pattern: p.dash_array.iter().take(MAX_DASH_ENTRIES).map(|v| *v as f64 * scale).collect(), offset: p.dash_offset as f64 * scale, align_corners: false };
     // An invalid dash array (a negative value, or all zeros) strokes solid.
     st.dash = dash.is_dashed().then_some(dash);
     st
 }
+
+/// The most entries of a dash array kept (an even count keeps it a pattern of dashes and gaps).
+const MAX_DASH_ENTRIES: usize = 64;
 
 pub(crate) fn round3(v: f32) -> f32 {
     (v * 1000.0).round() / 1000.0

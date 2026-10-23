@@ -166,6 +166,9 @@ pub(crate) struct TextLine {
     /// Runs of glyphs drawn alike: their look, how far the file raised them off the line's
     /// baseline (points, up; text rise, `Ts`), their text.
     runs: Vec<(Look, f64, String)>,
+    /// The bytes of text the horizontal glyphs added to `runs` so far (counted as they come: a
+    /// sum over the runs for each glyph is quadratic when every glyph is a run).
+    text_bytes: usize,
     /// Where the file put each character of the runs' text, in order: the first character of each
     /// glyph has its glyph's [`Slot`]; a space read from a gap and the other characters of a
     /// glyph of several have none.
@@ -227,6 +230,7 @@ impl TextLine {
             last_size: at.size,
             baseline: vec![],
             runs: vec![],
+            text_bytes: 0,
             slots: vec![],
             upright: None,
             column: false,
@@ -292,7 +296,7 @@ impl TextLine {
         if self.column || self.upright.is_some() {
             return false;
         }
-        let bytes: usize = self.runs.iter().map(|(_, _, t)| t.len()).sum();
+        let bytes = self.text_bytes;
         let glyph = self.baseline.len();
         let curved = self.curved();
         let mut shift = 0.0;
@@ -350,6 +354,7 @@ impl TextLine {
         } else {
             self.runs.push((look.clone(), 0.0, text.to_string()));
         }
+        self.text_bytes = self.text_bytes.saturating_add(text.len());
         let one = text.chars().count() == 1;
         self.slots.push(Some(Slot { glyph, advance: one.then_some(advance) }));
         self.slots.extend(text.chars().skip(1).map(|_| None));

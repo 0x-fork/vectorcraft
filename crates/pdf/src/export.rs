@@ -47,11 +47,15 @@ pub fn export_with_report(doc: &Document, opts: &PdfOptions) -> Result<ExportRep
 /// holds. The writer reports such an image (a PNG, GIF or WebP kept as it is, whose header reads)
 /// only when it finishes the file. Each repeated run leaves out at least one more image.
 pub(crate) fn leaving_out_undecodable<T>(mut write: impl FnMut(&mut HashSet<String>) -> Result<T, PdfError>) -> Result<T, PdfError> {
+    // The most runs repeated: each is a whole export, and a document of many images that don't
+    // decode would make them quadratic. Past it the writer's error is the result.
+    const MAX_RETRIES: usize = 16;
     let mut left_out = HashSet::new();
+    let mut retries = 0;
     loop {
         let known = left_out.len();
         match write(&mut left_out) {
-            Err(_) if left_out.len() > known => {}
+            Err(_) if left_out.len() > known && retries < MAX_RETRIES => retries += 1,
             done => return done,
         }
     }

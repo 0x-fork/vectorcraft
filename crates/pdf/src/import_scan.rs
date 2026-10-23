@@ -28,6 +28,9 @@ use crate::import_color::ink_names;
 
 /// The interpreter's limit on nested form XObjects.
 const MAX_DEPTH: u32 = 50;
+
+/// The most graphics states saved at once (PDF's own limit for nesting is 28; files nest far deeper).
+const MAX_STATES: usize = 65_536;
 /// The most content operators walked per page (a guard against forms drawn within each other
 /// many times over): the art past it can't be told apart by group. A drawing of a million paths
 /// takes a few million; the walk reads about 15 million a second, twice as fast as the
@@ -464,6 +467,8 @@ struct Walker<'w, 'p> {
     /// The saved graphics states' overprint parameters and inks, the current one last, pushed and
     /// popped as the interpreter does its states.
     states: Vec<State>,
+    /// The `q`s past [`MAX_STATES`] whose `Q` has not come.
+    unkept: usize,
     /// The text shown since the last painted path.
     text: TextOverprint,
     /// The inks of the text shown since the last painted path: of its fills, of its strokes.
@@ -513,12 +518,20 @@ impl Walker<'_, '_> {
     }
 
     fn save(&mut self) {
+        // Past this many nested states the new ones are not kept (a stream of `q` is cheap to write
+        // and holds a state each); their `Q`s are counted off first.
+        if self.states.len() >= MAX_STATES {
+            self.unkept = self.unkept.saturating_add(1);
+            return;
+        }
         self.states.push(self.state());
     }
 
     /// The interpreter never pops its first state.
     fn restore(&mut self) {
-        if self.states.len() > 1 {
+        if self.unkept > 0 {
+            self.unkept -= 1;
+        } else if self.states.len() > 1 {
             self.states.pop();
         }
     }
@@ -1028,6 +1041,7 @@ fn walk_page<'w, 'p>(page: &Page<'p>, ocgs: &'w mut Ocgs, all_on: bool, fonts: &
         out: Scan::default(),
         hidden_form: false,
         states: vec![State::default()],
+        unkept: 0,
         text: TextOverprint::None,
         text_inks: [RunInk::None; 2],
         ink_index: HashMap::new(),

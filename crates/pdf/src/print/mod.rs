@@ -221,6 +221,10 @@ impl<'a> Job<'a> {
         if printed.is_empty() {
             return Err(PdfError::BadSetting("output.inks: no ink is set to print".into()));
         }
+        // Counted before the sheets are made: layouts times inks can be far more than the limit.
+        if layouts.len().saturating_mul(printed.len()).saturating_mul(set.copies as usize) > MAX_PAGES {
+            return Err(PdfError::BadSetting(format!("the job would print more than {MAX_PAGES} pages")));
+        }
         let sheets: Vec<(usize, Option<usize>)> = (0..layouts.len()).flat_map(|l| printed.iter().map(move |i| (l, *i))).collect();
         if sheets.len().saturating_mul(set.copies as usize) > MAX_PAGES {
             return Err(PdfError::BadSetting(format!("the job would print more than {MAX_PAGES} pages")));
