@@ -155,3 +155,13 @@ fn links_out_of_a_root_are_refused() {
     refused(&mut server, "export", json!({"path": s(&base.join("out/away/art.png"))}), "outside the write root");
     assert!(!base.join("outside/art.png").exists());
 }
+
+/// The Place tool keeps its queue until a click, which no scope confines: a queued file outside the
+/// read root is refused when the queue is set.
+#[test]
+fn the_place_queue_names_only_files_inside_the_read_root() {
+    let (mut server, base) = confined("place-queue", true, true);
+    let queue = |file: &str| json!({"tool": "place", "key": "queue", "value": {"entries": [{"params": {"path": s(&base.join(file))}, "name": "x", "width": 10, "height": 10}]}});
+    ok(&mut server, "run_command", json!({"command": "tool.setOption", "params": queue("in/a.svg")}));
+    refused(&mut server, "run_command", json!({"command": "tool.setOption", "params": queue("outside/b.svg")}), "outside the read root");
+}
