@@ -189,6 +189,24 @@ fn the_foreground_layer_takes_the_runs_fill_and_black_for_a_gradient_fill() {
     assert_eq!(foreground(gradient), Paint::solid(Color::BLACK));
 }
 
+/// Fills that look alike but separate differently (a grey on the black plate, the same RGB grey on
+/// all four) each paint the foreground layer in their own colour.
+#[test]
+fn fills_that_only_look_alike_each_paint_the_foreground_layer() {
+    let db = colr_db(false);
+    let foreground = |fill: Color| {
+        let st = CharStyle { fill: Paint::solid(fill), ..colr_style(false) };
+        let l = layout(&db, &TextObject::point(KPoint::ZERO, &COLOUR_CHAR.to_string(), st));
+        let colour = l.glyphs[0].colour.clone().unwrap();
+        children(&colour)[1].appearance.fill_paint()
+    };
+    let grey = Color::gray(0.5);
+    let rgb = Color::rgb8(128, 128, 128);
+    assert_eq!(grey.to_rgba8(1.0), rgb.to_rgba8(1.0), "they look alike");
+    assert_eq!(foreground(grey), Paint::solid(grey));
+    assert_eq!(foreground(rgb), Paint::solid(rgb));
+}
+
 #[test]
 fn layout_bounds_take_in_the_colour_layers() {
     let db = colr_db(true);
