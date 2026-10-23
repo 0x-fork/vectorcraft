@@ -520,6 +520,15 @@ fn blank_pages(doc: &Document) -> Document {
 /// Why a `.ai` file saved without PDF content looks empty elsewhere.
 const NOT_PDF_COMPATIBLE: &str = "saved without PDF content: VectorCraft opens it as before, other apps show empty pages";
 
+/// `e`, an error of the export encoders, under the save command `cmd` instead of
+/// `document.export`.
+fn named_for_save(cmd: &str, e: crate::EngineError) -> crate::EngineError {
+    match e {
+        crate::EngineError::BadParams { cmd: c, msg } if c == "document.export" => bad(cmd, msg),
+        e => e,
+    }
+}
+
 /// The shared Save and Export encoder for PDF-compatible `.ai` files (and `.ait` templates, the
 /// same file).
 pub(super) fn encode_ai(cmd: &str, f: &Format, doc: &Document, p: &Value) -> Result<Encoded> {
@@ -603,7 +612,7 @@ fn job_for_stamped(s: &Session, st: &DocState, plan: SavePlan, stamped: Option<i
     if matches!(plan.format.id, "vectorcraft" | "template") {
         // Not remembered with the options: the preference decides each time it isn't given.
         params = with_compression_pref(&s.prefs, &params);
-        super::native::save_options(cmd, plan.format, &doc, &params)?;
+        super::native::save_options(cmd, plan.format, &doc, &params).map_err(|e| named_for_save(cmd, e))?;
     }
     let boards = separate_boards(cmd, plan.format, &doc, &params)?;
     let mut params = super::pdf::expand_preset(s, cmd, &params)?.into_owned();
@@ -658,7 +667,8 @@ impl SaveJob {
     /// Encode one file of `doc` in the job's format.
     fn encode_one(&self, doc: &Document) -> Result<Encoded> {
         let (cmd, f) = (self.plan.mode.command(), self.plan.format);
-        let enc = if matches!(f.id, "ai" | "ait") { encode_ai(cmd, f, doc, &self.params)? } else { encode_all(doc, f.id, &self.params)? };
+        let enc = if matches!(f.id, "ai" | "ait") { encode_ai(cmd, f, doc, &self.params) } else { encode_all(doc, f.id, &self.params) }
+            .map_err(|e| named_for_save(cmd, e))?;
         // A legacy .ai file per artboard.
         let per_artboard = f.id == "ai" && super::legacy_ai::wanted(cmd, f, &self.params)?;
         if enc.files.len() != 1 && !per_artboard {
