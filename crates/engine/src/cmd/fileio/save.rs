@@ -400,11 +400,12 @@ pub(super) fn keep_art_on(d: &mut Document, r: vectorcraft_geom::Rect) {
     }
 }
 
-/// Keep in layer `n` (and its sublayers) only the objects touching `r`.
+/// Keep in layer `n` (and its sublayers) only the objects touching `r`, and those without bounds.
 fn keep_on(n: &mut Arc<vectorcraft_doc::Node>, r: vectorcraft_geom::Rect) {
     let touches = |b: vectorcraft_geom::Rect| b.x0 <= r.x1 && b.x1 >= r.x0 && b.y0 <= r.y1 && b.y1 >= r.y0;
     if let Some(children) = Arc::make_mut(n).children_mut() {
-        children.retain(|c| c.is_layer() || c.visual_bounds().is_some_and(touches));
+        // An object whose bounds can't be measured (type in a missing font) stays: dropping it loses art.
+        children.retain(|c| c.is_layer() || c.visual_bounds().is_none_or(touches));
         for c in children.iter_mut().filter(|c| c.is_layer()) {
             keep_on(c, r);
         }
