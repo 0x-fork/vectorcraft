@@ -1080,3 +1080,22 @@ mod tests;
 mod tests_paint;
 #[cfg(test)]
 mod tests_sketch;
+
+#[cfg(test)]
+mod window_max_tests {
+    use super::window_max;
+
+    #[test]
+    fn the_sliding_maximum_matches_a_scan_of_each_window() {
+        let row: Vec<f32> = (0..40u32).map(|i| ((i * 7919) % 31) as f32).collect();
+        for radius in [0, 1, 2, 5, 39, 100] {
+            let mut out = vec![0.0; row.len()];
+            window_max(&row, radius, &mut out);
+            for (x, got) in out.iter().enumerate() {
+                let (lo, hi) = (x.saturating_sub(radius), (x + radius).min(row.len() - 1));
+                let want = row[lo..=hi].iter().copied().fold(f32::MIN, f32::max);
+                assert_eq!(*got, want, "radius {radius} at {x}");
+            }
+        }
+    }
+}
