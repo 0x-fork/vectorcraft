@@ -453,7 +453,7 @@ pub(crate) fn settle_interaction(s: &mut Session) -> Result<()> {
 
 fn undo(s: &mut Session, _: &Value) -> Result<Value> {
     settle_interaction(s)?;
-    let guides_locked = s.menu.guides_locked;
+    let menu = s.menu.clone();
     let st = s.doc_mut()?;
     let e = st.history.undo.pop().ok_or_else(|| EngineError::Other("nothing to undo".into()))?;
     let label = e.label.clone();
@@ -468,10 +468,8 @@ fn undo(s: &mut Session, _: &Value) -> Result<Value> {
     st.history.trim();
     st.revision += 1;
     st.selection.prune(&st.doc);
-    // Guides locked since the step was made stay deselected.
-    if guides_locked {
-        crate::deselect_guides(&st.doc, &mut st.selection);
-    }
+    // Guides locked and slices locked or hidden since the step was made stay deselected.
+    crate::deselect_hidden(&menu, &st.doc, &mut st.selection);
     st.sync_new_art();
     super::maskedit::follow_history(st, editing);
     leave_isolation_if_gone(st);
@@ -481,7 +479,7 @@ fn undo(s: &mut Session, _: &Value) -> Result<Value> {
 
 fn redo(s: &mut Session, _: &Value) -> Result<Value> {
     settle_interaction(s)?;
-    let guides_locked = s.menu.guides_locked;
+    let menu = s.menu.clone();
     let st = s.doc_mut()?;
     let e = st.history.redo.pop().ok_or_else(|| EngineError::Other("nothing to redo".into()))?;
     let label = e.label.clone();
@@ -496,9 +494,7 @@ fn redo(s: &mut Session, _: &Value) -> Result<Value> {
     st.history.trim();
     st.revision += 1;
     st.selection.prune(&st.doc);
-    if guides_locked {
-        crate::deselect_guides(&st.doc, &mut st.selection);
-    }
+    crate::deselect_hidden(&menu, &st.doc, &mut st.selection);
     st.sync_new_art();
     super::maskedit::follow_history(st, editing);
     leave_isolation_if_gone(st);
