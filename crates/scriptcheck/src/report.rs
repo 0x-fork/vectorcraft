@@ -1,5 +1,6 @@
 //! What a check finds ([`Report`]), and the tallies it is built from ([`Acc`]), each list capped.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Kind, Limits, Need, catalog};
@@ -265,6 +266,11 @@ impl<'l> Acc<'l> {
         echo(s, self.limits.echo)
     }
 
+    /// [`Acc::echo`] without a copy when `s` isn't cut.
+    fn echoed<'a>(&self, s: &'a str) -> Cow<'a, str> {
+        echo_cow(s, self.limits.echo)
+    }
+
     /// Room for one more entry in a list of the report, or in a table of names the check keeps, of
     /// `len` entries: false (and the report marked truncated) when it is full.
     pub fn room(&mut self, len: usize) -> bool {
@@ -290,12 +296,13 @@ impl<'l> Acc<'l> {
     }
 
     pub fn menu_string(&mut self, value: &str, line: Option<usize>) {
-        let key = self.echo(value);
-        if !self.menu.contains_key(&key) && !self.room(self.menu.len()) {
-            return;
-        }
+        let key = self.echoed(value);
         let max = self.limits.lines;
-        self.menu.entry(key).or_default().add(line, max);
+        if let Some(tally) = self.menu.get_mut(&*key) {
+            tally.add(line, max);
+        } else if self.room(self.menu.len()) {
+            self.menu.entry(key.into_owned()).or_default().add(line, max);
+        }
     }
 
     pub fn menu_dynamic(&mut self) {
@@ -303,25 +310,28 @@ impl<'l> Acc<'l> {
     }
 
     pub fn member(&mut self, path: &str) {
-        if !self.members.contains_key(path) && !self.room(self.members.len()) {
-            return;
+        if let Some(n) = self.members.get_mut(path) {
+            *n = n.saturating_add(1);
+        } else if self.room(self.members.len()) {
+            self.members.insert(path.to_string(), 1);
         }
-        let n = self.members.entry(path.to_string()).or_default();
-        *n = n.saturating_add(1);
     }
 
     pub fn type_name(&mut self, name: &str) {
-        let key = self.echo(name);
-        if !self.types.contains_key(&key) && !self.room(self.types.len()) {
-            return;
+        let key = self.echoed(name);
+        if let Some(n) = self.types.get_mut(&*key) {
+            *n = n.saturating_add(1);
+        } else if self.room(self.types.len()) {
+            self.types.insert(key.into_owned(), 1);
         }
-        let n = self.types.entry(key).or_default();
-        *n = n.saturating_add(1);
     }
 
     pub fn declared(&mut self, name: &str) {
         if self.declared.len() < self.limits.entries {
-            self.declared.insert(self.echo(name));
+            let name = self.echoed(name);
+            if !self.declared.contains(&*name) {
+                self.declared.insert(name.into_owned());
+            }
         }
     }
 
@@ -405,13 +415,18 @@ impl<'l> Acc<'l> {
 
 /// `s` cut to at most `max` characters, the last one `…` when it was cut.
 pub(crate) fn echo(s: &str, max: usize) -> String {
+    echo_cow(s, max).into_owned()
+}
+
+/// [`echo`], borrowing `s` when it isn't cut.
+fn echo_cow(s: &str, max: usize) -> Cow<'_, str> {
     match s.char_indices().nth(max) {
-        None => s.to_string(),
+        None => Cow::Borrowed(s),
         Some(_) => {
             let keep = s.char_indices().nth(max.saturating_sub(1)).map_or(0, |(i, _)| i);
             let mut out = s.get(..keep).unwrap_or_default().to_string();
             out.push('…');
-            out
+            Cow::Owned(out)
         }
     }
 }
