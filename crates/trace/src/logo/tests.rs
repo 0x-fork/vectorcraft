@@ -556,6 +556,45 @@ fn sparse_marks_on_paper_are_not_promoted_to_colours() {
     }
 }
 
+/// Bars two pixels wide (whole pixels of one color) on white beside a black disc, with the colors
+/// found: no pixel of a bar has a 3 × 3 neighborhood of its own color, and a gray bar is a blend of
+/// black and white. Light grays, a red and a pale yellow are found and traced in their own color. A
+/// gray bar darker than about `#9B9B9B` stays black: a black stroke 1 to 1.6 px wide on the pixel
+/// grid gives the same pixels.
+#[test]
+fn a_bar_two_pixels_wide_beside_black_art_is_found_in_its_color() {
+    const INK: [u8; 3] = [4, 4, 3];
+    for (bar, want) in [
+        ([170u8, 170, 170], None),
+        ([200, 200, 200], None),
+        ([230, 230, 230], None),
+        ([210, 40, 50], None),
+        ([250, 230, 150], None),
+        ([128, 128, 128], Some(INK)),
+        ([51, 51, 51], Some(INK)),
+    ] {
+        let img = Raster::from_fn(120, 60, |x, y| {
+            let (fx, fy) = (f64::from(x) + 0.5, f64::from(y) + 0.5);
+            let c = if (fx - 25.0).hypot(fy - 28.0) <= 18.0 {
+                INK
+            } else if ((50..52).contains(&x) && (8..50).contains(&y)) || ((60..110).contains(&x) && (30..32).contains(&y)) {
+                bar
+            } else {
+                [255, 255, 255]
+            };
+            [c[0], c[1], c[2], 255]
+        });
+        let res = trace(&img, &crate::preset("Flat Logo").unwrap());
+        let colour_at = |p: Point| res.paths.iter().rev().find(|t| t.path.to_bezpath().winding(p) != 0).map(|t| t.color);
+        let paths: Vec<_> = res.paths.iter().map(|t| (t.color, t.pixels)).collect();
+        let want = want.unwrap_or(bar);
+        for at in [Point::new(51.0, 20.0), Point::new(51.0, 40.0), Point::new(70.0, 31.0), Point::new(100.0, 31.0)] {
+            assert_eq!(colour_at(at), Some(want), "bar {bar:?}: {at:?}; {paths:?}");
+        }
+        assert_eq!(colour_at(Point::new(25.0, 28.0)), Some(INK), "bar {bar:?}: the disc; {paths:?}");
+    }
+}
+
 /// Three rows of thin anti-aliased "lettering" (rings, slants and bars 1.6 px wide) in red, blue
 /// and green on white. The lighter shades along the strokes' anti-aliased edges are blends of an
 /// ink with the paper, not colours of their own: the palette is the three inks and white.
