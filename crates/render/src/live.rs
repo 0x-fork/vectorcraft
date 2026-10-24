@@ -565,7 +565,10 @@ impl Renderer {
         }
     }
 
-    /// Draw a live node reached without its `Arc` (thumbnails, clip fallbacks): uncached.
+    /// Draw a live node that [`Self::draw_content`] reached without its kept `Arc`
+    /// ([`Self::live_root`]): the node of a thumbnail ([`Self::render_node_thumbnail_with`]), symbol
+    /// art placed again in every frame, color glyph art, and brush art that the brush cache did not
+    /// keep. It evaluates a copy of the node and does not use the live cache.
     pub(crate) fn draw_live_node(&mut self, ctx: &mut RenderContext, f: &Frame, n: &Node) {
         let a = Arc::new(n.clone());
         self.draw_live_body(ctx, f, &a, false);
