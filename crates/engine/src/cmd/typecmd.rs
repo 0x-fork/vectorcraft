@@ -1537,6 +1537,79 @@ mod area_tests {
         assert_eq!((list(&s, 0), list(&s, 1), list(&s, 2)), (None, None, None));
     }
 
+    /// Numbered lists: `list: "number"` numbers the paragraphs 1, 2, 3 and `number` picks the
+    /// style; a list switched between bullets and numbers keeps its bullet and its indents; an
+    /// unknown value is an error; the list is saved, reopened and carried by paragraph styles.
+    #[test]
+    fn numbered_lists_are_set_per_paragraph_saved_and_styled() {
+        use vectorcraft_doc::text::{Bullet, NumberStyle, ParaList};
+        let mut s = Session::new();
+        s.execute("file.new", &json!({"width": 400, "height": 400})).unwrap();
+        let id =
+            s.execute("text.create", &json!({"x": 10, "y": 10, "text": "One\nTwo\nThree", "area": {"width": 300, "height": 200}})).unwrap()["id"]
+                .as_u64()
+                .unwrap();
+        let text = |s: &Session| match &s.doc().unwrap().doc.node(NodeId(id)).unwrap().kind {
+            NodeKind::Text(t) => (**t).clone(),
+            _ => panic!("text"),
+        };
+        let list = |s: &Session, i: usize| text(s).para_at(i).list;
+        let numbers = |s: &Session| {
+            vectorcraft_text::layout(vectorcraft_text::FontDb::global(), &text(s)).markers.iter().map(|m| m.text.clone()).collect::<Vec<_>>()
+        };
+        s.execute("select.set", &json!({"ids": [id]})).unwrap();
+        s.execute("text.setFormat", &json!({"list": "number"})).unwrap();
+        let arabic = Some(ParaList::numbered(NumberStyle::Arabic));
+        assert_eq!((list(&s, 0), list(&s, 1), list(&s, 2)), (arabic, arabic, arabic));
+        assert_eq!((text(&s).para_at(0).left_indent, text(&s).para_at(0).first_line_indent), (18.0, -18.0));
+        assert_eq!(numbers(&s), ["1.", "2.", "3."]);
+        // `number` picks the style, `list: "number"` keeps it, and the count runs on through both.
+        s.execute("text.setFormat", &json!({"number": "upperRoman", "start": 0, "end": 0})).unwrap();
+        s.execute("text.setFormat", &json!({"list": "number", "start": 0, "end": 0})).unwrap();
+        let roman = Some(ParaList::numbered(NumberStyle::UpperRoman));
+        assert_eq!(list(&s, 0), roman);
+        assert_eq!(numbers(&s), ["I.", "2.", "3."]);
+        // A bullet makes it bulleted, a number style numbered again, and `list: "bullet"` brings
+        // back the bullet it had; the indents stay as they are.
+        s.execute("text.setFormat", &json!({"bullet": "square", "start": 0, "end": 0})).unwrap();
+        assert_eq!(list(&s, 0), Some(ParaList::bulleted(Bullet::Square)));
+        s.execute("text.setFormat", &json!({"number": "lowerLetters", "start": 0, "end": 0})).unwrap();
+        let letters = Some(ParaList { bullet: Bullet::Square, number: Some(NumberStyle::LowerLetters) });
+        assert_eq!(list(&s, 0), letters);
+        assert_eq!(numbers(&s), ["a.", "2.", "3."]);
+        assert_eq!((text(&s).para_at(0).left_indent, text(&s).para_at(0).first_line_indent), (18.0, -18.0));
+        for bad in [json!({"number": "roman"}), json!({"number": 1}), json!({"list": "numbered"}), json!({"number": true})] {
+            assert!(s.execute("text.setFormat", &bad).is_err(), "{bad}");
+        }
+        assert_eq!((list(&s, 0), list(&s, 1)), (letters, arabic), "an unknown value changes nothing");
+        assert_eq!(serde_json::to_value(text(&s).para_at(0)).unwrap()["list"], json!({"bullet": "square", "number": "lowerLetters"}));
+        let reopened = vectorcraft_format::load(&vectorcraft_format::save(&s.doc().unwrap().doc, false)).unwrap();
+        let Some(NodeKind::Text(back)) = reopened.node(NodeId(id)).map(|n| &n.kind) else { panic!("text") };
+        assert_eq!((back.para_at(0).list, back.para_at(1).list, back.para_at(2).list), (letters, arabic, arabic));
+        // Return at the end of a numbered item starts the next number.
+        s.execute("text.editRange", &json!({"id": id, "start": 13, "end": 13, "insert": "\nFour"})).unwrap();
+        assert_eq!(numbers(&s), ["a.", "2.", "3.", "4."]);
+        s.execute("edit.undo", &json!({})).unwrap();
+        // "none" turns the list off; the next numbered paragraph starts again at 1.
+        s.execute("text.setFormat", &json!({"number": "none", "start": 4, "end": 4})).unwrap();
+        assert_eq!(list(&s, 1), None);
+        assert_eq!(numbers(&s), ["a.", "1."]);
+        // A style that holds a numbered list sets it, a style captured from a numbered paragraph
+        // carries its list, and one captured from a paragraph without a list turns it off.
+        s.execute("paraStyle.new", &json!({"name": "Roman", "attrs": {"list": {"number": "upperRoman"}}})).unwrap();
+        s.execute("paraStyle.apply", &json!({"name": "Roman", "id": id})).unwrap();
+        assert_eq!((list(&s, 0), list(&s, 1), list(&s, 2)), (roman, roman, roman));
+        assert_eq!(numbers(&s), ["I.", "II.", "III."]);
+        let plain = s.execute("text.create", &json!({"x": 10, "y": 300, "text": "Plain"})).unwrap()["id"].as_u64().unwrap();
+        s.execute("paraStyle.new", &json!({"name": "Plain", "id": plain})).unwrap();
+        s.execute("paraStyle.new", &json!({"name": "Captured", "id": id})).unwrap();
+        s.execute("paraStyle.apply", &json!({"name": "Captured", "id": plain})).unwrap();
+        let Some(NodeKind::Text(t)) = s.doc().unwrap().doc.node(NodeId(plain)).map(|n| &n.kind) else { panic!("text") };
+        assert_eq!(t.para_at(0).list, roman);
+        s.execute("paraStyle.apply", &json!({"name": "Plain", "id": id})).unwrap();
+        assert_eq!((list(&s, 0), list(&s, 1), list(&s, 2)), (None, None, None));
+    }
+
     /// Type › Create Outlines makes a path of a list item's bullet as well as of its characters.
     #[test]
     fn create_outlines_makes_a_path_of_the_bullet() {

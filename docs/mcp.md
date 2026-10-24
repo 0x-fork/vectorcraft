@@ -4364,46 +4364,67 @@ The menu item is checked while the paragraph the Paragraph panel shows has it on
 {"name":"run_command","arguments":{"command":"text.setFormat","params":{"romanHangingPunctuation":true}}}
 ```
 
-## Bulleted lists
+## Bulleted and numbered lists
 
-`text.setFormat {list: "none"|"bullet", bullet: "none"|"dot"|"dash"|"circle"|"square"}` (Paragraph panel › Bullets)
-makes the paragraphs of the selected type (or `ids`, or the paragraphs a `start` / `end` range touches) a bulleted list
-or takes them out of one. `bullet` sets the bullet: a filled dot (•), a dash (–), a hollow circle (◦) or a filled
-square (▪). `list: "bullet"` keeps the bullet of a paragraph that is already in a list and gives the others the dot.
-`"none"` in either key turns the list off and leaves the indents as they are. An unknown value is an error and changes
-nothing. A paragraph that joins a list while its left and first-line indents are both 0 gets a left indent of 18 pt and a
-first-line indent of -18 pt, unless the same call sets `leftIndent` or `firstLineIndent`; other indents stay as they are.
-In a horizontal right-to-left list paragraph the indents are mirrored: the left and first-line indents are measured
-from the right edge, and the right indent from the left edge. Its bullet starts the first line at the right, and the
-lines it wraps to start at the right where the first line's text starts after the bullet. A right-to-left paragraph
-without a list keeps its left and first-line indents at the left, and vertical type keeps its indents as they are. In
-threaded type, a list paragraph that continues into the next frame starts that frame with its bullet again, as it
-starts it with its first-line indent.
+`text.setFormat {list: "none"|"bullet"|"number", bullet: "none"|"dot"|"dash"|"circle"|"square", number:
+"none"|"arabic"|"upperLetters"|"lowerLetters"|"upperRoman"|"lowerRoman"|"twoDigits"|"threeDigits"}` (Paragraph panel ›
+Bullets and Numbered List) makes the paragraphs of the selected type (or `ids`, or the paragraphs a `start` / `end`
+range touches) a bulleted or numbered list or takes them out of one. `bullet` sets the bullet: a filled dot (•), a dash
+(–), a hollow circle (◦) or a filled square (▪). `list: "bullet"` keeps the bullet of a paragraph that is already in a
+list and gives the others the dot. `number` sets the number style: 1, 2, 3; A, B, C; a, b, c; I, II, III; i, ii, iii;
+01, 02, 03; or 001, 002, 003. `list: "number"` keeps the style of a paragraph that is already in a numbered list and
+gives the others 1, 2, 3. Without `list`, a `number` style makes a numbered list and a `bullet` makes a bulleted one; a
+numbered list keeps its bullet for when it is made bulleted again. `"none"` in any of the three keys turns the list off
+and leaves the indents as they are. An unknown value is an error and changes nothing. A paragraph that joins a list
+while its left and first-line indents are both 0 gets a left indent of 18 pt and a first-line indent of -18 pt, unless
+the same call sets `leftIndent` or `firstLineIndent`; other indents stay as they are, also when a list changes between
+bullets and numbers. In a horizontal right-to-left list paragraph the indents are mirrored: the left and first-line
+indents are measured from the right edge, and the right indent from the left edge. Its marker starts the first line at
+the right, and the lines it wraps to start at the right where the first line's text starts after the marker. A
+right-to-left paragraph without a list keeps its left and first-line indents at the left, and vertical type keeps its
+indents as they are. In threaded type, a list paragraph that continues into the next frame starts that frame with its
+bullet or number again, as it starts it with its first-line indent.
 
-The layout draws the bullet before the first line of each list paragraph that has text, in the font, size, scales and
-color of the paragraph's first character, without that character's baseline shift, rotation, superscript or subscript,
-tracking, manual kerning and tate-chu-yoko. The bullet is not a character of the text: copied text leaves it out, the
-caret before the paragraph's first character stands at the text, a selection does not highlight the bullet, and Touch
-Type moves that character without the bullet. The text after it starts at the next tab stop, the left indent counting
-as a stop when no explicit stop comes before it, measured from the right in a right-to-left list paragraph. The lines
-the paragraph wraps to start at the left indent. Type on a path draws the bullet and the same gap before the
-paragraph's text; a right-to-left item on a path has its bullet at the right of its text. Justification and Optical
-Margin Alignment leave the bullet and the gap after it as they are, and an underline or strikethrough starts at the
-text. Return at the end of a list item starts another item in the same list. The list is saved with the paragraph
-(`list` in `para`, for example `{"bullet": "square"}`) only when it is set, and paragraph styles carry it: a style
-captured from a paragraph without a list turns the list off. Reset Panel turns it off. The change is one undo step.
+The layout draws the marker (the bullet, or the number and its period) before the first line of each list paragraph
+that has text, in the font, size, scales and color of the paragraph's first character, without that character's
+baseline shift, rotation, superscript or subscript, tracking, manual kerning and tate-chu-yoko. The marker is not a
+character of the text: copied text leaves it out, the caret before the paragraph's first character stands at the text,
+a selection does not highlight the marker, and Touch Type moves that character without the marker. The text after it
+starts at the next tab stop, the left indent counting as a stop when no explicit stop comes before it, measured from the
+right in a right-to-left list paragraph; a number that reaches past the left indent takes the text to the next tab stop
+after it. The lines the paragraph wraps to start at the left indent. Type on a path draws the marker and the same gap
+before the paragraph's text; a right-to-left item on a path has its marker at the right of its text. Justification and
+Optical Margin Alignment leave the marker and the gap after it as they are, and an underline or strikethrough starts at
+the text. Return at the end of a list item starts another item in the same list. The list is saved with the paragraph
+(`list` in `para`, for example `{"bullet": "square"}` or `{"bullet": "dot", "number": "upperRoman"}`) only when it is
+set, and paragraph styles carry it: a style captured from a paragraph without a list turns the list off. Reset Panel
+turns it off. The change is one undo step.
 
-The canvas, EPS, PDF and Type › Create Outlines draw the bullet; in PDF it is a path, not text. Live SVG text writes the
-bullet's character before the paragraph's text, except type on a path with bullets, which it writes as outlines with a
-warning. DXF writes the bullet as a TEXT entity of its own. Legacy `.ai` writes the
-paragraph's text without the bullet and warns that bulleted lists are left out.
+A numbered paragraph's number counts the numbered paragraphs of its story up to and including it: the count runs through
+consecutive list paragraphs, through the frames of threaded type in thread order, and starts again at 1 after a
+paragraph in no list. An empty paragraph has no number and is not counted, and a bulleted paragraph keeps its bullet and
+is not counted. Letters run from A to Z, then AA to ZZ, then AAA; roman numerals use IV, IX, XL, XC, CD and CM; 01 and
+001 keep every digit past 99 and 999; letters and roman numerals past 3999 are written in Arabic digits. In a
+right-to-left paragraph the number reads left to right with its period at its left. Each threaded frame saves the count
+that its earlier frames carry into it (`listCount`, only when it is not 0). Type that is in no thread counts from 1:
+after Remove Threading or Release Selection, in a frame converted to point type, and in every copy of a frame (pasted,
+duplicated, copied in the Layers panel, or taken out of a symbol or a placed file). A symbol made of a thread keeps the
+numbers in the symbol's art.
+
+The canvas, EPS, PDF and Type › Create Outlines draw the marker; in PDF it is a path, not text. Live SVG text writes the
+marker's characters before the paragraph's text, except type on a path with a list, which it writes as outlines with a
+warning. DXF writes the marker as a TEXT entity of its own, its characters in the order they are drawn. Legacy `.ai`
+writes the paragraph's text without the marker and warns that bulleted and numbered lists are left out.
 
 Type › Bullets and Numbering › Apply Bullets and the canvas context menu's Bullets and Numbering › Apply Bullets run
-`type.applyBullets {bullet?}` on the selected type's paragraphs, or on those the Type tool's selection touches: without
-`bullet` as `text.setFormat {list: "bullet"}`, with it as `text.setFormat {bullet}`.
+`type.applyBullets {bullet?}` on the selected type's paragraphs, or on those the Type tool's selection touches. Without
+`bullet` it runs `text.setFormat {list: "bullet"}`, and with it it runs `text.setFormat {bullet}`. Apply Numbers in the
+same menus runs `type.applyNumbers {number?}`. Without `number` it runs `text.setFormat {list: "number"}`, and with it
+it runs `text.setFormat {number}`.
 
 ```json
 {"name":"run_command","arguments":{"command":"text.setFormat","params":{"bullet":"square"}}}
+{"name":"run_command","arguments":{"command":"text.setFormat","params":{"number":"upperRoman"}}}
 ```
 
 ## Small Caps, Superscript and Subscript
