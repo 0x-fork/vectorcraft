@@ -1401,20 +1401,27 @@ pub fn layered_ai(private: &[u8], visible: Document, warnings: Vec<String>, outl
     if !has_layers(&data) {
         return (visible, warnings, false);
     }
+    // The PDF part, its pages placed and named as the editing data's artboards are, when the
+    // layers can't be used (`why`).
+    let from_pdf_part = |mut visible: Document, warnings: Vec<String>, why: &str| {
+        place_pages(&ai::artboards(&data), &mut visible, unit);
+        let mut all = unread(warnings, why);
+        all.extend(ai::variables(&data).note());
+        (visible, all, false)
+    };
     match build(&data, Some(&visible), Page::Artboard, outlined, trust, unit) {
+        // An image too large for the editing data's reader would be missing from the layers, while
+        // the PDF part has it: the file comes in as its PDF part instead (#1479).
+        Ok((_, notes)) if notes.iter().any(|n| n == ai::IMAGE_TOO_LARGE) => {
+            from_pdf_part(visible, warnings, "an image is too large to read from them")
+        }
         Ok((mut done, notes)) => {
             done.setup.bleed = visible.setup.bleed;
             let mut all = warnings;
             all.extend(notes.into_iter().filter(|n| !all.contains(n)).collect::<Vec<_>>());
             (done, all, true)
         }
-        Err(why) => {
-            let mut visible = visible;
-            place_pages(&ai::artboards(&data), &mut visible, unit);
-            let mut all = unread(warnings, &why);
-            all.extend(ai::variables(&data).note());
-            (visible, all, false)
-        }
+        Err(why) => from_pdf_part(visible, warnings, &why),
     }
 }
 
