@@ -395,6 +395,10 @@ impl std::hash::Hasher for PtrHasher {
 
 type PtrMap<K, V> = HashMap<K, V, std::hash::BuildHasherDefault<PtrHasher>>;
 
+/// The key of a cached stroke outline: ([`Renderer::stroke_owner`] of what owns the stroke, the
+/// stroke's place in it, width bits, tolerance level).
+type StrokeKey = (usize, usize, u64, i32);
+
 /// A stroke expanded to a fill outline: (owning node, outline, last frame used).
 struct StrokeEntry {
     node: Arc<Node>,
@@ -470,7 +474,13 @@ pub struct Renderer {
     plugin_revision: u64,
     /// Expanded stroke outlines keyed by ([`Self::stroke_owner`], stroke layer address, width bits,
     /// tolerance level): panning re-renders reuse them instead of re-expanding every stroke.
-    strokes: PtrMap<(usize, usize, u64, i32), StrokeEntry>,
+    strokes: PtrMap<StrokeKey, StrokeEntry>,
+    /// Expanded character stroke outlines, with the glyph geometry kept in `texts` they belong to,
+    /// keyed by ([`Self::stroke_owner`] of that geometry, run, width bits, tolerance level): type
+    /// that doesn't change draws them again instead of expanding its strokes in every frame. Within
+    /// a byte budget, and swept by frame, so the outlines of type that changes in every frame go
+    /// within a few frames.
+    char_strokes: FrameCache<StrokeKey, (Arc<TextGeom>, Arc<BezPath>)>,
     /// The node being drawn on the plain-path fast path, or the path of brush art being drawn
     /// ([`Self::draw_brush_pieces`]): the owner of cached stroke outlines.
     cur: Option<Arc<Node>>,
@@ -648,6 +658,7 @@ impl Renderer {
             symbols: vec![],
             plugin_revision: 0,
             strokes: PtrMap::default(),
+            char_strokes: FrameCache::new(lru::CHAR_STROKE_BUDGET, 0),
             cur: None,
             made_again: false,
             fx_owner: None,
@@ -789,6 +800,7 @@ impl Renderer {
         // Filtered rasters are large: only those of the last frame stay.
         self.pixel_fx.retain(|_, e| e.stamp == g);
         self.texts.sweep(g);
+        self.char_strokes.sweep(g);
         self.clips.sweep(g);
         self.clip_paints.sweep(g);
         self.fx_arts.sweep(g);
@@ -1173,11 +1185,11 @@ impl Renderer {
             && !fx::has_fx(a)
         {
             let t = &*f.doc.inline_resolved(t);
-            let g = match f.text_snap(t) {
-                Some(xf) => Arc::new(text_geom_snapped(t, Some(xf))),
+            let (g, kept) = match f.text_snap(t) {
+                Some(xf) => (Arc::new(text_geom_snapped(t, Some(xf))), false),
                 None => self.text_geom_of(a, t),
             };
-            self.draw_text_geom(ctx, f, a, t, &g);
+            self.draw_text_geom(ctx, f, a, t, &g, kept);
             self.stats.drawn += 1;
             return;
         }
@@ -1609,7 +1621,7 @@ impl Renderer {
                     if st.brush.is_some() && self.draw_brush(ctx, f, n, bp, st) {
                         continue;
                     }
-                    self.draw_stroke(ctx, f, Affine::IDENTITY, bp, rule, st, bounds);
+                    self.draw_stroke(ctx, f, Affine::IDENTITY, bp, rule, st, None, bounds);
                 }
             }
         }
@@ -1626,8 +1638,20 @@ impl Renderer {
 
     /// Paint stroke `st` of the shape `bp` (in the space `xf` maps to the document; `bounds`: its
     /// geometric bounds there) with its alignment, dashes, profile, arrowheads, opacity and blend.
+    /// `chars` is the glyph geometry kept in `texts` and the run that `st` is the character stroke
+    /// of, when it is one.
     #[allow(clippy::too_many_arguments)]
-    fn draw_stroke(&mut self, ctx: &mut RenderContext, f: &Frame, xf: Affine, bp: &BezPath, rule: FillRule, st: &StrokeLayer, bounds: Rect) {
+    fn draw_stroke(
+        &mut self,
+        ctx: &mut RenderContext,
+        f: &Frame,
+        xf: Affine,
+        bp: &BezPath,
+        rule: FillRule,
+        st: &StrokeLayer,
+        chars: Option<(&Arc<TextGeom>, usize)>,
+        bounds: Rect,
+    ) {
         let pieces = effects::stroke::stroke_pieces(bp, st);
         // The line and its heads overlap: they take the opacity once, in one layer, instead of
         // each folding it into its paint.
@@ -1650,11 +1674,11 @@ impl Renderer {
         // One paint box for the line and the heads, so a gradient runs on into the heads.
         let paint_bounds = bounds.inflate(st.width / 2.0, st.width / 2.0);
         if let Some(g) = st.path_gradient() {
-            self.fill_path_gradient(ctx, f, bp, rule, st, &pieces, width, &g.gradient);
+            self.fill_path_gradient(ctx, f, bp, rule, st, chars, &pieces, width, &g.gradient);
         } else if paint::set_paint(ctx, &st.paint, paint_bounds, f) {
             self.fold_alpha(ctx, f.ink, &st.paint);
             ctx.set_fill_rule(peniko::Fill::NonZero);
-            match self.cached_stroke(f, &pieces.line, st, width) {
+            match self.cached_stroke(f, chars, &pieces.line, st, width) {
                 Some(o) => ctx.fill_path(&o),
                 None => ctx.fill_path(&effects::stroke::line_outline(&pieces.line, st, width, f.px * 0.25)),
             }
@@ -1693,6 +1717,7 @@ impl Renderer {
         bp: &BezPath,
         rule: FillRule,
         st: &StrokeLayer,
+        chars: Option<(&Arc<TextGeom>, usize)>,
         pieces: &effects::stroke::StrokePieces,
         width: f64,
         g: &vectorcraft_color::Gradient,
@@ -1714,7 +1739,7 @@ impl Renderer {
         };
         let slices = match self.cur.clone().filter(|n| owns_stroke(n, st)) {
             Some(node) => {
-                let key = (self.stroke_owner(&node), st as *const StrokeLayer as usize, level);
+                let key = (self.stroke_owner(Arc::as_ptr(&node) as usize), st as *const StrokeLayer as usize, level);
                 match self.stroke_slices.get_mut(&key) {
                     Some(e) if Arc::ptr_eq(&e.node, &node) => {
                         e.stamp = self.stamp;
@@ -1729,7 +1754,7 @@ impl Renderer {
             }
             None => make(),
         };
-        let line = match self.cached_stroke(f, &pieces.line, st, width) {
+        let line = match self.cached_stroke(f, chars, &pieces.line, st, width) {
             Some(o) => o,
             None => Arc::new(effects::stroke::line_outline(&pieces.line, st, width, f.px * 0.25)),
         };
@@ -1751,30 +1776,51 @@ impl Renderer {
         }
     }
 
-    /// The line part of a stroke of `self.cur` (see [`effects::stroke::line_outline`]), cached
-    /// across frames under [`Self::stroke_owner`] and the stroke layer. The tolerance (vello's 0.25
-    /// device px) is bucketed to powers of two, never coarser than needed, so zooming reuses
-    /// outlines until the level changes. Only `self.cur`'s own strokes are cached: for other
-    /// strokes, this returns `None`.
-    fn cached_stroke(&mut self, f: &Frame, line: &BezPath, st: &StrokeLayer, width: f64) -> Option<Arc<BezPath>> {
-        let node = self.cur.clone().filter(|n| owns_stroke(n, st))?;
+    /// The line part of a stroke (see [`effects::stroke::line_outline`]), cached across frames: a
+    /// character stroke of run `chars.1` of kept glyph geometry `chars.0` in `char_strokes`, a
+    /// stroke of `self.cur` in `strokes` (under [`Self::stroke_owner`] and the stroke layer). The
+    /// tolerance (vello's 0.25 device px) is bucketed to powers of two, never coarser than needed,
+    /// so zooming reuses outlines until the level changes. Other strokes aren't cached: for them
+    /// this returns `None`.
+    fn cached_stroke(
+        &mut self,
+        f: &Frame,
+        chars: Option<(&Arc<TextGeom>, usize)>,
+        line: &BezPath,
+        st: &StrokeLayer,
+        width: f64,
+    ) -> Option<Arc<BezPath>> {
         let level = (f.px * 0.25).log2().floor() as i32;
-        let key = (self.stroke_owner(&node), st as *const StrokeLayer as usize, width.to_bits(), level);
+        let expand = || Arc::new(effects::stroke::line_outline(line, st, width, 2f64.powi(level)));
+        if let Some((g, run)) = chars {
+            let key = (self.stroke_owner(Arc::as_ptr(g) as usize), run, width.to_bits(), level);
+            if let Some((kept, outline)) = self.char_strokes.get(&key, self.stamp)
+                && Arc::ptr_eq(kept, g)
+            {
+                return Some(outline.clone());
+            }
+            let outline = expand();
+            self.char_strokes.insert(key, (g.clone(), outline.clone()), lru::path_bytes(&outline), self.stamp);
+            return Some(outline);
+        }
+        let node = self.cur.clone().filter(|n| owns_stroke(n, st))?;
+        let key = (self.stroke_owner(Arc::as_ptr(&node) as usize), st as *const StrokeLayer as usize, width.to_bits(), level);
         if let Some(e) = self.strokes.get_mut(&key)
             && Arc::ptr_eq(&e.node, &node)
         {
             e.stamp = self.stamp;
             return Some(e.outline.clone());
         }
-        let outline = Arc::new(effects::stroke::line_outline(line, st, width, 2f64.powi(level)));
+        let outline = expand();
         self.strokes.insert(key, StrokeEntry { node, outline: outline.clone(), stamp: self.stamp });
         Some(outline)
     }
 
-    /// What the `strokes` and `stroke_slices` keys hold for `node` (`self.cur`): its address,
-    /// or 0 while art made again in every frame is drawn ([`Self::made_again`]).
-    fn stroke_owner(&self, node: &Arc<Node>) -> usize {
-        if self.made_again { 0 } else { Arc::as_ptr(node) as usize }
+    /// What the `strokes`, `char_strokes` and `stroke_slices` keys hold for a stroke owner at
+    /// `address` (`self.cur` or kept glyph geometry): the address, or 0 while art made again in
+    /// every frame is drawn ([`Self::made_again`]).
+    fn stroke_owner(&self, address: usize) -> usize {
+        if self.made_again { 0 } else { address }
     }
 
     fn draw_text(&mut self, ctx: &mut RenderContext, f: &Frame, n: &Node, t: &TextObject) {
@@ -1783,11 +1829,11 @@ impl Renderer {
         // keeps, see `draw_fx_art`) takes its glyph geometry from `texts`, as on the fast path,
         // except in frames that snap type to pixels.
         let owner = self.fx_owner.as_ref().filter(|o| std::ptr::eq(&***o, n)).cloned();
-        let g = match (f.text_snap(t), owner) {
+        let (g, kept) = match (f.text_snap(t), owner) {
             (None, Some(a)) => self.text_geom_of(&a, t),
-            (snap, _) => Arc::new(text_geom_snapped(t, snap)),
+            (snap, _) => (Arc::new(text_geom_snapped(t, snap)), false),
         };
-        self.draw_text_geom(ctx, f, n, t, &g);
+        self.draw_text_geom(ctx, f, n, t, &g, kept);
     }
 
     /// Draw the inline graphics of type `t` (laid out in `g`): each symbol's art through the
@@ -1854,28 +1900,32 @@ impl Renderer {
 
     /// Cached glyph geometry for a text node (keyed by Arc identity like paths).
     /// Text `t` that is not the node's own, such as the copy whose inline graphics
-    /// `Document::inline_resolved` sized again, is laid out without the cache.
-    fn text_geom_of(&mut self, a: &Arc<Node>, t: &TextObject) -> Arc<TextGeom> {
+    /// `Document::inline_resolved` sized again, is laid out without the cache. Also returns
+    /// whether the geometry is kept in the cache.
+    fn text_geom_of(&mut self, a: &Arc<Node>, t: &TextObject) -> (Arc<TextGeom>, bool) {
         if !matches!(&a.kind, NodeKind::Text(own) if std::ptr::eq(&**own, t)) {
-            return Arc::new(text_geom(t));
+            return (Arc::new(text_geom(t)), false);
         }
         let fonts = vectorcraft_text::FontDb::global().generation();
         if fonts != self.text_fonts {
             self.texts.clear();
+            self.char_strokes.clear();
             self.text_fonts = fonts;
         }
         let key = Arc::as_ptr(a) as usize;
         if let Some((node, g)) = self.texts.get(&key, self.stamp)
             && Arc::ptr_eq(node, a)
         {
-            return g.clone();
+            return (g.clone(), true);
         }
         let g = Arc::new(text_geom(t));
-        self.texts.insert(key, (a.clone(), g.clone()), g.bytes(), self.stamp);
-        g
+        let kept = self.texts.insert(key, (a.clone(), g.clone()), g.bytes(), self.stamp);
+        (g, kept)
     }
 
-    fn draw_text_geom(&mut self, ctx: &mut RenderContext, f: &Frame, n: &Node, t: &TextObject, g: &TextGeom) {
+    /// Draw type `n` (`t`, laid out in `g`). The outlines of its character strokes are cached
+    /// when `g` is kept in `texts` (`kept`).
+    fn draw_text_geom(&mut self, ctx: &mut RenderContext, f: &Frame, n: &Node, t: &TextObject, g: &Arc<TextGeom>, kept: bool) {
         let xf = f.view * t.xf;
         if f.opts.outline {
             let mut p = g.all.clone();
@@ -1958,7 +2008,8 @@ impl Renderer {
             if run.style.has_stroke() {
                 // Character strokes are drawn in text space, with their cap, join and dashes.
                 overprint(ctx, run.style.overprint_stroke);
-                self.draw_stroke(ctx, f, t.xf, path, FillRule::NonZero, &run.style.stroke_layer(), g.bounds);
+                let chars = kept.then_some((g, i));
+                self.draw_stroke(ctx, f, t.xf, path, FillRule::NonZero, &run.style.stroke_layer(), chars, g.bounds);
             }
         }
         overprint(ctx, false);
@@ -1991,7 +2042,7 @@ impl Renderer {
                 }
                 AppearanceItem::Stroke(st) if st.width > 0.0 => {
                     if st.brush.is_none() || !self.draw_brush(ctx, f, n, all, st) {
-                        self.draw_stroke(ctx, f, Affine::IDENTITY, all, FillRule::NonZero, st, tb);
+                        self.draw_stroke(ctx, f, Affine::IDENTITY, all, FillRule::NonZero, st, None, tb);
                     }
                 }
                 AppearanceItem::Stroke(_) => {}

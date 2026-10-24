@@ -25,6 +25,9 @@ use crate::PtrHasher;
 
 /// Glyph outlines per text object (`Renderer::text_geom_of`).
 pub(crate) const TEXT_BUDGET: usize = 128 << 20;
+/// Expanded character strokes per run of the glyph outlines kept in `texts`
+/// (`Renderer::cached_stroke`).
+pub(crate) const CHAR_STROKE_BUDGET: usize = 128 << 20;
 /// Clip regions per clipping path (`Renderer::clip_of`), and separately what clipping paths
 /// paint (`Renderer::clip_paint_of`).
 pub(crate) const CLIP_BUDGET: usize = 32 << 20;
@@ -174,6 +177,12 @@ impl<K: Hash + Eq + Clone, V, S: BuildHasher + Default> FrameCache<K, V, S> {
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.map.len()
+    }
+
+    /// The values of the entries frame `stamp` made or used.
+    #[cfg(test)]
+    pub(crate) fn used_in(&self, stamp: u64) -> impl Iterator<Item = &V> {
+        self.map.values().filter(move |s| s.stamp == stamp).map(|s| &s.value)
     }
 
     #[cfg(test)]
