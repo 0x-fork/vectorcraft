@@ -457,18 +457,37 @@ impl BuilderMap {
         }
     }
 
-    /// Is region `r` no more than `2 * tol` across at `p`, measured from the point of its outline
-    /// nearest `p`, through `p`, to its outline on the other side? Every point on that line is
-    /// then within `tol` of the outline. False when `p` is on the outline or more than `tol` from
-    /// it.
+    /// Is region `r` no more than `2 * tol` across at `p`, measured from a point of its outline
+    /// within `tol` of `p`, through `p`, to its outline on the other side? Every point on that line
+    /// is then within `tol` of the outline. The points tried are the point of the outline nearest
+    /// `p` and each point inside a segment where the segment is square to the line to `p`, so a
+    /// point near the end of a thin bar measures across the bar from its sides as well as along it
+    /// from the end, and splitting a segment in two does not change the answer. False when `p` is
+    /// on the outline or more than `tol` from it.
     fn narrow_at(&self, r: usize, p: Point, tol: f64) -> bool {
-        let Some((reg, bp, _)) = self.regions.get(r) else { return false };
-        let Some((.., n, d)) = reg.path.nearest(p) else { return false };
-        if !(d.is_finite() && d > 1e-9 && d <= tol) {
+        use kurbo::{ParamCurve as _, ParamCurveNearest as _};
+        let Some((_, bp, _)) = self.regions.get(r) else { return false };
+        // Each segment with the parameter, point and distance of its point nearest `p`.
+        let near: Vec<(kurbo::PathSeg, f64, Point, f64)> = bp
+            .segments()
+            .map(|seg| {
+                let n = seg.nearest(p, 1e-6);
+                (seg, n.t, seg.eval(n.t), n.distance_sq.sqrt())
+            })
+            .collect();
+        if !near.iter().all(|&(.., d)| d.is_finite() && d > 1e-9) {
             return false;
         }
-        let line = kurbo::Line::new(p, p + (p - n) * ((2.0 * tol - d) / d));
-        bp.segments().any(|seg| seg.intersect_line(line).iter().any(|x| x.line_t > 1e-9 && x.line_t <= 1.0))
+        let closest = near.iter().map(|&(.., d)| d).fold(f64::INFINITY, f64::min);
+        // A line from `p` no longer than `2 * tol` only meets segments that close to `p`.
+        let reach: Vec<kurbo::PathSeg> = near.iter().filter(|&&(.., d)| d <= 2.0 * tol).map(|&(seg, ..)| seg).collect();
+        // A segment's end is its nearest point when the segment turns away from `p` or stops
+        // short of the point square to it; only the nearest point of all the outline counts there.
+        let from = |&&(_, t, _, d): &&(kurbo::PathSeg, f64, Point, f64)| d <= tol && (d == closest || (t > 1e-9 && t < 1.0 - 1e-9));
+        near.iter().filter(from).any(|&(_, _, n, d)| {
+            let line = kurbo::Line::new(p, p + (p - n) * ((2.0 * tol - d) / d));
+            reach.iter().any(|seg| seg.intersect_line(line).iter().any(|x| x.line_t > 1e-9 && x.line_t <= 1.0))
+        })
     }
 
     /// What a gesture along the polyline `pts` touches, in order: [`Self::hit`] at each vertex and
@@ -1996,7 +2015,32 @@ mod tests {
             let t = map.builder_hits_along(&[Point::new(20.0, 50.0), Point::new(80.0, 50.0)], Some(4.0));
             assert!(t.regions.contains(&inner), "{rs:?}: {t:?}");
             assert_eq!(t.regions.len(), rs.len(), "{rs:?}: {t:?}");
+            // 0.1 pt from an end, the nearest outline is the end, and the bar is still 1.5 pt
+            // across from its sides: a click there and a drag across the bar there touch it.
+            assert_eq!(map.builder_hit(Point::new(49.75, 10.1), Some(4.0)), Some(Hit::Region(inner)), "{rs:?}");
+            assert_eq!(map.builder_hit(Point::new(49.75, 89.9), Some(4.0)), Some(Hit::Region(inner)), "{rs:?}");
+            let t = map.builder_hits_along(&[Point::new(20.0, 10.1), Point::new(80.0, 10.1)], Some(4.0));
+            assert!(t.regions.contains(&inner), "{rs:?}: {t:?}");
         }
+        // Near a corner of the square, both of its edges there are close, and the square is wide
+        // across from each: the edge is touched.
+        let (d, s) = rects(&[Rect::new(0.0, 0.0, 100.0, 100.0), bar]);
+        let map = map_of(&d, &s);
+        assert!(matches!(map.builder_hit(Point::new(1.0, 1.0), Some(4.0)), Some(Hit::Edge(_))));
+        // So it is when the square's top edge has a point 2 pt from the corner: the end of the
+        // segment past that point is not where the square is narrow.
+        let mut d = Document::new(500.0, 500.0);
+        let l = d.layers[0].id;
+        let id = d.alloc_id();
+        let pts = [(0.0, 0.0), (2.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)].map(|(x, y)| Point::new(x, y));
+        let path = PathData::new(vec![SubPath::polyline(&pts, true)]);
+        d.insert(Some(l), 0, Node::path(id, path, Appearance::default_art())).unwrap();
+        let mut s = Selection::default();
+        s.add(id);
+        let map = map_of(&d, &s);
+        let square = map.region_at(Point::new(50.0, 50.0)).unwrap();
+        assert_eq!(map.regions[square].1.segments().count(), 5, "the point on the top edge stays");
+        assert!(matches!(map.builder_hit(Point::new(1.0, 1.0), Some(4.0)), Some(Hit::Edge(_))));
     }
 
     #[test]
