@@ -574,8 +574,8 @@ pub enum Cursor {
     MagicWand,
     /// The Pencil tool.
     Pencil,
-    /// The Pencil tool with Alt held while Alt key toggles to Smooth Tool is off: releasing the
-    /// mouse button with Alt still held closes the path. A crosshair with a ring.
+    /// The Pencil tool with Alt held while drawing and Alt key toggles to Smooth Tool off: releasing
+    /// the mouse button with Alt still held closes the path. A crosshair with a ring.
     PencilClose,
     /// The Paintbrush tool.
     Paintbrush,
