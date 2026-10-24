@@ -481,21 +481,131 @@ fn compound_assignments_and_increments_empty_a_name() {
     );
 }
 
+/// The lines of the `filesWritten` use in `r`, empty when it has none, and the member names, for a
+/// script whose other uses are not under test.
+fn written_lines_and_members(r: &Report) -> (Vec<usize>, Vec<&str>) {
+    let lines = r.outside.iter().flat_map(|o| {
+        assert_eq!(o.id, "filesWritten");
+        o.lines.iter().copied()
+    });
+    (lines.collect(), r.members.iter().map(|m| m.name.as_str()).collect())
+}
+
+/// `(name, script, lines of the files written, members)`: what a name holds after a value that goes
+/// on past its parentheses or past a call, or that is a comma expression or a grouped value.
+const HELD_VALUE_CASES: &[(&str, &str, &[usize], &[&str])] = &[
+    (
+        "a_value_that_goes_on_on_the_next_line_is_not_what_the_name_holds",
+        concat!(
+            "var a = new File(p);\n",
+            "var b = a\n  .name;\n",
+            "b.remove();\n",
+            "var d = app.activeDocument\n  + 'x';\n",
+            "d.acmeName;\n",
+            "var c = a\nc.remove();\n",
+            "var e = app.activeDocument\ne.acmeLayers;\n",
+        ),
+        &[9],
+        &["app.activeDocument", "app.activeDocument.acmeLayers"],
+    ),
+    // A comma expression in parentheses is the value of its last operand (ECMA-262 3rd edition,
+    // section 11.14).
+    (
+        "a_comma_expression_in_parentheses_is_its_last_operand",
+        concat!(
+            "var d = (0, app.activeDocument);\n",
+            "d.acmeName;\n",
+            "var f = (x, (new File(p)));\n",
+            "f.remove();\n",
+            "var g = (new File(p), 0);\n",
+            "g.remove();\n",
+            "var e = ((app.activeDocument), 0);\n",
+            "e.acmeLayers;\n",
+            "var k = (a = 1, f);\n",
+            "k.remove();\n",
+        ),
+        &[4, 10],
+        &["app.activeDocument", "app.activeDocument.acmeName"],
+    ),
+    // Parentheses that hold only the start of the value, or a value that goes on after them, leave the
+    // name holding nothing the check follows, as a call's argument list does.
+    (
+        "a_value_that_only_begins_in_parentheses_is_not_what_the_name_holds",
+        concat!(
+            "var f = new File(p);\n",
+            "var x = (app.activeDocument).name;\n",
+            "x.acmeLayers;\n",
+            "var y = (f).name;\n",
+            "y.remove();\n",
+            "var doc = ((app.activeDocument) + 1);\n",
+            "doc.acmeName;\n",
+            "var g = (new File(p).name);\n",
+            "g.remove();\n",
+            "var h = (new File(p))\n  .name;\n",
+            "h.remove();\n",
+            "var k = (File.name);\nnew File(p);\n",
+            "k.remove();\n",
+            "var flag = (File === File(p));\n",
+            "flag.remove();\n",
+            "var c = (f)(1), z = foo(new File(p));\n",
+            "c.remove(); z.remove();\n",
+            "var u = (x;\ny, new File(p));\n",
+            "u.remove();\n",
+        ),
+        &[],
+        &["app.activeDocument"],
+    ),
+    // The name holds a grouped value from the token after its last `)`: the next statement reads it, a
+    // function's own variable holds it only inside the function, and grouped values inside a function in
+    // parentheses don't change what the outer name holds.
+    (
+        "a_grouped_value_is_held_from_the_token_after_its_parentheses",
+        concat!(
+            "var doc = (app.activeDocument)\n",
+            "doc.acmeName;\n",
+            "function test() { var d2 = (app.activeDocument) }\n",
+            "d2.acmeLayers;\n",
+            "var f = (new File(File(p).fsName));\n",
+            "f.remove();\n",
+            "var lib = (function () { var sel = (selection); return sel.length; })();\n",
+            "var w = new File(p);\n",
+            "w = (function () { var inner = (q); return inner; });\n",
+            "w.remove();\n",
+        ),
+        &[6],
+        &["app.activeDocument", "app.activeDocument.acmeName", "selection", "selection.length"],
+    ),
+    // A value without parentheses that starts with `File` or `Folder` is what the name holds only when
+    // nothing follows the call, the dialog or the place, as in parentheses.
+    (
+        "a_file_value_that_goes_on_is_not_what_the_name_holds",
+        concat!(
+            "var a = File(p) && {remove: function () {}};\n",
+            "a.remove();\n",
+            "var b = new File(p).name;\n",
+            "b.remove();\n",
+            "var c = new File(p)\n  .parent;\n",
+            "c.remove();\n",
+            "var d = Folder.temp + '/x', e = File.openDialog('Pick') || other;\n",
+            "d.remove(); e.remove();\n",
+            "var g = File(p) == null, h = File, k = File.saveDialog;\n",
+            "g.remove(); h.remove(); k.remove();\n",
+        ),
+        &[],
+        &[],
+    ),
+];
+
+const HELD_VALUE_CASE_COUNT: usize = 5;
+
 #[test]
-fn a_value_that_goes_on_on_the_next_line_is_not_what_the_name_holds() {
-    let r = report(concat!(
-        "var a = new File(p);\n",
-        "var b = a\n  .name;\n",
-        "b.remove();\n",
-        "var d = app.activeDocument\n  + 'x';\n",
-        "d.acmeName;\n",
-        "var c = a\nc.remove();\n",
-        "var e = app.activeDocument\ne.acmeLayers;\n",
-    ));
-    let outside: Vec<(&str, &[usize])> = r.outside.iter().map(|o| (o.id, o.lines.as_slice())).collect();
-    assert_eq!(outside, [("filesWritten", &[9][..])]);
-    let members: Vec<&str> = r.members.iter().map(|m| m.name.as_str()).collect();
-    assert_eq!(members, ["app.activeDocument", "app.activeDocument.acmeLayers"]);
+fn a_name_holds_what_the_value_it_was_given_ends_as() {
+    assert_eq!(HELD_VALUE_CASES.len(), HELD_VALUE_CASE_COUNT);
+    for &(name, src, lines, members) in HELD_VALUE_CASES {
+        let r = report(src);
+        let (got_lines, got_members) = written_lines_and_members(&r);
+        assert_eq!((got_lines.as_slice(), got_members.as_slice()), (lines, members), "{name}");
+    }
 }
 
 /// A value in grouping parentheses, nested to any depth, is what the name holds (ECMA-262 3rd
@@ -522,9 +632,8 @@ fn a_value_in_grouping_parentheses_is_what_the_name_holds() {
     )
     .to_string();
     let r = report(&(src + &deep));
-    let outside: Vec<(&str, &[usize])> = r.outside.iter().map(|o| (o.id, o.lines.as_slice())).collect();
-    assert_eq!(outside, [("filesWritten", &[2, 4, 8, 9, 11, 12, 13, 17][..])]);
-    let members: Vec<&str> = r.members.iter().map(|m| m.name.as_str()).collect();
+    let (lines, members) = written_lines_and_members(&r);
+    assert_eq!(lines, [2, 4, 8, 9, 11, 12, 13, 17]);
     assert_eq!(members, ["app.activeDocument", "app.activeDocument.acmeLayers", "selection", "selection.length"]);
 }
 
@@ -588,100 +697,6 @@ fn a_call_on_a_file_in_grouping_parentheses_is_followed() {
     assert_eq!(feature(&r, "file.read").map(|f| f.lines.as_slice()), Some(&[11][..]));
 }
 
-/// A comma expression in parentheses is the value of its last operand (ECMA-262 3rd edition,
-/// section 11.14).
-#[test]
-fn a_comma_expression_in_parentheses_is_its_last_operand() {
-    let r = report(concat!(
-        "var d = (0, app.activeDocument);\n",
-        "d.acmeName;\n",
-        "var f = (x, (new File(p)));\n",
-        "f.remove();\n",
-        "var g = (new File(p), 0);\n",
-        "g.remove();\n",
-        "var e = ((app.activeDocument), 0);\n",
-        "e.acmeLayers;\n",
-        "var k = (a = 1, f);\n",
-        "k.remove();\n",
-    ));
-    let outside: Vec<(&str, &[usize])> = r.outside.iter().map(|o| (o.id, o.lines.as_slice())).collect();
-    assert_eq!(outside, [("filesWritten", &[4, 10][..])]);
-    let members: Vec<&str> = r.members.iter().map(|m| m.name.as_str()).collect();
-    assert_eq!(members, ["app.activeDocument", "app.activeDocument.acmeName"]);
-}
-
-/// Parentheses that hold only the start of the value, or a value that goes on after them, leave the
-/// name holding nothing the check follows, as a call's argument list does.
-#[test]
-fn a_value_that_only_begins_in_parentheses_is_not_what_the_name_holds() {
-    let r = report(concat!(
-        "var f = new File(p);\n",
-        "var x = (app.activeDocument).name;\n",
-        "x.acmeLayers;\n",
-        "var y = (f).name;\n",
-        "y.remove();\n",
-        "var doc = ((app.activeDocument) + 1);\n",
-        "doc.acmeName;\n",
-        "var g = (new File(p).name);\n",
-        "g.remove();\n",
-        "var h = (new File(p))\n  .name;\n",
-        "h.remove();\n",
-        "var k = (File.name);\nnew File(p);\n",
-        "k.remove();\n",
-        "var flag = (File === File(p));\n",
-        "flag.remove();\n",
-        "var c = (f)(1), z = foo(new File(p));\n",
-        "c.remove(); z.remove();\n",
-        "var u = (x;\ny, new File(p));\n",
-        "u.remove();\n",
-    ));
-    assert!(r.outside.is_empty(), "{:?}", r.outside);
-    let members: Vec<&str> = r.members.iter().map(|m| m.name.as_str()).collect();
-    assert_eq!(members, ["app.activeDocument"]);
-}
-
-/// The name holds a grouped value from the token after its last `)`: the next statement reads it, a
-/// function's own variable holds it only inside the function, and grouped values inside a function in
-/// parentheses don't change what the outer name holds.
-#[test]
-fn a_grouped_value_is_held_from_the_token_after_its_parentheses() {
-    let r = report(concat!(
-        "var doc = (app.activeDocument)\n",
-        "doc.acmeName;\n",
-        "function test() { var d2 = (app.activeDocument) }\n",
-        "d2.acmeLayers;\n",
-        "var f = (new File(File(p).fsName));\n",
-        "f.remove();\n",
-        "var lib = (function () { var sel = (selection); return sel.length; })();\n",
-        "var w = new File(p);\n",
-        "w = (function () { var inner = (q); return inner; });\n",
-        "w.remove();\n",
-    ));
-    let outside: Vec<(&str, &[usize])> = r.outside.iter().map(|o| (o.id, o.lines.as_slice())).collect();
-    assert_eq!(outside, [("filesWritten", &[6][..])]);
-    let members: Vec<&str> = r.members.iter().map(|m| m.name.as_str()).collect();
-    assert_eq!(members, ["app.activeDocument", "app.activeDocument.acmeName", "selection", "selection.length"]);
-}
-
-/// A value without parentheses that starts with `File` or `Folder` is what the name holds only when
-/// nothing follows the call, the dialog or the place, as in parentheses.
-#[test]
-fn a_file_value_that_goes_on_is_not_what_the_name_holds() {
-    let r = report(concat!(
-        "var a = File(p) && {remove: function () {}};\n",
-        "a.remove();\n",
-        "var b = new File(p).name;\n",
-        "b.remove();\n",
-        "var c = new File(p)\n  .parent;\n",
-        "c.remove();\n",
-        "var d = Folder.temp + '/x', e = File.openDialog('Pick') || other;\n",
-        "d.remove(); e.remove();\n",
-        "var g = File(p) == null, h = File, k = File.saveDialog;\n",
-        "g.remove(); h.remove(); k.remove();\n",
-    ));
-    assert!(r.outside.is_empty(), "{:?}", r.outside);
-}
-
 /// The name holds a value without parentheses from the token that ends it: the next statement reads
 /// it, the value itself reads what the name held before, a function's own variable holds it only
 /// inside the function, a preprocessor line or the end of a file ends it, and a line break after a
@@ -707,9 +722,8 @@ fn a_file_value_is_held_from_the_token_that_ends_it() {
         "s.remove();\n",
     );
     let r = check("main.jsx", src.as_bytes(), Some(&mut m), &Limits::default());
-    let outside: Vec<(&str, &[usize])> = r.outside.iter().map(|o| (o.id, o.lines.as_slice())).collect();
-    assert_eq!(outside, [("filesWritten", &[2, 5, 11, 13, 16][..])]);
-    let members: Vec<&str> = r.members.iter().map(|m| m.name.as_str()).collect();
+    let (lines, members) = written_lines_and_members(&r);
+    assert_eq!(lines, [2, 5, 11, 13, 16]);
     assert_eq!(members, ["app.activeDocument", "app.activeDocument.fullName"]);
 }
 
