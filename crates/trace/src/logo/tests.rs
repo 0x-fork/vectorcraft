@@ -592,3 +592,24 @@ fn anti_aliased_coloured_lettering_has_only_its_inks() {
         assert!(colours.iter().any(|&c| near(c, ink, 12)), "{ink:?} missing from {:?}", res.palette);
     }
 }
+
+/// An outline whose fit has no area is left out. A pixel-sized black and cream noise, with both
+/// colors named exactly, fits some specks to two anchors whose segments run along one line and
+/// others to one anchor, which has no segment.
+#[test]
+fn an_outline_fitted_without_area_is_left_out() {
+    use kurbo::ParamCurveArea;
+    let noise = render(96, 96, 0.0, |x, y| {
+        let n = ((x.floor() * 12.9898 + y.floor() * 78.233).sin() * 43758.5453).fract();
+        Some(if n > 0.5 { [4, 4, 3] } else { [252, 248, 227] })
+    });
+    let res = trace(&noise, &TraceParams { logo_colors: vec!["#040403".into(), "#FCF8E3".into()], ..logo_params() });
+    assert!(res.paths.len() > 1, "{} paths", res.paths.len());
+    for t in &res.paths {
+        for sp in &t.path.subpaths {
+            let origin = sp.anchors[0].p.to_vec2();
+            let area: f64 = (0..sp.segment_count()).map(|i| (kurbo::Affine::translate(-origin) * sp.segment(i)).signed_area()).sum();
+            assert!(area.abs() >= 1e-6, "a {:?} subpath of {} anchors with area {area:e}", t.color, sp.anchors.len());
+        }
+    }
+}
