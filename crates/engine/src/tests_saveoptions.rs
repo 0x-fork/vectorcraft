@@ -236,7 +236,7 @@ fn a_remembered_artboard_pick_follows_the_artboards_it_named() {
         }
         let range = s.execute("file.formatOptions", &json!({})).unwrap()["options"]["range"]["value"].clone();
         let r = s.execute("document.save", &json!({})).unwrap();
-        let files = r["files"].as_array().unwrap().iter().skip(1).map(|f| f.as_str().unwrap().rsplit('/').next().unwrap().to_string());
+        let files = r["files"].as_array().unwrap().iter().skip(1).map(|f| f.as_str().unwrap().rsplit(['/', '\\']).next().unwrap().to_string());
         (range, files.collect())
     };
     let delete = |i: usize| ("artboard.delete", json!({"index": i}));
