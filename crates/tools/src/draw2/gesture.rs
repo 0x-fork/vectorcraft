@@ -137,10 +137,10 @@ impl GestureTool {
         }
     }
 
-    /// Would a press with `m` held draw a straight Pencil line? Shift held, unless Alt lends the
-    /// Smooth tool: the rule `PointerKind::Down` sets `straight` by.
+    /// Would a press with `m` held draw a straight Pencil line? Shift or Alt held, unless Alt lends
+    /// the Smooth tool: the rule `PointerKind::Down` sets `straight` by.
     fn straight_at_press(&self, m: Mods) -> bool {
-        self.id == "pencil" && !(self.alt_smooth && m.alt) && m.shift
+        self.id == "pencil" && !(self.alt_smooth && m.alt) && (m.shift || m.alt)
     }
 
     /// Where the stroke takes a pointer at `p`. For the Blob Brush with Shift held, that is the
@@ -664,7 +664,7 @@ mod tests {
     }
 
     /// Holding Alt shows the Paintbrush's closing cursor before the press, and the Pencil's and the
-    /// Paintbrush's while drawing (before a press, Alt gives the Pencil a straight line); a release
+    /// Paintbrush's while drawing (before a press, Alt gives the Pencil its straight-line cursor); a release
     /// with Alt still held closes the path, and Alt let go before the release leaves it open.
     #[test]
     fn alt_shows_the_closing_cursor_and_a_release_with_alt_closes() {
@@ -679,7 +679,7 @@ mod tests {
         {
             let mut t = GestureTool::new(id);
             assert_eq!(t.cursor(&cx, at, Mods::default()), own, "{id}");
-            assert_eq!(t.cursor(&cx, at, alt), if id == "pencil" { own } else { closing }, "{id}");
+            assert_eq!(t.cursor(&cx, at, alt), if id == "pencil" { Cursor::PencilStraight } else { closing }, "{id}");
             for alt_at_release in [true, false] {
                 t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0));
                 t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 10.0, 5.0).with_mods(alt));
@@ -859,6 +859,7 @@ mod tests {
         cx.smart_guides = false;
         let at = Point::new(0.0, 0.0);
         let shift = Mods { shift: true, ..Default::default() };
+        let alt = Mods { alt: true, ..Default::default() };
         let shift_alt = Mods { shift: true, alt: true, ..Default::default() };
         // The last drag's preview: two points for a line, all three for a freehand stroke, none
         // for a smoothing drag.
@@ -866,7 +867,7 @@ mod tests {
             acts[acts.len() - 2].iter().any(|a| matches!(a, Action::Preview(_, v) if v["points"].as_array().is_some_and(|q| q.len() == 2)))
         };
         for alt_smooth in [false, true] {
-            for m in [Mods::default(), shift, shift_alt] {
+            for m in [Mods::default(), shift, alt, shift_alt] {
                 let mut t = GestureTool::new("pencil");
                 t.set_option("altSmooth", &json!(alt_smooth));
                 let shown = t.cursor(&cx, at, m) == Cursor::PencilStraight;
@@ -877,6 +878,7 @@ mod tests {
         let mut t = GestureTool::new("pencil");
         assert_eq!(t.cursor(&cx, at, Mods::default()), Cursor::Pencil);
         assert_eq!(t.cursor(&cx, at, shift), Cursor::PencilStraight);
+        assert_eq!(t.cursor(&cx, at, alt), Cursor::PencilStraight, "Alt alone draws a line at any angle");
         assert_eq!(t.cursor(&cx, at, shift_alt), Cursor::PencilStraight, "Alt at the release leaves a straight line open");
         // While the line is drawn, the Pencil's own cursor; after the release, Shift shows it again.
         t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0).with_mods(shift));
@@ -990,7 +992,7 @@ mod tests {
         };
         let wavy = [(0.0, 0.0), (30.0, -10.0), (50.0, -60.0), (100.0, -84.0)];
         let mut t = GestureTool::new("pencil");
-        assert_eq!(t.cursor(&cx, Point::new(0.0, 0.0), alt), Cursor::Pencil, "before the press");
+        assert_eq!(t.cursor(&cx, Point::new(0.0, 0.0), alt), Cursor::PencilStraight, "before the press");
         let acts = drag_held(&mut t, &cx, &wavy, alt);
         let all = pts(&acts);
         assert_eq!(all.len(), 4, "{all:?}");
@@ -1203,7 +1205,7 @@ mod tests {
         t.set_option("altSmooth", &json!(false));
         assert_eq!(t.options()["altSmooth"], json!(false));
         // Before a press, Alt gives a straight line rather than a closed path.
-        assert_eq!(t.cursor(&cx, Point::new(50.0, 50.0), alt_mod), Cursor::Pencil);
+        assert_eq!(t.cursor(&cx, Point::new(50.0, 50.0), alt_mod), Cursor::PencilStraight);
 
         // A drag released with Alt held draws a closed pencil path.
         let empty_sel = Selection::default();
