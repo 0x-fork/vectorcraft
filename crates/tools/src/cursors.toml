@@ -536,7 +536,10 @@ hotspot = "The lead tip."
 [[cursor]]
 id = "PencilClose"
 group = "Drawing and editing tools"
-shown_when = ["The Pencil tool with Alt pressed after the drag starts, when Alt key toggles to Smooth Tool is off: releasing the mouse button with Alt still held closes the path. A drag started with Shift or Alt held draws an open straight line and does not show this cursor."]
+shown_when = [
+    "The Pencil tool with Alt pressed after the drag starts, when Alt key toggles to Smooth Tool is off: releasing the mouse button with Alt still held closes the path. A drag started with Shift or Alt held draws an open straight line and does not show this cursor.",
+    "The Pencil tool while a freehand stroke is drawn back to within Close Paths When Ends Are Within of its start: releasing the mouse button there closes the path.",
+]
 hotspot = "The lead tip."
 look = "The Pencil cursor with a ring badge (closing the loop), like PenClose."
 
@@ -556,7 +559,10 @@ hotspot = "The bristle tip."
 [[cursor]]
 id = "PaintbrushClose"
 group = "Drawing and editing tools"
-shown_when = ["The Paintbrush tool with Alt held, before a press and while drawing: releasing the mouse button with Alt still held closes the path."]
+shown_when = [
+    "The Paintbrush tool with Alt held, before a press and while drawing: releasing the mouse button with Alt still held closes the path.",
+    "The Paintbrush tool while a stroke is drawn back to within Close Paths When Ends Are Within of its start: releasing the mouse button there closes the path.",
+]
 hotspot = "The bristle tip."
 look = "The Paintbrush cursor with a ring badge (closing the loop), like PenClose."
 
