@@ -24,7 +24,9 @@ use vectorcraft_geom::{FillRule, PathData};
 use crate::import_color::{Colors, Native};
 use crate::import_mask::{MaskSpec, contains, is_rectangle, luminance, mask_spec, white_cover};
 use crate::import_scan::{FontNames, MAX_NESTING, Ocgs, Scan, TextOverprint, Walked, all_on, hides_forms, scan_page, tag_key};
-use crate::import_shading::{clipped, extend_clip, fold_stop_opacity, gradient_shape, mesh_shading, shading_gradient};
+use crate::import_shading::{
+    FunctionBudget, FunctionPaint, clipped, extend_clip, fold_stop_opacity, function_paint, gradient_shape, mesh_shading, shading_gradient,
+};
 use crate::import_text::{Families, LineFacts, Look, Placement, TextLine, Upright};
 use crate::{CropTo, ImportOptions, ImportReport, PdfError, TextAs};
 
@@ -878,6 +880,10 @@ struct Builder<'p> {
     /// Pattern swatches made, and per (pattern, stroke) the art signatures read and their names.
     patterns: Vec<PatternDef>,
     pattern_keys: HashMap<(u128, bool), PatternReadings>,
+    /// Per function-based shading (and the inks it paints with): what it comes in as, read once.
+    function_paints: HashMap<(u128, Option<Vec<String>>), Paint>,
+    /// What is left of the import's function evaluations for those shadings.
+    function_budget: FunctionBudget,
     /// Swatch names in use.
     taken: Vec<String>,
     /// The page as walked by [`scan_page`], and how far the interpreter is through it.
@@ -1049,6 +1055,8 @@ impl<'p> Builder<'p> {
             masks: HashMap::new(),
             patterns: vec![],
             pattern_keys: HashMap::new(),
+            function_paints: HashMap::new(),
+            function_budget: FunctionBudget::new(),
             taken: vec![],
             scan: Scan::default(),
             tag_at: 0,
@@ -1433,13 +1441,20 @@ impl<'p> Builder<'p> {
                 (paint, a)
             }
             craft_pdf::interpret::Paint::Pattern(pat) => match pat.as_ref() {
-                Pattern::Shading(sp) => match shading_gradient(sp, &mut self.colors, inks) {
-                    Some((g, _)) => (Paint::Gradient(Box::new(g)), sp.opacity),
-                    None => {
-                        self.warn("function-based shadings (and very large meshes) are imported as a flat colour");
-                        (Paint::solid(Color::rgb(0.5, 0.5, 0.5)), sp.opacity)
+                Pattern::Shading(sp) => {
+                    // The ink names outlive the walk's borrow of `self`.
+                    let inks = inks.map(<[String]>::to_vec);
+                    match self.function_shading(sp, inks.as_deref()) {
+                        Some(paint) => (paint, sp.opacity),
+                        None => match shading_gradient(sp, &mut self.colors, inks.as_deref()) {
+                            Some((g, _)) => (Paint::Gradient(Box::new(g)), sp.opacity),
+                            None => {
+                                self.warn("shadings that can't be read as a gradient or gradient mesh (such as very large meshes) are imported as a flat grey");
+                                (Paint::solid(Color::rgb(0.5, 0.5, 0.5)), sp.opacity)
+                            }
+                        },
                     }
-                },
+                }
                 Pattern::Tiling(t) => match self.tiling(t, stroke) {
                     Some(paint) => (paint, 1.0),
                     None => {
@@ -1505,6 +1520,30 @@ impl<'p> Builder<'p> {
         let spec = Arc::new(spec);
         self.masks.insert(key, spec.clone());
         spec
+    }
+
+    /// Function-based shading `sp` (painting with `inks`) as a paint, read the first time it is
+    /// used and within the import's budget of function evaluations; `None` for other shadings.
+    fn function_shading(&mut self, sp: &craft_pdf::interpret::pattern::ShadingPattern, inks: Option<&[String]>) -> Option<Paint> {
+        let key = (sp.cache_key(), inks.map(<[String]>::to_vec));
+        if let Some(paint) = self.function_paints.get(&key) {
+            return Some(paint.clone());
+        }
+        let paint = match function_paint(sp, &mut self.colors, inks, &self.function_budget)? {
+            FunctionPaint::Gradient(g) => Paint::Gradient(g),
+            FunctionPaint::Average(c) => {
+                self.warn(
+                    "function-based shadings that aren't read as a gradient (their colour changes in two directions, they need too many stops, or the file has too many to read) are imported as their average colour",
+                );
+                Paint::solid(c)
+            }
+            FunctionPaint::Unread => {
+                self.warn("function-based shadings that can't be read (their function or domain is invalid, or the file has too many to read) are imported as a flat grey");
+                Paint::solid(Color::rgb(0.5, 0.5, 0.5))
+            }
+        };
+        self.function_paints.insert(key, paint.clone());
+        Some(paint)
     }
 
     /// Tiling pattern `t` as a pattern swatch's paint (the swatch made the first time).

@@ -707,6 +707,32 @@ fn pdf_of(objs: &[Vec<u8>]) -> Vec<u8> {
     out
 }
 
+/// A file filling thousands of paths with function-based shadings, each a long PostScript
+/// calculator function of fine stripes, opens in bounded time: each shading is read once, and all
+/// of them within one budget of function evaluations per import (#3621 review).
+#[test]
+fn pdf_many_paths_filled_with_long_function_shadings_open_in_bounded_time() {
+    let shadings = 20;
+    // Five hundred no-op steps, then stripes: red, then white, along x.
+    let program = format!("{{ pop {}dup truncate sub 0.5 le {{ 1 0 0 }} {{ 1 1 1 }} ifelse }}", "1 mul ".repeat(500));
+    let patterns: String = (0..shadings)
+        .map(|i| format!("/P{i} << /PatternType 2 /Shading << /ShadingType 1 /ColorSpace /DeviceRGB /Domain [0 {} 0 1] /Matrix [1 0 0 100 0 0] /Function {} 0 R >> >> ", 200 + i, 5 + i))
+        .collect();
+    let functions: Vec<Vec<u8>> = (0..shadings)
+        .map(|i| {
+            format!("<< /FunctionType 4 /Domain [0 {} 0 1] /Range [0 1 0 1 0 1] /Length {} >>\nstream\n{program}\nendstream", 200 + i, program.len())
+                .into_bytes()
+        })
+        .collect();
+    let content: String = (0..5000).map(|i| format!("/Pattern cs /P{} scn {} {} 2 2 re f\n", i % shadings, i % 100 * 2, i / 100 * 2)).collect();
+    let pdf = handmade_pdf_with(&content, &format!("<< /Pattern << {patterns}>> >>"), "[0 0 200 100]", &functions);
+    let start = std::time::Instant::now();
+    let d = vectorcraft_pdf::import(&pdf).unwrap();
+    let took = start.elapsed();
+    assert!(!d.layers.is_empty());
+    assert!(took < std::time::Duration::from_secs(30), "took {took:?}");
+}
+
 /// One content-stream operation with junk operands.
 fn arb_pdf_op() -> impl Strategy<Value = String> {
     let op = prop::sample::select(vec![
