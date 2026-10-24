@@ -30,6 +30,9 @@ pub struct GestureTool {
     pressures: Vec<f32>,
     active: bool,
     began: bool,
+    /// A release where the pointer last dragged to would close the stroke because it ends near
+    /// its start (Close Paths When Ends Are Within): the cursor shows the closing ring.
+    near_start: bool,
     /// Pencil/Paintbrush continuing a selected open path: (path, continue from its start).
     extend: Option<(NodeId, bool)>,
     /// Pencil/Paintbrush starting on a selected path away from its ends: (path, Edit Selected
@@ -93,6 +96,7 @@ impl GestureTool {
             pressures: vec![],
             active: false,
             began: false,
+            near_start: false,
             extend: None,
             redraw: None,
             fidelity,
@@ -250,6 +254,19 @@ impl GestureTool {
         })
     }
 
+    /// Does a stroke that ends at `end` end near its start (Close Paths When Ends Are Within, off
+    /// at 0 pixels)?
+    fn ends_near_start(&self, cx: &ToolContext, end: Point) -> bool {
+        self.close_within > 0.0 && self.points.len() > 2 && self.points[0].distance(end) <= cx.tol(self.close_within)
+    }
+
+    /// Does a release now, with the stroke ending at `end`, close a freehand stroke because it ends
+    /// near its start (`finish`)? A stroke that redraws a selected path closes only when the engine
+    /// finds it does not end on that path, so it counts as not closing.
+    fn release_closes_near_start(&self, cx: &ToolContext, end: Point) -> bool {
+        self.draws_path() && !self.smoothing && !self.straight && self.extend.is_none() && self.redraw.is_none() && self.ends_near_start(cx, end)
+    }
+
     /// Parameters of `path.freehand` for the current stroke.
     pub fn freehand_params(&self, closed: bool) -> Value {
         let mut v = json!({
@@ -284,7 +301,7 @@ impl GestureTool {
                     return vec![];
                 }
                 // Close Paths When Ends Are Within is off at 0 pixels.
-                let near = self.close_within > 0.0 && pts.len() > 2 && pts[0].distance(pts[pts.len() - 1]) <= cx.tol(self.close_within);
+                let near = pts.last().is_some_and(|&end| self.ends_near_start(cx, end));
                 // A straight line has two points: closing it would draw it back over itself.
                 let closed = !self.straight && ((m.alt && !self.alt_smooth) || (self.extend.is_none() && near));
                 vec![Action::Preview("path.freehand".into(), self.freehand_params(closed)), Action::Commit]
@@ -327,6 +344,7 @@ impl Tool for GestureTool {
             PointerKind::Down => {
                 self.active = true;
                 self.began = false;
+                self.near_start = false;
                 self.smoothing = self.id == "pencil" && self.alt_smooth && ev.mods.alt;
                 // Alt draws a straight line only while it doesn't lend the Smooth tool; with Shift
                 // too, the line keeps Shift's 45° steps.
@@ -356,9 +374,10 @@ impl Tool for GestureTool {
                 if !self.began && !self.straight && self.id == "pencil" && self.alt_smooth && ev.mods.alt {
                     self.smoothing = true;
                 }
+                let mut end = p;
                 if self.snaps() && !self.smoothing && !self.straight {
                     // Where the stroke would end: shown, taken on release.
-                    self.snap.drag(cx, p, None);
+                    end = self.snap.drag(cx, p, None);
                 }
                 let p = if self.straight && self.unconstrained && self.snaps() {
                     // Alt's line ends where a stroke would: shown, taken on release.
@@ -379,9 +398,15 @@ impl Tool for GestureTool {
                     }
                     self.points.truncate(1);
                 } else if self.points.last().is_some_and(|l| l.distance(p) < cx.tol(1.0)) || self.points.len() >= crate::MAX_STROKE_SAMPLES {
+                    // A release here keeps the last point unless it snaps (`Up`), so the ring
+                    // follows the point `finish` will test.
+                    let kept = self.points.last().copied().filter(|l| l.distance(p) < cx.tol(1.0) && !self.snaps());
+                    let release_end = kept.unwrap_or(end);
+                    self.near_start = self.release_closes_near_start(cx, release_end);
                     return vec![];
                 }
                 self.push(p, ev.pressure);
+                self.near_start = self.release_closes_near_start(cx, end);
                 if !self.draws_path() || self.smoothing {
                     return vec![];
                 }
@@ -424,6 +449,7 @@ impl Tool for GestureTool {
                 let out = if cancel { vec![Action::Cancel] } else { self.finish(cx, ev.mods) };
                 self.active = false;
                 self.began = false;
+                self.near_start = false;
                 self.smoothing = false;
                 self.straight = false;
                 self.unconstrained = false;
@@ -446,6 +472,7 @@ impl Tool for GestureTool {
                 self.snap.clear();
                 self.active = false;
                 self.began = false;
+                self.near_start = false;
                 self.smoothing = false;
                 self.straight = false;
                 self.unconstrained = false;
@@ -470,6 +497,7 @@ impl Tool for GestureTool {
             .then(|| Action::Preview("path.freehand".into(), self.freehand_params(false)));
         self.snap.clear();
         self.active = false;
+        self.near_start = false;
         self.began = false;
         self.straight = false;
         self.unconstrained = false;
@@ -503,6 +531,11 @@ impl Tool for GestureTool {
         // A straight line stays open, so its release has nothing to close, and before a press Alt
         // gives the Pencil a straight line.
         if self.draws_path() && !self.alt_smooth && m.alt && !self.straight && (self.active || self.id != "pencil") {
+            return if self.id == "paintbrush" { Cursor::PaintbrushClose } else { Cursor::PencilClose };
+        }
+        // A release near a freehand stroke's start closes it too (`finish`): the ring shows while
+        // the pointer is there.
+        if self.draws_path() && self.active && self.near_start {
             return if self.id == "paintbrush" { Cursor::PaintbrushClose } else { Cursor::PencilClose };
         }
         match self.id {
@@ -1138,6 +1171,52 @@ mod tests {
                 let Some(Action::Preview(_, v)) = acts.last().and_then(|a| a.first()) else { panic!("{tool}: {acts:?}") };
                 assert_eq!(v["points"][0], v["points"][3], "{tool}");
                 assert_eq!(v["closed"], json!(closes), "{tool} at {within} px");
+            }
+        }
+    }
+
+    /// While a stroke is drawn back near its start, the cursor shows the closing ring when a
+    /// release there closes the path (Close Paths When Ends Are Within), and the tool's own cursor
+    /// away from the start, at 0 pixels and after the release.
+    #[test]
+    fn a_stroke_near_its_start_shows_the_closing_cursor() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let none = Mods::default();
+        let tools = [("pencil", Cursor::Pencil, Cursor::PencilClose), ("paintbrush", Cursor::Paintbrush, Cursor::PaintbrushClose)];
+        for (tool, own, closing) in tools {
+            for within in [15.0, 0.0] {
+                let near = if within > 0.0 { closing } else { own };
+                let mut t = GestureTool::new(tool);
+                t.set_option("closeWithin", &json!(within));
+                let mut at = |k, x, y| {
+                    let acts = t.pointer(&cx, &PointerEvent::new(k, x, y));
+                    (acts, t.cursor(&cx, Point::new(x, y), none))
+                };
+                assert_eq!(at(PointerKind::Down, 310.0, 330.0).1, own, "{tool} at the press");
+                assert_eq!(at(PointerKind::Drag, 360.0, 350.0).1, own, "{tool} away from the start");
+                assert_eq!(at(PointerKind::Drag, 330.0, 390.0).1, own, "{tool} away from the start");
+                assert_eq!(at(PointerKind::Drag, 318.0, 335.0).1, near, "{tool} near the start at {within} px");
+                assert_eq!(at(PointerKind::Drag, 345.0, 340.0).1, own, "{tool} away from the start again");
+                assert_eq!(at(PointerKind::Drag, 318.0, 335.0).1, near, "{tool} back near the start at {within} px");
+                let (acts, after) = at(PointerKind::Up, 318.0, 335.0);
+                let Some(Action::Preview(_, v)) = acts.first() else { panic!("{tool}: {acts:?}") };
+                assert_eq!(v["closed"], json!(within > 0.0), "{tool}: the release does what the cursor showed");
+                assert_eq!(after, own, "{tool} after the release");
+            }
+        }
+        // A straight Pencil line (Shift or Alt held at the press) stays open, so it shows no ring
+        // near its start.
+        for held in [Mods { shift: true, ..Mods::default() }, Mods { alt: true, ..Mods::default() }] {
+            let mut t = GestureTool::new("pencil");
+            t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 310.0, 330.0).with_mods(held));
+            for (x, y) in [(360.0, 330.0), (330.0, 390.0), (318.0, 335.0)] {
+                t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, x, y).with_mods(held));
+            }
+            for m in [held, none] {
+                assert_eq!(t.cursor(&cx, Point::new(318.0, 335.0), m), Cursor::Pencil, "a straight line, {held:?}, {m:?}");
             }
         }
     }

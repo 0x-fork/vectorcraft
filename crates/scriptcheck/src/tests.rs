@@ -2,6 +2,7 @@
 
 use proptest::prelude::*;
 
+use crate::catalog::FeatureId;
 use crate::lex::{Lexer, T};
 use crate::*;
 
@@ -95,7 +96,7 @@ fn each_feature_is_found_where_it_is_and_nowhere_else() {
         assert_eq!(r.kind, Kind::Script, "{with}");
         let f = feature(&r, id).unwrap_or_else(|| panic!("{id} not found in {with:?}: {:?}", r.features));
         assert_eq!(f.lines, [1], "{with}");
-        let need = catalog::need(id).unwrap_or_else(|| panic!("{id} sets no need"));
+        let need = FeatureId::ALL.iter().find(|f| f.id() == *id).map(|f| f.need()).unwrap_or_else(|| panic!("{id} sets no need"));
         assert!(r.needs.contains(&need), "{with}: {:?}", r.needs);
         let r = report(without);
         assert!(feature(&r, id).is_none(), "{id} found in {without:?}");
@@ -103,14 +104,20 @@ fn each_feature_is_found_where_it_is_and_nowhere_else() {
 }
 
 #[test]
-fn every_feature_id_has_a_need_and_a_case() {
-    assert!(FEATURES.windows(2).all(|w| w[0] < w[1]), "FEATURES is sorted, as the report lists them");
-    for id in FEATURES {
-        assert!(catalog::need(id).is_some(), "{id}");
-        assert!(FEATURE_CASES.iter().any(|(case, ..)| case == id), "{id} has no case");
+fn features_are_listed_in_alphabetical_order_of_their_ids() {
+    let ids: Vec<&str> = FeatureId::ALL.iter().map(|f| f.id()).collect();
+    assert!(ids.windows(2).all(|w| w[0] < w[1]), "{ids:?}");
+    assert!(FeatureId::ALL.windows(2).all(|w| w[0] < w[1]), "the enum is declared in the order of its ids");
+}
+
+#[test]
+fn every_feature_id_has_a_case() {
+    for f in FeatureId::ALL {
+        let id = f.id();
+        assert!(FEATURE_CASES.iter().any(|(case, ..)| *case == id), "{id} has no case");
     }
     for (id, ..) in FEATURE_CASES {
-        assert!(FEATURES.contains(id), "{id} isn't in FEATURES");
+        assert!(FeatureId::ALL.iter().any(|f| f.id() == *id), "{id} isn't a FeatureId");
     }
     let unique = |ids: &[&str]| ids.iter().collect::<std::collections::BTreeSet<_>>().len() == ids.len();
     assert!(unique(PROBLEMS) && unique(OUTSIDE));
@@ -1475,7 +1482,8 @@ fn include_lines_share_the_folders_of_the_include_path_before_them() {
     }
     let limits = Limits::default();
     let mut acc = report::Acc::new(&limits);
-    let scan = analyze::scan(&src, None, std::rc::Rc::from([]), &analyze::Known::default(), &mut acc);
+    let declared = analyze::declarations(&src, &mut acc);
+    let scan = analyze::scan(&src, &declared, None, std::rc::Rc::from([]), &analyze::Known::default(), &mut acc);
     let (first, rest) = scan.includes.split_first().unwrap();
     assert_eq!((first.paths.len(), rest.len()), (64, 999));
     assert!(rest.iter().all(|i| std::rc::Rc::ptr_eq(&i.paths, &first.paths)), "one list of folders, not a copy for each line");
@@ -1748,4 +1756,64 @@ proptest! {
         prop_assert!(m.asked.len() <= lookups, "{} paths looked up: {:?}", m.asked.len(), m.asked);
         prop_assert!(r.includes.iter().all(|i| i.status != IncludeStatus::NotRead));
     }
+}
+
+/// A function that writes to a variable the global code assigns a File object after it: the
+/// variable declaration is hoisted, so the function writes a file, with a loader and without one.
+#[test]
+fn a_variable_assigned_after_the_function_using_it_holds_its_value() {
+    let src = "function g(){ f.write('x'); }  var f = new File('a');";
+    let without = report(src);
+    let with = check("test.jsx", src.as_bytes(), Some(&mut mem(&[])), &Limits::default());
+    assert!(feature(&without, "file.write").is_some(), "{:?}", without.features);
+    assert!(feature(&with, "file.write").is_some(), "{:?}", with.features);
+}
+
+/// Script-like text with functions that use variables the code after them assigns, a chain of them
+/// taking more than one scan to settle.
+fn hoisting_text() -> impl Strategy<Value = String> {
+    let pieces = prop::sample::select(vec![
+        "function g(){ ",
+        "function h(){ ",
+        "}",
+        "f.write('x'); ",
+        "b.remove(); ",
+        "e.acmeItems.add(); ",
+        "b = a; ",
+        "var a = f; ",
+        "var f = new File('a'); ",
+        "var d = app.activeDocument; ",
+        "var e = d; ",
+        "e = d.acmeLayers; ",
+        "f = d; ",
+    ]);
+    (prop::collection::vec(pieces, 0..30), script_text()).prop_map(|(v, tail)| v.concat() + &tail)
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(512))]
+
+    /// A script that includes nothing gets the same report with a loader and without one.
+    #[test]
+    fn a_script_without_includes_reports_the_same_with_and_without_a_loader(text in hoisting_text()) {
+        let mut without = report(&text);
+        prop_assume!(without.includes.is_empty());
+        let mut with = check("test.jsx", text.as_bytes(), Some(&mut mem(&[])), &Limits::default());
+        without.steps = 0;
+        with.steps = 0;
+        prop_assert_eq!(without, with);
+    }
+}
+
+/// Chains of variables a function assigns before the code after it assigns their source take a
+/// scan each to settle: the script is read at most seven times.
+#[test]
+fn variables_that_settle_over_several_scans_stay_linear() {
+    let mut src = String::new();
+    for i in 0..150 {
+        src += &format!("function a{i}(){{ e{i} = d{i}; }} function b{i}(){{ d{i} = c{i}; }} function c{i}(){{ c{i} = b{i}; }} ");
+        src += &format!("function d{i}(){{ b{i} = a{i}; }} var a{i} = new File('x');\n");
+    }
+    let r = report(&src);
+    assert!(r.steps <= 9 * src.len() + 16, "{} steps for {} bytes", r.steps, src.len());
 }

@@ -538,11 +538,15 @@ pub fn hatch(path: &BezPath, gap: f64) -> BezPath {
     out
 }
 
-/// The planar map of the current selection, cached by document identity, selection and whether
-/// filled open paths count as closed.
+/// What a [`RegionCache`] map was built for: the document's address and revision, the selected ids
+/// and whether filled open paths count as closed.
+type CacheKey = (usize, (u64, u64), Vec<NodeId>, bool);
+
+/// The planar map of the current selection, cached by document identity, revision, selection and
+/// whether filled open paths count as closed.
 #[derive(Default)]
 struct RegionCache {
-    key: Option<(usize, Vec<NodeId>, bool)>,
+    key: Option<CacheKey>,
     map: BuilderMap,
     /// Live Paint faces (every path an edge, filled or not) rather than Shape Builder regions.
     live: bool,
@@ -561,7 +565,7 @@ impl RegionCache {
     /// The map, with the outline edges when `edges` (built the first time they're wanted), and
     /// filled open paths closed when `open_filled_as_closed` (Shape Builder only).
     fn get(&mut self, cx: &ToolContext, edges: bool, open_filled_as_closed: bool) -> &BuilderMap {
-        let key = (cx.doc as *const Document as usize, cx.selection.objects.clone(), open_filled_as_closed);
+        let key = (cx.doc as *const Document as usize, cx.revision, cx.selection.objects.clone(), open_filled_as_closed);
         if self.key.as_ref() != Some(&key) || (edges && !self.edges) {
             let roots = sorted_roots(cx.doc, &cx.selection.objects);
             self.map = if self.live {
@@ -1284,12 +1288,17 @@ mod tests {
     use vectorcraft_geom::shapes;
 
     fn two_rects() -> (Document, NodeId, NodeId) {
+        two_rects_at(0.0)
+    }
+
+    /// Squares A (`x`..`x`+100) and B (`x`+50..`x`+150), 100 pt tall, overlapping by half.
+    fn two_rects_at(x: f64) -> (Document, NodeId, NodeId) {
         let mut d = Document::new(500.0, 500.0);
         let l = d.layers[0].id;
         let a = d.alloc_id();
-        d.insert(Some(l), 0, Node::path(a, shapes::rectangle(Rect::new(0.0, 0.0, 100.0, 100.0)), Appearance::default_art())).unwrap();
+        d.insert(Some(l), 0, Node::path(a, shapes::rectangle(Rect::new(x, 0.0, x + 100.0, 100.0)), Appearance::default_art())).unwrap();
         let b = d.alloc_id();
-        d.insert(Some(l), 1, Node::path(b, shapes::rectangle(Rect::new(50.0, 0.0, 150.0, 100.0)), Appearance::default_art())).unwrap();
+        d.insert(Some(l), 1, Node::path(b, shapes::rectangle(Rect::new(x + 50.0, 0.0, x + 150.0, 100.0)), Appearance::default_art())).unwrap();
         (d, a, b)
     }
 
@@ -1333,6 +1342,24 @@ mod tests {
         assert_eq!(v["erase"], false);
         assert_eq!(v["ids"], json!([a.0, b.0]), "sorted back to front");
         assert!(v["points"].as_array().unwrap().len() >= 2);
+    }
+
+    #[test]
+    fn shape_builder_rebuilds_its_map_for_a_new_revision_at_the_same_address() {
+        let (mut d, a, b) = two_rects();
+        let mut s = Selection::default();
+        s.set([a, b]);
+        let p = paint();
+        let mut t = ShapeBuilderTool::default();
+        let cx1 = ToolContext { revision: (1, 1), ..cx(&d, &s, &p) };
+        t.pointer(&cx1, &ev(PointerKind::Move, 75.0, 50.0));
+        // A later revision of the document, with the squares 300 pt to the right, at the same address.
+        d = two_rects_at(300.0).0;
+        let cx2 = ToolContext { revision: (1, 2), ..cx(&d, &s, &p) };
+        t.pointer(&cx2, &ev(PointerKind::Down, 325.0, 50.0));
+        t.pointer(&cx2, &ev(PointerKind::Drag, 375.0, 50.0));
+        let acts = t.pointer(&cx2, &ev(PointerKind::Up, 375.0, 50.0));
+        assert!(matches!(acts.as_slice(), [Action::Exec(id, _)] if id == "shapeBuilder.merge"), "{acts:?}");
     }
 
     #[test]
@@ -1735,6 +1762,22 @@ mod tests {
         let Action::Exec(id, v) = &acts[0] else { panic!() };
         assert_eq!(id, "livePaint.fill");
         assert_eq!(v["ids"], json!([a.0, b.0]));
+    }
+
+    #[test]
+    fn bucket_rebuilds_its_map_for_a_new_revision_at_the_same_address() {
+        let (mut d, a, b) = two_rects();
+        let mut s = Selection::default();
+        s.set([a, b]);
+        let p = paint();
+        let mut t = LivePaintBucketTool::default();
+        let cx1 = ToolContext { revision: (1, 1), ..cx(&d, &s, &p) };
+        t.pointer(&cx1, &ev(PointerKind::Move, 75.0, 50.0));
+        // A later revision of the document, with the squares 300 pt to the right, at the same address.
+        d = two_rects_at(300.0).0;
+        let cx2 = ToolContext { revision: (1, 2), ..cx(&d, &s, &p) };
+        let acts = t.pointer(&cx2, &ev(PointerKind::Down, 375.0, 50.0));
+        assert_eq!(acts, vec![Action::Exec("livePaint.fill".into(), json!({ "ids": [a.0, b.0], "point": [375.0, 50.0] }))]);
     }
 
     #[test]
