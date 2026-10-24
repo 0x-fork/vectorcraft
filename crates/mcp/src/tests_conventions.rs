@@ -210,6 +210,84 @@ impl Backend for Panics {
         "test".into()
     }
 }
+/// An app whose window capture is a 1200 × 800 PNG.
+struct Window(Vec<u8>);
+impl Backend for Window {
+    fn call(&mut self, method: &str, _: Value) -> Result<Value, String> {
+        match method {
+            "ui.screenshot" => Ok(json!({"pngBase64": vectorcraft_format::base64_encode(&self.0), "width": 1200, "height": 800})),
+            _ => Err(format!("unexpected {method}")),
+        }
+    }
+    fn has_ui(&self) -> bool {
+        true
+    }
+    fn describe(&self) -> String {
+        "window".into()
+    }
+}
+
+/// `ui_screenshot` and `screenshot {window: true}` take `max_side`, which scales the returned
+/// image down to it and reports the capture's own size; without it the capture comes back as sent.
+#[test]
+fn window_captures_take_max_side() {
+    let mut capture = std::io::Cursor::new(Vec::new());
+    image::RgbaImage::from_fn(1200, 800, |x, y| image::Rgba([(x % 256) as u8, (y % 256) as u8, 90, 255]))
+        .write_to(&mut capture, image::ImageFormat::Png)
+        .unwrap();
+    let capture = capture.into_inner();
+    let mut s = Server::new(Box::new(Window(capture.clone())));
+    let image_of = |r: &Value| vectorcraft_format::base64_decode(r["content"][0]["data"].as_str().unwrap()).unwrap();
+    let info = |r: &Value| -> Value { serde_json::from_str(r["content"][1]["text"].as_str().unwrap()).unwrap() };
+    for (name, mut args) in [("ui_screenshot", json!({})), ("screenshot", json!({"window": true}))] {
+        let r = call(&mut s, name, args.clone());
+        assert_eq!(r["isError"], false, "{name}: {r}");
+        assert_eq!(image_of(&r), capture, "{name}: the capture as sent");
+        assert!(info(&r).get("capturedWidth").is_none(), "{name}: {r}");
+        args["max_side"] = json!(300);
+        let r = call(&mut s, name, args.clone());
+        assert_eq!(r["isError"], false, "{name}: {r}");
+        let img = image::load_from_memory(&image_of(&r)).unwrap();
+        assert_eq!((img.width(), img.height()), (300, 200), "{name}");
+        let i = info(&r);
+        assert_eq!((i["width"].clone(), i["height"].clone()), (json!(300), json!(200)), "{name}: {i}");
+        assert_eq!((i["capturedWidth"].clone(), i["capturedHeight"].clone()), (json!(1200), json!(800)), "{name}: {i}");
+        // A capture that already fits comes back as sent.
+        args["max_side"] = json!(4096);
+        let r = call(&mut s, name, args.clone());
+        assert_eq!(image_of(&r), capture, "{name}");
+        assert_eq!(info(&r)["capturedWidth"], 1200, "{name}");
+        for bad in [json!(0), json!(4097), json!("300"), json!(1.5)] {
+            args["max_side"] = bad.clone();
+            assert_eq!(call(&mut s, name, args.clone())["isError"], true, "{name}: {bad}");
+        }
+    }
+    // An artboard render is sized with `scale`.
+    let r = call(&mut s, "screenshot", json!({"max_side": 300}));
+    assert_eq!(r["isError"], true, "{r}");
+    assert!(r["content"][0]["text"].as_str().unwrap().contains("`scale`"), "{r}");
+}
+
+/// Each tool with another name for the same call names it in its description.
+#[test]
+fn alias_tools_name_their_pair() {
+    let tools = tool_definitions();
+    let description = |name: &str| tools.iter().find(|t| t["name"] == name).unwrap()["description"].as_str().unwrap().to_string();
+    let names = |text: &str, name: &str| text.split(|c: char| !(c.is_ascii_alphanumeric() || c == '_')).any(|word| word == name);
+    for (a, b) in [
+        ("command_list", "list_commands"),
+        ("command_run", "run_command"),
+        ("doc_inspect", "inspect_document"),
+        ("ui_inspect", "inspect_ui"),
+        ("ui_screenshot", "screenshot"),
+        ("undo", "redo"),
+    ] {
+        assert!(names(&description(a), b), "{a} names {b}: {}", description(a));
+        assert!(names(&description(b), a), "{b} names {a}: {}", description(b));
+    }
+    assert!(description("ui_screenshot").contains("window:true"));
+}
+
 #[test]
 fn conventions_tool_panics_are_tool_errors() {
     let mut s = Server::new(Box::new(Panics));
