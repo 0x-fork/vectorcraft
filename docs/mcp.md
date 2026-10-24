@@ -83,7 +83,10 @@ vectorcraft --control 7979
 The Dock, Start menu and desktop launchers start the app without `--control`, so the app opens no control
 port unless `VECTORCRAFT_CONTROL_PORT` is set. `vectorcraft-cli mcp` with no flag tries `127.0.0.1:7979`
 once, when it starts: a server that started before the app stays headless until the MCP client restarts
-it. With `--connect`, a server that finds no app stops with `cannot connect to 127.0.0.1:7979`.
+it. `open -a` and PowerShell's `&` return before the app opens the port, so wait until the VectorCraft
+window is open before you start the MCP client. With `--connect`, a server that finds no app stops and
+prints `vectorcraft-cli: cannot connect to 127.0.0.1:7979: ` followed by the system's connection error, for
+example `connection timed out`.
 
 ## Confining file access
 
