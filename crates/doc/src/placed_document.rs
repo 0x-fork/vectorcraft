@@ -553,8 +553,10 @@ impl Document {
         let mut reads = 0usize;
         while let Some((p, depth)) = queue.pop() {
             let Some(blob) = d.images.get(&p.key).cloned() else { continue };
-            let read_full = depth < MAX_DEPTH && reads < MAX_PLACED_READS;
-            reads += usize::from(read_full);
+            // Top-level placements are distinct already (by key): only reads nested inside placed
+            // documents count, so a catalogue placing many files still reads each of them.
+            let read_full = depth < MAX_DEPTH && (depth == 0 || reads < MAX_PLACED_READS);
+            reads += usize::from(read_full && depth > 0);
             let full = if read_full { full_bytes(&p, &blob) } else { None };
             if full.and_then(|b| read(&p, &b)).is_none() {
                 let preview = if blob.is_proxy() { Some(blob.bytes.clone()) } else { blob.proxy.clone() };
