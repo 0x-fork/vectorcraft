@@ -118,7 +118,10 @@ pub(super) fn palette(data: &[u8]) -> Palette {
                 });
             }
             "Pg" => {
-                if let Some(name) = first_text(&vals) {
+                // Capped as swatches are: a file of many `Pg` would make as many empty groups.
+                if let Some(name) = first_text(&vals)
+                    && out.groups.len() < MAX_SWATCHES
+                {
                     out.groups.push((name, Vec::new()));
                 }
             }
