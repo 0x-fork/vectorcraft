@@ -355,6 +355,8 @@ font-technology	Variable	Variables
 	Bullets	Viñetas
 	Bullets and Numbering	Viñetas y numeración
 	Apply Bullets	Aplicar viñetas
+	Numbered List	Lista numerada
+	Apply Numbers	Aplicar numeración
 	Filled Dot	Punto relleno
 	Dash	Guion
 	Hollow Circle	Círculo vacío
@@ -3081,6 +3083,7 @@ font-technology	Variable	Variables
 	Outlines	Contornos
 	Outlines with Source Image	Contornos con imagen de origen
 	Source Image	Imagen de origen
+	Press and hold to view the source image	Mantén pulsado para ver la imagen de origen
 	Image Trace View	Vista del calco de imagen
 	Snap Options	Opciones de ajuste
 	Snap to Glyph	Ajustar a glifo
@@ -3835,6 +3838,7 @@ axis	Both	Ambos
 @msg	Installed plug-in {_1}	Se instaló el plugin {_1}
 @msg	Internal error: {msg} (please report this bug)	Error interno: {msg} (por favor, informa de este error)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Combinar pintura interactiva: selecciona un grupo de pintura interactiva y los trazados que quieres agregar
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	La pintura interactiva admite trazados y trazados compuestos: convierte primero el texto, las imágenes y otros objetos en trazados
 @msg	Live Paint: select paths or compound paths	Pintura interactiva: selecciona trazados o trazados compuestos
 @msg	Live Paint: these paths are too degenerate to paint	Pintura interactiva: estos trazados están demasiado degenerados para pintarlos
 @msg	Make Guides: select paths	Crear guías: selecciona trazados
@@ -3901,6 +3905,12 @@ axis	Both	Ambos
 @msg	`{key}` must be between {min} and {max} (got {x})	`{key}` debe estar entre {min} y {max} (se recibió {x})
 @msg	`{key}` must be one of {_1}	`{key}` debe ser uno de estos: {_1}
 @msg	`{key}` must be true or false	`{key}` debe ser true o false
+@msg	`select` must be true or false	`select` debe ser true o false
+@msg	`minAnchors` and `maxAnchors` must be whole numbers	`minAnchors` y `maxAnchors` deben ser números enteros
+@msg	`{key}` must be a number not below 0	`{key}` debe ser un número no inferior a 0
+@msg	`{key}` must be [x, y, width, height]: four finite numbers, width and height not negative	`{key}` debe ser [x, y, width, height]: cuatro números finitos, con anchura y altura no negativas
+@msg	`{min_key}` is greater than `{max_key}`	`{min_key}` es mayor que `{max_key}`
+@msg	give at least one of `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`	indica al menos uno de `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`
 @msg	`mode` must be grayscale, rgb, hsb, cmyk or websafe	`mode` debe ser grayscale, rgb, hsb, cmyk o websafe
 @msg	`{k}` must be [x, y]	`{k}` debe ser [x, y]
 @msg	`{name}` has no options	`{name}` no tiene opciones
@@ -4339,6 +4349,7 @@ axis	Both	Ambos
 @msg	unsupported: {0}	no compatible: {0}
 @msg	variables are locked	las variables están bloqueadas
 @msg	variables that aren't text were left out: {kinds}	se omitieron las variables que no son de texto: {kinds}
+@msg	`{key}: {top}` and `options.{key}: {inner}` disagree: give the option once	`{key}: {top}` y `options.{key}: {inner}` no coinciden: indique la opción una sola vez
 @msg	version {0} files can't be compressed: only version {COMPRESSED_SINCE} and later open compressed files	los archivos de la versión {0} no se pueden comprimir: solo la versión {COMPRESSED_SINCE} y posteriores abren archivos comprimidos
 @msg	width and height are at least 1 pixel	el ancho y el alto son de al menos 1 píxel
 @msg	workspace name can't be empty	el nombre del espacio de trabajo no puede estar vacío
@@ -4352,6 +4363,7 @@ axis	Both	Ambos
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} es un plugin de exportación (Archivo › Exportar › Exportar como…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` ocupa {size} bytes (límite {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} ya lo usa {_2}
+@msg	{_1} is reserved by the system	{_1} está reservado por el sistema
 @msg	{_1} linked file(s) can't be read here: their previews show	aquí no se pueden leer {_1} archivo(s) vinculado(s): se muestran sus previsualizaciones
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} imagen(es) vinculada(s) cambiaron en el disco: Actualizar vínculos muestra las versiones nuevas
 @msg	Updated {_1} linked file(s) changed on disk	Se actualizaron {_1} archivo(s) vinculado(s) que cambiaron en el disco
@@ -4485,6 +4497,8 @@ axis	Both	Ambos
 @msg	{key} must be an array of non-negative integer object ids	{key} debe ser una lista de identificadores de objeto que sean enteros no negativos
 @msg	invalid object id {value}: expected a non-negative integer	identificador de objeto no válido {value}: se esperaba un entero no negativo
 @msg	no such object id {value}	no existe el objeto con el identificador {value}
+@msg	id {value} is a layer, not an object	el identificador {value} es una capa, no un objeto
+@msg	id {value} is a layer, not an object; move layers with layer.move	el identificador {value} es una capa, no un objeto; mueva las capas con layer.move
 @msg	automation filesystem access is not granted: read authority is absent: {path}	la automatización no tiene acceso al sistema de archivos: falta el permiso de lectura: {path}
 @msg	automation filesystem access is not granted: write authority is absent: {path}	la automatización no tiene acceso al sistema de archivos: falta el permiso de escritura: {path}
 @msg	automation path rejected: outside the read root {root}: {path}	ruta de automatización rechazada: fuera de la carpeta raíz de lectura {root}: {path}
@@ -5318,6 +5332,7 @@ mark-style	Japanese	Japonesas
 @msg	Persistent libraries not found: {files}	No se encontraron bibliotecas persistentes: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` no es un panel de biblioteca (consulte window.swatchLibrary)
 @msg	library panel `{given}` isn't open	el panel de biblioteca `{given}` no está abierto
+@msg	too many changed shortcuts	demasiados atajos modificados
 @msg	library panel `{given}` isn't missing its library	la biblioteca del panel de biblioteca `{given}` no falta
 @msg	too many library panels were opened in this session	se abrieron demasiados paneles de biblioteca en esta sesión
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	La imagen tiene {_1} × {_2} píxeles, más de {LARGE_TRACE_SIDE} en un lado: se calcará, pero más despacio. Un ajuste preestablecido de menor fidelidad o una copia más pequeña de la imagen se calcan más rápido.
@@ -5327,6 +5342,7 @@ mark-style	Japanese	Japonesas
 	Snap to Perpendicular	Ajustar a perpendicular
 @msg	unknown snap option `{key}` (use {options})	opción de ajuste desconocida `{key}` (use {options})
 	Gap Length:	Longitud del hueco:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	El modo Logotipo plano calcó la imagen a {_1} × {_2} píxeles, reducida promediando desde {_3} × {_4}.
 	Artboard {n} of {total}	Mesa de trabajo {n} de {total}
 	File {n} of {total}	Archivo {n} de {total}
 	Encoding and writing the file…	Codificando y escribiendo el archivo…

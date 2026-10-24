@@ -432,9 +432,10 @@ pub struct UiState {
     /// Recording in progress: (set index, action name, journal length when recording started).
     #[serde(skip)]
     pub recording: Option<(usize, String, usize)>,
-    /// Keyboard shortcut overrides: command id or `tool:<id>` → chord ("" = none).
-    #[serde(default)]
-    pub shortcut_overrides: std::collections::BTreeMap<String, String>,
+    /// Keyboard shortcut overrides: command id, `tool:<id>` or `panel:<id>` → chord ("" = none),
+    /// stored in the form every earlier version reads.
+    #[serde(default, with = "crate::keymap::stored")]
+    pub shortcut_overrides: craft_keymap::Overrides,
     /// Name of the shortcut set (preset or "Custom").
     #[serde(default = "default_shortcut_set", deserialize_with = "crate::shortcut_editor::deserialize_set_name")]
     pub shortcut_set: String,
@@ -549,6 +550,10 @@ pub struct UiState {
     /// becoming active, leaves it.
     #[serde(skip)]
     pub home: Option<(Option<u64>, usize)>,
+    /// The Image Trace objects the canvas draws with the Source Image view while the Image Trace
+    /// panel's eye button is held down ([`vectorcraft_render::RenderOptions::trace_source`]).
+    #[serde(skip)]
+    pub trace_hold_source: Option<std::sync::Arc<Vec<vectorcraft_doc::NodeId>>>,
     /// Layers panel › Panel Options… (row size, thumbnails, Show Layers Only, Locate Selected Objects).
     #[serde(default)]
     pub layers_panel: crate::panels::layers::PanelOptions,
@@ -559,6 +564,10 @@ pub struct UiState {
     /// The Image Trace panel's Advanced section is open (as it was last left).
     #[serde(default = "yes")]
     pub image_trace_advanced: bool,
+    /// The Image Trace panel's Preview: a setting changed in the panel traces the selected Image
+    /// Trace object again at once. Off, the changes wait in the panel until Trace applies them.
+    #[serde(default = "yes")]
+    pub image_trace_preview: bool,
     /// Glyphs panel preview step, kept with the other panel choices. `0` is the default 30 pt
     /// cell; `1`..=`7` is a step from smallest to largest (`crates/ui-egui/src/panels/glyphs.rs`).
     #[serde(default, skip_serializing_if = "is_zero_u8")]
@@ -813,7 +822,15 @@ impl UiState {
         self.workspace_changes.truncate(64);
         // Overrides that can't fire (modifier-only chords recorded by older versions, #487) give
         // the default back.
-        self.shortcut_overrides.retain(|_, c| c.is_empty() || crate::shortcut_editor::normalize(c).is_some());
+        let unusable: Vec<String> = self
+            .shortcut_overrides
+            .iter()
+            .filter(|(_, texts)| !texts.iter().all(|t| craft_keymap::Binding::parse(t).is_ok()))
+            .map(|(k, _)| k.to_string())
+            .collect();
+        for k in unusable {
+            self.shortcut_overrides.remove(&k);
+        }
         self
     }
 }
@@ -898,9 +915,11 @@ impl Default for UiState {
             move_options: Value::Null,
             dxf_import: Value::Null,
             home: None,
+            trace_hold_source: None,
             layers_panel: Default::default(),
             layers_filter: Default::default(),
             image_trace_advanced: true,
+            image_trace_preview: true,
             glyphs_preview: 0,
             window: None,
         }

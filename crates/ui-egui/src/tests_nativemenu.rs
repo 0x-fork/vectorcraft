@@ -210,7 +210,7 @@ fn the_window_menu_has_the_system_items() {
 #[test]
 fn a_command_keeps_a_system_key_it_is_bound_to() {
     let mut app = app(true);
-    app.ui.shortcut_overrides.insert("view.grid".into(), "Ctrl+Cmd+H".into());
+    crate::keymap::set_override(&mut app.ui.shortcut_overrides, "view.grid", "Ctrl+Cmd+H");
     crate::shortcut_editor::sync(&app.ui);
     let layout = native_menu::mac_layout(&app, &native_menu::from_tree(&app, &menus::menu_tree()), Lang::EN);
     app.ui.shortcut_overrides.clear();

@@ -89,10 +89,14 @@ fn pdf_real_text_draws_svg_glyphs_as_art_and_keeps_their_characters() {
     let d = s.doc().unwrap().doc.clone();
     let pdf = vectorcraft_pdf::export(&d, &vectorcraft_pdf::PdfOptions::uncompressed()).unwrap();
     // The glyphs each text-showing line writes (the font's codes are octal escapes), and whether
-    // it is invisible.
+    // it is invisible. Only text objects count: the file ID in the trailer and the XMP is random
+    // base64, which now and then spells `Tj` or `TJ`.
     let raw = String::from_utf8_lossy(&pdf);
-    let shown: Vec<(bool, usize)> =
-        raw.lines().filter(|l| l.contains("Tj") || l.contains("TJ")).map(|l| (l.contains("3 Tr"), l.matches("\\0").count())).collect();
+    let shown: Vec<(bool, usize)> = raw
+        .lines()
+        .filter(|l| l.starts_with("BT ") && (l.contains("Tj") || l.contains("TJ")))
+        .map(|l| (l.contains("3 Tr"), l.matches("\\0").count()))
+        .collect();
     assert_eq!(shown, [(false, 2)], "both characters once, as text");
     // The glyphs as the font draws them (its Type 3 glyph procedures, `<width> 0 d0` and what
     // they paint): the SVG glyph's draws nothing, rather than the font's plain outline over the

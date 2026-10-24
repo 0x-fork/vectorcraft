@@ -768,6 +768,10 @@ fn move_rows(s: &mut Session, p: &Value) -> Result<Value> {
         let ch = d.children_mut(parent)?;
         let index = index.min(ch.len());
         ch.splice(index..index, nodes);
+        // Copied type whose layout caches `reid` dropped has them again.
+        if copy {
+            super::typecmd::refresh_bounds_of(d, &out);
+        }
         sel.prune(d);
         sel.deselect_uneditable(d);
         Ok(out)
@@ -866,6 +870,7 @@ fn artboard_delete(s: &mut Session, p: &Value) -> Result<Value> {
         // The last first, so the others keep their places; their guides go with them.
         for &i in indices.iter().rev() {
             let id = d.artboards.remove(i).id;
+            d.retire_artboard_id(id);
             d.retain_guides(sel, |_, g| g.artboard != Some(id));
         }
         Ok(())

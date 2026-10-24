@@ -114,24 +114,31 @@ impl Ctx<'_> {
         }
     }
 
-    /// Bullets: put the marker of list paragraph `pr` (attributes `para`, right to left when
-    /// `rtl`) before its glyphs `sg` and return how many glyphs went in (none for a paragraph
-    /// without a list or without text). The marker's characters are set in
+    /// Bullets and numbered lists: put marker `text` (the bullet, or the number and its period;
+    /// [`list_markers`]) of list paragraph `pr` (attributes `para`, right to left when `rtl`)
+    /// before its glyphs `sg` and return how many glyphs went in (none for a paragraph without a
+    /// marker). The marker's characters are set in
     /// [`vectorcraft_doc::text::ParaList::marker_style`], and a tab after them takes the text to
     /// the next tab stop past them on the first line, the left indent counting as a stop when no
     /// explicit stop comes before it. In a horizontal right-to-left paragraph, whose indents are
-    /// mirrored ([`line_indents`]), these are measured from the right. The tab keeps that width
-    /// however the line is aligned or justified. Each of these glyphs stands for no character of the text: length 0, at the
+    /// mirrored ([`line_indents`]), these are measured from the right, and a number reads left to
+    /// right with its period at its left. The tab keeps that width however the line is aligned or
+    /// justified. Each of these glyphs stands for no character of the text: length 0, at the
     /// paragraph's first byte, in its first character's run, at the paragraph's embedding level.
-    fn prepend_marker(&self, pr: &Range<usize>, para: &ParaStyle, rtl: bool, sg: &mut Vec<SGlyph>) -> usize {
-        let Some(list) = para.list.filter(|_| !pr.is_empty()) else { return 0 };
-        let text = list.marker();
+    fn prepend_marker(&self, pr: &Range<usize>, para: &ParaStyle, text: Option<&str>, rtl: bool, sg: &mut Vec<SGlyph>) -> usize {
+        let Some(text) = text.filter(|_| para.list.is_some() && !pr.is_empty()) else { return 0 };
         let st = vectorcraft_doc::text::ParaList::marker_style(self.style_at(pr.start));
         let Some(run) = self.runs.iter().position(|(r, _)| r.start <= pr.start && pr.start < r.end) else { return 0 };
         // The paragraph's direction: the marker starts a right-to-left paragraph at its right.
         let level = if rtl { Level::rtl() } else { Level::ltr() };
         let mut marker = Vec::with_capacity(text.len() + 1);
-        shape_range(self.db, &text, 0..text.len(), &[(0..text.len(), &st)], &[None], &self.opts.features, &vec![level; text.len()], &mut marker);
+        shape_range(self.db, text, 0..text.len(), &[(0..text.len(), &st)], &[None], &self.opts.features, &vec![level; text.len()], &mut marker);
+        if rtl {
+            // [`visual_order`] draws a right-to-left marker's glyphs in reverse: the number's
+            // glyphs go in reversed, so that it reads left to right, and the period after them.
+            let number = marker.iter().take_while(|g| text.get(g.byte..).is_some_and(|s| !s.starts_with('.'))).count();
+            marker[..number].reverse();
+        }
         for g in &mut marker {
             g.byte = pr.start;
             g.len = 0;
@@ -1946,8 +1953,17 @@ const MAX_COMPOSE_GLYPHS: usize = 200_000;
 
 /// Every-line composition of paragraph glyphs `sg` if applicable (area text, justified or ragged,
 /// with uniform line metrics or in rectangular cells without text wrap); `None` falls back to the
-/// greedy single-line composer.
-fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pen: &Pen<'_>, rtl: bool) -> Option<Vec<(usize, bool)>> {
+/// greedy single-line composer. With `continued`, the paragraph continues from the frame before,
+/// and its first composed line is not its first line.
+fn compose_para(
+    cx: &Ctx<'_>,
+    sg: &[SGlyph],
+    flex: &[Flex],
+    para: &ParaStyle,
+    pen: &Pen<'_>,
+    rtl: bool,
+    continued: bool,
+) -> Option<Vec<(usize, bool)>> {
     let ragged = matches!(para.justify, Justify::Auto | Justify::Left | Justify::Center | Justify::Right);
     let composer = cx.opts.composer.unwrap_or(para.composer);
     // A paragraph whose commas or full stops may hang is composed line by line (as the Japanese
@@ -1979,7 +1995,7 @@ fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pe
     // indents of a right-to-left list ([`line_indents`]) keep.
     while widths.len() < sg.len() {
         let first = widths.is_empty();
-        let ind_l = para.left_indent + if first { para.first_line_indent } else { 0.0 };
+        let ind_l = para.left_indent + if first && !continued { para.first_line_indent } else { 0.0 };
         // Only the first line's first word is known here. Later lines are placed as the composed
         // lines need: each fits its width, so its first word does too.
         let word = if first { word_width(sg, 0) } else { 0.0 };
@@ -2016,6 +2032,14 @@ fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pe
     compose(sg, &width, &start_credit, &cands, flex, &params(strict)).or_else(|| compose(sg, &width, &start_credit, &cands, flex, &params(loose)))
 }
 
+/// The list marker of each of the paragraphs `paras` of `t` (None for none): bullets, and numbers
+/// counted through consecutive list paragraphs from [`TextObject::list_count`], as
+/// [`vectorcraft_doc::text::ParaList::next_marker`] counts them.
+fn list_markers(t: &TextObject, paras: &[Range<usize>]) -> Vec<Option<String>> {
+    let mut count = t.list_count;
+    paras.iter().enumerate().map(|(pi, pr)| vectorcraft_doc::text::ParaList::next_marker(t.para_at(pi).list, pr.is_empty(), &mut count)).collect()
+}
+
 /// Whether paragraph `para` (right to left when `rtl`) has its indents mirrored: a horizontal
 /// right-to-left list paragraph does.
 fn mirrors_indents(para: &ParaStyle, rtl: bool, vertical: bool) -> bool {
@@ -2046,8 +2070,10 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
         next_top: None,
         no_room_for: f64::INFINITY,
     };
+    let markers = list_markers(t, paras);
     'paras: for (pi, pr) in paras.iter().enumerate() {
         let para = t.para_at(pi);
+        let marker_text = markers.get(pi).and_then(Option::as_deref);
         // The leading model is a paragraph attribute: this paragraph's lines (and the space to
         // its first line) follow its own.
         pen.model = para.leading_model;
@@ -2064,9 +2090,12 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
         // Justification…: the glyphs at Desired word and letter spacing and glyph scaling, and how
         // far a justified line may move each one from it.
         let mut flex = apply_desired(&mut sg, &para.justification, !cx.vertical);
-        // Bullets: the list marker's glyphs `0..marker` start the paragraph. Justification and
-        // Optical Margin Alignment leave them as they are.
-        let marker = cx.prepend_marker(pr, para, rtl, &mut sg);
+        // Threaded text: a first paragraph that continues from the frame before has its first
+        // line, first-line indent and list marker there.
+        let continued = pi == 0 && t.first_para_continues;
+        // Bullets and numbers: the list marker's glyphs `0..marker` start the paragraph.
+        // Justification and Optical Margin Alignment leave them as they are.
+        let marker = if continued { 0 } else { cx.prepend_marker(pr, para, marker_text, rtl, &mut sg) };
         if marker > 0 {
             flex.splice(0..0, vec![Flex::default(); marker]);
             if !compressed.is_empty() {
@@ -2095,7 +2124,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             pen.pending += para.space_before;
         }
         let n = sg.len();
-        let composed = compose_para(cx, &sg, &flex, para, &pen, rtl);
+        let composed = compose_para(cx, &sg, &flex, para, &pen, rtl, continued);
         // Hyphenation options: the Hyphenation Zone applies with the Single-line Composer, and the
         // Hyphen Limit counts the lines in a row that end with a hyphen.
         let zone = if cx.opts.composer.unwrap_or(para.composer) == Composer::SingleLine { para.hyphenation.zone } else { 0.0 };
@@ -2106,7 +2135,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
         let mirror = mirrors_indents(para, rtl, cx.vertical);
         loop {
             let est = if i < n { Metrics::of(&sg[i]) } else { pm };
-            let first_line = li_para == 0;
+            let first_line = li_para == 0 && !continued;
             let (ind_l, ind_r) = line_indents(para, first_line, mirror);
             // Measured before Mojikumi narrows an opening bracket, as the composer measures it.
             let word = word_width(&sg, i);
@@ -2452,8 +2481,8 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
                     x_end = x;
                 }
             }
-            if let (Some(glyphs), Some(list)) = (marker_glyphs, para.list) {
-                cx.out.markers.push(ListMarker { glyphs, tab: marker_tab, text: list.marker() });
+            if let (Some(glyphs), Some(text)) = (marker_glyphs, marker_text) {
+                cx.out.markers.push(ListMarker { glyphs, tab: marker_tab, text: text.to_string() });
             }
             if let Some(h) = &hyphen {
                 // The hyphen follows the last non-space glyph.
@@ -2520,13 +2549,18 @@ fn on_path(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, path: &Path
     // The first paragraph's direction aligns the line (Auto) and sets the caret's.
     let mut rtl = None;
     let mut shaped = Vec::new();
+    let markers = list_markers(t, paras);
     for (pi, pr) in paras.iter().enumerate() {
         let text = cx.text;
         let bidi = para_bidi_with(text.get(pr.clone()).unwrap_or_default(), para.direction, &cx.char_directions(pr));
         rtl.get_or_insert(is_rtl(bidi.as_ref()) && !cx.vertical);
         let mut glyphs = cx.shape_para(pr.clone(), bidi.as_ref());
-        // Bullets: a list paragraph's text starts after its marker here too.
-        cx.prepend_marker(pr, t.para_at(pi), is_rtl(bidi.as_ref()) && !cx.vertical, &mut glyphs);
+        // Bullets and numbers: a list paragraph's text starts after its marker here too, unless
+        // the paragraph continues from the frame before in its thread.
+        if pi > 0 || !t.first_para_continues {
+            let marker_text = markers.get(pi).and_then(Option::as_deref);
+            cx.prepend_marker(pr, t.para_at(pi), marker_text, is_rtl(bidi.as_ref()) && !cx.vertical, &mut glyphs);
+        }
         shaped.push((pr.clone(), bidi.filter(|b| b.has_rtl() && !cx.vertical), glyphs));
     }
     let rtl = rtl.unwrap_or(false);
@@ -2742,8 +2776,8 @@ fn on_path(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, path: &Path
             match cx.out.markers.last_mut() {
                 Some(m) if m.glyphs.end == at && cx.out.glyphs.get(m.glyphs.start).is_some_and(|h| h.byte == g.byte) => m.glyphs.end = at + 1,
                 _ => {
-                    if let Some(list) = starts_paragraph(g.byte).and_then(|pi| t.para_at(pi).list) {
-                        cx.out.markers.push(ListMarker { glyphs: at..at + 1, tab: at, text: list.marker() });
+                    if let Some(text) = starts_paragraph(g.byte).and_then(|pi| markers.get(pi)).and_then(Option::as_ref) {
+                        cx.out.markers.push(ListMarker { glyphs: at..at + 1, tab: at, text: text.clone() });
                     }
                 }
             }

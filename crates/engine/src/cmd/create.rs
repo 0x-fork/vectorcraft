@@ -206,6 +206,8 @@ pub(crate) fn draw_inside_group(d: &mut vectorcraft_doc::Document, target: NodeI
     let gid = d.alloc_id();
     d.insert(par, idx + 1, Node::new(gid, NodeKind::Group { children: vec![std::sync::Arc::new(mask)], clip: true }))?;
     d.move_node(target, Some(gid), usize::MAX)?;
+    // Copied type whose layout caches `reid` dropped has them again.
+    super::typecmd::refresh_bounds_of(d, &[gid]);
     Ok(gid)
 }
 

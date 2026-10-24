@@ -310,13 +310,18 @@ fn save_prefs(app: &VectorcraftApp) {
     }
     if let Some(p) = prefs_path() {
         let _ = std::fs::create_dir_all(p.parent().unwrap_or(std::path::Path::new(".")));
-        let mut ui = app.ui.clone();
-        ui.engine_prefs = app.session.prefs.to_json();
-        if let Ok(bytes) = serde_json::to_vec_pretty(&ui) {
+        if let Ok(bytes) = prefs_bytes(app) {
             // Preferences are best effort: a failed write keeps the previous file.
             let _ = fileio::write_atomic(&p, &bytes);
         }
     }
+}
+
+/// The preferences file's contents: the UI state with the engine preferences.
+fn prefs_bytes(app: &VectorcraftApp) -> serde_json::Result<Vec<u8>> {
+    let mut ui = app.ui.clone();
+    ui.engine_prefs = app.session.prefs.to_json();
+    serde_json::to_vec_pretty(&ui)
 }
 
 /// The window file dialogs belong to.
@@ -1144,6 +1149,38 @@ mod tests {
         vectorcraft_ui_egui::UiState { engine_prefs, ..Default::default() }
     }
 
+    /// Shortcut overrides an earlier version saved still load: its spellings, `panel:` keys, an
+    /// override that can't fire (#487), an entry for a command this version lacks, and an old set
+    /// name.
+    #[test]
+    fn shortcut_overrides_from_an_earlier_version_load() {
+        use serde_json::json;
+        use vectorcraft_ui_egui::{keymap, shortcut_editor};
+        let mut raw = serde_json::to_value(vectorcraft_ui_egui::UiState::default()).unwrap();
+        raw["shortcut_overrides"] = json!({
+            "tool:pen": "Shift+9",
+            "edit.preferences": "",
+            "panel:layers": "Cmd+Alt+Shift+F7",
+            "tool:groupSelection": "Shift+ShiftLeft",
+            "test.unknown": "Cmd+Alt+Shift+F9",
+            "view.grid": "Cmd+Period",
+        });
+        raw["shortcut_set"] = json!(shortcut_editor::LEGACY_PRESETS[0].0);
+        let ui = decode_saved_prefs(&serde_json::to_vec(&raw).unwrap()).unwrap().sanitized();
+        assert_eq!(ui.shortcut_set, shortcut_editor::LEGACY_PRESETS[0].1);
+        let km = keymap::keymap_with(&ui.shortcut_overrides);
+        let text = |key: &str| keymap::effective_with(&km, key);
+        assert_eq!(text("tool:pen").as_deref(), Some("Shift+9"));
+        assert_eq!(text("edit.preferences"), None);
+        assert_eq!(text("panel:layers").as_deref(), Some("Cmd+Alt+Shift+F7"));
+        assert_eq!(text("tool:groupSelection").as_deref(), shortcut_editor::default_of("tool:groupSelection"), "back on its default");
+        assert_eq!(text("view.grid").as_deref(), Some("Cmd+Period"));
+        let period = keymap::vc_chord("Cmd+.").unwrap();
+        assert_eq!(keymap::lookup(&km, &period).map(|c| c.id), Some("view.grid".to_string()));
+        assert_eq!(text("test.unknown").as_deref(), Some("Cmd+Alt+Shift+F9"), "kept");
+        assert!(km.problems().iter().any(|p| format!("{p:?}") == r#"UnknownCommand { key: "test.unknown" }"#), "reported");
+    }
+
     #[test]
     fn opening_files_unminimizes_and_focuses_the_window() {
         let ctx = egui::Context::default();
@@ -1203,6 +1240,17 @@ mod tests {
             decode_saved_prefs(&serde_json::to_vec(&json!({"toolbar":"invalid"})).unwrap()).is_none(),
             "unrelated fields retain normal strict parsing"
         );
+    }
+
+    #[test]
+    fn the_image_trace_preview_setting_is_kept_across_a_restart() {
+        for preview in [false, true] {
+            let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
+            app.ui.image_trace_preview = preview;
+            let saved = prefs_bytes(&app).unwrap();
+            let loaded = decode_saved_prefs(&saved).unwrap().sanitized();
+            assert_eq!(loaded.image_trace_preview, preview, "Preview {preview} after a restart");
+        }
     }
 
     #[test]

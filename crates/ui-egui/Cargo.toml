@@ -21,6 +21,7 @@ interface-fonts = []
 
 [dependencies]
 craft-ui = { workspace = true }
+craft-keymap = { workspace = true, features = ["egui"] }
 vectorcraft-geom = { workspace = true }
 vectorcraft-color = { workspace = true }
 vectorcraft-doc = { workspace = true }
