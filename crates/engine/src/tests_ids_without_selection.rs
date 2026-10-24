@@ -53,6 +53,78 @@ fn only_an_ids_key_counts() {
     // A word in what the description says about another key isn't the key.
     assert_eq!(given_ids("{name: of the swatch the ids of the selection take}", &p), None);
     assert_eq!(given_ids("{ids?: [id]}", &json!({"ids": []})), None);
+    // `id` is `ids` of one where the description names both keys, and `ids` aren't given.
+    let one = json!({"id": 3});
+    assert_eq!(given_ids("{ids?|id?}", &one), Some(vec![NodeId(3)]));
+    assert_eq!(given_ids("{id?, ids?: [id…] (instead of id)}", &one), Some(vec![NodeId(3)]));
+    assert_eq!(given_ids("{ids?: [id…]}", &one), None, "a description without `id`");
+    assert_eq!(given_ids("{id?: dimension id}", &one), None, "a description without `ids`");
+    assert_eq!(given_ids("{ids?|id?}", &json!({"id": "a1"})), None, "not an object id");
+    assert_eq!(given_ids("{ids?|id?}", &json!({"id": 3, "ids": [4]})), Some(vec![NodeId(4)]), "`ids` first");
+    assert_eq!(given_ids("{ids?|id?}", &json!({"id": 3, "ids": null})), Some(vec![NodeId(3)]));
+}
+
+/// `{"id": x}` with params besides it, and the same as `{"ids": [x]}`.
+fn id_and_ids(cmd: &str, x: u64, d: u64) -> (serde_json::Value, serde_json::Value) {
+    let (mut one, mut list) = (params_for(cmd, d), params_for(cmd, d));
+    one["id"] = json!(x);
+    list["ids"] = json!([x]);
+    (one, list)
+}
+
+/// [`doc_with_nested_groups`] with point type `Ab` added, nothing selected → its session and the
+/// type's id.
+fn doc_with_type() -> (Session, [u64; 4], u64) {
+    let (mut s, ids) = doc_with_nested_groups();
+    let t = s.execute("text.create", &json!({"x": 10, "y": 120, "text": "Ab", "size": 20})).unwrap()["id"].as_u64().unwrap();
+    s.execute("select.none", &json!({})).unwrap();
+    (s, ids, t)
+}
+
+/// What `cmd` gives in a fresh [`doc_with_type`] (nothing selected) with `params`: its result or
+/// error, and the document after it.
+fn run_fresh(
+    cmd: &str,
+    params: &serde_json::Value,
+) -> (std::result::Result<serde_json::Value, String>, Option<std::sync::Arc<vectorcraft_doc::Document>>) {
+    let (mut s, ..) = doc_with_type();
+    let r = s.execute(cmd, params).map_err(|e| e.to_string());
+    (r, s.doc().ok().map(|d| d.doc.clone()))
+}
+
+/// Every command whose params description names both `id` and `ids` (`{ids?|id?}`, `{id?, ids?:
+/// … (instead of id)}`), with nothing selected: `id` does what `ids` of that one object does (the
+/// same result or the same error, and the same document), for objects of the document and for an
+/// id the document doesn't have. Before, the commands that need a selection refused `id` as
+/// "nothing selected" and took `ids`.
+#[test]
+fn id_does_what_ids_of_one_does_with_nothing_selected() {
+    let (fresh, [a, inner, _, d], t) = doc_with_type();
+    let (mut checked, mut failures, mut refused, mut refused_ran) = (vec![], vec![], vec![], vec![]);
+    for spec in command_specs() {
+        if !cmd::params::takes_key(spec.params, "ids") || !cmd::params::takes_key(spec.params, "id") {
+            continue;
+        }
+        // Those the menus refuse with nothing selected are the ones that refused `id`.
+        if (spec.enabled)(&fresh).is_err() {
+            refused.push(spec.id);
+        }
+        // A rectangle, a group, type, and an id the document doesn't have.
+        for x in [a, inner, t, 999_999] {
+            let (one, list) = id_and_ids(spec.id, x, d);
+            let (with_id, with_ids) = (run_fresh(spec.id, &one), run_fresh(spec.id, &list));
+            if with_id != with_ids {
+                failures.push(format!("{} {x}: with id {:.160}; with ids {:.160}", spec.id, format!("{:?}", with_id.0), format!("{:?}", with_ids.0)));
+            } else if refused.last() == Some(&spec.id) && x != 999_999 && with_id.0.is_ok() && !refused_ran.contains(&spec.id) {
+                refused_ran.push(spec.id);
+            }
+        }
+        checked.push(spec.id);
+    }
+    assert!(failures.is_empty(), "{} differ:\n{}", failures.len(), failures.join("\n"));
+    // The commands that refused `id` with nothing selected (29), and those of them that run on
+    // these objects (14: the rest need other art, as with `ids`).
+    assert!(refused.len() >= 26 && refused_ran.len() >= 14, "{refused_ran:?} ran of {refused:?}; checked {}", checked.len());
 }
 
 /// Every command that names `ids` and is refused with nothing selected: given the object as `ids`

@@ -367,6 +367,14 @@ pub(crate) fn id_param(p: &Value, key: &str) -> Option<NodeId> {
 pub(crate) fn ids_param(p: &Value, key: &str) -> Option<Vec<NodeId>> {
     p.get(key).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_u64).map(NodeId).collect())
 }
+/// The objects `p` gives: its `ids`, else its `id` as `ids` of one (as [`targets`] reads them);
+/// `None` when it gives neither.
+pub(crate) fn given_objects(p: &Value) -> Option<Vec<NodeId>> {
+    match p.get("ids").filter(|v| !v.is_null()) {
+        Some(_) => ids_param(p, "ids"),
+        None => id_param(p, "id").map(|id| vec![id]),
+    }
+}
 /// `v` as an index, a count or a byte offset: past `usize::MAX` reads as `usize::MAX`, past the end of any list.
 pub(crate) fn index(v: u64) -> usize {
     usize::try_from(v).unwrap_or(usize::MAX)

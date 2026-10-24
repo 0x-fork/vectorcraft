@@ -1762,11 +1762,12 @@ impl Session {
         self.check_params(id, params)?;
         // Clear's menu needs a selection; an agent supplying explicit targets only needs a
         // document. The command validates those targets before making any edit.
+        let given = given_ids(spec.params, params);
         let enabled = if id == "edit.clear" && params.get("ids").is_some() {
             cmd::has_doc(self)
-        } else if let Some(ids) = given_ids(spec.params, params) {
-            // Objects given as `ids` stand in for the selection: the command is enabled as it is
-            // with them selected (#1575).
+        } else if let Some(ids) = given.clone() {
+            // Objects given as `ids` (or `id`) stand in for the selection: the command is enabled
+            // as it is with them selected (#1575).
             self.enabled_with_selection(spec, ids)
         } else {
             (spec.enabled)(self)
@@ -1782,13 +1783,18 @@ impl Session {
             self.journal_query = false;
             self.batch_stash = None;
         }
-        // A selection-only command given `ids` selects them first, in the same undo step (#2130);
-        // when the command then fails, the selection (and the current layer selecting them made
-        // current) goes back to how it was, as when the ids are refused.
-        let select_first = SELECTS_GIVEN_IDS.contains(&id).then(|| params.get("ids")).flatten();
-        let selected_before = select_first.and(self.active()).map(|d| (d.uid, d.selection.clone(), d.active_layer));
+        // A selection-only command given `ids` (or `id`) selects them first, in the same undo step
+        // (#2130); when the command then fails, the selection (and the current layer selecting
+        // them made current) goes back to how it was, as when the ids are refused.
+        let select_first = SELECTS_GIVEN_IDS
+            .contains(&id)
+            .then(|| {
+                params.get("ids").filter(|v| !v.is_null()).cloned().or_else(|| given.map(|ids| ids.iter().map(|i| i.0).collect::<Vec<_>>().into()))
+            })
+            .flatten();
+        let selected_before = select_first.as_ref().and(self.active()).map(|d| (d.uid, d.selection.clone(), d.active_layer));
         let run = |s: &mut Session| {
-            if let Some(ids) = select_first {
+            if let Some(ids) = &select_first {
                 s.execute("select.set", &serde_json::json!({ "ids": ids }))?;
             }
             let r = (spec.run)(s, params);
@@ -2784,8 +2790,13 @@ pub(crate) const SELECTS_GIVEN_IDS: &[&str] = &[
 ];
 
 /// The non-empty `ids` given to a command whose params description names `ids` as a key (the
-/// key callers outside the app may pass it, [`cmd::params::takes_key`]).
+/// key callers outside the app may pass it, [`cmd::params::takes_key`]), or its `id` as `ids` of
+/// one when the description names that key too and no `ids` are given, as [`cmd::targets`] reads
+/// them.
 fn given_ids(description: &'static str, params: &Value) -> Option<Vec<NodeId>> {
-    let ids = cmd::ids_param(params, "ids").filter(|ids| !ids.is_empty())?;
-    cmd::params::takes_key(description, "ids").then_some(ids)
+    let by_id = params.get("ids").is_none_or(Value::is_null);
+    if !cmd::params::takes_key(description, "ids") || (by_id && !cmd::params::takes_key(description, "id")) {
+        return None;
+    }
+    cmd::given_objects(params).filter(|ids| !ids.is_empty())
 }

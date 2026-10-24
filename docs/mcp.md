@@ -347,8 +347,10 @@ currently describes them in prose, so MCP does not guess schemas or silently rem
 
 Coordinates are points in document space: y points down, the origin is the first artboard's top-left, and a new
 document is 612 × 792 (US Letter). New objects become the selection. Most commands act on the selection or on
-explicit `ids`. A command that leaves out an object selected inside a selected group also leaves it out when `ids`
-list it together with a group that holds it.
+explicit `ids`, which stand in for the selection, so they work with nothing selected. Where a command's params say
+`ids?|id?` (or `id?, ids?: … (instead of id)`), `id` is `ids` of one object: `{"id": 7}` does what `{"ids": [7]}`
+does, with or without a selection. A command that leaves out an object selected inside a selected group also leaves
+it out when `ids` list it together with a group that holds it.
 
 Paint values (`fill`, `stroke`) accept `"#rrggbb"`, `"none"`, `[r,g,b]` (0..1), `{"c","m","y","k"}`, `{"gray"}`,
 or a full `paint.setFill` params object (`{"gradient": …}`, `{"swatch": "name"}`).
