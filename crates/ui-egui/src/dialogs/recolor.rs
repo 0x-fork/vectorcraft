@@ -744,33 +744,57 @@ mod tests {
         frame(app, ctx, time + 0.15, vec![button(false)], i);
     }
 
-    /// Double-clicking a row's new color opens the Color Picker on it, over the dialog. OK sets the
-    /// row's new color in the model it was picked in (a CMYK mix stays that mix, not a hex value
-    /// converted back), a color picked as RGB is CMYK in a CMYK document, Cancel leaves the row as
-    /// it was, and nothing is committed until Recolor Artwork's own OK.
+    /// Double-clicking a row's new color opens the Color Picker on that new color, over the dialog.
+    /// OK sets that row's new color, and only that row's, in the model it was picked in (a CMYK mix
+    /// stays that mix, not a hex value converted back), and the art previews it; a color picked as
+    /// RGB is CMYK in a CMYK document. Cancel leaves the rows and the preview as they were, and
+    /// nothing is committed until Recolor Artwork's own OK.
     #[test]
     fn double_clicking_a_new_color_picks_it_in_its_own_model() {
         let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
         app.run("file.new", json!({"width": 100, "height": 100, "colorMode": "cmyk"})).unwrap();
-        app.run("shape.rectangle", json!({"x": 10, "y": 10, "width": 50, "height": 50})).unwrap();
-        app.run("paint.setFill", json!({"color": {"c": 0, "m": 100, "y": 100, "k": 0}})).unwrap();
-        app.run("ui.recolorDialog", json!({})).unwrap();
+        let mut ids = vec![];
+        for (n, c) in [json!({"c": 0, "m": 100, "y": 100, "k": 0}), json!({"c": 100, "m": 0, "y": 0, "k": 0})].into_iter().enumerate() {
+            let id = app.run("shape.rectangle", json!({"x": 10 + 30 * n, "y": 10, "width": 20, "height": 20})).unwrap()["id"].clone();
+            app.run("paint.setFill", json!({"ids": [id], "color": c})).unwrap();
+            app.run("paint.setStroke", json!({"ids": [id], "none": true})).unwrap();
+            ids.push(id.as_u64().unwrap());
+        }
+        app.run("select.all", json!({})).unwrap();
+        // New colors other than the current ones, so the picker can only start from the new one.
+        let assign = json!([{"c": 0, "m": 0, "y": 100, "k": 0}, {"c": 0, "m": 100, "y": 0, "k": 0}]);
+        app.run("ui.recolorDialog", json!({"colors": assign})).unwrap();
+        app.ui.dialog.as_mut().unwrap().fields.insert("method".into(), json!(Method::Exact.id()));
         let undo = |app: &VectorcraftApp| app.session.doc().unwrap().history.undo.len();
+        // The previewed fill of the rectangle whose color row `row` recolors.
+        let fill = |app: &VectorcraftApp, row: &Value| {
+            let from = from_colors(row);
+            let doc = &app.session.doc().unwrap().doc;
+            let original = |id: u64| if id == ids[0] { Color::cmyk(0.0, 1.0, 1.0, 0.0) } else { Color::cmyk(1.0, 0.0, 0.0, 0.0) };
+            let id = *ids.iter().find(|id| from.contains(&original(**id))).expect("a rectangle for the row");
+            doc.node(vectorcraft_doc::NodeId(id)).unwrap().appearance.fill().and_then(|f| f.paint.color())
+        };
         let before = undo(&app);
         let ctx = egui::Context::default();
         crate::theme::install_fonts(&ctx);
         frame(&mut app, &ctx, 0.0, vec![], 0);
         let all = super::rows(app.ui.dialog.as_ref().unwrap());
-        let i = all.iter().position(|r| r["to"] == "cmyk 0 100 100 0").expect("a row for the fill");
+        assert_eq!(all.len(), 2);
+        let i = 1;
+        assert_ne!(all[i]["from"][0], all[i]["to"], "the row's new color isn't its current color");
         let rect = settled(&mut app, &ctx, 0.01, i).expect("the row's new color is drawn");
+        let previewed = to_color(&all[i]);
+        assert_eq!(fill(&app, &all[i]), previewed, "the art previews the row's new color");
 
         double_click(&mut app, &ctx, rect, 0.1, i);
         let d = app.ui.dialog.as_ref().unwrap();
         assert_eq!(d.kind, "colorPicker", "a double-click opens the Color Picker");
-        assert_eq!(d.fields.get("color").and_then(color_value), Some(Color::cmyk(0.0, 1.0, 1.0, 0.0)), "on the row's new color");
+        assert_eq!(d.fields.get("color").and_then(color_value), previewed, "on the row's new color");
         crate::dialogs::cancel(&mut app);
         assert_eq!(app.ui.dialog.as_ref().map(|d| d.kind.as_str()), Some(KIND), "Cancel comes back to Recolor Artwork");
         assert_eq!(super::rows(app.ui.dialog.as_ref().unwrap()), all, "with the rows as they were");
+        frame(&mut app, &ctx, 0.5, vec![], i);
+        assert_eq!(fill(&app, &all[i]), previewed, "and the art previews them again");
 
         let rect = settled(&mut app, &ctx, 1.0, i).unwrap();
         double_click(&mut app, &ctx, rect, 1.1, i);
@@ -781,8 +805,13 @@ mod tests {
         crate::dialogs::confirm(&mut app).unwrap();
         let d = app.ui.dialog.as_ref().unwrap();
         assert_eq!(d.kind, KIND, "OK comes back to Recolor Artwork");
-        assert_eq!(super::rows(d)[i]["to"], "cmyk 100 50 0 0", "the row keeps the CMYK mix picked");
+        let rows = super::rows(d);
+        assert_eq!(rows[i]["to"], "cmyk 100 50 0 0", "the row keeps the CMYK mix picked");
+        assert_eq!(rows[0], all[0], "the other row stays");
+        assert!(app.session.in_interaction(), "the dialog still previews");
         assert_eq!(undo(&app), before, "nothing is committed before Recolor Artwork's OK");
+        frame(&mut app, &ctx, 1.5, vec![], i);
+        assert_eq!(fill(&app, &rows[i]), Some(Color::cmyk(1.0, 0.5, 0.0, 0.0)), "the art previews the picked color");
 
         let rect = settled(&mut app, &ctx, 2.0, i).unwrap();
         double_click(&mut app, &ctx, rect, 2.1, i);
