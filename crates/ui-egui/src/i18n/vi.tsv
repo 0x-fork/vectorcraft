@@ -1779,6 +1779,7 @@ file-filter	Templates	Mẫu
 	The file writes keys and modifiers as codes. Check the proposed meanings and answer the codes that are not known yet.	Tệp ghi phím và phím bổ trợ dưới dạng mã. Hãy kiểm tra các nghĩa được đề xuất và trả lời những mã chưa biết.
 	Click, then press the key this code stands for (Esc cancels)	Bấm, rồi nhấn phím mà mã này biểu thị (Esc để hủy)
 	Press a key…	Nhấn một phím…
+	Press and hold to view the source image	Nhấn giữ để xem ảnh nguồn
 	from your earlier imports	từ các lần nhập trước của bạn
 	from the format's public description	từ mô tả công khai của định dạng
 	not known yet	chưa biết

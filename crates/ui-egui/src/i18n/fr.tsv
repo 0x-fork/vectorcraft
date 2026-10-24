@@ -3078,6 +3078,7 @@ font-technology	Variable	Variables
 	Outlines	Contours
 	Outlines with Source Image	Tracés avec l’image source
 	Source Image	Image source
+	Press and hold to view the source image	Maintenez le bouton enfoncé pour afficher l’image source
 	Image Trace View	Affichage de la vectorisation de l’image
 	Snap Options	Options de magnétisme
 	Snap to Glyph	Magnétisme du glyphe

@@ -159,6 +159,10 @@ pub struct RenderOptions {
     /// Screen view: Image Trace objects draw as their View asks (outlines, the source image…);
     /// off, they draw their tracing result, as exports and printing do.
     pub trace_views: bool,
+    /// Screen view with `trace_views` on: the Image Trace objects drawn with the Source Image view
+    /// for this render only, whatever View they have (the Image Trace panel's eye button, while it
+    /// is held down).
+    pub trace_source: Option<Arc<Vec<NodeId>>>,
     /// Images are sampled smoothly when scaled or rotated; off, each pixel takes its nearest image
     /// pixel (Pixel Preview with File Handling › Display Bitmaps as Anti-aliased Images off).
     pub smooth_images: bool,
@@ -266,6 +270,7 @@ impl Default for RenderOptions {
             anti_alias: AntiAlias::Art,
             progressive_placed: false,
             trace_views: false,
+            trace_source: None,
             smooth_images: true,
             isolated: None,
             precise: false,
@@ -1301,8 +1306,8 @@ impl Renderer {
     /// What `n` draws inside its transparency group (`knockout`: its children knock each other out).
     fn draw_content(&mut self, ctx: &mut RenderContext, f: &Frame, n: &Node, knockout: bool) {
         match &n.kind {
-            NodeKind::Group { children, clip: false } if f.opts.trace_views && !f.opts.outline && n.trace_view() != TraceView::Result => {
-                self.draw_trace_view(ctx, f, children, n.trace_view(), knockout)
+            NodeKind::Group { children, clip: false } if f.opts.trace_views && !f.opts.outline && Self::trace_view(f, n) != TraceView::Result => {
+                self.draw_trace_view(ctx, f, children, Self::trace_view(f, n), knockout)
             }
             NodeKind::Layer { children, clip: false, .. } | NodeKind::Group { children, clip: false } => {
                 self.draw_children(ctx, f, children, knockout)
@@ -1427,6 +1432,15 @@ impl Renderer {
         let outer = std::mem::replace(&mut self.live_root, live);
         self.draw_node(ctx, f, a, true);
         self.live_root = outer;
+    }
+
+    /// The View `n` draws with on screen: Source Image when it is an Image Trace object listed in
+    /// [`RenderOptions::trace_source`], else its own.
+    fn trace_view(f: &Frame, n: &Node) -> TraceView {
+        match &f.opts.trace_source {
+            Some(ids) if n.extras().trace.is_some() && ids.contains(&n.id) => TraceView::Source,
+            _ => n.trace_view(),
+        }
     }
 
     /// An Image Trace object's `children` (the hidden source image, then the traced shapes) as

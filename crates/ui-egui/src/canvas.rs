@@ -419,6 +419,8 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
         rich_black: app.session.prefs.black_on_screen == "rich",
         // A tool's drag on the canvas, during an interaction (not a dialog's preview).
         dragging: app.session.in_interaction() && ui.data(|d| d.get_temp::<Drag>(drag_id())) == Some(Drag::Tool),
+        // The Image Trace panel's eye button, only while a pointer button is down.
+        trace_source: app.ui.trace_hold_source.clone().filter(|_| ui.input(|i| i.pointer.any_down())),
     };
     // Placed documents' bitmaps are being made: draw again when they are ready.
     if vectorcraft_render::placed_document::busy() {
@@ -487,6 +489,8 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             anti_alias: if app.session.prefs.anti_aliased_artwork { vectorcraft_render::AntiAlias::Art } else { vectorcraft_render::AntiAlias::None },
             progressive_placed: true,
             trace_views: true,
+            // Image Trace › the eye button held: the source image of the selected objects.
+            trace_source: key.trace_source.clone(),
             smooth_images,
             // Isolation mode: the art around the isolated group or layer is dimmed (#833).
             isolated: key.isolated.map(vectorcraft_doc::NodeId),

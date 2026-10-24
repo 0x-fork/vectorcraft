@@ -549,6 +549,10 @@ pub struct UiState {
     /// becoming active, leaves it.
     #[serde(skip)]
     pub home: Option<(Option<u64>, usize)>,
+    /// The Image Trace objects the canvas draws with the Source Image view while the Image Trace
+    /// panel's eye button is held down ([`vectorcraft_render::RenderOptions::trace_source`]).
+    #[serde(skip)]
+    pub trace_hold_source: Option<std::sync::Arc<Vec<vectorcraft_doc::NodeId>>>,
     /// Layers panel › Panel Options… (row size, thumbnails, Show Layers Only, Locate Selected Objects).
     #[serde(default)]
     pub layers_panel: crate::panels::layers::PanelOptions,
@@ -902,6 +906,7 @@ impl Default for UiState {
             move_options: Value::Null,
             dxf_import: Value::Null,
             home: None,
+            trace_hold_source: None,
             layers_panel: Default::default(),
             layers_filter: Default::default(),
             image_trace_advanced: true,
