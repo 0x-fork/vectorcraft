@@ -23,10 +23,10 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::catalog;
+use crate::catalog::{self, FeatureId};
 use crate::directives;
 use crate::lex::{Lexer, T, Token, expr_after};
-use crate::report::{self, Acc};
+use crate::report::{self, Acc, OutsideId};
 
 /// An `#include` line: what it names, its line, and the folders `#includepath` named at that point
 /// (one list, shared by every line it applies to).
@@ -361,14 +361,14 @@ fn platform_name(n: &str) -> bool {
 }
 
 /// The feature of a window of type `value` (`"dialog"`, or a resource string that starts with it).
-fn window_type(value: &str) -> &'static str {
+fn window_type(value: &str) -> FeatureId {
     let word = value.trim_start().split(|c: char| c.is_whitespace() || c == '{').next().unwrap_or_default();
     if word.eq_ignore_ascii_case("dialog") {
-        "scriptui.dialog"
+        FeatureId::ScriptuiDialog
     } else if word.eq_ignore_ascii_case("palette") {
-        "scriptui.palette"
+        FeatureId::ScriptuiPalette
     } else {
-        "scriptui.window"
+        FeatureId::ScriptuiWindow
     }
 }
 
@@ -1101,13 +1101,13 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
                 self.acc.member(&c.path);
             }
             if c.path.strip_prefix("app.preferences").is_some_and(then) {
-                self.acc.feature("preferences", line);
+                self.acc.feature(FeatureId::Preferences, line);
                 if c.change_call || ending.is_some_and(|t| t.is("=")) {
-                    self.acc.outside("preferences", line, None);
+                    self.acc.outside(OutsideId::Preferences, line, None);
                 }
             }
             if ["app.name", "app.version"].iter().any(|p| c.path.strip_prefix(p).is_some_and(then)) {
-                self.acc.feature("hostCheck", line);
+                self.acc.feature(FeatureId::HostCheck, line);
             }
         }
         // A chain that an operand in a grouped value's parentheses starts with is complete: the
@@ -1751,11 +1751,11 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
                 if t.is("(") {
                     self.pending = Pending::WindowType(l);
                 } else {
-                    self.acc.feature("scriptui.window", l);
+                    self.acc.feature(FeatureId::ScriptuiWindow, l);
                 }
             }
             Pending::WindowType(l) => {
-                let feature = if t.kind == T::Str { window_type(&unquote(t.text, 64)) } else { "scriptui.window" };
+                let feature = if t.kind == T::Str { window_type(&unquote(t.text, 64)) } else { FeatureId::ScriptuiWindow };
                 self.acc.feature(feature, l);
             }
             Pending::Menu(l) => {
@@ -1776,7 +1776,7 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             T::Ident => self.name(t, line),
             T::Punct => self.punct(t, line),
             T::Str => self.string(t, line),
-            T::Xml => self.acc.feature("e4x", line),
+            T::Xml => self.acc.feature(FeatureId::E4x, line),
             _ => {}
         }
     }
@@ -1790,15 +1790,15 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             }
             None => self.acc.menu_dynamic(),
         }
-        self.acc.feature("menuCommand", line);
+        self.acc.feature(FeatureId::MenuCommand, line);
     }
 
     fn open_mode(&mut self, mode: &str, line: Option<usize>) {
         if mode.eq_ignore_ascii_case("r") {
-            self.acc.feature("file.read", line);
+            self.acc.feature(FeatureId::FileRead, line);
         } else if let Some(m) = catalog::WRITE_MODES.iter().copied().find(|m| m.eq_ignore_ascii_case(mode)) {
-            self.acc.feature("file.write", line);
-            self.acc.outside("filesWritten", line, Some(m));
+            self.acc.feature(FeatureId::FileWrite, line);
+            self.acc.outside(OutsideId::FilesWritten, line, Some(m));
         }
     }
 
@@ -1810,7 +1810,7 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             pending = std::mem::take(&mut self.pending);
         }
         match pending {
-            Pending::Window(l) | Pending::WindowType(l) => self.acc.feature("scriptui.window", l),
+            Pending::Window(l) | Pending::WindowType(l) => self.acc.feature(FeatureId::ScriptuiWindow, l),
             Pending::Menu(l) | Pending::MenuString(l, _) => self.menu(None, l),
             Pending::Open(_) | Pending::Name(..) | Pending::None => {}
         }
@@ -1820,23 +1820,23 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
     /// outside the document.
     fn platform(&mut self, n: &'s str, line: Option<usize>) {
         match n {
-            catalog::UNIT_VALUE => self.acc.feature("unitValue", line),
-            catalog::FILE | catalog::FOLDER => self.acc.feature("file.objects", line),
+            catalog::UNIT_VALUE => self.acc.feature(FeatureId::UnitValue, line),
+            catalog::FILE | catalog::FOLDER => self.acc.feature(FeatureId::FileObjects, line),
             catalog::BRIDGE_TALK => {
-                self.acc.feature("bridgeTalk", line);
-                self.acc.outside("otherApps", line, None);
+                self.acc.feature(FeatureId::BridgeTalk, line);
+                self.acc.outside(OutsideId::OtherApps, line, None);
             }
             catalog::SOCKET => {
-                self.acc.feature("socket", line);
-                self.acc.outside("network", line, None);
+                self.acc.feature(FeatureId::Socket, line);
+                self.acc.outside(OutsideId::Network, line, None);
             }
             catalog::EXTERNAL_OBJECT => {
-                self.acc.feature("externalObject", line);
-                self.acc.outside("nativeCode", line, None);
+                self.acc.feature(FeatureId::ExternalObject, line);
+                self.acc.outside(OutsideId::NativeCode, line, None);
             }
             catalog::WINDOW => self.pending = Pending::Window(line),
-            _ if catalog::XMP.contains(&n) => self.acc.feature("xmp", line),
-            _ if catalog::XML.contains(&n) => self.acc.feature("xml", line),
+            _ if catalog::XMP.contains(&n) => self.acc.feature(FeatureId::Xmp, line),
+            _ if catalog::XML.contains(&n) => self.acc.feature(FeatureId::Xml, line),
             _ => {}
         }
     }
@@ -1850,26 +1850,26 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             let of = |name: &str| word(h1, name) && !member_mark(h2) && !own.contains(name);
             if of(catalog::DOLLAR) {
                 if catalog::DOLLAR_ENV.contains(&n) {
-                    self.acc.feature("dollar.env", line);
-                    self.acc.outside("environment", line, None);
+                    self.acc.feature(FeatureId::DollarEnv, line);
+                    self.acc.outside(OutsideId::Environment, line, None);
                 } else if n == catalog::DOLLAR_EVAL_FILE {
-                    self.acc.feature("dollar.evalFile", line);
-                    self.acc.outside("unseenCode", line, None);
+                    self.acc.feature(FeatureId::DollarEvalFile, line);
+                    self.acc.outside(OutsideId::UnseenCode, line, None);
                 } else if n == catalog::LOCALIZE {
-                    self.acc.feature("localize", line);
+                    self.acc.feature(FeatureId::Localize, line);
                 } else {
-                    self.acc.feature("dollar", line);
+                    self.acc.feature(FeatureId::Dollar, line);
                 }
             } else if (of(catalog::FILE) && catalog::FILE_DIALOGS.contains(&n)) || (of(catalog::FOLDER) && catalog::FOLDER_DIALOGS.contains(&n)) {
-                self.acc.feature("file.dialog", line);
+                self.acc.feature(FeatureId::FileDialog, line);
             } else if of(catalog::FOLDER) && catalog::FOLDER_PLACES.contains(&n) {
-                self.acc.feature("file.places", line);
+                self.acc.feature(FeatureId::FilePlaces, line);
             }
             if n == catalog::ON_DRAW {
-                self.acc.feature("scriptui.drawing", line);
+                self.acc.feature(FeatureId::ScriptuiDrawing, line);
             }
             if n == catalog::REFLECT {
-                self.acc.feature("reflection", line);
+                self.acc.feature(FeatureId::Reflection, line);
             }
             return;
         }
@@ -1923,8 +1923,8 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
         }
         match n {
             // E4X: `default xml namespace = …` and `for each (…)`.
-            "namespace" if word(h0, "xml") && word(h1, "default") => self.acc.feature("e4x", line),
-            "each" if word(h0, "for") => self.acc.feature("e4x", line),
+            "namespace" if word(h0, "xml") && word(h1, "default") => self.acc.feature(FeatureId::E4x, line),
+            "each" if word(h0, "for") => self.acc.feature(FeatureId::E4x, line),
             _ => {}
         }
     }
@@ -1937,11 +1937,11 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             "=" => {
                 let operator = || h1.filter(|s| s.kind == T::Str).is_some_and(|s| catalog::OPERATORS.contains(&unquote(s.text, 4).as_str()));
                 if is(h0, "]") && is(h2, "[") && word(h3, "prototype") && operator() {
-                    self.acc.feature("operatorOverloading", line);
+                    self.acc.feature(FeatureId::OperatorOverloading, line);
                 }
             }
             // E4X: attributes (`x.@id`, `@*`), descendants (`x..item`) and qualified names (`ns::x`).
-            ".@" | ".." | "::" | "@" => self.acc.feature("e4x", line),
+            ".@" | ".." | "::" | "@" => self.acc.feature(FeatureId::E4x, line),
             _ => {}
         }
     }
@@ -1961,30 +1961,30 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             } else if n == catalog::OPEN && file {
                 self.pending = Pending::Open(line);
             } else if catalog::DRAWING.contains(&n) {
-                self.acc.feature("scriptui.drawing", line);
+                self.acc.feature(FeatureId::ScriptuiDrawing, line);
             } else if catalog::INSTANCE_DIALOGS.contains(&n) {
-                self.acc.feature("file.dialog", line);
+                self.acc.feature(FeatureId::FileDialog, line);
             } else if catalog::FOLDER_READS.contains(&n) || (file && catalog::FILE_READS.contains(&n)) {
-                self.acc.feature("file.read", line);
+                self.acc.feature(FeatureId::FileRead, line);
             } else if file && catalog::FILE_WRITES.contains(&n) {
-                self.acc.feature("file.write", line);
-                self.acc.outside("filesWritten", line, None);
+                self.acc.feature(FeatureId::FileWrite, line);
+                self.acc.outside(OutsideId::FilesWritten, line, None);
             } else if n == catalog::EXECUTE {
-                self.acc.feature("file.execute", line);
-                self.acc.outside("filesOpened", line, None);
+                self.acc.feature(FeatureId::FileExecute, line);
+                self.acc.outside(OutsideId::FilesOpened, line, None);
             } else if catalog::ACTIONS.contains(&n) {
-                self.acc.feature("actions", line);
+                self.acc.feature(FeatureId::Actions, line);
             } else if n == catalog::SELECT_TOOL {
-                self.acc.feature("selectTool", line);
+                self.acc.feature(FeatureId::SelectTool, line);
             }
         } else if !member_mark(h1) && !word(h1, "function") && !self.own_names.contains(n) {
             if catalog::NOTIFY.contains(&n) {
-                self.acc.feature("notify", line);
+                self.acc.feature(FeatureId::Notify, line);
             } else if n == catalog::LOCALIZE {
-                self.acc.feature("localize", line);
+                self.acc.feature(FeatureId::Localize, line);
             } else if matches!(n, "eval" | "Function") {
-                self.acc.feature("dynamicCode", line);
-                self.acc.outside("unseenCode", line, None);
+                self.acc.feature(FeatureId::DynamicCode, line);
+                self.acc.outside(OutsideId::UnseenCode, line, None);
             }
         }
     }
@@ -1992,7 +1992,7 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
     fn string(&mut self, t: &Sig<'s>, line: Option<usize>) {
         let [h0, h1, h2, _] = self.h;
         if t.text.contains(catalog::ACTION_TEXT) {
-            self.acc.feature("actions", line);
+            self.acc.feature(FeatureId::Actions, line);
         }
         let compares = h0.is_some_and(|s| s.kind == T::Punct && matches!(s.text, "==" | "===" | "!=" | "!=="));
         if compares && word(h1, "typename") && is(h2, ".") {
@@ -2055,10 +2055,10 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             return;
         };
         let feature = match name {
-            "target" => "directive.target",
-            "include" | "includepath" => "directive.include",
-            "targetengine" => "directive.targetengine",
-            _ => "directive.other",
+            "target" => FeatureId::DirectiveTarget,
+            "include" | "includepath" => FeatureId::DirectiveInclude,
+            "targetengine" => FeatureId::DirectiveTargetengine,
+            _ => FeatureId::DirectiveOther,
         };
         let line = self.agg(t.line);
         self.acc.feature(feature, line);

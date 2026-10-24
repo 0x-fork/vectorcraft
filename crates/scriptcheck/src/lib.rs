@@ -137,8 +137,6 @@ impl Need {
     }
 }
 
-/// Every feature id a report can list, in the order the report lists them.
-pub use catalog::FEATURES;
 /// Every id in [`Report::outside`], in the order the report lists them.
 pub use report::OUTSIDE;
 /// Every problem code a report can list.

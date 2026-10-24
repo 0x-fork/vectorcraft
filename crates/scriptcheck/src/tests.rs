@@ -2,6 +2,7 @@
 
 use proptest::prelude::*;
 
+use crate::catalog::FeatureId;
 use crate::lex::{Lexer, T};
 use crate::*;
 
@@ -95,7 +96,7 @@ fn each_feature_is_found_where_it_is_and_nowhere_else() {
         assert_eq!(r.kind, Kind::Script, "{with}");
         let f = feature(&r, id).unwrap_or_else(|| panic!("{id} not found in {with:?}: {:?}", r.features));
         assert_eq!(f.lines, [1], "{with}");
-        let need = catalog::need(id).unwrap_or_else(|| panic!("{id} sets no need"));
+        let need = FeatureId::ALL.iter().find(|f| f.id() == *id).map(|f| f.need()).unwrap_or_else(|| panic!("{id} sets no need"));
         assert!(r.needs.contains(&need), "{with}: {:?}", r.needs);
         let r = report(without);
         assert!(feature(&r, id).is_none(), "{id} found in {without:?}");
@@ -103,14 +104,20 @@ fn each_feature_is_found_where_it_is_and_nowhere_else() {
 }
 
 #[test]
-fn every_feature_id_has_a_need_and_a_case() {
-    assert!(FEATURES.windows(2).all(|w| w[0] < w[1]), "FEATURES is sorted, as the report lists them");
-    for id in FEATURES {
-        assert!(catalog::need(id).is_some(), "{id}");
-        assert!(FEATURE_CASES.iter().any(|(case, ..)| case == id), "{id} has no case");
+fn features_are_listed_in_alphabetical_order_of_their_ids() {
+    let ids: Vec<&str> = FeatureId::ALL.iter().map(|f| f.id()).collect();
+    assert!(ids.windows(2).all(|w| w[0] < w[1]), "{ids:?}");
+    assert!(FeatureId::ALL.windows(2).all(|w| w[0] < w[1]), "the enum is declared in the order of its ids");
+}
+
+#[test]
+fn every_feature_id_has_a_case() {
+    for f in FeatureId::ALL {
+        let id = f.id();
+        assert!(FEATURE_CASES.iter().any(|(case, ..)| *case == id), "{id} has no case");
     }
     for (id, ..) in FEATURE_CASES {
-        assert!(FEATURES.contains(id), "{id} isn't in FEATURES");
+        assert!(FeatureId::ALL.iter().any(|f| f.id() == *id), "{id} isn't a FeatureId");
     }
     let unique = |ids: &[&str]| ids.iter().collect::<std::collections::BTreeSet<_>>().len() == ids.len();
     assert!(unique(PROBLEMS) && unique(OUTSIDE));
