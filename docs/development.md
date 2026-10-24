@@ -1,5 +1,6 @@
 # Development
 
+> **Last updated:** 2026-10-23 · **Change:** Tests: cargo xtask test, one integration-test binary per crate, the dev profile's debug info.
 > **Last updated:** 2026-10-21 · **Change:** the interface faces as vectorcraft-ui-egui's `interface-fonts` feature, and `theme::install_fonts` for an embedder that draws the panels itself.
 > **Last updated:** 2026-10-21 · **Change:** leaving out the bundled fonts with the egui panels (vectorcraft-ui-egui's and vectorcraft-mcp's `bundled-fonts` features).
 > **Last updated:** 2026-10-14 · **Change:** leaving out the bundled fonts (`bundled-fonts` feature).
@@ -297,6 +298,31 @@ other `sv-*` locale resolve to it), Georgian (`ka`, complete; `ka-GE` and `ka_GE
 
 `cargo xtask brands` (part of `cargo xtask ci`) fails when user-visible text names another vendor's products or company: string literals in Rust sources (command labels and params docs, menus, panels, MCP tool definitions), `Cargo.toml` descriptions and packaging files. Comments, test files and `#[cfg(test)]` modules are not checked. Say "the reference app" or name the feature itself. A line that must keep an old name, such as an alias that files or preferences from earlier versions still use, or a name another project defines, such as a shared MIME type, carries a `brand-ok` comment. In the Linux desktop entry, whose comments take whole lines, the comment goes on the `#` line just above it; `MARK_ABOVE` in `xtask/src/brands.rs` lists the files that accept a mark there.
 
+## Tests
+
+- `cargo xtask test` runs the workspace's unit and integration tests with
+  [cargo-nextest](https://nexte.st) when it is installed (`cargo install cargo-nextest --locked`),
+  otherwise with `cargo test`, and then the doctests (`cargo test --workspace --doc`), which nextest
+  doesn't run. `cargo xtask ci` runs the same two as its `test` and `doctests` steps.
+- The test build leaves out the examples (`--lib --bins --tests`); clippy (`--all-targets`) still
+  checks them.
+- Each crate has one integration-test binary: its test files are modules of `tests/it/main.rs`. Run
+  one file's tests with `cargo nextest run -p vectorcraft-svg --test it roundtrip::` (or `cargo test`
+  with the same arguments). A new test file gets a `mod` line in `main.rs`.
+- A test file stays a binary of its own (`tests/<name>.rs`) when it changes process-wide state that
+  other tests would see, because `cargo test` runs a binary's tests as threads of one process (nextest
+  runs each test in its own process). In `crates/engine/tests`: the Color Settings
+  (`color_settings.rs`), the font database and Fonts folder (`removed_font.rs`, `font_folder.rs`,
+  `text_import_fuzz.rs`), installed plug-ins (`plugin_export.rs`, `plugin_fuzz.rs`), the working
+  directory (`open_relative_path.rs`) and every command run with junk parameters
+  (`command_sweep.rs`); the `system_fonts` tests of `vectorcraft-text` and `vectorcraft-pdf` too. The
+  fuzz files under Robustness › Fuzzing keep their own binaries, so a deeper search runs alone, and so
+  do `affinity_artboards`, `affinity_text` and `affinity_corpus`, which the Affinity corpus workflow
+  names.
+- The dev profile builds the workspace crates with line tables only (`debug = "line-tables-only"`),
+  so panics and backtraces still name file and line, and dependencies without debug info. For a
+  debugger session, `CARGO_PROFILE_DEV_DEBUG=true cargo build` gives full debug info.
+
 ## Robustness: VectorCraft never crashes
 
 A crash takes the user's unsaved work with it, and much of what the app reads is untrusted: SVG,
@@ -319,7 +345,8 @@ in the code:
 | `todo!`, `unimplemented!` | don't merge unfinished paths; return an error that says what isn't supported |
 
 `clippy.toml` allows `unwrap`, `expect` and `panic` inside `#[test]` and `#[cfg(test)]` code.
-Integration-test files under `tests/` and `examples/`, and the `testkit` crate, opt out with
+Integration tests (`tests/it/main.rs` and the test files that are binaries of their own), examples
+and the `testkit` crate opt out with
 `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]`. Tests use `panic!("…")`
 instead of `unreachable!()`.
 
@@ -462,6 +489,7 @@ Scores and hour estimates are unchanged.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | minor | Tests: `cargo xtask test` (nextest, then doctests), one integration-test binary per crate and the files that keep their own, the dev profile's debug info. |
 | 2026-10-21 | minor | Fonts › Leaving out the bundled fonts: vectorcraft-ui-egui's `interface-fonts` feature, and `theme::install_fonts` for an embedder that draws the panels without `VectorcraftApp::logic`. |
 | 2026-10-21 | minor | M3: highlighted-text Eyedropper sampling preserves ranges and rejects unsupported source/target transparency atomically; regression-tested; scores and estimates unchanged. |
 | 2026-10-21 | minor | Fonts › Leaving out the bundled fonts: vectorcraft-ui-egui's and vectorcraft-mcp's `bundled-fonts` features, and the engine declared without default features. |
