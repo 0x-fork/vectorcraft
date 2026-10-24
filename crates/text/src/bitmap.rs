@@ -104,7 +104,7 @@ fn has_compressed_metadata(bytes: &[u8]) -> bool {
 fn itxt_uncompressed(bytes: &[u8], head_at: usize, len: u32) -> bool {
     let from = head_at + 8;
     let data = bytes.get(from..from.saturating_add(len as usize)).unwrap_or(&[]);
-    data.iter().position(|&b| b == 0).and_then(|kw| data.get(kw + 1)).map_or(false, |&flag| flag == 0)
+    data.iter().position(|&b| b == 0).and_then(|kw| data.get(kw + 1)).is_some_and(|&flag| flag == 0)
 }
 
 /// The width and height in PNG `bytes`' header (its signature, then the IHDR chunk); `None` when
