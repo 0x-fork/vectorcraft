@@ -354,7 +354,7 @@ pub fn tool_definitions() -> Vec<Value> {
             "save_file",
             "Save file",
             &format!(
-                "Save the active document with the engine's document.save: by default to its own file in its own format (native .vectorcraft unless it was opened from or saved as SVG, PDF or a restorable .ai). With `path`, the extension picks the format: .{}. Other formats are exports (see export). The reply's `format` says what was written and `warnings` what that format loses.",
+                "Save the active document with the engine's document.save: by default to its own file in its own format (native .vectorcraft unless it was opened from or saved as SVG, PDF or a restorable .ai). With `path`, the extension picks the format: .{}. Other formats are exports (see export). The reply's `format` says what was written and `warnings` what that format loses. In the running app the call returns once the file is written, or with the error, even with Background Save on. When the save asks first (before replacing a file that opened with losses, or with a file dialog for an untitled document without `path`), the reply is `pending` or \"cancelled\" as before.",
                 save_extensions().join(", .")
             ),
             obj(json!({"path": string("Destination; its extension picks the format (default: the document's own file)")}), &[]),
@@ -1022,7 +1022,15 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Args) -> Result<ToolResult, Str
         }
         "screenshot" => screenshot(b, a),
         "open_file" => j(b.call("app.open", json!({"path": absolute_path(req_str(a, "path")?)?}))?),
-        "save_file" => j(b.call("app.save", json!({"path": a.get("path").and_then(Value::as_str).map(absolute_path).transpose()?}))?),
+        "save_file" => {
+            let mut p = json!({"path": a.get("path").and_then(Value::as_str).map(absolute_path).transpose()?});
+            // The app writes the file before it replies, even with Background Save on, so a failed
+            // save is this call's error.
+            if b.has_ui() {
+                p["wait"] = json!(true);
+            }
+            j(b.call("app.save", p)?)
+        }
         "export" => {
             // One params object for every backend; the named arguments win over `options` (a named
             // artboard or range replaces every artboard choice in `options`).

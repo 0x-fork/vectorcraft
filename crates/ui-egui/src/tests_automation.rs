@@ -8,12 +8,19 @@ use serde_json::{Value, json};
 use vectorcraft_engine::Session;
 use vectorcraft_engine::file_access::AutomationRoots;
 
+use crate::background::SharedWriteFn;
 use crate::control::ControlRequest;
 use crate::{Services, VectorcraftApp};
 
 /// A folder holding `in` (the read root, with `a.svg`), `out` (the write root) and `outside`
 /// (with `b.svg`), and an app with the desktop's file services confined to `in` and `out`.
 fn confined(tag: &str) -> (VectorcraftApp, std::sync::mpsc::Sender<ControlRequest>, PathBuf) {
+    confined_with(tag, None)
+}
+
+/// [`confined`], with `write_shared` as the thread-safe writer that Background Save and Background
+/// Export use.
+fn confined_with(tag: &str, write_shared: Option<SharedWriteFn>) -> (VectorcraftApp, std::sync::mpsc::Sender<ControlRequest>, PathBuf) {
     let base = std::env::temp_dir().join(format!("vc-ui-roots-{tag}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&base);
     for d in ["in", "out", "outside"] {
@@ -25,6 +32,7 @@ fn confined(tag: &str) -> (VectorcraftApp, std::sync::mpsc::Sender<ControlReques
     let services = Services {
         read: Some(Box::new(|p: &str| std::fs::read(p).map_err(|e| e.to_string()))),
         write: Some(Box::new(|p: &str, b: &[u8]| vectorcraft_format::write_atomic(Path::new(p), b).map_err(|e| e.to_string()))),
+        write_shared,
         ..Default::default()
     };
     let roots = AutomationRoots::new(&[&base.join("in")], &[&base.join("out")]).unwrap();
@@ -74,6 +82,30 @@ fn control_requests_stay_inside_the_roots() {
 
     // The person at the keyboard isn't confined.
     assert!(app.run("file.open", json!({"path": s(base.join("outside/b.svg"))})).is_ok());
+    let _ = std::fs::remove_dir_all(base);
+}
+
+/// With Background Save and Background Export on, `app.save` and `app.export` with `wait: true`
+/// (MCP's `save_file` in the app) reply with the write root's refusal, and write a file inside it
+/// before they reply. Without `wait` the refusal reaches only the status bar.
+#[test]
+fn control_saves_with_wait_reply_with_the_write_roots_refusal() {
+    let shared: SharedWriteFn = std::sync::Arc::new(|p: &str, b: &[u8]| vectorcraft_format::write_atomic(Path::new(p), b).map_err(|e| e.to_string()));
+    let (mut app, tx, base) = confined_with("wait", Some(shared));
+    app.run("file.new", json!({"width": 100, "height": 50})).unwrap();
+    for (method, name) in [("app.save", "a.vectorcraft"), ("app.export", "a.svg")] {
+        let r = request(&mut app, &tx, method, json!({"path": s(base.join("outside").join(name)), "wait": true}));
+        assert!(r["error"].as_str().is_some_and(|e| e.contains("outside the write root")), "{method}: {r}");
+        let path = base.join("out").join(name);
+        let r = request(&mut app, &tx, method, json!({"path": s(path.clone()), "wait": true}));
+        assert_eq!(r["ok"], true, "{method}: {r}");
+        assert!(r["result"].get("background").is_none() && path.is_file(), "{method}: written before the reply: {r}");
+    }
+    let r = request(&mut app, &tx, "app.save", json!({"path": s(base.join("outside/b.vectorcraft"))}));
+    assert_eq!(r["result"]["background"], true, "{r}");
+    crate::background::wait_all(&mut app);
+    assert!(app.ui.status.contains("outside the write root"), "{}", app.ui.status);
+    assert_eq!(std::fs::read_dir(base.join("outside")).unwrap().count(), 1, "nothing written outside");
     let _ = std::fs::remove_dir_all(base);
 }
 
