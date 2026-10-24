@@ -111,6 +111,9 @@ fn parse(s: &str) -> Option<(Step, Vec<Seg>)> {
             rest = r;
         } else {
             let (n, r) = rest.strip_prefix('[')?.split_once(']')?;
+            if n.is_empty() || !n.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
             path.push(Seg::Index(n.parse().ok()?));
             rest = r;
         }
@@ -159,6 +162,16 @@ mod tests {
         let many = Value::Array(vec![json!("$0"); 32]);
         let e = resolve(&many, &results).unwrap_err();
         assert!(e.contains("MB of values"), "{e}");
+    }
+
+    #[test]
+    fn array_index_must_be_plain_digits() {
+        let results = [json!({"ids": [5, 6]})];
+        assert_eq!(resolve(&json!("$0.ids[1]"), &results).unwrap(), json!(6));
+        for s in ["$0.ids[+1]", "$0.ids[]", "$0.ids[ 1]", "$0.ids[-1]"] {
+            let p = json!(s);
+            assert!(resolve(&p, &results).map_or(true, |v| v == p), "{s}");
+        }
     }
 
     #[test]
