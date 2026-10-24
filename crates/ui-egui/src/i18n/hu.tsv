@@ -2039,6 +2039,7 @@ file-filter	Templates	Sablonok
 	The file writes keys and modifiers as codes. Check the proposed meanings and answer the codes that are not known yet.	A fájl a billentyűket és a módosítóbillentyűket kódként tárolja. Ellenőrizd a javasolt jelentéseket, és add meg a még ismeretlen kódok jelentését.
 	Click, then press the key this code stands for (Esc cancels)	Kattints, majd nyomd le azt a billentyűt, amelyet ez a kód jelöl (Esc: mégse)
 	Press a key…	Nyomj le egy billentyűt…
+	Press and hold to view the source image	Tartsd lenyomva a forráskép megtekintéséhez
 	from your earlier imports	a korábbi importálásaidból
 	from the format's public description	a formátum nyilvános leírásából
 	not known yet	még ismeretlen

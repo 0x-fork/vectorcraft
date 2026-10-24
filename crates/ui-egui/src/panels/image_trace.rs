@@ -135,6 +135,25 @@ fn set_view(app: &mut VectorcraftApp, view: TraceView) {
     }
 }
 
+/// While `down`, the selected Image Trace objects show their source image on the canvas, whatever
+/// their View. The document and the undo history stay as they are. The panel's eye button next to
+/// View calls it; per the public documentation of the panel, that control is pressed and held to
+/// view the source image
+/// (<https://web.archive.org/web/20250831090623/https://helpx.adobe.com/illustrator/using/image-trace.html>).
+fn hold_source(app: &mut VectorcraftApp, ctx: &egui::Context, down: bool) {
+    let ids = app
+        .session
+        .active()
+        .filter(|_| down)
+        .map(|st| st.selection.objects.iter().copied().filter(|id| st.doc.node(*id).is_some_and(is_trace)).collect::<Vec<_>>())
+        .filter(|ids| !ids.is_empty())
+        .map(std::sync::Arc::new);
+    if ids != app.ui.trace_hold_source {
+        app.ui.trace_hold_source = ids;
+        ctx.request_repaint();
+    }
+}
+
 /// The selected Image Trace object's View row (Control bar, Properties).
 pub(crate) fn view_row(app: &mut VectorcraftApp, ui: &mut Ui, current: TraceView, width: f32) {
     widgets::dim_label(ui, tl!("View:"));
@@ -295,12 +314,19 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     }
     ui.horizontal(|ui| {
         widgets::dim_label(ui, tl!("View:"));
-        if let Some(v) = view_dropdown(ui, st.view, 170.0) {
+        let eye = 24.0;
+        if let Some(v) = view_dropdown(ui, st.view, (ui.available_width() - eye - ui.spacing().item_spacing.x).min(170.0)) {
             st.view = v;
             if is_trace {
                 set_view(app, v);
             }
         }
+        let held = app.ui.trace_hold_source.is_some();
+        let r = widgets::icon_button_enabled(ui, "eye", tl!("Press and hold to view the source image"), held, is_trace, eye);
+        if cfg!(test) {
+            ui.ctx().data_mut(|d| d.insert_temp(egui::Id::new("trace-hold-source"), r.rect));
+        }
+        hold_source(app, ui.ctx(), is_trace && r.is_pointer_button_down_on());
     });
     ui.horizontal(|ui| {
         widgets::dim_label(ui, tl!("Mode:"));
@@ -835,6 +861,39 @@ mod tests {
             let state: TraceUi = pstate(&ctx, "image-trace");
             assert_eq!(state.params, stored["params"], "{label} survives the next frame");
         }
+    }
+
+    /// Holding the eye button next to View down lists the selected Image Trace object for the
+    /// canvas to draw with its source image; releasing it shows the object's View again. The
+    /// document, its View and the undo history stay as they were. With a plain image selected the
+    /// button is disabled.
+    #[test]
+    fn holding_the_eye_button_shows_the_source_image_until_released() {
+        let mut app = traced_app();
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        frame(&mut app, &ctx, vec![]);
+        let id = first_selected(&app).unwrap().id;
+        let undo = |app: &VectorcraftApp| app.session.active().unwrap().history.undo.len();
+        let revision = |app: &VectorcraftApp| app.session.active().unwrap().revision;
+        let (steps, rev) = (undo(&app), revision(&app));
+        let at = ctx.data(|d| d.get_temp::<Rect>(egui::Id::new("trace-hold-source"))).unwrap().center();
+        let press = |pressed| Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() };
+        frame(&mut app, &ctx, vec![Event::PointerMoved(at), press(true)]);
+        assert_eq!(app.ui.trace_hold_source.as_deref(), Some(&vec![id]), "held: the object shows its source image");
+        frame(&mut app, &ctx, vec![]);
+        assert!(app.ui.trace_hold_source.is_some(), "still held on the next frame");
+        frame(&mut app, &ctx, vec![press(false)]);
+        assert_eq!(app.ui.trace_hold_source, None, "released: the object shows its View again");
+        assert_eq!(undo(&app), steps, "no undo step");
+        assert_eq!(revision(&app), rev, "the document is unchanged");
+        assert_eq!(selected_trace(&app).map(|t| t.1), Some(TraceView::Result), "its View is unchanged");
+        app.run("imageTrace.release", json!({})).unwrap();
+        assert!(matches!(first_selected(&app).unwrap().kind, NodeKind::Image(_)));
+        frame(&mut app, &ctx, vec![]);
+        frame(&mut app, &ctx, vec![Event::PointerMoved(at), press(true)]);
+        assert_eq!(app.ui.trace_hold_source, None, "a plain image has no source image to show");
+        frame(&mut app, &ctx, vec![press(false)]);
     }
 
     #[test]

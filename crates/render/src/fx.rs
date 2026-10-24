@@ -2130,6 +2130,7 @@ impl Renderer {
         if reads.images {
             let o = f.opts;
             (doc.images, self.dim_images.map(f32::to_bits), o.smooth_images, o.image_mips, o.trace_views, o.progressive_placed).hash(&mut h);
+            o.trace_source.as_deref().hash(&mut h);
         }
         if reads.brushes {
             self.brushes.library_key(f.doc, self.stamp).hash(&mut h);
