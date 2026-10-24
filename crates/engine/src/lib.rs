@@ -1762,8 +1762,13 @@ impl Session {
         self.check_params(id, params)?;
         // Objects given as `id` (where it stands for `ids` of one) or as `ids` beside it are checked
         // before anything else: a malformed one, or one naming no object, is an error under this
-        // command's id, never the selection in its place.
-        if cmd::params::id_stands_for_ids(spec.params) && self.active().is_some() {
+        // command's id, never the selection in its place. `effect.apply {id: "stylize.dropShadow"}`
+        // without `effect` names the effect (its older key), not an object.
+        let effect_named = id == "effect.apply"
+            && params.get("effect").is_none()
+            && params.get("ids").is_none_or(Value::is_null)
+            && params.get("id").and_then(Value::as_str).is_some_and(|e| !e.starts_with('$'));
+        if cmd::params::id_stands_for_ids(spec.params) && !effect_named && self.active().is_some() {
             cmd::given_objects(self, params, id)?;
         }
         // Clear's menu needs a selection; an agent supplying explicit targets only needs a

@@ -376,9 +376,9 @@ pub(crate) fn given_objects(s: &Session, p: &Value, command: &str) -> Result<Opt
     }
     match p.get("id").filter(|v| !v.is_null()) {
         None => Ok(None),
-        // A step reference a batch couldn't resolve, as `targets` reports it.
+        // A step reference a batch couldn't resolve, as `targets` reports it, under the command.
         Some(Value::String(r)) if r.starts_with('$') => {
-            Err(EngineError::Other(format!("`id` is the step reference {r:?}, which only `run` and `command_batch` resolve")))
+            Err(bad(command, format!("`id` is the step reference {r:?}, which only `run` and `command_batch` resolve")))
         }
         Some(v) => Ok(Some(vec![checked_id(s, v, command)?])),
     }

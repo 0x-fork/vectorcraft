@@ -136,7 +136,8 @@ fn id_does_what_ids_of_one_does_with_nothing_selected() {
 /// Every command that takes `id` as `ids` of one ([`cmd::params::id_stands_for_ids`]), with an
 /// object selected: an `id` that is malformed (a string, negative, a fraction, an object) or names
 /// no object is refused under the command's id, as the same value in `ids` is, and the document
-/// and the selection stay as they were. It never stands for the selection instead.
+/// and the selection stay as they were. It never stands for the selection instead. (A string `id`
+/// given to `effect.apply` without `effect` names the effect, which "bad" isn't: refused too.)
 #[test]
 fn a_bad_id_is_refused_as_the_same_ids_are_and_changes_nothing() {
     let (_, [.., d], _) = doc_with_type();
@@ -158,7 +159,8 @@ fn a_bad_id_is_refused_as_the_same_ids_are_and_changes_nothing() {
                 (r, st.doc == before && st.selection.objects == vec![NodeId(d)])
             };
             let (with_id, with_ids) = (run("id", bad.clone()), run("ids", json!([bad.clone()])));
-            if with_id.0.is_ok() || !with_id.1 || with_id != with_ids {
+            let effect_named = spec.id == "effect.apply" && bad.is_string();
+            if with_id.0.is_ok() || !with_id.1 || (with_id != with_ids && !effect_named) {
                 failures.push(format!(
                     "{} {bad}: with id {:.160} (unchanged: {}); with ids {:.160}",
                     spec.id,
@@ -167,6 +169,19 @@ fn a_bad_id_is_refused_as_the_same_ids_are_and_changes_nothing() {
                     format!("{:?}", with_ids.0)
                 ));
             }
+        }
+        // A step reference no batch resolved is refused under this command's id too.
+        let (mut s, ..) = doc_with_type();
+        s.execute("select.set", &json!({ "ids": [d] })).unwrap();
+        let before = s.doc().unwrap().doc.clone();
+        let mut p = params_for(spec.id, d);
+        p["id"] = json!("$missing");
+        match s.execute(spec.id, &p) {
+            Err(EngineError::BadParams { cmd, msg }) if cmd == spec.id && msg.contains("step reference") => {}
+            r => failures.push(format!("{} \"$missing\": {r:?}", spec.id)),
+        }
+        if s.doc().unwrap().doc != before {
+            failures.push(format!("{} \"$missing\": the document changed", spec.id));
         }
     }
     assert!(failures.is_empty(), "{} fail:\n{}", failures.len(), failures.join("\n"));
