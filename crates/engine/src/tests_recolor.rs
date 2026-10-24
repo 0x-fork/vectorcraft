@@ -430,6 +430,14 @@ fn apply_with_a_group_keeps_art_linked_to_its_global_swatches() {
     run(&mut s, "recolor.apply", json!({"map": {"#2878f0": "#ff6a00"}, "group": "Brand", "groupColors": ["#123456"]}));
     assert_eq!(link(&s, full), (orange, None, 1.0));
     assert_eq!(swatch_hex(&s), "#123456");
+    // A row that leaves the art's color as it is while the swatch is rewritten with another color:
+    // the art keeps its color, unlinked.
+    run(&mut s, "edit.undo", json!({}));
+    select_all(&mut s);
+    let blue = Color::from_hex("#2878f0").unwrap();
+    run(&mut s, "recolor.apply", json!({"map": {"#2878f0": "#2878f0"}, "group": "Brand", "groupColors": ["#123456"]}));
+    assert_eq!(link(&s, full), (blue, None, 1.0));
+    assert_eq!(swatch_hex(&s), "#123456");
     // Without a group the swatch is unchanged, so the art takes the new color unlinked.
     run(&mut s, "edit.undo", json!({}));
     select_all(&mut s);
