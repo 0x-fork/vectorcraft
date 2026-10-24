@@ -43,7 +43,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Convert To Point Type",
             ["Type"],
             None,
-            "{ids?|id?} area type → point type; soft line wraps become line breaks → {ids}",
+            "{ids?|id?} area type → point type; soft line wraps become line breaks, and a frame of threaded text leaves its thread with the text it holds → {ids}",
             has_selection,
             to_point
         ),
@@ -520,7 +520,9 @@ pub(crate) fn fill_with_placeholder(t: &mut TextObject) {
         TextKind::Area { frame } => {
             let b = frame.bounds().unwrap_or_default();
             let chars_per_line = (b.width() / (style.size * 0.5)).max(1.0);
-            let lines = (b.height() / style.effective_leading()).max(1.0);
+            // The first paragraph's Auto Leading sets the leading of Auto type (a leading of 0
+            // counts as a tenth of a point a line).
+            let lines = (b.height() / t.para_at(0).effective_leading(&style).max(0.1)).max(1.0);
             let want = (chars_per_line * lines) as usize;
             let mut out = String::new();
             for (i, w) in PLACEHOLDER.split(' ').cycle().enumerate() {
@@ -646,9 +648,10 @@ pub(crate) fn find_all(hay: &str, needle: &str, match_case: bool, whole_word: bo
 
 fn all_texts(d: &Document) -> Vec<NodeId> {
     let mut v = vec![];
+    let locks = d.locked_artboards();
     for l in d.layers.iter().filter(|l| l.visible && !l.locked) {
         l.walk(&mut |n| {
-            if matches!(n.kind, NodeKind::Text(_)) && n.visible && !n.locked {
+            if matches!(n.kind, NodeKind::Text(_)) && n.visible && !n.locked && !locks.holds_id(n.id) {
                 v.push(n.id);
             }
         });

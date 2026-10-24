@@ -7,6 +7,7 @@ use vectorcraft_engine::file_access::{self, AutomationRoots};
 use vectorcraft_engine::{Session, UiRequest, ViewInfo};
 use vectorcraft_geom::Point;
 use vectorcraft_render::Renderer;
+use vectorcraft_render::encode::{RasterExportOptions, RasterFormat};
 use vectorcraft_tools::{Mods, PointerEvent, PointerKind, TOOL_GROUPS, ToolKey};
 
 use crate::backend::Backend;
@@ -168,6 +169,10 @@ impl Headless {
                 }
                 UiRequest::Dialog(k, p) => out.push(json!({"dialog": k, "params": p})),
                 UiRequest::Status(msg) => out.push(json!({"status": msg})),
+                // The place cursor's file, placed at once.
+                UiRequest::Place(p) => {
+                    self.session.execute("file.place", &p).map_err(|e| e.to_string())?;
+                }
             }
         }
         Ok(())
@@ -252,7 +257,9 @@ impl Headless {
         let r = doc.artboards.get(idx).map(|a| a.rect).ok_or("no such artboard")?;
         let scale = p.get("scale").and_then(Value::as_f64).unwrap_or(1.0).clamp(0.01, 16.0);
         vectorcraft_render::raster_size(r, scale)?;
-        let img = self.renderer.render_region(&doc, r, scale, true);
+        // Rendered with the options of a PNG export on white, so its pixels are the exported file's.
+        let opts = RasterExportOptions { background: Some([255; 3]), ..Default::default() }.render_options(RasterFormat::Png);
+        let img = self.renderer.render_region_with(&doc, r, scale, &opts);
         // A cancelled render stops drawing: the picture is not whole and is not written.
         vectorcraft_engine::cancel::check().map_err(|e| e.to_string())?;
         let png = img.to_png()?;
@@ -275,7 +282,8 @@ impl Headless {
     /// `app.open {path}`: any readable file as a new active document (`document.open`).
     pub fn open(&mut self, p: &Value) -> Result<Value, String> {
         let path = s(p, "path").ok_or("missing `path`")?;
-        self.session.execute("document.open", &json!({"path": path})).map_err(|e| e.to_string())
+        let roots = self.roots.clone();
+        file_access::confine(roots.as_ref(), || self.session.execute("document.open", &json!({"path": path}))).map_err(|e| e.to_string())
     }
 
     /// `app.save {path?, format?, options?}`: `document.save` (by default the document's own path and
@@ -285,12 +293,14 @@ impl Headless {
         if s(p, "path").is_none() && st.path.is_none() {
             return Err("missing `path` (document was never saved)".into());
         }
-        self.session.execute("document.save", p).map_err(|e| e.to_string())
+        let roots = self.roots.clone();
+        file_access::confine(roots.as_ref(), || self.session.execute("document.save", p)).map_err(|e| e.to_string())
     }
 
     /// `app.export {path?, format?, …}`: `document.export` (format defaults to the path's extension).
     pub fn export(&mut self, p: &Value) -> Result<Value, String> {
-        self.session.execute("document.export", p).map_err(|e| e.to_string())
+        let roots = self.roots.clone();
+        file_access::confine(roots.as_ref(), || self.session.execute("document.export", p)).map_err(|e| e.to_string())
     }
 }
 

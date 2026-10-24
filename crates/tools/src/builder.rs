@@ -16,7 +16,7 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use vectorcraft_color::{Paint, Swatch};
 use vectorcraft_doc::{Document, Node, NodeId, NodeKind};
-use vectorcraft_geom::{BezPath, FillRule, PathData, Point, Rect, Shape as _};
+use vectorcraft_geom::{BezPath, FillRule, PathData, Point, Rect, Shape as _, SubPath};
 use vectorcraft_pathops as po;
 
 use crate::{Action, Cursor, Mods, Overlay, PointerEvent, PointerKind, Tool, ToolContext, ToolKey, json_ids};
@@ -37,6 +37,19 @@ pub const HIGHLIGHT_RED: [u8; 3] = [0xff, 0x2a, 0x2a];
 /// Is `n` a Live Paint group?
 pub fn is_live_paint(n: &Node) -> bool {
     matches!(n.kind, NodeKind::Group { clip: false, .. }) && n.name.as_deref().is_some_and(|s| s.starts_with(LIVE_PAINT_PREFIX))
+}
+
+/// Whether Live Paint can take `n` as it is: a Live Paint group, a path or compound path, or a
+/// group of those. Type, images, symbols, blends, meshes and the rest have to be converted to
+/// paths first (<https://helpx.adobe.com/illustrator/desktop/paint-and-fill/learn-painting-basics/create-live-paint-groups.html>);
+/// Make and Merge refuse them rather than hide them among the group's sources.
+pub fn live_paint_takes(n: &Node) -> bool {
+    is_live_paint(n)
+        || match &n.kind {
+            NodeKind::Path { .. } | NodeKind::Compound { .. } => true,
+            NodeKind::Group { children, .. } => children.iter().all(|c| live_paint_takes(c)),
+            _ => false,
+        }
 }
 
 fn named(n: &Node, name: &str) -> bool {
@@ -72,7 +85,17 @@ pub fn path_contains(path: &PathData, rule: FillRule, p: Point) -> bool {
 
 /// The face of `group` under `p` (front-most).
 pub fn face_at(group: &Node, p: Point) -> Option<&Arc<Node>> {
-    faces(group).into_iter().rev().find(|f| f.path_data().is_some_and(|pd| path_contains(pd, FillRule::NonZero, p)))
+    front_face(faces(group).into_iter(), p)
+}
+
+/// The face of `group` under `p` (front-most) among its faces that are not hidden.
+pub fn visible_face_at(group: &Node, p: Point) -> Option<&Arc<Node>> {
+    front_face(faces(group).into_iter().filter(|f| f.visible), p)
+}
+
+/// The face of `faces` (paint order) under `p` (front-most).
+fn front_face<'a>(faces: impl DoubleEndedIterator<Item = &'a Arc<Node>>, p: Point) -> Option<&'a Arc<Node>> {
+    faces.rev().find(|f| f.path_data().is_some_and(|pd| path_contains(pd, FillRule::NonZero, p)))
 }
 
 /// The edge of `group` nearest to `p` within `tol`.
@@ -99,11 +122,11 @@ fn nearest_edge<'a>(edges: impl IntoIterator<Item = &'a Arc<Node>>, p: Point, to
     best.map(|b| b.1)
 }
 
-/// The visible Live Paint group with a face under `p` (front-most in paint order).
+/// The visible Live Paint group with a face under `p` that is not hidden (front-most in paint order).
 pub fn live_paint_at(doc: &Document, p: Point) -> Option<NodeId> {
     let mut hit = None;
     doc.walk(|n| {
-        if is_live_paint(n) && doc.is_visible(n.id) && face_at(n, p).is_some() {
+        if is_live_paint(n) && doc.is_visible(n.id) && visible_face_at(n, p).is_some() {
             hit = Some(n.id);
         }
     });
@@ -144,6 +167,30 @@ pub fn node_outline(n: &Node) -> Option<(PathData, FillRule)> {
         }
         _ => None,
     }
+}
+
+/// How far (pt) a piece of the planar map may lie from `outline`, the outline it follows, to be
+/// matched to it or cut out of it: a ten-thousandth of the outline's larger side, at least 0.05.
+/// The map's pieces follow the outlines to within a few hundredths of a point.
+pub fn outline_snap(outline: &PathData) -> f64 {
+    outline.bounds().map_or(0.05, |b| (b.width().max(b.height()) / 2000.0).max(0.25) * 0.2)
+}
+
+/// The outlines of `leaves` as they are drawn ([`node_outline`]), in their order, for
+/// [`BuilderMap::stroke_at`]. A leaf without an outline, and one inside a Live Paint group or a
+/// Shaper Group (which make their own paths), gets an empty outline, so no stroke of it splits.
+pub fn drawn_outlines(doc: &Document, leaves: &[&Node]) -> Vec<PathData> {
+    let in_live_group = |id: NodeId| {
+        let mut up = doc.parent_of(id);
+        while let Some(p) = up {
+            if doc.node(p).is_some_and(|n| is_live_paint(n) || n.extras().shaper.is_some()) {
+                return true;
+            }
+            up = doc.parent_of(p);
+        }
+        false
+    };
+    leaves.iter().map(|l| if in_live_group(l.id) { None } else { node_outline(l) }.map_or_else(PathData::default, |o| o.0)).collect()
 }
 
 /// Pathfinder shapes for the given roots (back → front by the order given), keyed by leaf index,
@@ -243,11 +290,16 @@ impl BuilderMap {
     /// `open_filled_as_closed` (Consider Open Filled Paths as Closed), a filled open path bounds a
     /// region as if an invisible edge closed it; without it, the path cuts like a line.
     pub fn new<'a>(doc: &'a Document, roots: &[NodeId], with_edges: bool, open_filled_as_closed: bool) -> (Self, Vec<&'a Node>) {
+        Self::with_gap(doc, roots, with_edges, open_filled_as_closed, 0.0)
+    }
+
+    /// The same arrangement with Gap Detection, using the shared Live Paint gap finder.
+    pub fn with_gap<'a>(doc: &'a Document, roots: &[NodeId], with_edges: bool, open_filled_as_closed: bool, gap: f64) -> (Self, Vec<&'a Node>) {
         let (shapes, leaves) = shape_builder_shapes(doc, roots, open_filled_as_closed);
         if shapes.is_empty() {
             return (Self::default(), leaves);
         }
-        let arr = po::shape_builder(&shapes, with_edges);
+        let arr = po::shape_builder_with_gap(&shapes, with_edges, gap);
         let bounded = |pieces: Vec<po::Shape>| {
             pieces
                 .into_iter()
@@ -265,6 +317,27 @@ impl BuilderMap {
         self.regions.iter().position(|(_, bp, b)| b.contains(p) && bp.winding(p) != 0)
     }
 
+    /// The regions a rectangular marquee from `from` (where the drag started) to `to` touches: each
+    /// region whose outline crosses the rectangle or has an anchor inside it, and the region the
+    /// whole rectangle lies in. Of those, the region under `from` comes first, then the one under
+    /// `to`, then the others in map order. A marquee of no size touches the region under `from`.
+    pub fn regions_in_marquee(&self, from: Point, to: Point) -> Vec<usize> {
+        let r = Rect::from_points(from, to);
+        if r.width() <= 0.0 && r.height() <= 0.0 {
+            return self.region_at(from).into_iter().collect();
+        }
+        let c = r.center();
+        let touches = |(reg, bp, b): &Face| (b.contains(c) && bp.winding(c) != 0) || vectorcraft_geom::hit::intersects_rect(&reg.path, r);
+        let mut out: Vec<usize> = self.regions.iter().enumerate().filter(|(_, f)| touches(f)).map(|(i, _)| i).collect();
+        for p in [to, from] {
+            if let Some(k) = self.region_at(p).and_then(|i| out.iter().position(|&j| j == i)) {
+                let i = out.remove(k);
+                out.insert(0, i);
+            }
+        }
+        out
+    }
+
     /// What a gesture at `p` touches: with `piece_tol` (erasing), the line piece or edge that
     /// close, else the region under it.
     pub fn hit(&self, p: Point, piece_tol: Option<f64>) -> Option<Hit> {
@@ -274,6 +347,49 @@ impl BuilderMap {
             (None, e) => e.map(|e| Hit::Edge(e.1)),
         });
         piece.or_else(|| self.region_at(p).map(Hit::Region))
+    }
+
+    /// The stroke a click at `p` splits with In Merge Mode, Clicking Stroke Splits the Path: the
+    /// line piece or edge nearest `p` within `tol` (as [`BuilderMap::hit`] finds it), from the
+    /// anchor or crossing point before `p` to the one after it on the path it lies on. `outlines`
+    /// are the inputs' outlines as they are drawn (a filled open path without the edge that closes
+    /// it in the map). Returns the input's index and the run, going the way the path goes; None
+    /// when no piece is that close, when the run is not on the outline as drawn, when it would be a
+    /// whole closed subpath, when it is too short to cut out (see [`po::cut_out`]), or when it is
+    /// all of the path (a lone line) or leaves no more of it than [`outline_snap`], which leaves
+    /// nothing to split off.
+    pub fn stroke_at(&self, outlines: &[PathData], p: Point, tol: f64) -> Option<(usize, SubPath)> {
+        use kurbo::ParamCurve as _;
+        let piece = match self.hit(p, Some(tol))? {
+            Hit::Line(i) => self.lines.get(i),
+            Hit::Edge(i) => self.edges.get(i),
+            Hit::Region(_) => None,
+        }?;
+        let i = piece.0.key as usize;
+        let drawn = outlines.get(i)?;
+        let stops: Vec<Point> = drawn.anchors().map(|(.., a)| a.p).collect();
+        let snap = outline_snap(drawn);
+        let mut run = po::run_around(piece.0.path.subpaths.first()?, &stops, p, snap)?;
+        let n = run.segment_count();
+        if n == 0 {
+            return None;
+        }
+        let mid = run.segment(n / 2).eval(0.5);
+        drawn.nearest(mid).filter(|n| n.4 <= snap)?;
+        // A run that cannot be cut out, or that is all of the path (such as a lone line) or all
+        // but a speck of it, leaves nothing to split off.
+        if !po::cut_out(drawn, &run, false, snap).is_some_and(|rest| rest.length() > snap) {
+            return None;
+        }
+        // Reverse the run when the path's parameter goes down along it.
+        let seg = run.segment(n / 2);
+        if let (Some(a), Some(b)) = (drawn.nearest(seg.eval(0.25)), drawn.nearest(seg.eval(0.75)))
+            && a.0 == b.0
+            && (b.1 as f64 + b.2) < (a.1 as f64 + a.2)
+        {
+            run.reverse();
+        }
+        Some((i, run))
     }
 
     /// The regions just either side of the middle of `piece` (None: outside every region).
@@ -432,6 +548,10 @@ struct RegionCache {
     live: bool,
     /// The map has the Shape Builder's outline edges.
     edges: bool,
+    /// Gap Detection distance; changing tool options invalidates the cache.
+    gap: f64,
+    /// The outlines of the Shape Builder's inputs as they are drawn (see [`BuilderMap::stroke_at`]).
+    outlines: Vec<PathData>,
 }
 
 impl RegionCache {
@@ -449,7 +569,9 @@ impl RegionCache {
                 let regions = if shapes.is_empty() { vec![] } else { faces_of(po::live_paint(&shapes).0) };
                 BuilderMap { regions, ..Default::default() }
             } else {
-                BuilderMap::new(cx.doc, &roots, edges, open_filled_as_closed).0
+                let (map, leaves) = BuilderMap::with_gap(cx.doc, &roots, edges, open_filled_as_closed, self.gap);
+                self.outlines = drawn_outlines(cx.doc, &leaves);
+                map
             };
             self.key = Some(key);
             self.edges = edges;
@@ -463,6 +585,10 @@ impl RegionCache {
 
 // ---------- Shape Builder ----------
 
+pub use po::SHAPE_BUILDER_MAX_GAP;
+/// Small, Medium and Large gap lengths in points.
+pub const GAP_LENGTHS: [f64; 3] = [3.0, 6.0, 12.0];
+
 /// Shape Builder Tool Options (double-click the tool; `tool.setOption`), kept across tool switches
 /// and saved with the preferences.
 #[derive(Clone, Debug, PartialEq)]
@@ -474,7 +600,8 @@ pub struct ShapeBuilderOptions {
     /// Pick Color From Color Swatches (`pickColorFrom: "swatches"`; off: `"artwork"`): a merge
     /// fills the new shape with the current fill, and the Left and Right arrow keys step the current
     /// fill through the document's color swatches. With Artwork, the shape takes the look of the
-    /// art it is merged from.
+    /// object where the drag starts, else of the one where it ends, else of the front-most selected
+    /// object.
     pub swatches: bool,
     /// Cursor Swatch Preview (`cursorSwatchPreview`, off): with Color Swatches, the current fill
     /// and the swatches before and after it show as chips above the pointer while no drag is on.
@@ -486,11 +613,39 @@ pub struct ShapeBuilderOptions {
     /// Highlight Fill (`highlightFill`, on): in merge mode, the regions under the pointer or
     /// touched by the drag are shaded with a gray mesh. When it is off, they are not highlighted.
     pub highlight_fill: bool,
+    /// Close gaps up to `gap_length` while finding regions.
+    pub gap_detection: bool,
+    /// Gap Length in points (at most [`SHAPE_BUILDER_MAX_GAP`]).
+    pub gap_length: f64,
+    /// In Merge Mode, Clicking Stroke Splits the Path (`clickStrokeSplitsPath`, off): in merge mode,
+    /// a click on a stroke splits its path into the run under the pointer
+    /// ([`BuilderMap::stroke_at`]) and the rest, and the pointer shows scissors over such a stroke.
+    pub click_stroke_splits: bool,
+    /// Highlight Stroke When Editable (`highlightStroke`, on): with `click_stroke_splits`, the run
+    /// of stroke a click would split is drawn in `stroke_color` while the pointer is over it.
+    pub highlight_stroke: bool,
+    /// The color of that highlight (`highlightColor`: `#rrggbb` or a layer color's name; the layer
+    /// color Red by default).
+    pub stroke_color: [u8; 3],
 }
+
+/// The color Highlight Stroke When Editable draws in by default: the layer color Red.
+pub const STROKE_HIGHLIGHT: [u8; 3] = [0xff, 0x4f, 0x4f];
 
 impl Default for ShapeBuilderOptions {
     fn default() -> Self {
-        Self { open_filled_as_closed: true, swatches: false, cursor_swatch_preview: false, straight_line: false, highlight_fill: true }
+        Self {
+            open_filled_as_closed: true,
+            swatches: false,
+            cursor_swatch_preview: false,
+            straight_line: false,
+            highlight_fill: true,
+            gap_detection: false,
+            gap_length: GAP_LENGTHS[0],
+            click_stroke_splits: false,
+            highlight_stroke: true,
+            stroke_color: STROKE_HIGHLIGHT,
+        }
     }
 }
 
@@ -528,7 +683,9 @@ fn step_swatch(list: &[&Swatch], fill: &Paint, last: Option<usize>, forward: boo
 /// Shape Builder tool: drag across regions to merge them. Holding Alt (Option) switches to erase
 /// mode while it is held: the pointer shows a minus, what a click or drag would delete highlights in
 /// red, and the gesture deletes the regions it touches, the pieces of open paths and the edges
-/// (outline pieces between the points where paths meet) it passes over. Its options are
+/// (outline pieces between the points where paths meet) it passes over. With Shift held at the
+/// press, the drag draws a rectangular marquee and touches the regions it reaches (see
+/// [`BuilderMap::regions_in_marquee`]): they merge, or with Alt they are deleted. Its options are
 /// [`ShapeBuilderOptions`].
 #[derive(Default)]
 pub struct ShapeBuilderTool {
@@ -537,6 +694,8 @@ pub struct ShapeBuilderTool {
     points: Vec<Point>,
     touched: Touched,
     dragging: bool,
+    /// A Shift-drag's marquee: where the drag started and where the pointer is.
+    marquee: Option<(Point, Point)>,
     /// Erase mode: Alt held while hovering, or when the drag started.
     alt: bool,
     /// Where the pointer last moved (the cursor swatch preview sits above it).
@@ -544,12 +703,36 @@ pub struct ShapeBuilderTool {
     /// The index in [`color_swatches`] of the swatch the arrow keys picked last.
     picked: Option<usize>,
     opts: ShapeBuilderOptions,
+    /// With In Merge Mode, Clicking Stroke Splits the Path: the run of stroke under the pointer,
+    /// which a click splits off.
+    stroke: Option<SubPath>,
+    /// The pointer went more than [`CLICK_TOL_PX`] from the press during the drag, so the gesture
+    /// is not a click.
+    far: bool,
 }
 
 /// How close (screen px) the pointer must come to a line piece or an edge to delete it.
 const LINE_TOL_PX: f64 = 4.0;
 
+/// How far (screen px) the pointer may move between press and release for the gesture to be a
+/// click, which with In Merge Mode, Clicking Stroke Splits the Path splits the stroke at the press.
+const CLICK_TOL_PX: f64 = 3.0;
+
 impl ShapeBuilderTool {
+    fn gap(&self) -> f64 {
+        if self.opts.gap_detection { self.opts.gap_length } else { 0.0 }
+    }
+
+    /// With In Merge Mode, Clicking Stroke Splits the Path and not in erase mode (`alt`): the run of
+    /// stroke a click at `p` splits off ([`BuilderMap::stroke_at`]).
+    fn stroke_at(&mut self, cx: &ToolContext, p: Point, alt: bool) -> Option<SubPath> {
+        if alt || !self.opts.click_stroke_splits {
+            return None;
+        }
+        self.cache.get(cx, true, self.opts.open_filled_as_closed);
+        self.cache.map.stroke_at(&self.cache.outlines, p, cx.tol(LINE_TOL_PX)).map(|(_, run)| run)
+    }
+
     fn line_tol(cx: &ToolContext, alt: bool) -> Option<f64> {
         alt.then(|| cx.tol(LINE_TOL_PX))
     }
@@ -576,6 +759,19 @@ impl ShapeBuilderTool {
         } else {
             self.points = vec![start, p];
             self.touch(cx, Some(start), p);
+        }
+    }
+
+    /// A Shift-drag: the drag touches the regions the marquee from where it started to `p` reaches;
+    /// while the pointer is where the drag started, what a click there touches.
+    fn marquee_to(&mut self, cx: &ToolContext, p: Point) {
+        let Some((start, _)) = self.marquee else { return };
+        self.marquee = Some((start, p));
+        self.touched = Touched::default();
+        if start == p {
+            self.touch(cx, None, start);
+        } else {
+            self.touched.regions = self.cache.get(cx, self.alt, self.opts.open_filled_as_closed).regions_in_marquee(start, p);
         }
     }
 
@@ -610,7 +806,12 @@ impl Tool for ShapeBuilderTool {
             PointerKind::Move => {
                 self.alt = ev.mods.alt;
                 self.at = Some(p);
-                self.hover = self.cache.get(cx, self.alt, self.opts.open_filled_as_closed).hit(p, Self::line_tol(cx, self.alt));
+                // Over a stroke a click would split, the tool highlights the stroke and not the region.
+                self.stroke = self.stroke_at(cx, p, self.alt);
+                self.hover = match self.stroke {
+                    Some(_) => None,
+                    None => self.cache.get(cx, self.alt, self.opts.open_filled_as_closed).hit(p, Self::line_tol(cx, self.alt)),
+                };
                 vec![]
             }
             PointerKind::Down => {
@@ -619,13 +820,22 @@ impl Tool for ShapeBuilderTool {
                 }
                 self.dragging = true;
                 self.alt = ev.mods.alt;
+                self.marquee = ev.mods.shift.then_some((p, p));
                 self.points = vec![p];
+                self.far = false;
                 self.touched = Touched::default();
                 self.touch(cx, None, p);
                 vec![]
             }
             PointerKind::Drag if self.dragging => {
                 self.at = Some(p);
+                if self.points.first().is_some_and(|s| s.distance(p) > cx.tol(CLICK_TOL_PX)) {
+                    self.far = true;
+                }
+                if self.marquee.is_some() {
+                    self.marquee_to(cx, p);
+                    return vec![];
+                }
                 if self.opts.straight_line {
                     self.straight_to(cx, p);
                     return vec![];
@@ -639,7 +849,9 @@ impl Tool for ShapeBuilderTool {
             }
             PointerKind::Up if self.dragging => {
                 self.dragging = false;
-                if self.opts.straight_line {
+                if self.marquee.is_some() {
+                    self.marquee_to(cx, p);
+                } else if self.opts.straight_line {
                     self.straight_to(cx, p);
                 } else if self.points.last().is_none_or(|q| *q != p) {
                     let last = self.points.last().copied();
@@ -647,17 +859,35 @@ impl Tool for ShapeBuilderTool {
                     self.points.push(p);
                 }
                 let points = std::mem::take(&mut self.points);
-                if std::mem::take(&mut self.touched).is_empty() {
+                // The mode the drag started in, which its highlight showed.
+                let erase = self.alt;
+                // A marquee of no size is a click.
+                let marquee = self.marquee.take().filter(|(a, b)| a != b);
+                // With In Merge Mode, Clicking Stroke Splits the Path, a click on a stroke splits it
+                // where the press was; a marquee splits nothing.
+                let press = points.first().copied().filter(|s| marquee.is_none() && !self.far && s.distance(p) <= cx.tol(CLICK_TOL_PX));
+                let split = press.filter(|q| self.stroke_at(cx, *q, erase).is_some());
+                if std::mem::take(&mut self.touched).is_empty() && split.is_none() {
                     return vec![];
                 }
                 self.cache.key = None;
+                self.stroke = None;
                 let roots = sorted_roots(cx.doc, &cx.selection.objects);
+                let points = split.map_or(points, |q| vec![q]);
                 let pts: Vec<Value> = points.iter().map(|q| json!([q.x, q.y])).collect();
-                // The mode the drag started in, which its highlight showed.
-                let erase = self.alt;
-                let mut params = json!({ "ids": json_ids(&roots), "points": pts, "erase": erase });
+                let mut params = json!({ "ids": json_ids(&roots), "points": pts, "erase": erase, "gap": self.gap() });
+                if let Some((a, b)) = marquee
+                    && let Some(o) = params.as_object_mut()
+                {
+                    o.remove("points");
+                    o.insert("rect".into(), json!([a.x, a.y, b.x - a.x, b.y - a.y]));
+                }
                 if let Some(t) = Self::line_tol(cx, erase) {
                     params["tolerance"] = json!(t);
+                }
+                if split.is_some() {
+                    params["splitStroke"] = json!(true);
+                    params["tolerance"] = json!(cx.tol(LINE_TOL_PX));
                 }
                 if !self.opts.open_filled_as_closed {
                     params["openFilledAsClosed"] = json!(false);
@@ -700,6 +930,11 @@ impl Tool for ShapeBuilderTool {
                 }
             }
         }
+        if self.dragging
+            && let Some((a, b)) = self.marquee.filter(|(a, b)| a != b)
+        {
+            out.push(Overlay::Marquee(Rect::from_points(a, b)));
+        }
         if self.dragging && self.points.len() > 1 {
             let mut bp = BezPath::new();
             bp.move_to(self.points[0]);
@@ -711,13 +946,26 @@ impl Tool for ShapeBuilderTool {
         if self.opts.swatches && self.opts.cursor_swatch_preview && !self.dragging {
             out.extend(self.swatch_chips(cx));
         }
+        // Highlight Stroke When Editable draws the stroke a click would split.
+        if let Some(run) = self.stroke.as_ref().filter(|_| self.opts.highlight_stroke && !self.dragging) {
+            let mut path = BezPath::new();
+            run.to_bezpath_into(&mut path);
+            out.push(Overlay::Path { path, color: self.opts.stroke_color, width: 3.0, dashed: false });
+        }
         out
     }
 
     fn cursor(&self, _cx: &ToolContext, _p: Point, m: Mods) -> Cursor {
         // A drag keeps the mode it started in; hovering follows the key.
         let erase = if self.dragging { self.alt } else { m.alt };
-        if erase { Cursor::ShapeBuilderErase } else { Cursor::ShapeBuilder }
+        if erase {
+            Cursor::ShapeBuilderErase
+        } else if self.stroke.is_some() && !self.dragging {
+            // Over a stroke a click splits.
+            Cursor::Scissors
+        } else {
+            Cursor::ShapeBuilder
+        }
     }
 
     fn busy(&self) -> bool {
@@ -745,12 +993,18 @@ impl Tool for ShapeBuilderTool {
 
     fn options(&self) -> Value {
         let o = &self.opts;
+        let [r, g, b] = o.stroke_color;
         json!({
             "openFilledAsClosed": o.open_filled_as_closed,
             "pickColorFrom": if o.swatches { "swatches" } else { "artwork" },
             "cursorSwatchPreview": o.cursor_swatch_preview,
             "selection": if o.straight_line { "straightLine" } else { "freeform" },
             "highlightFill": o.highlight_fill,
+            "gapDetection": o.gap_detection,
+            "gapLength": o.gap_length,
+            "clickStrokeSplitsPath": o.click_stroke_splits,
+            "highlightStroke": o.highlight_stroke,
+            "highlightColor": format!("#{r:02x}{g:02x}{b:02x}"),
         })
     }
 
@@ -762,8 +1016,20 @@ impl Tool for ShapeBuilderTool {
             "cursorSwatchPreview" => o.cursor_swatch_preview = v.as_bool().unwrap_or(o.cursor_swatch_preview),
             "selection" => o.straight_line = v.as_str().map_or(o.straight_line, |s| s == "straightLine"),
             "highlightFill" => o.highlight_fill = v.as_bool().unwrap_or(o.highlight_fill),
+            "gapDetection" => o.gap_detection = v.as_bool().unwrap_or(o.gap_detection),
+            "gapLength" => {
+                if let Some(n) = v.as_f64().filter(|n| n.is_finite()) {
+                    o.gap_length = n.clamp(0.0, SHAPE_BUILDER_MAX_GAP);
+                }
+            }
+            "clickStrokeSplitsPath" => o.click_stroke_splits = v.as_bool().unwrap_or(o.click_stroke_splits),
+            "highlightStroke" => o.highlight_stroke = v.as_bool().unwrap_or(o.highlight_stroke),
+            "highlightColor" => o.stroke_color = lp_color(v).unwrap_or(o.stroke_color),
             _ => {}
         }
+        self.stroke = None;
+        self.cache.key = None;
+        self.cache.gap = self.gap();
     }
 }
 
@@ -780,14 +1046,14 @@ enum LpHover {
     Region(usize),
 }
 
-/// The Live Paint group and part the Live Paint tools hover and click at `p`. Inside a face of a
-/// visible Live Paint group ([`live_paint_at`]) it is that group with its face under `p`, or with
-/// `edge` its visible edge nearest `p` within `tol` (None when there is none). Outside every face,
-/// with `edge`, it is the visible edge nearest `p` within `tol` among the visible Live Paint groups
-/// (the front-most group's on a tie). None when no group is found.
+/// The Live Paint group and part the Live Paint tools hover and click at `p`. Inside a visible face
+/// of a visible Live Paint group ([`live_paint_at`]) it is that group with its visible face under
+/// `p`, or with `edge` its visible edge nearest `p` within `tol` (None when there is none). Outside
+/// every visible face, with `edge`, it is the visible edge nearest `p` within `tol` among the
+/// visible Live Paint groups (the front-most group's on a tie). None when no group is found.
 fn lp_part_at(doc: &Document, p: Point, tol: f64, edge: bool) -> Option<(NodeId, Option<&Arc<Node>>)> {
     if let Some(g) = live_paint_at(doc, p).and_then(|id| doc.node(id)) {
-        return Some((g.id, if edge { visible_edge_near(g, p, tol) } else { face_at(g, p) }));
+        return Some((g.id, if edge { visible_edge_near(g, p, tol) } else { visible_face_at(g, p) }));
     }
     if !edge {
         return None;
@@ -1170,6 +1436,220 @@ mod tests {
         assert_eq!(colors(&t.overlays(&cx)), [HIGHLIGHT_RED; 5]);
     }
 
+    /// A 3×3 grid of touching 100 pt squares from (0, 0) to (300, 300), selected.
+    fn grid() -> (Document, Selection) {
+        let mut d = Document::new(500.0, 500.0);
+        let l = d.layers[0].id;
+        let mut s = Selection::default();
+        for k in 0..9 {
+            let (x, y) = ((k % 3) as f64 * 100.0, (k / 3) as f64 * 100.0);
+            let id = d.alloc_id();
+            d.insert(Some(l), k, Node::path(id, shapes::rectangle(Rect::new(x, y, x + 100.0, y + 100.0)), Appearance::default_art())).unwrap();
+            s.add(id);
+        }
+        (d, s)
+    }
+
+    /// The paths of an overlay list (a shaded region draws two: its mesh and its outline), and its
+    /// marquees.
+    fn paths_and_marquees(ov: &[Overlay]) -> (usize, Vec<Rect>) {
+        let paths = ov.iter().filter(|o| matches!(o, Overlay::Path { .. })).count();
+        (paths, ov.iter().filter_map(|o| if let Overlay::Marquee(r) = o { Some(*r) } else { None }).collect())
+    }
+
+    #[test]
+    fn shape_builder_shift_drag_highlights_and_merges_every_region_in_its_marquee() {
+        let (d, s) = grid();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        let shift = Mods { shift: true, ..Default::default() };
+        t.pointer(&cx, &ev(PointerKind::Down, 250.0, 250.0).with_mods(shift));
+        // Shift may be let go once the drag is on.
+        t.pointer(&cx, &ev(PointerKind::Drag, 150.0, 150.0));
+        t.pointer(&cx, &ev(PointerKind::Drag, 50.0, 50.0));
+        assert_eq!(t.touched.regions.len(), 9, "{:?}", t.touched);
+        assert_eq!(t.touched.regions[0], t.cache.map.region_at(Point::new(250.0, 250.0)).unwrap(), "where the drag started comes first");
+        assert_eq!(paths_and_marquees(&t.overlays(&cx)), (18, vec![Rect::new(50.0, 50.0, 250.0, 250.0)]), "nine regions, no trail");
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, 50.0, 50.0));
+        let Action::Exec(id, v) = &acts[0] else { panic!("{acts:?}") };
+        assert_eq!((id.as_str(), &v["rect"], &v["erase"]), ("shapeBuilder.merge", &json!([250.0, 250.0, -200.0, -200.0]), &json!(false)));
+        assert!(v.get("points").is_none(), "{v}");
+        assert!(t.overlays(&cx).iter().all(|o| !matches!(o, Overlay::Marquee(_))), "the marquee goes with the drag");
+    }
+
+    #[test]
+    fn shape_builder_alt_shift_drag_marks_the_regions_in_its_marquee_for_deleting() {
+        let (d, s) = grid();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        let alt_shift = Mods { alt: true, shift: true, ..Default::default() };
+        // A narrow marquee down the middle column.
+        t.pointer(&cx, &ev(PointerKind::Down, 140.0, 50.0).with_mods(alt_shift));
+        t.pointer(&cx, &ev(PointerKind::Drag, 160.0, 250.0).with_mods(alt_shift));
+        assert_eq!(t.touched.regions.len(), 3);
+        let ov = t.overlays(&cx);
+        assert!(ov.iter().all(|o| matches!(o, Overlay::Marquee(_) | Overlay::Path { color: HIGHLIGHT_RED, .. })), "{ov:?}");
+        assert_eq!(paths_and_marquees(&ov).0, 6, "three regions");
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, 160.0, 250.0).with_mods(alt_shift));
+        let Action::Exec(_, v) = &acts[0] else { panic!("{acts:?}") };
+        assert_eq!((&v["rect"], &v["erase"]), (&json!([140.0, 50.0, 20.0, 200.0]), &json!(true)));
+    }
+
+    /// Without Shift a drag still touches what the pointer passes over; a Shift-click that does not
+    /// move is a click.
+    #[test]
+    fn shape_builder_drag_without_shift_and_shift_click_send_points() {
+        let (d, s) = grid();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        t.pointer(&cx, &ev(PointerKind::Down, 250.0, 250.0));
+        t.pointer(&cx, &ev(PointerKind::Drag, 150.0, 150.0));
+        t.pointer(&cx, &ev(PointerKind::Drag, 50.0, 50.0));
+        assert_eq!(t.touched.regions.len(), 3, "the diagonal");
+        let (paths, marquees) = paths_and_marquees(&t.overlays(&cx));
+        assert_eq!((paths, marquees.len()), (7, 0), "three regions and the trail");
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, 50.0, 50.0));
+        let Action::Exec(_, v) = &acts[0] else { panic!("{acts:?}") };
+        assert_eq!(v["points"], json!([[250.0, 250.0], [150.0, 150.0], [50.0, 50.0]]));
+        assert!(v.get("rect").is_none(), "{v}");
+        let shift = Mods { shift: true, ..Default::default() };
+        t.pointer(&cx, &ev(PointerKind::Down, 150.0, 150.0).with_mods(shift));
+        assert_eq!(t.touched.regions.len(), 1);
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, 150.0, 150.0).with_mods(shift));
+        let Action::Exec(_, v) = &acts[0] else { panic!("{acts:?}") };
+        assert_eq!((&v["points"], v.get("rect")), (&json!([[150.0, 150.0]]), None));
+    }
+
+    #[test]
+    fn marquee_regions_touch_crossed_outlines_held_anchors_and_the_region_around_it() {
+        let (d, s) = grid();
+        let (map, _) = BuilderMap::new(&d, &sorted_roots(&d, &s.objects), false, true);
+        let at = |x: f64, y: f64| map.region_at(Point::new(x, y)).unwrap();
+        // Wholly inside the middle square, then crossing into the one to its right.
+        assert_eq!(map.regions_in_marquee(Point::new(120.0, 120.0), Point::new(180.0, 180.0)), [at(150.0, 150.0)]);
+        assert_eq!(map.regions_in_marquee(Point::new(120.0, 120.0), Point::new(220.0, 180.0)), [at(150.0, 150.0), at(250.0, 150.0)]);
+        // Ending on a shared side does not reach the square past it.
+        assert_eq!(map.regions_in_marquee(Point::new(120.0, 120.0), Point::new(200.0, 180.0)), [at(150.0, 150.0)]);
+        // Around the whole grid, from outside it: every square, with no region under either corner.
+        assert_eq!(map.regions_in_marquee(Point::new(-10.0, -10.0), Point::new(310.0, 310.0)).len(), 9);
+        assert!(map.regions_in_marquee(Point::new(400.0, 400.0), Point::new(450.0, 450.0)).is_empty());
+        // Where the drag started first, then where it ends, whichever way it runs.
+        for (a, b) in [((50.0, 50.0), (250.0, 250.0)), ((250.0, 250.0), (50.0, 50.0)), ((250.0, 50.0), (50.0, 250.0))] {
+            let got = map.regions_in_marquee(a.into(), b.into());
+            assert_eq!((got.len(), got[0], got[1]), (9, at(a.0, a.1), at(b.0, b.1)), "{a:?} to {b:?}");
+        }
+    }
+
+    /// With In Merge Mode, Clicking Stroke Splits the Path on, a Shift-drag that starts on a stroke
+    /// sends its marquee and no split, however little it moves; a Shift-click there splits the
+    /// stroke as a click does.
+    #[test]
+    fn shape_builder_shift_drag_on_a_stroke_merges_and_a_shift_click_splits() {
+        let (d, s) = corner_rects();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        t.set_option("clickStrokeSplitsPath", &json!(true));
+        let shift = Mods { shift: true, ..Default::default() };
+        // 1 pt outside A's left side, a move of less than 3 pixels, and one across the art.
+        for (to, rect) in [((0.5, 26.0), json!([-1.0, 25.0, 1.5, 1.0])), ((75.0, 75.0), json!([-1.0, 25.0, 76.0, 50.0]))] {
+            t.pointer(&cx, &ev(PointerKind::Move, -1.0, 25.0));
+            t.pointer(&cx, &ev(PointerKind::Down, -1.0, 25.0).with_mods(shift));
+            t.pointer(&cx, &ev(PointerKind::Drag, to.0, to.1).with_mods(shift));
+            let acts = t.pointer(&cx, &ev(PointerKind::Up, to.0, to.1).with_mods(shift));
+            let [Action::Exec(_, v)] = acts.as_slice() else { panic!("{acts:?}") };
+            assert_eq!((&v["rect"], v.get("points"), v.get("splitStroke")), (&rect, None, None), "{v}");
+        }
+        t.pointer(&cx, &ev(PointerKind::Move, -1.0, 25.0));
+        t.pointer(&cx, &ev(PointerKind::Down, -1.0, 25.0).with_mods(shift));
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, -1.0, 25.0).with_mods(shift));
+        let [Action::Exec(_, v)] = acts.as_slice() else { panic!("{acts:?}") };
+        assert_eq!((&v["splitStroke"], &v["points"], v.get("rect")), (&json!(true), &json!([[-1.0, 25.0]]), None), "{v}");
+    }
+
+    /// While a Shift-drag that started over a stroke a click would split draws its marquee, the
+    /// pointer shows the Shape Builder, not the scissors, and the stroke is not highlighted.
+    #[test]
+    fn shape_builder_shift_drag_shows_no_scissors_or_stroke_highlight() {
+        let (d, s) = corner_rects();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        t.set_option("clickStrokeSplitsPath", &json!(true));
+        let shift = Mods { shift: true, ..Default::default() };
+        let highlighted = |ov: &[Overlay]| ov.iter().any(|o| matches!(o, Overlay::Path { color: STROKE_HIGHLIGHT, width: 3.0, .. }));
+        t.pointer(&cx, &ev(PointerKind::Move, -1.0, 25.0));
+        assert_eq!(t.cursor(&cx, Point::new(-1.0, 25.0), shift), Cursor::Scissors);
+        assert!(highlighted(&t.overlays(&cx)));
+        t.pointer(&cx, &ev(PointerKind::Down, -1.0, 25.0).with_mods(shift));
+        t.pointer(&cx, &ev(PointerKind::Drag, 75.0, 75.0).with_mods(shift));
+        let ov = t.overlays(&cx);
+        assert!(ov.iter().any(|o| matches!(o, Overlay::Marquee(_))) && !highlighted(&ov), "{ov:?}");
+        assert_eq!(t.cursor(&cx, Point::new(75.0, 75.0), shift), Cursor::ShapeBuilder);
+    }
+
+    #[test]
+    fn shape_builder_stroke_options_round_trip_and_pick_the_side_under_the_pointer() {
+        let (d, s) = corner_rects();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        let o = t.options();
+        assert_eq!((&o["clickStrokeSplitsPath"], &o["highlightStroke"], &o["highlightColor"]), (&json!(false), &json!(true), &json!("#ff4f4f")));
+        // With the option off, the pointer 1 pt outside A's left side highlights nothing.
+        t.pointer(&cx, &ev(PointerKind::Move, -1.0, 25.0));
+        assert!(t.overlays(&cx).is_empty());
+        assert_eq!(t.cursor(&cx, Point::new(-1.0, 25.0), Mods::default()), Cursor::ShapeBuilder);
+        t.set_option("clickStrokeSplitsPath", &json!(true));
+        t.set_option("highlightColor", &json!("#00ff00"));
+        // A value that is not a color or not a switch is ignored.
+        t.set_option("highlightColor", &json!("nope"));
+        t.set_option("highlightStroke", &json!("off"));
+        let o = t.options();
+        assert_eq!((&o["clickStrokeSplitsPath"], &o["highlightStroke"], &o["highlightColor"]), (&json!(true), &json!(true), &json!("#00ff00")));
+        // On, the tool draws A's left side from corner to corner in the highlight color and shows the scissors.
+        t.pointer(&cx, &ev(PointerKind::Move, -1.0, 25.0));
+        let ov = t.overlays(&cx);
+        let [Overlay::Path { path, color: [0, 0xff, 0], width: 3.0, .. }] = ov.as_slice() else { panic!("{ov:?}") };
+        assert_eq!(path.bounding_box(), Rect::new(0.0, 0.0, 0.0, 100.0));
+        assert_eq!(t.cursor(&cx, Point::new(-1.0, 25.0), Mods::default()), Cursor::Scissors);
+        // With Alt the tool is in erase mode, which deletes edges and does not split them.
+        let alt = Mods { alt: true, ..Default::default() };
+        t.pointer(&cx, &ev(PointerKind::Move, -1.0, 25.0).with_mods(alt));
+        assert_eq!(t.cursor(&cx, Point::new(-1.0, 25.0), alt), Cursor::ShapeBuilderErase);
+        assert!(t.stroke.is_none());
+        // A click splits; the command gets the point, the switch and the tolerance.
+        t.pointer(&cx, &ev(PointerKind::Down, -1.0, 25.0));
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, -1.0, 25.0));
+        let [Action::Exec(id, v)] = acts.as_slice() else { panic!("{acts:?}") };
+        assert_eq!((id.as_str(), &v["splitStroke"], &v["erase"], &v["tolerance"]), ("shapeBuilder.merge", &json!(true), &json!(false), &json!(4.0)));
+        // A release up to 3 pixels from the press is still a click, which splits where the press was.
+        t.pointer(&cx, &ev(PointerKind::Down, -1.0, 25.0));
+        t.pointer(&cx, &ev(PointerKind::Drag, -1.5, 26.0));
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, 0.5, 27.0));
+        let [Action::Exec(_, v)] = acts.as_slice() else { panic!("{acts:?}") };
+        assert_eq!((&v["splitStroke"], &v["points"]), (&json!(true), &json!([[-1.0, 25.0]])));
+        // A release farther away is a drag, which splits nothing.
+        t.pointer(&cx, &ev(PointerKind::Down, -1.0, 25.0));
+        assert!(t.pointer(&cx, &ev(PointerKind::Up, -1.0, 30.0)).is_empty());
+        // So is a Straight Line drag that goes away and ends back near the press.
+        t.set_option("selection", &json!("straightLine"));
+        t.pointer(&cx, &ev(PointerKind::Down, -1.0, 25.0));
+        t.pointer(&cx, &ev(PointerKind::Drag, 30.0, 25.0));
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, -0.5, 25.5));
+        assert!(!acts.iter().any(|a| matches!(a, Action::Exec(_, v) if v.get("splitStroke").is_some())), "{acts:?}");
+        t.set_option("selection", &json!("freeform"));
+        // A drag merges as before and sends no switch.
+        t.pointer(&cx, &ev(PointerKind::Down, 25.0, 25.0));
+        t.pointer(&cx, &ev(PointerKind::Drag, 75.0, 75.0));
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, 75.0, 75.0));
+        let [Action::Exec(_, v)] = acts.as_slice() else { panic!("{acts:?}") };
+        assert!(v.get("splitStroke").is_none(), "{v}");
+    }
+
     #[test]
     fn hatch_stays_inside_region() {
         let bp = shapes::rectangle(Rect::new(0.0, 0.0, 40.0, 20.0)).to_bezpath();
@@ -1415,6 +1895,49 @@ mod tests {
                 want.map(|(g, ..)| Action::Exec("livePaint.strokeEdge".into(), json!({ "group": g.0, "point": [x, 50.0], "tolerance": 4.0 })));
             assert_eq!(bucket.pointer(&cx, &ev(PointerKind::Down, x, 50.0).with_mods(shift)), stroked.into_iter().collect::<Vec<_>>(), "x {x}");
         }
+    }
+
+    #[test]
+    fn live_paint_tools_skip_hidden_faces() {
+        let mut d = Document::new(500.0, 500.0);
+        let (back, [_, _, back_right, _]) = live_square(&mut d, Rect::new(0.0, 0.0, 100.0, 100.0));
+        let (front, _) = live_square(&mut d, Rect::new(50.0, 0.0, 150.0, 100.0));
+        let face = |g: NodeId| faces(d.node(g).unwrap())[0].id;
+        let (back_face, hidden) = (face(back), face(front));
+        // The front group's face is hidden on its own; both groups stay visible.
+        d.node_mut(hidden).unwrap().visible = false;
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let alt = Mods { alt: true, ..Default::default() };
+        let part = |ov: &[Overlay]| match ov {
+            [] => None,
+            [Overlay::Path { path, .. }] => Some(path.bounding_box()),
+            _ => panic!("{ov:?}"),
+        };
+        // Where the faces overlap, both tools take the back group's face under the hidden one.
+        let mut bucket = LivePaintBucketTool::default();
+        bucket.pointer(&cx, &ev(PointerKind::Move, 75.0, 50.0));
+        assert_eq!(part(&bucket.overlays(&cx)), Some(Rect::new(0.0, 0.0, 100.0, 100.0)));
+        let fill = Action::Exec("livePaint.fill".into(), json!({ "group": back.0, "point": [75.0, 50.0] }));
+        assert_eq!(bucket.pointer(&cx, &ev(PointerKind::Down, 75.0, 50.0)), vec![fill]);
+        let mut sel = LivePaintSelectionTool::default();
+        sel.pointer(&cx, &ev(PointerKind::Move, 75.0, 50.0));
+        assert_eq!(part(&sel.overlays(&cx)), Some(Rect::new(0.0, 0.0, 100.0, 100.0)));
+        assert_eq!(sel.pointer(&cx, &ev(PointerKind::Down, 75.0, 50.0)), vec![Action::Exec("select.set".into(), json!({ "ids": [back_face.0] }))]);
+        // Over the hidden face alone, neither tool highlights or picks a face.
+        bucket.pointer(&cx, &ev(PointerKind::Move, 125.0, 50.0));
+        assert_eq!(part(&bucket.overlays(&cx)), None);
+        assert!(bucket.pointer(&cx, &ev(PointerKind::Down, 125.0, 50.0)).is_empty());
+        sel.pointer(&cx, &ev(PointerKind::Move, 125.0, 50.0));
+        assert_eq!(part(&sel.overlays(&cx)), None);
+        assert_eq!(sel.pointer(&cx, &ev(PointerKind::Down, 125.0, 50.0)), vec![Action::Exec("select.none".into(), json!({}))]);
+        // Inside the hidden face, 1.5 pt from the back group's right side, Alt-click takes that side
+        // as it does outside every face.
+        sel.pointer(&cx, &ev(PointerKind::Move, 101.5, 50.0).with_mods(alt));
+        assert_eq!(part(&sel.overlays(&cx)), Some(Rect::new(100.0, 0.0, 100.0, 100.0)));
+        let picked = sel.pointer(&cx, &ev(PointerKind::Down, 101.5, 50.0).with_mods(alt));
+        assert_eq!(picked, vec![Action::Exec("select.set".into(), json!({ "ids": [back_right.0] }))]);
     }
 
     #[test]

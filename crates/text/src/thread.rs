@@ -47,7 +47,8 @@ fn slice_paras(paras: &[ParaStyle], first: usize, runs: &[TextRun]) -> Vec<ParaS
 }
 
 /// How many bytes of `runs` fit in `frame` (whole lines; a following break space or paragraph
-/// break stays with the line that ends there).
+/// break stays with the line that ends there, but on a path, where a space with no room
+/// overflows as any character does, it starts the next frame).
 fn fit(db: &FontDb, frame: &TextObject, runs: &[TextRun]) -> usize {
     let mut probe = frame.clone();
     probe.runs = runs.to_vec();
@@ -57,6 +58,9 @@ fn fit(db: &FontDb, frame: &TextObject, runs: &[TextRun]) -> usize {
         return text.len();
     }
     let mut end = lay.lines.last().map_or(0, |l| l.end);
+    if lay.on_path {
+        return end;
+    }
     let bytes = text.as_bytes();
     while end < bytes.len() && bytes[end] == b' ' {
         end += 1;
@@ -67,21 +71,39 @@ fn fit(db: &FontDb, frame: &TextObject, runs: &[TextRun]) -> usize {
     end
 }
 
-/// A frame's share of a story: its runs and its paragraphs' styles (one per paragraph).
+/// A frame's share of a story: its runs, its paragraphs' styles (one per paragraph) and the
+/// numbered list paragraphs counted before its first one ([`TextObject::list_count`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Slice {
     pub runs: Vec<TextRun>,
     pub paras: Vec<ParaStyle>,
+    pub list_count: u32,
+}
+
+/// The count of numbered list paragraphs after the paragraphs of `runs` (styles `paras`, one per
+/// paragraph) but the last one, counted on from `count` as the layout counts them
+/// ([`vectorcraft_doc::text::ParaList::next_marker`]). A slice's last paragraph also starts the
+/// next frame, which counts it.
+fn count_list_paragraphs(runs: &[TextRun], paras: &[ParaStyle], mut count: u32) -> u32 {
+    let text: String = runs.iter().map(|r| r.text.as_str()).collect();
+    let mut pieces: Vec<&str> = text.split('\n').collect();
+    pieces.pop();
+    for (piece, para) in pieces.iter().zip(paras) {
+        vectorcraft_doc::text::ParaList::next_marker(para.list, piece.is_empty(), &mut count);
+    }
+    count
 }
 
 /// The story `runs` (with paragraph styles `paras`, one per story paragraph; empty = each
 /// frame's own) split across `frames` in order (the last frame takes any overflow). Empty slices
 /// keep one empty run carrying the style at the split, so typing there has a style. A paragraph
-/// split between frames has its style in both.
+/// split between frames has its style in both. Each frame's numbered list paragraphs are counted
+/// on from the frames before it.
 pub fn distribute(db: &FontDb, frames: &[&TextObject], runs: &[TextRun], paras: &[ParaStyle]) -> Vec<Slice> {
     let mut rest = runs.to_vec();
     let mut out = Vec::with_capacity(frames.len());
     let mut next_para = 0;
+    let mut list_count = 0;
     for (i, f) in frames.iter().enumerate() {
         let first_para = next_para;
         let len = runs_len(&rest);
@@ -93,6 +115,7 @@ pub fn distribute(db: &FontDb, frames: &[&TextObject], runs: &[TextRun], paras: 
             let mut probe = (*f).clone();
             probe.runs = rest.clone();
             probe.set_paragraph_styles(slice_paras(paras, first_para, &rest));
+            probe.list_count = list_count;
             fit(db, &probe, &rest)
         };
         let mut head = slice_runs(&rest, 0, n);
@@ -103,7 +126,9 @@ pub fn distribute(db: &FontDb, frames: &[&TextObject], runs: &[TextRun], paras: 
         rest = if tail.is_empty() { vec![TextRun { text: String::new(), style: style_at(&rest, len), inline: None }] } else { tail };
         let head_paras = slice_paras(paras, first_para, &head);
         next_para += head_paras.len().saturating_sub(1);
-        out.push(Slice { runs: head, paras: head_paras });
+        let next_count = count_list_paragraphs(&head, &head_paras, list_count);
+        out.push(Slice { runs: head, paras: head_paras, list_count });
+        list_count = next_count;
     }
     out
 }
@@ -112,13 +137,97 @@ pub fn distribute(db: &FontDb, frames: &[&TextObject], runs: &[TextRun], paras: 
 mod tests {
     use super::*;
     use vectorcraft_doc::{CharStyle, Justify, TextKind};
-    use vectorcraft_geom::{Affine, Rect, shapes};
+    use vectorcraft_geom::{Affine, PathData, Rect, shapes};
 
     fn frame(x: f64) -> TextObject {
         let mut t = TextObject::point(vectorcraft_geom::Point::ZERO, "", CharStyle::default());
         t.kind = TextKind::Area { frame: shapes::rectangle(Rect::new(x, 0.0, x + 120.0, 60.0)) };
         t.xf = Affine::IDENTITY;
         t
+    }
+
+    /// Type on a straight path `length` long.
+    fn path_frame(length: f64) -> TextObject {
+        let mut t = TextObject::point(vectorcraft_geom::Point::ZERO, "", CharStyle::default());
+        let line = kurbo::Line::new((0.0, 0.0), (length, 0.0));
+        t.kind = TextKind::OnPath { path: PathData::from_bezpath(&kurbo::Shape::to_path(&line, 0.1)), start: 0.0, end: None };
+        t.xf = Affine::IDENTITY;
+        t
+    }
+
+    /// Type on a path that overflows ends its line where its text stops fitting, as area type's
+    /// last line does, so a story flows on from there through area type and type on a path alike.
+    #[test]
+    fn story_flows_across_area_type_and_type_on_a_path() {
+        let db = FontDb::global();
+        let text = "The quick brown fox jumps over the lazy dog. ".repeat(6);
+        let story = vec![TextRun { text: text.clone(), style: CharStyle::default(), inline: None }];
+        let mut path = path_frame(100.0);
+        path.runs = story.clone();
+        let laid = layout(db, &path);
+        let end = laid.lines.first().map_or(0, |l| l.end);
+        assert!(laid.overflow && end > 0 && end < text.len(), "the path's line ends where its text stops: {end}");
+        let (a, b, c) = (frame(0.0), path_frame(100.0), frame(400.0));
+        let parts: Vec<Vec<TextRun>> = distribute(db, &[&a, &b, &c], &story, &[]).into_iter().map(|s| s.runs).collect();
+        let lens: Vec<usize> = parts.iter().map(|p| runs_len(p)).collect();
+        assert!(lens.iter().all(|l| *l > 0), "each frame takes a share: {lens:?}");
+        let joined: String = parts.iter().flatten().map(|r| r.text.as_str()).collect();
+        assert_eq!(joined, text, "no character lost or duplicated");
+        let mut on_path = b.clone();
+        on_path.runs = parts[1].clone();
+        assert!(!layout(db, &on_path).overflow, "the path's share fits it");
+    }
+
+    /// A path that runs out of room at a space holds only what it shows: the space starts the
+    /// next frame, as a space with no room on a path overflows.
+    #[test]
+    fn a_path_that_runs_out_at_a_space_leaves_it_to_the_next_frame() {
+        let db = FontDb::global();
+        let text = "The quick brown fox jumps over the lazy dog. ".repeat(6);
+        let story = vec![TextRun { text: text.clone(), style: CharStyle::default(), inline: None }];
+        let mut at_space = 0;
+        for length in (60..160).step_by(3) {
+            let (a, b) = (path_frame(f64::from(length)), frame(400.0));
+            let parts: Vec<Vec<TextRun>> = distribute(db, &[&a, &b], &story, &[]).into_iter().map(|s| s.runs).collect();
+            let joined: String = parts.iter().flatten().map(|r| r.text.as_str()).collect();
+            assert_eq!(joined, text, "no character lost or duplicated");
+            let mut on_path = a.clone();
+            on_path.runs = parts[0].clone();
+            assert!(!layout(db, &on_path).overflow, "the path's share fits it ({length})");
+            at_space += usize::from(parts[1].iter().map(|r| r.text.as_str()).collect::<String>().starts_with(' '));
+        }
+        assert!(at_space > 0, "some lengths end at a space");
+    }
+
+    /// A right-to-left story flows on from where its text stops fitting a path, in reading order.
+    #[test]
+    fn right_to_left_story_flows_on_from_a_path() {
+        let db = FontDb::global();
+        let text = "שלום עולם ".repeat(8);
+        let story = vec![TextRun { text: text.clone(), style: CharStyle::default(), inline: None }];
+        let (a, b) = (path_frame(100.0), frame(400.0));
+        let parts: Vec<Vec<TextRun>> = distribute(db, &[&a, &b], &story, &[]).into_iter().map(|s| s.runs).collect();
+        let lens: Vec<usize> = parts.iter().map(|p| runs_len(p)).collect();
+        assert!(lens.iter().all(|l| *l > 0), "each frame takes a share: {lens:?}");
+        let joined: String = parts.iter().flatten().map(|r| r.text.as_str()).collect();
+        assert_eq!(joined, text, "no character lost or duplicated");
+        let mut on_path = a.clone();
+        on_path.runs = parts[0].clone();
+        assert!(!layout(db, &on_path).overflow, "the path's share fits it");
+    }
+
+    /// A path with no length holds no text, so the story flows past it.
+    #[test]
+    fn story_flows_past_a_path_with_no_length() {
+        let db = FontDb::global();
+        let text = "The quick brown fox jumps over the lazy dog. ".repeat(6);
+        let story = vec![TextRun { text: text.clone(), style: CharStyle::default(), inline: None }];
+        let (a, b, c) = (frame(0.0), path_frame(0.0), frame(400.0));
+        let parts: Vec<Vec<TextRun>> = distribute(db, &[&a, &b, &c], &story, &[]).into_iter().map(|s| s.runs).collect();
+        let lens: Vec<usize> = parts.iter().map(|p| runs_len(p)).collect();
+        assert!(lens[0] > 0 && lens[1] == 0 && lens[2] > 0, "{lens:?}");
+        let joined: String = parts.iter().flatten().map(|r| r.text.as_str()).collect();
+        assert_eq!(joined, text, "no character lost or duplicated");
     }
 
     #[test]
@@ -170,6 +279,44 @@ mod tests {
         fb.edit_paras(Some(0..1), |p| p.justify = JustifyAll);
         assert_eq!(story_paras(&[&fa, &fb], &[false, true])[0].justify, JustifyAll);
         assert_eq!(story_paras(&[&fa, &fb], &[false, false])[0].justify, Left);
+    }
+
+    /// Numbered list paragraphs count on from one frame to the next: the second frame's first
+    /// whole paragraph takes the next number. A paragraph split between the frames is numbered
+    /// alike in both, and the paragraph after it takes the next number.
+    #[test]
+    fn numbered_list_paragraphs_count_on_through_the_frames() {
+        use vectorcraft_doc::text::{NumberStyle, ParaList};
+        let db = FontDb::global();
+        let (a, mut b) = (frame(0.0), frame(200.0));
+        b.kind = TextKind::Area { frame: shapes::rectangle(Rect::new(200.0, 0.0, 320.0, 400.0)) };
+        let numbered =
+            ParaStyle { list: Some(ParaList::numbered(NumberStyle::Arabic)), left_indent: 18.0, first_line_indent: -18.0, ..Default::default() };
+        let numbers = |f: &TextObject, s: &Slice| {
+            let mut t = f.clone();
+            t.runs = s.runs.clone();
+            t.set_paragraph_styles(s.paras.clone());
+            t.list_count = s.list_count;
+            layout(db, &t).markers.iter().map(|m| m.text.clone()).collect::<Vec<_>>()
+        };
+        // Whole paragraphs: the first frame ends with a paragraph break.
+        let text = (1..=8).map(|i| format!("Item {i}")).collect::<Vec<_>>().join("\n");
+        let story = vec![TextRun { text, style: CharStyle::default(), inline: None }];
+        let parts = distribute(db, &[&a, &b], &story, &vec![numbered.clone(); 8]);
+        let first = numbers(&a, &parts[0]);
+        assert!((2..8).contains(&first.len()), "both frames hold items: {first:?}");
+        assert_eq!(parts.iter().map(|s| s.list_count).collect::<Vec<_>>(), [0, first.len() as u32]);
+        let second = numbers(&b, &parts[1]);
+        let expected: Vec<String> = (first.len() + 1..=8).map(|n| format!("{n}.")).collect();
+        assert_eq!(second, expected, "{first:?}");
+        // A paragraph split between the frames.
+        let text = format!("One\nTwo\n{}\nFour", "The quick brown fox jumps over the lazy dog. ".repeat(4));
+        let story = vec![TextRun { text, style: CharStyle::default(), inline: None }];
+        let parts = distribute(db, &[&a, &b], &story, &vec![numbered; 4]);
+        assert_eq!(
+            (numbers(&a, &parts[0]), numbers(&b, &parts[1])),
+            (vec!["1.".to_string(), "2.".into(), "3.".into()], vec!["3.".to_string(), "4.".into()])
+        );
     }
 
     #[test]

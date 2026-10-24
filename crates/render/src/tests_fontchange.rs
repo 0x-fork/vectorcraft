@@ -20,7 +20,7 @@ pub(crate) fn fonts_steady() -> RwLockReadGuard<'static, ()> {
 }
 
 /// No test holding [`fonts_steady`] runs until the guard is dropped.
-fn adding_fonts() -> RwLockWriteGuard<'static, ()> {
+pub(crate) fn adding_fonts() -> RwLockWriteGuard<'static, ()> {
     FONTS.write().unwrap_or_else(PoisonError::into_inner)
 }
 
