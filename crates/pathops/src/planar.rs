@@ -96,58 +96,128 @@ fn mid(segs: &[Seg]) -> Option<Point> {
 
 /// Rectangles looked up by a point inside them, when there are too many to test one by one for
 /// every point (the map asks once per edge and once per hole, so a scan of them all made it
-/// quadratic in the input, #937). Rectangles narrow in x are sorted by their left edge, so the
-/// ones that can hold a point are one short run of them; those wide in x but narrow in y (a hatch
-/// of long horizontal lines) are sorted by their top edge the same way; the few wide both ways (a
-/// long diagonal across the art) are scanned. "Narrow" is up to twice the side of a cell holding
-/// one rectangle on average, so a run holds about the rectangles of one row or column of cells.
+/// quadratic in the input, #937). A grid of cells over their bounds, each cell listing the
+/// rectangles touching it; a lookup reads the cells around the point. The grid has about one cell
+/// per rectangle, so a lookup reads about the rectangles of the point's neighbourhood. A rectangle
+/// covering too many cells (a long diagonal's bounds take in most of the art, so an index of the
+/// bounds alone scanned a diagonal hatch whole for every point) is filed under the cells of a
+/// smaller footprint instead ([`Self::with_footprint`]), or, failing that, scanned for every point.
 struct RectIndex<T> {
-    by_x: Vec<(kurbo::Rect, T)>,
-    max_width: f64,
-    by_y: Vec<(kurbo::Rect, T)>,
-    max_height: f64,
-    wide: Vec<(kurbo::Rect, T)>,
+    items: Vec<(kurbo::Rect, T)>,
+    /// The grid's top-left corner, cell size and column count; `cells` lists the items touching
+    /// each cell, row by row.
+    origin: Point,
+    cell: (f64, f64),
+    cols: usize,
+    cells: Vec<Vec<u32>>,
+    /// Items the grid doesn't hold (bounds covering most of it, or not finite), scanned for
+    /// every point.
+    rest: Vec<usize>,
+}
+
+/// The fewest cells one footprint rectangle may always be filed under. The cap is this or two
+/// rows or columns of the grid, whichever is more: a thin stripe across the art (one of the faces
+/// a hatch cuts a shape into) is filed under the cells along it, while a rectangle covering most
+/// of the grid costs more to file and to read than to scan for every point.
+const CELLS_PER_FOOTPRINT: usize = 64;
+
+/// The cells (columns or rows) an interval `lo..=hi` touches on one axis of a grid: clamped to the
+/// grid, so an interval past its edge gets the nearest cell (whose items `contains` then rejects),
+/// and `None` for an interval that isn't a number.
+fn cell_span(lo: f64, hi: f64, origin: f64, size: f64, count: usize) -> Option<std::ops::RangeInclusive<usize>> {
+    let last = count.saturating_sub(1) as f64;
+    let a = ((lo - origin) / size).floor().clamp(0.0, last);
+    let b = ((hi - origin) / size).floor().clamp(0.0, last);
+    (a.is_finite() && b.is_finite()).then(|| (a as usize)..=(b.max(a) as usize))
 }
 
 impl<T> RectIndex<T> {
     fn new(items: Vec<(kurbo::Rect, T)>) -> Self {
-        let n = items.len().max(1) as f64;
-        let all = items.iter().map(|(r, _)| *r).reduce(|a, b| a.union(b));
-        let cell = all
-            .map(|a| {
-                let side = (a.area() / n).sqrt();
-                if side > 0.0 { 2.0 * side } else { 2.0 * a.width().max(a.height()) / n }
-            })
-            .filter(|c| c.is_finite())
-            .unwrap_or(0.0)
-            .max(1e-9);
-        let (mut by_x, mut by_y, mut wide) = (Vec::new(), Vec::new(), Vec::new());
-        for it in items {
-            if it.0.width() <= cell {
-                by_x.push(it);
-            } else if it.0.height() <= cell {
-                by_y.push(it);
-            } else {
-                // A NaN extent fails both tests above, so a non-finite rectangle is never in a sorted
-                // run along that axis; `contains` rejects it wherever it lands.
-                wide.push(it);
-            }
-        }
-        by_x.sort_by(|a, b| a.0.x0.total_cmp(&b.0.x0));
-        by_y.sort_by(|a, b| a.0.y0.total_cmp(&b.0.y0));
-        let max_width = by_x.iter().map(|(r, _)| r.width()).fold(0.0, f64::max);
-        let max_height = by_y.iter().map(|(r, _)| r.height()).fold(0.0, f64::max);
-        Self { by_x, max_width, by_y, max_height, wide }
+        Self::with_footprint(items, |r, _, _| vec![*r])
     }
 
-    /// The items whose rectangle, grown by `tol`, holds `p`.
-    fn at(&self, p: Point, tol: f64) -> impl Iterator<Item = &T> {
-        let lo = self.by_x.partition_point(|(r, _)| r.x0 < p.x - tol - self.max_width);
-        let run_x = self.by_x.get(lo..).unwrap_or_default().iter().take_while(move |(r, _)| r.x0 <= p.x + tol);
-        let lo = self.by_y.partition_point(|(r, _)| r.y0 < p.y - tol - self.max_height);
-        let run_y = self.by_y.get(lo..).unwrap_or_default().iter().take_while(move |(r, _)| r.y0 <= p.y + tol);
-        run_x.chain(run_y).chain(&self.wide).filter(move |(r, _)| r.inflate(tol, tol).contains(p)).map(|(_, t)| t)
+    /// `footprint(bounds, item, cell side)` gives the rectangles an item is filed under: a lookup
+    /// finds the item when its bounds hold the point and one footprint rectangle is within the
+    /// lookup's tolerance of it. The bounds themselves (`new`) suit items as compact as their
+    /// bounds; a long diagonal segment is better filed under the bounds of its pieces, about a
+    /// cell long each, which take in the cells along it rather than every cell its bounds cover.
+    fn with_footprint(items: Vec<(kurbo::Rect, T)>, footprint: impl Fn(&kurbo::Rect, &T, f64) -> Vec<kurbo::Rect>) -> Self {
+        let n = items.len().max(1);
+        let all = items.iter().map(|(r, _)| *r).filter(kurbo::Rect::is_finite).reduce(|a, b| a.union(b)).unwrap_or(kurbo::Rect::ZERO);
+        // A cell's side holds one rectangle on average; a grid of collinear rectangles (zero area)
+        // is divided along its length.
+        let side = (all.area() / n as f64).sqrt();
+        let side = if side > 0.0 { side } else { all.width().max(all.height()) / n as f64 }.max(1e-9);
+        // Saturating casts: an extent of a billion cells is clamped to the item count, then the
+        // grid is kept to a few cells per item however lopsided its bounds.
+        let mut cols = ((all.width() / side).ceil() as usize).clamp(1, 2 * n);
+        let mut rows = ((all.height() / side).ceil() as usize).clamp(1, 2 * n);
+        while cols * rows > 4 * n + 4 {
+            if cols > rows { cols = cols.div_ceil(2) } else { rows = rows.div_ceil(2) }
+        }
+        let cell = ((all.width() / cols as f64).max(1e-9), (all.height() / rows as f64).max(1e-9));
+        let cap = CELLS_PER_FOOTPRINT.max(2 * cols.max(rows));
+        let mut cells: Vec<Vec<u32>> = vec![Vec::new(); cols * rows];
+        let mut rest = Vec::new();
+        for (i, (r, t)) in items.iter().enumerate() {
+            // Cells hold `u32` indices to halve the memory of a long stripe filed under a row of them.
+            let Ok(index) = u32::try_from(i) else {
+                rest.push(i);
+                continue;
+            };
+            let mut scan = !r.is_finite();
+            for f in if scan { Vec::new() } else { footprint(r, t, cell.0.min(cell.1)) } {
+                match (cell_span(f.x0, f.x1, all.x0, cell.0, cols), cell_span(f.y0, f.y1, all.y0, cell.1, rows)) {
+                    (Some(xs), Some(ys)) if (xs.end() - xs.start() + 1) * (ys.end() - ys.start() + 1) <= cap => {
+                        for y in ys {
+                            for x in xs.clone() {
+                                if let Some(c) = cells.get_mut(y * cols + x) {
+                                    c.push(index);
+                                }
+                            }
+                        }
+                    }
+                    _ => scan = true,
+                }
+            }
+            if scan {
+                rest.push(i);
+            }
+        }
+        Self { items, origin: all.origin(), cell, cols, cells, rest }
     }
+
+    /// The items whose rectangle, grown by `tol`, holds `p` (and, with a footprint, one of whose
+    /// footprint rectangles is within `tol` of it).
+    fn at(&self, p: Point, tol: f64) -> impl Iterator<Item = &T> {
+        let mut found = self.rest.clone();
+        let rows = self.cells.len() / self.cols.max(1);
+        if let (Some(xs), Some(ys)) = (
+            cell_span(p.x - tol, p.x + tol, self.origin.x, self.cell.0, self.cols),
+            cell_span(p.y - tol, p.y + tol, self.origin.y, self.cell.1, rows),
+        ) {
+            for y in ys {
+                for x in xs.clone() {
+                    found.extend(self.cells.get(y * self.cols + x).into_iter().flatten().map(|&i| i as usize));
+                }
+            }
+        }
+        found.sort_unstable();
+        found.dedup();
+        found.into_iter().filter_map(move |i| self.items.get(i)).filter(move |(r, _)| r.inflate(tol, tol).contains(p)).map(|(_, t)| t)
+    }
+}
+
+/// A segment's footprint in a [`RectIndex`]: the bounds of its pieces about a cell long, so a long
+/// diagonal is filed under the cells along it, not under every cell its bounds cover.
+fn segment_footprint(bounds: &kurbo::Rect, seg: &PathSeg, cell: f64) -> Vec<kurbo::Rect> {
+    let pieces = (bounds.width().max(bounds.height()) / cell).ceil();
+    // A count past the cap gives longer pieces, each filed under more cells.
+    if pieces.is_nan() || pieces <= 1.0 {
+        return vec![*bounds];
+    }
+    let pieces = pieces.min(4096.0) as usize;
+    (0..pieces).map(|k| seg.subsegment(k as f64 / pieces as f64..(k + 1) as f64 / pieces as f64).bounding_box()).collect()
 }
 
 /// The inputs' segments (in the sweep's frame), to tell which inputs an edge lies on.
@@ -165,7 +235,7 @@ impl Outlines {
             .filter(|(r, ..)| r.width() > 0.0 || r.height() > 0.0)
             .collect();
         // The sweep moves points by a few `eps` at most.
-        Self { segs: RectIndex::new(segs), tol: 16.0 * eps }
+        Self { segs: RectIndex::with_footprint(segs, |r, (s, _), cell| segment_footprint(r, s, cell)), tol: 16.0 * eps }
     }
 
     /// The front-most input whose outline passes through `p`.
@@ -1968,6 +2038,45 @@ mod tests {
             assert_eq!(got, want, "{p:?}");
         }
         assert_eq!(RectIndex::<usize>::new(Vec::new()).at(Point::ZERO, 1.0).count(), 0);
+    }
+
+    #[test]
+    fn rect_index_reads_a_diagonal_hatch_only_near_the_point() {
+        // 2,000 parallel diagonals a tenth of a point apart: the bounds of every line left of a
+        // point hold it, so an index of the bounds alone handed half the hatch to each lookup
+        // (quadratic in the hatch, #937). Filed by pieces, a lookup gets the lines of its
+        // neighbourhood (a few cells' worth), among them every line through the point.
+        let n = 2000;
+        let items: Vec<_> = (0..n)
+            .map(|k| {
+                let d = f64::from(k) * 0.1;
+                let s = PathSeg::Line(kurbo::Line::new((d, 0.0), (d + 200.0, 200.0)));
+                (s.bounding_box(), (s, k))
+            })
+            .collect();
+        let index = RectIndex::with_footprint(items.clone(), |r, (s, _), cell| segment_footprint(r, s, cell));
+        for p in [Point::new(100.0, 100.0), Point::new(130.25, 60.0), Point::new(250.0, 150.0), Point::new(399.9, 200.0)] {
+            let got: Vec<u32> = index.at(p, 0.1).map(|(_, k)| *k).collect();
+            assert!(got.len() <= n as usize / 4, "{p:?}: {} candidates", got.len());
+            let through: Vec<u32> =
+                items.iter().filter(|(_, (s, _))| kurbo::ParamCurveNearest::nearest(s, p, 1e-9).distance_sq <= 0.01).map(|(_, (_, k))| *k).collect();
+            assert!(!through.is_empty() && through.iter().all(|k| got.contains(k)), "{p:?}: {through:?} vs {got:?}");
+        }
+        // Faces a hatch cuts a square into: thin stripes across the whole grid, each filed under
+        // its own column of cells, so a lookup reads a few of them, not the hatch.
+        let stripes: Vec<_> = (0..n).map(|k| (kurbo::Rect::new(f64::from(k) * 0.1, 0.0, f64::from(k) * 0.1 + 0.1, 200.0), k)).collect();
+        let index = RectIndex::new(stripes);
+        let got: Vec<u32> = index.at(Point::new(100.05, 50.0), 0.0).copied().collect();
+        assert_eq!(got, [1000]);
+        assert!(index.rest.is_empty());
+        // A footprint still finds a point on the item but off the grid's cells' edges, and a
+        // degenerate grid (collinear items) is divided along its length.
+        let line = PathSeg::Line(kurbo::Line::new((0.0, 0.0), (1000.0, 0.0)));
+        let items: Vec<_> = (0..10).map(|k| (line.bounding_box(), (line, k))).collect();
+        let index = RectIndex::with_footprint(items, |r, (s, _), cell| segment_footprint(r, s, cell));
+        assert_eq!(index.at(Point::new(333.3, 0.0), 0.1).count(), 10);
+        assert_eq!(index.at(Point::new(1000.0, 0.0), 0.1).count(), 10);
+        assert_eq!(index.at(Point::new(-5.0, 0.0), 0.1).count(), 0);
     }
 
     fn poly(pts: &[(f64, f64)], closed: bool) -> SubPath {
