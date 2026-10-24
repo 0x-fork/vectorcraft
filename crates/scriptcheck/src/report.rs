@@ -253,6 +253,7 @@ impl Tally {
 }
 
 /// What a check has found so far, across the script and its included files.
+#[derive(Clone)]
 pub(crate) struct Acc<'l> {
     pub limits: &'l Limits,
     pub steps: usize,
