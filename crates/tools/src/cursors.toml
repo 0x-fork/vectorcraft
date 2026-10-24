@@ -543,7 +543,7 @@ look = "The Pencil cursor with a ring badge (closing the loop), like PenClose."
 [[cursor]]
 id = "PencilStraight"
 group = "Drawing and editing tools"
-shown_when = ["The Pencil tool with Shift held before a press: the press draws a straight line at 45° steps."]
+shown_when = ["The Pencil tool with Shift held before a press, except with Alt also held when Alt key toggles to Smooth Tool is on: the press draws a straight line at 45° steps from the Constrain Angle."]
 hotspot = "The lead tip."
 look = "The Pencil cursor with a short straight-line badge, where PencilClose has its ring."
 
