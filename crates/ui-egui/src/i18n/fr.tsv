@@ -5560,3 +5560,4 @@ axis	Y Axis	Axe Y
 	Scale Presets	Préréglages de mise à l'échelle
 @msg	a {width}×{height} screenshot's byte count overflows	le nombre d'octets d'une capture {width}×{height} dépasse la limite
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	la {what} de la fenêtre ({points} points × {scale} DPI) ne permet pas de dimensionner une capture
+	Live preview	Aperçu en direct

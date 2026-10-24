@@ -58,6 +58,10 @@ pub struct GestureTool {
     /// "Alt key toggles to Smooth Tool": holding Alt with the Pencil tool smooths selected paths
     /// instead of closing the path (Pencil only, off by default).
     pub alt_smooth: bool,
+    /// "Live preview" (Pencil only, on by default): the stroke shows with its fill and stroke as it
+    /// is drawn. Off, only a thin line follows the pen while drawing, and the path takes its fill
+    /// and stroke on release.
+    pub live_preview: bool,
     /// "Live curve fitting": the Pencil's preview fits the stroke while it is drawn; off, the
     /// preview shows the points joined by straight segments and the release fits them (Pencil
     /// only, on by default).
@@ -131,6 +135,7 @@ impl GestureTool {
             keep_selected: id != "blobBrush",
             // Off, as Pencil Tool Options ships it: Alt keeps drawing a closed path until it is on.
             alt_smooth: false,
+            live_preview: true,
             live_fit: true,
             smoothing: false,
             straight: false,
@@ -152,6 +157,12 @@ impl GestureTool {
 
     fn draws_path(&self) -> bool {
         matches!(self.id, "pencil" | "paintbrush")
+    }
+
+    /// Does a stroke show as the path it draws while it is drawn? Not with the Pencil's Live preview
+    /// off: then the drag shows as a thin line (an overlay) until the release.
+    fn previews(&self) -> bool {
+        !(self.id == "pencil" && !self.live_preview)
     }
 
     /// Add a stroke sample.
@@ -469,7 +480,8 @@ impl Tool for GestureTool {
                     self.began = true;
                     out.push(Action::Begin(self.label().into()));
                 }
-                if crate::previews_at(self.points.len()) {
+                // With the Pencil's Live preview off a thin line shows instead (`overlays`).
+                if self.previews() && crate::previews_at(self.points.len()) {
                     self.previewed = self.points.len();
                     let mut v = self.freehand_params(false);
                     if !self.live_fit {
@@ -567,7 +579,8 @@ impl Tool for GestureTool {
     }
     fn overlays(&self, cx: &ToolContext) -> Vec<Overlay> {
         let mut o = self.snap.guides().to_vec();
-        if !self.active || self.points.len() < 2 || self.began {
+        // A path being drawn shows itself, except with the Pencil's Live preview off.
+        if !self.active || self.points.len() < 2 || (self.began && self.previews()) {
             return o;
         }
         let width = match self.id {
@@ -627,6 +640,7 @@ impl Tool for GestureTool {
                     "fidelity": self.fidelity,
                     "fill": self.fill,
                     "altSmooth": self.alt_smooth,
+                    "livePreview": self.live_preview,
                     "liveFit": self.live_fit,
                     "keepSelected": self.keep_selected,
                     "editWithin": self.edit_within,
@@ -656,6 +670,7 @@ impl Tool for GestureTool {
             "roundness" => self.roundness = v.as_f64().unwrap_or(self.roundness).clamp(1.0, 100.0),
             "fill" => self.fill = v.as_bool().unwrap_or(self.fill),
             "altSmooth" => self.alt_smooth = v.as_bool().unwrap_or(self.alt_smooth),
+            "livePreview" if self.id == "pencil" => self.live_preview = v.as_bool().unwrap_or(self.live_preview),
             "liveFit" if self.id == "pencil" => self.live_fit = v.as_bool().unwrap_or(self.live_fit),
             "keepSelected" => self.keep_selected = v.as_bool().unwrap_or(self.keep_selected),
             "mergeOnlySelection" => self.merge_only_selection = v.as_bool().unwrap_or(self.merge_only_selection),
@@ -810,6 +825,50 @@ mod tests {
                 assert!(matches!(&acts.last().unwrap()[0], Action::Preview(_, v) if v["keepSelected"] == keep), "{id}");
             }
         }
+    }
+
+    /// With the Pencil's Live preview off, a stroke previews nothing while it is drawn: a thin line
+    /// follows the pen (an overlay), and the release draws the path with its fill and stroke. On (the
+    /// default), every step previews the path and no line is shown. The Paintbrush has no such option.
+    #[test]
+    fn pencil_with_live_preview_off_shows_a_thin_line_until_the_release() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let previews = |acts: &[Action]| acts.iter().filter(|a| matches!(a, Action::Preview(..))).count();
+        let line = |t: &GestureTool| t.overlays(&cx).iter().any(|o| matches!(o, Overlay::Path { width, .. } if *width == 1.0));
+        let pts = [(0.0, 0.0), (10.0, 5.0), (20.0, 0.0), (30.0, 5.0)];
+        for live in [true, false] {
+            let mut t = GestureTool::new("pencil");
+            assert_eq!(t.options()["livePreview"], json!(true), "on by default");
+            t.set_option("livePreview", &json!(live));
+            assert_eq!(t.options()["livePreview"], json!(live));
+            t.pointer(&cx, &PointerEvent::new(PointerKind::Down, pts[0].0, pts[0].1));
+            let mut during = vec![];
+            for &(x, y) in &pts[1..] {
+                during.extend(t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, x, y)));
+            }
+            assert!(matches!(during.first(), Some(Action::Begin(_))), "live {live}: {during:?}");
+            assert_eq!(previews(&during), if live { 3 } else { 0 }, "live {live}: {during:?}");
+            assert_eq!(line(&t), !live, "live {live}: the thin line shows only with Live preview off");
+            let up = t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 30.0, 5.0));
+            assert!(matches!(up.as_slice(), [Action::Preview(c, _), Action::Commit] if c == "path.freehand"), "live {live}: {up:?}");
+            assert!(!line(&t), "live {live}: no line after the release");
+        }
+        // Escape mid-stroke with Live preview off cancels the stroke it began.
+        let mut t = GestureTool::new("pencil");
+        t.set_option("livePreview", &json!(false));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 10.0, 5.0));
+        assert_eq!(t.key(&cx, ToolKey::Escape, Mods::default()), vec![Action::Cancel]);
+        // The Paintbrush keeps previewing: Live preview isn't one of its options.
+        let mut b = GestureTool::new("paintbrush");
+        assert!(b.options().get("livePreview").is_none());
+        b.set_option("livePreview", &json!(false));
+        b.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0));
+        let acts = b.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 10.0, 5.0));
+        assert_eq!(previews(&acts), 1, "{acts:?}");
     }
 
     /// Holding Alt shows the Paintbrush's closing cursor before the press, and the Pencil's and the

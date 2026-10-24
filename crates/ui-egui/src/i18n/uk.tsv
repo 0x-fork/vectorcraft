@@ -5157,3 +5157,4 @@ axis	Y Axis	Вісь Y
 	Scale Presets	Набори масштабу
 @msg	a {width}×{height} screenshot's byte count overflows	кількість байтів знімка {width}×{height} переповнюється
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	{what} вікна ({points} пунктів × {scale} DPI) не дозволяє задати розмір знімка
+	Live preview	Перегляд у реальному часі

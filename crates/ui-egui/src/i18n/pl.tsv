@@ -5413,3 +5413,4 @@ axis	Y Axis	Oś Y
 	Scale Presets	Ustawienia wstępne skali
 @msg	a {width}×{height} screenshot's byte count overflows	liczba bajtów zrzutu ekranu {width}×{height} przekracza limit
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	{what} okna ({points} punktów × {scale} DPI) nie pozwala ustalić rozmiaru zrzutu ekranu
+	Live preview	Podgląd na żywo
