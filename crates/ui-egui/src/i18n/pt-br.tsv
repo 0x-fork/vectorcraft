@@ -5314,6 +5314,7 @@ mark-style	Japanese	Japonesas
 	Snap to Perpendicular	Ajustar à Perpendicular
 @msg	unknown snap option `{key}` (use {options})	opção de ajuste desconhecida `{key}` (use {options})
 	Gap Length:	Comprimento da Lacuna:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	O modo Logotipo Plano traçou a imagem em {_1} × {_2} pixels, reduzida por média de {_3} × {_4}.
 	Artboard {n} of {total}	Mesa de Trabalho {n} de {total}
 	File {n} of {total}	Arquivo {n} de {total}
 	Encoding and writing the file…	Codificando e gravando o arquivo…

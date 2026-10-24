@@ -2070,6 +2070,36 @@ fn a_large_image_traces_with_a_warning() {
 }
 
 #[test]
+fn flat_logo_says_when_it_traces_an_image_averaged_down() {
+    // Flat Logo works at most 1024 px on a side: a 1025 px image is averaged down to 513 px.
+    let params = json!({"params": {"mode": "logo", "logoColors": ["#000000", "#F0F0DC"]}});
+    let warnings = |n: u32| {
+        let art = vectorcraft_trace::Raster::from_fn(n, n, |x, y| {
+            if !(50..n - 50).contains(&x) || !(50..n - 50).contains(&y) {
+                [0, 0, 0, 0]
+            } else if (i64::from(x) - i64::from(y) / 8).rem_euclid(40) < 2 {
+                [0, 0, 0, 255]
+            } else {
+                [240, 240, 220, 255]
+            }
+        });
+        let mut s = session();
+        add_image(&mut s, &art, Affine::IDENTITY);
+        let r = s.execute("imageTrace.makeAndExpand", &params).unwrap();
+        assert!(r["paths"].as_u64().unwrap() > 0, "{r}");
+        r["warnings"].clone()
+    };
+    let w = warnings(1025);
+    let w = w.as_array().unwrap();
+    assert_eq!(w.len(), 1, "{w:?}");
+    let text = w[0].as_str().unwrap();
+    assert!(text.contains("513 × 513") && text.contains("1025 × 1025"), "{text}");
+    assert_eq!(warnings(1024), json!([]));
+    // Over 1500 px, Flat Logo still traces at its reduced size: no slow-trace warning.
+    assert_eq!(warnings(1600), json!(["Flat Logo traced the image at 800 × 800 pixels, averaged down from 1600 × 1600."]));
+}
+
+#[test]
 fn image_trace_make_places_paths_over_the_image() {
     let mut s = session();
     let img = image_doc(&mut s);

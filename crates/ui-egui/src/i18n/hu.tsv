@@ -5383,6 +5383,7 @@ imageTrace	Outline	Körvonal
 	Snap to Perpendicular	Illesztés merőlegesre
 @msg	unknown snap option `{key}` (use {options})	ismeretlen illesztési beállítás: `{key}` (használható: {options})
 	Gap Length:	Rés hossza:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Az Egyszínű logó mód {_1} × {_2} képponton vektorizálta a képet, {_3} × {_4} méretről átlagolással kicsinyítve.
 	Artboard {n} of {total}	Rajztábla: {n} / {total}
 	File {n} of {total}	Fájl: {n} / {total}
 	Encoding and writing the file…	A fájl kódolása és írása…

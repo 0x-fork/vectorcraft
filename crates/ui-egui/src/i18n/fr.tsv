@@ -5396,6 +5396,7 @@ theme	Appearance	Apparence
 	Snap to Perpendicular	Magnétisme de la perpendiculaire
 @msg	unknown snap option `{key}` (use {options})	option de magnétisme inconnue `{key}` (utilisez {options})
 	Gap Length:	Longueur de lacune :
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Le mode Logo en aplats a vectorisé l’image à {_1} × {_2} pixels, réduite par moyennage de {_3} × {_4}.
 	Artboard {n} of {total}	Plan de travail {n} sur {total}
 	File {n} of {total}	Fichier {n} sur {total}
 	Encoding and writing the file…	Encodage et écriture du fichier…

@@ -472,7 +472,7 @@ pub(crate) fn trace_logo(img: &Raster, params: &TraceParams, max_anchors: usize)
     // Painter's order: biggest shapes first, so smaller ones sit on top of what they belong to.
     shapes.sort_by(|a, b| b.area.total_cmp(&a.area).then(a.class.cmp(&b.class)));
     let to_source = ToSource { factor: factor as f64, work: (w, h), source: (w0, h0) };
-    let mut out = TraceResult::default();
+    let mut out = TraceResult { worked_at: (factor > 1).then_some((w as u32, h as u32)), ..TraceResult::default() };
     for s in shapes {
         let color = palette.get(s.class).copied().unwrap_or([255, 255, 255]);
         let mut subs: Vec<SubPath> = Vec::new();
