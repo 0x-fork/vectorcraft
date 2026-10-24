@@ -367,12 +367,20 @@ pub(crate) fn id_param(p: &Value, key: &str) -> Option<NodeId> {
 pub(crate) fn ids_param(p: &Value, key: &str) -> Option<Vec<NodeId>> {
     p.get(key).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_u64).map(NodeId).collect())
 }
-/// The objects `p` gives: its `ids`, else its `id` as `ids` of one (as [`targets`] reads them);
-/// `None` when it gives neither.
-pub(crate) fn given_objects(p: &Value) -> Option<Vec<NodeId>> {
-    match p.get("ids").filter(|v| !v.is_null()) {
-        Some(_) => ids_param(p, "ids"),
-        None => id_param(p, "id").map(|id| vec![id]),
+/// The objects `p` gives `command`: its `ids`, else its `id` as `ids` of one (as [`targets`] reads
+/// them), each checked ([`checked_id`]): a malformed one, or one naming no object, is an error,
+/// never the selection. `None` when it gives neither (or gives them as `null`).
+pub(crate) fn given_objects(s: &Session, p: &Value, command: &str) -> Result<Option<Vec<NodeId>>> {
+    if p.get("ids").is_some_and(|v| !v.is_null()) {
+        return checked_ids_param(s, p, "ids", command).map(Some);
+    }
+    match p.get("id").filter(|v| !v.is_null()) {
+        None => Ok(None),
+        // A step reference a batch couldn't resolve, as `targets` reports it.
+        Some(Value::String(r)) if r.starts_with('$') => {
+            Err(EngineError::Other(format!("`id` is the step reference {r:?}, which only `run` and `command_batch` resolve")))
+        }
+        Some(v) => Ok(Some(vec![checked_id(s, v, command)?])),
     }
 }
 /// `v` as an index, a count or a byte offset: past `usize::MAX` reads as `usize::MAX`, past the end of any list.
