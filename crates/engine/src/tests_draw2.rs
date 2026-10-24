@@ -2960,3 +2960,29 @@ fn join_two_refuses_an_empty_subpath() {
     .unwrap();
     assert!(s.execute("path.join", &json!({"ids": [a.0, b.0], "ends": ["last", "first"], "subpaths": [0, 0]})).is_err());
 }
+
+/// Continuing a compound member at its first anchor reverses that subpath only. The Pen puts the
+/// compound back in the selection before it reverses, so the reverse has to name the member path:
+/// addressed through the selection it would walk the compound and flip every member's subpath.
+#[test]
+fn pen_continue_at_a_first_anchor_in_a_compound_reverses_only_that_subpath() {
+    let (v, none) = (view(), Mods::default());
+    let mut s = session();
+    let a = NodeId(s.execute("path.create", &json!({"d": "M100 100 L200 100 M100 150 L200 150"})).unwrap()["id"].as_u64().unwrap());
+    let b = NodeId(s.execute("path.create", &json!({"d": "M300 100 L400 100 M300 150 L400 150"})).unwrap()["id"].as_u64().unwrap());
+    s.execute("select.set", &json!({"ids": [a.0, b.0]})).unwrap();
+    let cid = NodeId(s.execute("object.compoundPath.make", &json!({})).unwrap()["id"].as_u64().unwrap());
+    // The member path itself is the whole selection, as a direct selection inside the compound
+    // leaves it: continuing it selects the compound again, which must not widen the reverse.
+    s.execute("select.set", &json!({"ids": [a.0]})).unwrap();
+    let (before_a, before_b) = (path(&s, a), path(&s, b));
+
+    s.select_tool("pen", v).unwrap();
+    gesture(&mut s, &[(100.0, 100.0)], none);
+
+    let after_a = path(&s, a);
+    assert_eq!(after_a.subpaths[0].anchors.iter().map(|x| x.p).collect::<Vec<_>>(), vec![Point::new(200.0, 100.0), Point::new(100.0, 100.0)]);
+    assert_eq!(after_a.subpaths[1], before_a.subpaths[1], "the member's other subpath keeps its anchors and handles");
+    assert_eq!(path(&s, b), before_b, "the compound's other member keeps its anchors, handles and closed flags");
+    assert_eq!(s.doc().unwrap().selection.objects, vec![cid], "the compound is selected again");
+}

@@ -362,9 +362,10 @@ impl Tool for PenTool {
                             out.push(Action::Exec("select.set".into(), json!({"ids": [top.0]})));
                         }
                         if at_first {
-                            let p =
-                                if cx.selection.objects.as_slice() == [id] { json!({"subpath": si}) } else { json!({"ids": [id.0], "subpath": si}) };
-                            out.push(Action::Exec("path.reverse".into(), p));
+                            // Name the path: the `select.set` above may have just put its compound
+                            // parent in the selection, and a reverse addressed through the
+                            // selection would flip this subpath of every member of it.
+                            out.push(Action::Exec("path.reverse".into(), json!({"ids": [id.0], "subpath": si})));
                         }
                         return out;
                     }
@@ -1457,5 +1458,43 @@ mod tests {
         t.key(&cx, ToolKey::Enter, Mods::default());
         assert_eq!(t.cursor(&cx, empty, Mods::default()), Cursor::Pen, "the path is finished");
         assert_eq!(Cursor::PenDrawing.precise(), Cursor::Crosshair);
+    }
+
+    /// Continuing an open path inside a compound path at its first anchor names the path it
+    /// reverses. The same press selects the compound, and `path.reverse` without `ids` would then
+    /// walk the compound and flip that subpath of every member.
+    #[test]
+    fn continuing_a_compound_member_at_its_first_anchor_reverses_that_path_by_id() {
+        let (mut d, _) = doc_with_rect();
+        let l = d.layers[0].id;
+        let (a, b, compound) = (d.alloc_id(), d.alloc_id(), d.alloc_id());
+        let two_subpaths = |x: f64| {
+            vectorcraft_geom::PathData::new(vec![
+                vectorcraft_geom::SubPath::polyline(&[Point::new(x, 300.0), Point::new(x + 100.0, 300.0)], false),
+                vectorcraft_geom::SubPath::polyline(&[Point::new(x, 350.0), Point::new(x + 100.0, 350.0)], false),
+            ])
+        };
+        let path = |id, x| std::sync::Arc::new(vectorcraft_doc::Node::path(id, two_subpaths(x), vectorcraft_doc::Appearance::default_art()));
+        let mut c = vectorcraft_doc::Node::new(
+            compound,
+            NodeKind::Compound { children: vec![path(a, 10.0), path(b, 300.0)], rule: vectorcraft_geom::FillRule::NonZero },
+        );
+        c.appearance = vectorcraft_doc::Appearance::default_art().into();
+        d.insert(Some(l), 1, c).unwrap();
+        let p = paint();
+        // The member path alone is the selection, as a direct selection inside the compound leaves it.
+        let mut s = Selection::default();
+        s.set([a]);
+        let cx = ToolContext { smart_guides: false, snap_to_point: false, snap_to_grid: false, snap_to_pixel: false, ..cx(&d, &s, &p) };
+        let mut pen = PenTool::default();
+        assert_eq!(
+            click(&mut pen, &cx, 10.0, 300.0, Mods::default()),
+            vec![
+                Action::Exec("select.set".into(), json!({"ids": [compound.0]})),
+                Action::Exec("path.reverse".into(), json!({"ids": [a.0], "subpath": 0})),
+            ],
+            "the reverse names the member path, not the compound the select.set just selected"
+        );
+        assert_eq!((pen.path, pen.subpath), (Some(a), Some(0)));
     }
 }
