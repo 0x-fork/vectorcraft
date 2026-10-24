@@ -47,7 +47,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Flatten Transparency…",
             ["Object"],
             None,
-            "{preset?: \"high\"|\"medium\"|\"low\" or a saved preset's name (see flattener.presets.list; default medium), balance?: 0..100 (raster/vector balance; 0 rasterizes everything), lineArtPpi?: 1..2400, gradientPpi?: 1..2400 (areas only gradients and meshes reach), textToOutlines?, strokesToOutlines?, clipComplexRegions? (clip images to the region outlines, else rectangles), antiAlias?, preserveAlpha? (composite over nothing instead of white), preserveOverprints? (areas showing one paint keep its colour and overprint; false clears overprints), options?: {the same keys}, ids?|id?} overlapping transparent objects become one group of flat-colour regions (CMYK colours composited ink by ink in CMYK documents), plus an image where gradients, patterns, images, masks or raster effects reach; objects without transparency stay → {ids, rasterized: images made, vector: regions made, options, warning? (an image in the art couldn't be decoded, as object.rasterize says)}",
+            "{preset?: \"high\"|\"medium\"|\"low\" or a saved preset's name (see flattener.presets.list; default medium), balance?: 0..100 (raster/vector balance; 0 rasterizes everything), lineArtPpi?: 1..2400, gradientPpi?: 1..2400 (areas only gradients and meshes reach), textToOutlines?, strokesToOutlines?, clipComplexRegions? (clip images to the region outlines, else rectangles), antiAlias?, preserveAlpha? (composite over nothing instead of white), preserveOverprints? (areas showing one paint keep its colour and overprint; false clears overprints), options?: {the same keys}, ids?|id?} overlapping transparent objects become one group of flat-colour regions (CMYK colours composited ink by ink in CMYK documents), plus an image where gradients, patterns, images, masks or raster effects reach; objects without transparency stay; a frame of threaded text that is outlined or flattened leaves its thread with the text it shows → {ids, rasterized: images made, vector: regions made, options, warning? (an image in the art couldn't be decoded, as object.rasterize says)}",
             has_doc,
             flatten
         ),
@@ -268,7 +268,14 @@ fn flatten(s: &mut Session, p: &Value) -> Result<Value> {
     if plan.flat.is_empty() && !plan.kept.iter().any(|id| src.node(*id).is_some_and(|n| kept_work(n, &o))) {
         return Ok(json!({ "ids": roots.iter().map(|i| i.0).collect::<Vec<_>>(), "rasterized": 0, "vector": 0, "options": options }));
     }
-    let (ids, vector, rasterized) = s.edit("Flatten Transparency", |d, sel| apply(d, sel, plan, &o))?;
+    let (ids, vector, rasterized) = s.edit("Flatten Transparency", |d, sel| {
+        let threaded = super::threads::frames(d);
+        let out = apply(d, sel, plan, &o)?;
+        // Frames of threaded text that were outlined or flattened leave their threads with the
+        // text they show.
+        super::threads::leave_threads(d, &threaded);
+        Ok(out)
+    })?;
     let mut out = json!({ "ids": ids.iter().map(|i| i.0).collect::<Vec<_>>(), "rasterized": rasterized, "vector": vector, "options": options });
     if let Some(w) = warning {
         out["warning"] = json!(w);

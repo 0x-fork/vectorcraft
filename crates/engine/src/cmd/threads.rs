@@ -1066,6 +1066,55 @@ mod tests {
         }
     }
 
+    /// Object › Flatten Transparency outlines frames of threaded text with Convert All Text to
+    /// Outlines, and turns transparent frames into flat regions or an image: each such frame leaves
+    /// its thread with the text it shows, and the other frames keep the text they hold. Undo threads
+    /// the frames again. When the last frame is flattened, the frame before it takes the text it has
+    /// no room for.
+    #[test]
+    fn flattened_frames_leave_their_thread_with_their_text() {
+        let cases = [(json!({"textToOutlines": true}), false), (json!({}), true), (json!({"balance": 0}), true)];
+        for (options, transparent) in cases {
+            for out in [&[0][..], &[1], &[2], &[0, 2]] {
+                let case = format!("{options} {out:?}");
+                let (mut s, frames) = three_frames(&TEXT.repeat(4), 200.0);
+                let ids: Vec<u64> = out.iter().map(|k| frames[*k]).collect();
+                if transparent {
+                    s.execute("transparency.set", &json!({"ids": ids, "opacity": 50})).unwrap();
+                }
+                let shown = frames.map(|id| text(&s, id));
+                assert_eq!(shown.concat(), TEXT.repeat(4));
+                let mut p = options.clone();
+                p["ids"] = json!(ids);
+                s.execute("object.flattenTransparency", &p).unwrap();
+                let rest: Vec<u64> = frames.iter().copied().filter(|id| !ids.contains(id)).collect();
+                for id in &ids {
+                    assert!(!is_frame(&s, *id), "{case}: frame {id} is flattened");
+                }
+                for (id, before) in frames.iter().zip(&shown).filter(|(id, _)| rest.contains(id)) {
+                    assert_eq!(text(&s, *id), *before, "{case}: frame {id} keeps its text");
+                }
+                assert_eq!(threads(&s), if rest.len() >= 2 { vec![rest] } else { vec![] }, "{case}");
+                s.execute("edit.undo", &json!({})).unwrap();
+                assert_eq!(threads(&s), [frames], "{case}: undo");
+                assert_eq!(frames.map(|id| text(&s, id)), shown, "{case}: undo");
+            }
+        }
+        let (mut s, [a, b, c]) = three_frames(&TEXT.repeat(12), 100.0);
+        let shown = [a, b, c].map(|id| text(&s, id));
+        let laid = {
+            let Some(t) = text_of(&s.doc().unwrap().doc, NodeId(c)) else { panic!("not area type") };
+            vectorcraft_text::layout(vectorcraft_text::FontDb::global(), t)
+        };
+        assert!(laid.overflow, "the last frame has more text than it shows");
+        let end = laid.lines.last().map_or(0, |l| l.end);
+        let hidden = shown[2][end..].trim_start_matches(' ');
+        s.execute("object.flattenTransparency", &json!({"ids": [c], "textToOutlines": true})).unwrap();
+        assert_eq!(text(&s, a), shown[0]);
+        assert_eq!(text(&s, b), format!("{}{hidden}", shown[1]), "the frame before it keeps its text and takes the rest");
+        assert_eq!(threads(&s), [[a, b]]);
+    }
+
     /// Expand Appearance keeps type whose only effect is a shadow or Crop Marks as type under a new
     /// id, in a group under the frame's id: the type takes the frame's place in its thread, and
     /// each frame keeps its text, the last frame the text it has no room for too. Type in a group

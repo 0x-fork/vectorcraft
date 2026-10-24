@@ -4224,7 +4224,8 @@ frames keep the text they hold. When the thread's last frame is outlined, the te
 outlines do not draw, goes after the text of the last frame that stays. A thread left with one frame is no longer a
 thread. When `effect.expandAppearance` keeps a frame as type in a group (type with no fills or strokes of its own whose only
 effects are shadows, outer glows or Crop Marks), the type stays in the thread in the frame's place. Object › Expand
-(`object.expand`) outlines type with these two commands.
+(`object.expand`) outlines type with these two commands. `object.flattenTransparency` takes each frame of threaded text
+that it outlines (`textToOutlines`) or turns into flat regions or an image out of its thread in the same way.
 
 ## Converting between point type and area type
 
