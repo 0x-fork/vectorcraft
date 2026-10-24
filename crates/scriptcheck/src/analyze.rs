@@ -19,6 +19,7 @@
 //! operand read so far at its depth, and a call on a File or Folder object in them (`(f).remove()`)
 //! is a call on the object. Nothing recurses.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -76,14 +77,11 @@ pub(crate) struct Scan {
     pub known: Known,
 }
 
-/// Scan `src`: the script itself (`file` none) or a file it includes (`file`: its path inside the
-/// script's folder), with the `#includepath` folders `paths` in force at its start and its variables
-/// holding what `known` says.
-pub(crate) fn scan(src: &str, file: Option<&str>, paths: Rc<[String]>, known: &Known, acc: &mut Acc) -> Scan {
-    // A name written with `\u` escapes is read as the name it spells.
-    let unescaped = unescape_names(src, acc);
-    let src = unescaped.as_deref().unwrap_or(src);
-    let declared = declarations(src, acc);
+/// Scan `src` (already through [`unescaped`]): the script itself (`file` none) or a file it includes
+/// (`file`: its path inside the script's folder), with the names it declares (`declared`, from
+/// [`declarations`] on the same `src`), the `#includepath` folders `paths` in force at its start and
+/// its variables holding what `known` says.
+pub(crate) fn scan<'s>(src: &'s str, declared: &Declared<'s>, file: Option<&str>, paths: Rc<[String]>, known: &Known, acc: &mut Acc) -> Scan {
     let mut lexer = Lexer::new(src, acc.limits.nesting);
     let mut a = Analyzer::new(acc, file, paths, known, declared);
     let mut nl = false;
@@ -119,8 +117,15 @@ pub(crate) fn scan(src: &str, file: Option<&str>, paths: Rc<[String]>, known: &K
 }
 
 /// `src` with the `\uXXXX` escapes in its names written as the characters they stand for (ECMA-262
-/// 3rd edition, section 7.6), or none when no name has one. An escape for a character no name may
-/// hold stays as written. Line breaks don't change, so every line keeps its number.
+/// 3rd edition, section 7.6), and `src` itself when no name has one. An escape for a character no
+/// name may hold stays as written. Line breaks don't change, so every line keeps its number.
+pub(crate) fn unescaped<'a>(src: Cow<'a, str>, acc: &mut Acc) -> Cow<'a, str> {
+    match unescape_names(&src, acc) {
+        Some(out) => Cow::Owned(out),
+        None => src,
+    }
+}
+
 fn unescape_names(src: &str, acc: &mut Acc) -> Option<String> {
     if !src.contains("\\u") {
         return None;
@@ -654,7 +659,7 @@ impl Brackets {
 /// `var` statements are not read here. A function declaration inside a block, which ECMAScript 3
 /// does not allow (sections 12.1 and 14), makes its name the script's own from where it stands.
 #[derive(Default)]
-struct Declared<'s> {
+pub(crate) struct Declared<'s> {
     /// For each function body, by the offset of its `{` in the text, the names it declares, in the
     /// order the bodies start.
     bodies: Vec<(usize, Vec<&'s str>)>,
@@ -695,7 +700,7 @@ struct Declarations<'s, 'a, 'l> {
 }
 
 /// What `src` declares ([`Declared`]), read in one pass over its tokens.
-fn declarations<'s>(src: &'s str, acc: &mut Acc) -> Declared<'s> {
+pub(crate) fn declarations<'s>(src: &'s str, acc: &mut Acc) -> Declared<'s> {
     let mut lexer = Lexer::new(src, acc.limits.nesting);
     let mut d = Declarations {
         acc,
@@ -864,7 +869,7 @@ struct Analyzer<'s, 'a, 'l> {
     /// The function bodies being read, the innermost last, up to [`crate::Limits::nesting`].
     scopes: Vec<Scope>,
     /// The names each function body and the global code declare, read before the analysis.
-    declared: Declared<'s>,
+    declared: &'a Declared<'s>,
     /// The first entry of `declared.bodies` whose body's `{` hasn't been read yet.
     next_body: usize,
     /// `function` was read at this bracket depth, and its body's `{` is still to come.
@@ -912,7 +917,7 @@ struct Analyzer<'s, 'a, 'l> {
 }
 
 impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
-    fn new(acc: &'a mut Acc<'l>, file: Option<&'a str>, paths: Rc<[String]>, known: &Known, declared: Declared<'s>) -> Self {
+    fn new(acc: &'a mut Acc<'l>, file: Option<&'a str>, paths: Rc<[String]>, known: &Known, declared: &'a Declared<'s>) -> Self {
         let global: Vec<&'s str> = declared.global.iter().copied().collect();
         let mut a = Analyzer {
             acc,
@@ -1181,15 +1186,16 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
         }
     }
 
-    /// The names [`Declared`] has for the function body whose `{` starts at `start`, taken once.
-    fn declared_in(&mut self, start: usize) -> Vec<&'s str> {
-        let bodies = &mut self.declared.bodies;
+    /// The names [`Declared`] has for the function body whose `{` starts at `start`.
+    fn declared_in(&mut self, start: usize) -> &'a [&'s str] {
+        let declared = self.declared;
+        let bodies = &declared.bodies;
         while bodies.get(self.next_body).is_some_and(|(at, _)| *at < start) {
             self.next_body += 1;
         }
-        match bodies.get_mut(self.next_body) {
-            Some((at, names)) if *at == start => std::mem::take(names),
-            _ => vec![],
+        match bodies.get(self.next_body) {
+            Some((at, names)) if *at == start => names,
+            _ => &[],
         }
     }
 
@@ -1356,7 +1362,7 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
                             self.keep_outer(&name);
                             self.unbind(&name);
                         }
-                        for name in self.declared_in(t.start) {
+                        for &name in self.declared_in(t.start) {
                             self.acc.steps = self.acc.steps.saturating_add(1);
                             self.hoist(name);
                         }
@@ -1929,8 +1935,8 @@ impl<'s, 'a, 'l> Analyzer<'s, 'a, 'l> {
             "(" => self.call(line),
             // `Name.prototype["+"] = …` defines an operator.
             "=" => {
-                let operator = h1.filter(|s| s.kind == T::Str).is_some_and(|s| catalog::OPERATORS.contains(&unquote(s.text, 4).as_str()));
-                if is(h0, "]") && operator && is(h2, "[") && word(h3, "prototype") {
+                let operator = || h1.filter(|s| s.kind == T::Str).is_some_and(|s| catalog::OPERATORS.contains(&unquote(s.text, 4).as_str()));
+                if is(h0, "]") && is(h2, "[") && word(h3, "prototype") && operator() {
                     self.acc.feature("operatorOverloading", line);
                 }
             }

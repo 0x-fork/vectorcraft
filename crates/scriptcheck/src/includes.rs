@@ -20,13 +20,11 @@ use crate::analyze::{self, IncludeRef, Known};
 use crate::directives::MAX_PATH;
 use crate::report::{Acc, IncludeStatus};
 
-/// An included file that was read and is checked: its path inside the script's folder, its text
-/// (and whether it held bytes that aren't UTF-8), and the `#includepath` folders in force at its
-/// start.
+/// An included file that was read and is checked: its path inside the script's folder, its bytes,
+/// and the `#includepath` folders in force at its start.
 pub(crate) struct ReadFile {
     pub path: String,
-    pub text: String,
-    pub invalid: bool,
+    pub bytes: Vec<u8>,
     pub paths: Rc<[String]>,
 }
 
@@ -141,12 +139,14 @@ pub(crate) fn follow(
                 files.push(path.clone());
                 let file = files.len() - 1;
                 read.insert(path.clone(), (status, Some(file)));
-                let (text, invalid) = crate::decode(&b);
+                let (text, _) = crate::decode(&b);
                 let mut tallies = Acc::new(limits);
-                let scan = analyze::scan(&text, Some(&path), Rc::clone(&inc.paths), known, &mut tallies);
+                let text = analyze::unescaped(text, &mut tallies);
+                let declared = analyze::declarations(&text, &mut tallies);
+                let scan = analyze::scan(&text, &declared, Some(&path), Rc::clone(&inc.paths), known, &mut tallies);
                 acc.steps = acc.steps.saturating_add(tallies.steps);
                 known.add(scan.known, limits.entries);
-                checked.push(ReadFile { path: path.clone(), text: text.into_owned(), invalid, paths: Rc::clone(&inc.paths) });
+                checked.push(ReadFile { path: path.clone(), bytes: b, paths: Rc::clone(&inc.paths) });
                 work.push_back(Work { file, includes: scan.includes, depth: w.depth + 1 });
                 (found, to) = (Some(path), Some(file));
                 break;

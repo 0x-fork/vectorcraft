@@ -1475,7 +1475,8 @@ fn include_lines_share_the_folders_of_the_include_path_before_them() {
     }
     let limits = Limits::default();
     let mut acc = report::Acc::new(&limits);
-    let scan = analyze::scan(&src, None, std::rc::Rc::from([]), &analyze::Known::default(), &mut acc);
+    let declared = analyze::declarations(&src, &mut acc);
+    let scan = analyze::scan(&src, &declared, None, std::rc::Rc::from([]), &analyze::Known::default(), &mut acc);
     let (first, rest) = scan.includes.split_first().unwrap();
     assert_eq!((first.paths.len(), rest.len()), (64, 999));
     assert!(rest.iter().all(|i| std::rc::Rc::ptr_eq(&i.paths, &first.paths)), "one list of folders, not a copy for each line");
