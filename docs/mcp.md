@@ -69,6 +69,22 @@ claude mcp add vectorcraft -- "C:\Program Files\VectorCraft\vectorcraft-cli.exe"
 claude mcp add vectorcraft -- vectorcraft-cli mcp
 ```
 
+For a live session, start the installed app with the control port before the MCP client starts the server:
+
+```sh
+# macOS: quit VectorCraft first, since `open -a` passes no arguments to an app that is already running
+open -a VectorCraft --args --control 7979
+# Windows (PowerShell), default install folder
+& "C:\Program Files\VectorCraft\vectorcraft.exe" --control 7979
+# Linux (deb, rpm)
+vectorcraft --control 7979
+```
+
+The Dock, Start menu and desktop launchers start the app without `--control`, so the app opens no control
+port unless `VECTORCRAFT_CONTROL_PORT` is set. `vectorcraft-cli mcp` with no flag tries `127.0.0.1:7979`
+once, when it starts: a server that started before the app stays headless until the MCP client restarts
+it. With `--connect`, a server that finds no app stops with `cannot connect to 127.0.0.1:7979`.
+
 ## Confining file access
 
 ```sh
