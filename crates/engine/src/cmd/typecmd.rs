@@ -580,6 +580,18 @@ fn create_outlines(s: &mut Session, _: &Value) -> Result<Value> {
                 node.appearance = st.appearance().into();
                 children.push(Arc::new(node));
             }
+            // Ruby (furigana) glyphs, where the layout put them, in their base text's run's paint,
+            // as the canvas draws them (colour glyphs in ruby draw nothing there either).
+            for g in &lay.ruby {
+                let path = PathData::from_bezpath(&g.outline).transformed(t.xf);
+                if path.is_empty() {
+                    continue;
+                }
+                let st = t.runs.get(g.run).map(|r| r.style.clone()).unwrap_or_else(|| t.first_style());
+                let mut node = shape_node(d, path, None);
+                node.appearance = st.appearance().into();
+                children.push(Arc::new(node));
+            }
             // Underline and strikethrough bars become paths of their run's paint too (#847).
             for (run, bar) in vectorcraft_text::decorations(&lay, vectorcraft_text::FontDb::global(), t) {
                 let st = t.runs.get(run).map(|r| r.style.clone()).unwrap_or_else(|| t.first_style());
@@ -2177,6 +2189,33 @@ mod ruby_tests {
         // Setting all the text drops the old ruby (it isn't the same text any more).
         s.execute("text.setText", &json!({"id": id, "text": "新しい"})).unwrap();
         assert!(text_of(&s, id).ruby.is_empty());
+    }
+
+    /// Create Outlines keeps the ruby: one path per inked glyph of the base text and of the
+    /// reading, each where the layout (and so the canvas) puts it.
+    #[test]
+    fn create_outlines_keeps_the_ruby_where_it_is_laid_out() {
+        use kurbo::Shape;
+        let (mut s, id) = session_with_text();
+        s.execute("type.ruby", &json!({"text": "かんじ", "start": 0, "end": 6})).unwrap();
+        let t = text_of(&s, id).clone();
+        let lay = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), &t);
+        let inked = |gs: &[vectorcraft_text::PositionedGlyph]| -> Vec<kurbo::Rect> {
+            gs.iter().filter(|g| !g.outline.elements().is_empty()).map(|g| t.xf.transform_rect_bbox(g.outline.bounding_box())).collect()
+        };
+        let (base, ruby) = (inked(&lay.glyphs), inked(&lay.ruby));
+        assert_eq!(ruby.len(), 3, "the reading's three kana have ink");
+        let g = s.execute("type.createOutlines", &json!({})).unwrap()["ids"][0].as_u64().unwrap();
+        let d = &s.doc().unwrap().doc;
+        let paths: Vec<kurbo::Rect> = d.node(NodeId(g)).unwrap().children().unwrap().iter().filter_map(|c| c.geometric_bounds()).collect();
+        assert_eq!(paths.len(), base.len() + ruby.len(), "a path per glyph, the reading's included: {paths:?}");
+        let near = |a: &kurbo::Rect, b: &kurbo::Rect| [a.x0 - b.x0, a.y0 - b.y0, a.x1 - b.x1, a.y1 - b.y1].iter().all(|v| v.abs() < 0.05);
+        for r in &ruby {
+            assert!(paths.iter().any(|p| near(p, r)), "the kana at {r:?} among {paths:?}");
+        }
+        // Undo brings the type back with its ruby.
+        s.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(text_of(&s, id).ruby.len(), 1);
     }
 
     /// Ruby is written to SVG and PDF with its text: SVG outlines the type where ruby is present
