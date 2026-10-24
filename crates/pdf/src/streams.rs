@@ -275,18 +275,19 @@ fn unsafe_data(stream: &Stream<'_>, inside: bool) -> bool {
 /// dictionary that `stream` follows (white space and comments between) is a stream's, whose data
 /// is skipped. So a `stream` or `>>` in a string or a comment is no keyword (#3919 review). The
 /// reader may still start at a `<<` inside what this reading skipped (a cross-reference offset or
-/// its repair scan can point there), so each such `<<` is read as a dictionary of its own, within
-/// a budget for the whole file: a file that spends it is refused. Linear in the file (#3586).
+/// its repair scan can point there), so each such `<<` it could start at is read as a dictionary
+/// of its own, within a budget for the whole file: a file that spends it is refused. Linear in
+/// the file (#3586), a run of `<` included (#3924 review).
 pub(crate) fn unsafe_file_streams(pdf: &[u8]) -> bool {
-    let mut scan = FileScan { pdf, budget: pdf.len().saturating_mul(4).saturating_add(1 << 20), endstream: None };
+    let mut scan = FileScan { pdf, budget: pdf.len().saturating_mul(4).saturating_add(1 << 20), endstream: None, line: None, read_from: Vec::new() };
     scan.read().is_err()
 }
 
 /// A stream the reader would fail on, or a file that spent the scan's budget.
 struct Unsafe;
 
-/// The most bytes a dictionary read from inside a string, comment or stream data may span, as far
-/// as the scan looked back from a `stream` keyword before.
+/// The most bytes a dictionary read from inside a string, comment or stream data may span past
+/// the last `<<` in it, as far as the scan looked back from a `stream` keyword before.
 const MAX_SKIPPED_DICT: usize = 1 << 16;
 
 /// The most `<<` the scan keeps open: deeper than the reader nests dictionaries.
@@ -338,40 +339,13 @@ fn comment_end(pdf: &[u8], at: usize) -> usize {
     pdf.get(at..).and_then(|rest| rest.iter().position(|b| matches!(b, b'\n' | b'\r'))).map_or(pdf.len(), |n| at + n)
 }
 
-/// Past the white space and comments from `at`.
-fn skip_space(pdf: &[u8], mut at: usize) -> usize {
-    while let Some(&b) = pdf.get(at) {
-        match b {
-            b'%' => at = comment_end(pdf, at),
-            b if white(b) => at += 1,
-            _ => break,
-        }
-    }
-    at
-}
-
-/// Past the dictionary opening at `at` (a `<<`), read to the `>>` that closes it before `limit`.
-/// `Err` with how far it got for one that doesn't close there.
-fn dict_end(pdf: &[u8], at: usize, limit: usize) -> Result<usize, usize> {
-    let (mut depth, mut i) = (0usize, at);
-    while let Some(&b) = pdf.get(i).filter(|_| i < limit) {
-        match pdf.get(i..i + 2) {
-            Some(b"<<") => (depth, i) = (depth + 1, i + 2),
-            Some(b">>") => {
-                (depth, i) = (depth.saturating_sub(1), i + 2);
-                if depth == 0 {
-                    return Ok(i);
-                }
-            }
-            _ => match b {
-                b'(' => i = string_end(pdf, i, limit)?,
-                b'<' => i = hex_end(pdf, i, limit)?,
-                b'%' => i = comment_end(pdf, i),
-                _ => i += 1,
-            },
-        }
-    }
-    Err(i.min(limit))
+/// Can the reader start a dictionary at the `<<` at `at`? Its repair scan tries one at the start
+/// of the file, after white space and after a dictionary it read (`>>`); an object that a
+/// cross-reference offset points at begins `N G obj`, then white space or comments. A `<<` after
+/// anything else is read only as part of what is before it: in a run of `<`, only the first.
+fn startable(pdf: &[u8], at: usize) -> bool {
+    let before = pdf.get(..at).unwrap_or_default();
+    before.last().is_none_or(|b| white(*b)) || before.ends_with(b">>") || before.ends_with(b"obj")
 }
 
 /// The pre-open scan of a file's streams ([`unsafe_file_streams`]).
@@ -382,6 +356,11 @@ struct FileScan<'a> {
     budget: usize,
     /// Where an `endstream` was last looked for, and the first one found there (`None`: none).
     endstream: Option<(usize, Option<usize>)>,
+    /// Where a comment's end of line was last looked for, and where it is.
+    line: Option<(usize, usize)>,
+    /// The `<<` a dictionary in skipped text was read from, a bit a byte of the file (empty
+    /// until one is).
+    read_from: Vec<u64>,
 }
 
 impl FileScan<'_> {
@@ -415,10 +394,6 @@ impl FileScan<'_> {
                         opens.pop_front();
                     }
                     opens.push_back(i);
-                    // In `<<<` the reader may start a dictionary at the second `<` too.
-                    if pdf.get(i + 2) == Some(&b'<') {
-                        self.dict(i + 1)?;
-                    }
                     i += 2;
                 }
                 Some(b">>") => {
@@ -444,31 +419,114 @@ impl FileScan<'_> {
         Ok(())
     }
 
-    /// Each `<<` in `from..to`, text the reading skipped, read as a dictionary of its own.
+    /// Each `<<` in `from..to`, text the reading skipped, that the reader could start at, read as
+    /// a dictionary of its own.
     fn skipped(&mut self, from: usize, to: usize) -> Result<(), Unsafe> {
         let text = self.pdf.get(..to).unwrap_or_default();
         let mut i = from;
         while let Some(at) = find(text, i, b"<<") {
-            self.dict(at)?;
+            if startable(self.pdf, at) {
+                self.dicts(at)?;
+            }
             i = at + 1;
         }
         Ok(())
     }
 
-    /// The dictionary opening at `at`, and the stream it begins if `stream` follows it.
-    fn dict(&mut self, at: usize) -> Result<(), Unsafe> {
+    /// The dictionary at `at` in skipped text, read to the `>>` that closes it, as far as
+    /// [`MAX_SKIPPED_DICT`] past the last `<<` opened on the way; and each dictionary it holds.
+    /// Each `>>` closing one is looked at for a stream after it, and each `<<` opening one is
+    /// marked: a reading from there reads the same text as far, so a later call for it returns
+    /// at once and text dense with `<<` is read about once.
+    fn dicts(&mut self, at: usize) -> Result<(), Unsafe> {
+        if self.was_read(at) {
+            return Ok(());
+        }
         let pdf = self.pdf;
-        let limit = at.saturating_add(MAX_SKIPPED_DICT).min(pdf.len());
-        let end = dict_end(pdf, at, limit);
-        let (Ok(reached) | Err(reached)) = end;
-        self.charge(reached.saturating_sub(at))?;
-        let Ok(close) = end else { return Ok(()) };
-        let keyword = skip_space(pdf, close);
+        let mut opens = std::collections::VecDeque::new();
+        let (mut depth, mut limit, mut i, mut work) = (0usize, at.saturating_add(MAX_SKIPPED_DICT), at, 0usize);
+        while let Some(&b) = pdf.get(i).filter(|_| i < limit) {
+            let next = match pdf.get(i..i + 2) {
+                Some(b"<<") => {
+                    self.mark(i);
+                    limit = limit.max(i.saturating_add(MAX_SKIPPED_DICT));
+                    if opens.len() == MAX_OPEN {
+                        opens.pop_front();
+                    }
+                    opens.push_back(i);
+                    depth += 1;
+                    Ok(i + 2)
+                }
+                Some(b">>") => {
+                    depth = depth.saturating_sub(1);
+                    if let Some(open) = opens.pop_back() {
+                        self.closed(open, i + 2)?;
+                    }
+                    if depth == 0 { Err(i + 2) } else { Ok(i + 2) }
+                }
+                _ => match b {
+                    b'(' => string_end(pdf, i, limit),
+                    b'<' => hex_end(pdf, i, limit),
+                    b'%' => {
+                        i = self.line_end(i)?;
+                        continue;
+                    }
+                    _ => Ok(i + 1),
+                },
+            };
+            let (Ok(n) | Err(n)) = next;
+            work += n.saturating_sub(i);
+            if next.is_err() {
+                break;
+            }
+            i = n;
+        }
+        self.charge(work)
+    }
+
+    /// The dictionary `open..close` in skipped text: the stream it begins if `stream` follows it.
+    fn closed(&mut self, open: usize, close: usize) -> Result<(), Unsafe> {
+        let mut keyword = close;
+        while let Some(&b) = self.pdf.get(keyword) {
+            match b {
+                b'%' => keyword = self.line_end(keyword)?,
+                b if white(b) => keyword += 1,
+                _ => break,
+            }
+        }
         self.charge(keyword - close)?;
-        if pdf.get(keyword..).is_some_and(|rest| rest.starts_with(b"stream")) {
-            self.stream(at, close, keyword + 6)?;
+        if self.pdf.get(keyword..).is_some_and(|rest| rest.starts_with(b"stream")) {
+            self.stream(open, close, keyword + 6)?;
         }
         Ok(())
+    }
+
+    /// The end of the comment at `at` ([`comment_end`]), the last one found kept: comments in
+    /// skipped text are read again from many places.
+    fn line_end(&mut self, at: usize) -> Result<usize, Unsafe> {
+        if let Some((from, end)) = self.line
+            && from <= at
+            && at <= end
+        {
+            return Ok(end);
+        }
+        let end = comment_end(self.pdf, at);
+        self.charge(end - at)?;
+        self.line = Some((at, end));
+        Ok(end)
+    }
+
+    fn mark(&mut self, at: usize) {
+        if self.read_from.is_empty() {
+            self.read_from = vec![0; self.pdf.len() / 64 + 1];
+        }
+        if let Some(word) = self.read_from.get_mut(at / 64) {
+            *word |= 1 << (at % 64);
+        }
+    }
+
+    fn was_read(&self, at: usize) -> bool {
+        self.read_from.get(at / 64).is_some_and(|word| word >> (at % 64) & 1 == 1)
     }
 
     /// The stream whose dictionary is `open..close` and whose `stream` keyword ends at `from`:
@@ -477,6 +535,7 @@ impl FileScan<'_> {
         let pdf = self.pdf;
         let cr = usize::from(pdf.get(from) == Some(&b'\r'));
         let start = from + cr + usize::from(pdf.get(from + cr) == Some(&b'\n'));
+        self.charge(close.saturating_sub(open))?;
         let dict = pdf.get(open..close).and_then(Dict::from_bytes);
         let length = dict.as_ref().and_then(|d| d.get::<usize>(b"Length")).and_then(|n| start.checked_add(n)).filter(|e| *e <= pdf.len());
         let end = match length {
@@ -695,29 +754,67 @@ mod tests {
     #[test]
     fn a_stream_in_text_the_scan_skips_is_still_read() {
         // The scan skips a stream's data, a string and a comment; the reader may still start at
-        // a dictionary in them (a cross-reference offset can point anywhere), so they're read too.
+        // a dictionary in them (a cross-reference offset can point at `1 0 obj` anywhere, its
+        // repair scan tries a `<<` after white space), so they're read too.
         let bad = b"<< /Type /XRef /DecodeParms 9 0 R >> stream\nx\nendstream";
-        for wrap in [
-            [&b"1 0 obj << /Length 99 >> stream\n"[..], bad, b"\nendstream endobj"],
-            [b"(", bad, b")"],
-            [b"% ", bad, b"\n"],
-            [b"<< /Note (", bad, b") >>"],
+        // `data` as the data of a stream whose length holds all of it.
+        let image = |data: &[u8]| [format!("1 0 obj << /Length {} >> stream\n", data.len()).as_bytes(), data, b"\nendstream endobj"].concat();
+        let run = vec![b'<'; 1 << 16];
+        let cases = [
+            image(bad),
+            [&b"(1 0 obj "[..], bad, b")"].concat(),
+            [&b"(1 0 obj"[..], bad, b")"].concat(),
+            [&b"% "[..], bad, b"\n"].concat(),
+            [&b"<< /Note (1 0 obj "[..], bad, b") >>"].concat(),
+            // #3924 review: right after a run of `<` in an image, and as the end of one (a
+            // reader starting at the run's first `<<` reads it inside the others).
+            image(&[&run[..], b"\n", bad].concat()),
+            image(&[&run[..], b" /Type /XRef /DecodeParms 9 0 R >> stream\nx\nendstream"].concat()),
+        ];
+        let unread: Vec<_> =
+            cases.iter().filter(|bad| !unsafe_file_streams(bad)).map(|bad| String::from_utf8_lossy(&bad[..bad.len().min(80)])).collect();
+        assert!(unread.is_empty(), "{unread:#?}");
+    }
+
+    #[test]
+    fn a_run_of_lt_in_an_image_a_string_or_a_comment_opens() {
+        // #3924 review: every `<<` in a run of `<` (an image's flat area of grey 60) was read as a
+        // dictionary to past the run, so 1 MiB of it spent the budget and the file was refused.
+        // The reader starts a dictionary only at the run's first `<<`.
+        let run = vec![b'<'; 1 << 20];
+        let image = b"1 0 obj << /Type /XObject /Subtype /Image /Width 1024 /Height 1024 /ColorSpace /DeviceGray /BitsPerComponent 8 /Length 1048576 >> stream\n";
+        for (what, pdf) in [
+            ("image", [&b"%PDF-1.7\n"[..], image, &run[..], b"\nendstream endobj\n"].concat()),
+            ("string", [&b"%PDF-1.7\n2 0 obj ("[..], &run[..], b") endobj\n"].concat()),
+            ("comment", [&b"%PDF-1.7\n% "[..], &run[..], b"\n"].concat()),
         ] {
-            let pdf = wrap.concat();
-            assert!(unsafe_file_streams(&pdf), "{}", String::from_utf8_lossy(&pdf));
+            let t = std::time::Instant::now();
+            assert!(!unsafe_file_streams(&pdf), "{what}");
+            let took = t.elapsed();
+            assert!(took < std::time::Duration::from_secs(5), "{what} took {took:?}");
         }
     }
 
     #[test]
     fn strings_and_comments_dense_with_dictionaries_are_scanned_in_bounded_time() {
-        // Each `<<` in a string or comment is read as a dictionary of its own (the reader may
-        // start at one), within a budget for the whole file.
-        for unit in [&b"<<("[..], b"(<<", b"%<<\n", b"<</A (<</B 1>>stream) >>stream\n"] {
+        // Each `<<` in a string or comment the reader could start at is read as a dictionary of
+        // its own, within a budget for the whole file.
+        for unit in [&b"<<("[..], b"(<<", b"%<<\n", b"<</A (<</B 1>>stream) >>stream\n", b"<"] {
             let pdf = unit.repeat((1 << 20) / unit.len());
             let t = std::time::Instant::now();
             unsafe_file_streams(&pdf);
             let took = t.elapsed();
             assert!(took < std::time::Duration::from_secs(5), "{} took {took:?}", String::from_utf8_lossy(unit));
+        }
+        // An image's flat area of a colour whose bytes are `<<` and white space, `(` or `%` (a
+        // reader may start at each `<<` after white space): read about once, and it opens.
+        for pixel in [&b" <<"[..], b"<<(", b"<<%", b" <<%", b"\0<<\0"] {
+            let data = pixel.repeat((1 << 20) / pixel.len());
+            let pdf = [format!("1 0 obj << /Length {} >> stream\n", data.len()).as_bytes(), &data[..], b"\nendstream endobj\n"].concat();
+            let t = std::time::Instant::now();
+            assert!(!unsafe_file_streams(&pdf), "{}", String::from_utf8_lossy(pixel));
+            let took = t.elapsed();
+            assert!(took < std::time::Duration::from_secs(5), "{} took {took:?}", String::from_utf8_lossy(pixel));
         }
     }
 }
