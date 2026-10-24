@@ -2003,6 +2003,15 @@ impl Document {
         {
             dimension.source = None;
         }
+        // A copy of a threaded frame is in no thread, so its first paragraph starts in it and its
+        // layout caches are dropped. A caller that keeps the copy as an object fills them again.
+        if let NodeKind::Text(t) = &mut n.kind
+            && t.first_para_continues
+        {
+            t.first_para_continues = false;
+            t.cached_bounds = None;
+            t.cached_baselines.clear();
+        }
         let mut renamed = std::collections::HashMap::new();
         if let Some(ch) = n.children_mut() {
             let old: Vec<Arc<Node>> = std::mem::take(ch);

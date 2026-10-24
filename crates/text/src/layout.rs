@@ -1953,8 +1953,17 @@ const MAX_COMPOSE_GLYPHS: usize = 200_000;
 
 /// Every-line composition of paragraph glyphs `sg` if applicable (area text, justified or ragged,
 /// with uniform line metrics or in rectangular cells without text wrap); `None` falls back to the
-/// greedy single-line composer.
-fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pen: &Pen<'_>, rtl: bool) -> Option<Vec<(usize, bool)>> {
+/// greedy single-line composer. With `continued`, the paragraph continues from the frame before,
+/// and its first composed line is not its first line.
+fn compose_para(
+    cx: &Ctx<'_>,
+    sg: &[SGlyph],
+    flex: &[Flex],
+    para: &ParaStyle,
+    pen: &Pen<'_>,
+    rtl: bool,
+    continued: bool,
+) -> Option<Vec<(usize, bool)>> {
     let ragged = matches!(para.justify, Justify::Auto | Justify::Left | Justify::Center | Justify::Right);
     let composer = cx.opts.composer.unwrap_or(para.composer);
     // A paragraph whose commas or full stops may hang is composed line by line (as the Japanese
@@ -1986,7 +1995,7 @@ fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pe
     // indents of a right-to-left list ([`line_indents`]) keep.
     while widths.len() < sg.len() {
         let first = widths.is_empty();
-        let ind_l = para.left_indent + if first { para.first_line_indent } else { 0.0 };
+        let ind_l = para.left_indent + if first && !continued { para.first_line_indent } else { 0.0 };
         // Only the first line's first word is known here. Later lines are placed as the composed
         // lines need: each fits its width, so its first word does too.
         let word = if first { word_width(sg, 0) } else { 0.0 };
@@ -2081,9 +2090,12 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
         // Justification…: the glyphs at Desired word and letter spacing and glyph scaling, and how
         // far a justified line may move each one from it.
         let mut flex = apply_desired(&mut sg, &para.justification, !cx.vertical);
+        // Threaded text: a first paragraph that continues from the frame before has its first
+        // line, first-line indent and list marker there.
+        let continued = pi == 0 && t.first_para_continues;
         // Bullets and numbers: the list marker's glyphs `0..marker` start the paragraph.
         // Justification and Optical Margin Alignment leave them as they are.
-        let marker = cx.prepend_marker(pr, para, marker_text, rtl, &mut sg);
+        let marker = if continued { 0 } else { cx.prepend_marker(pr, para, marker_text, rtl, &mut sg) };
         if marker > 0 {
             flex.splice(0..0, vec![Flex::default(); marker]);
             if !compressed.is_empty() {
@@ -2112,7 +2124,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             pen.pending += para.space_before;
         }
         let n = sg.len();
-        let composed = compose_para(cx, &sg, &flex, para, &pen, rtl);
+        let composed = compose_para(cx, &sg, &flex, para, &pen, rtl, continued);
         // Hyphenation options: the Hyphenation Zone applies with the Single-line Composer, and the
         // Hyphen Limit counts the lines in a row that end with a hyphen.
         let zone = if cx.opts.composer.unwrap_or(para.composer) == Composer::SingleLine { para.hyphenation.zone } else { 0.0 };
@@ -2123,7 +2135,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
         let mirror = mirrors_indents(para, rtl, cx.vertical);
         loop {
             let est = if i < n { Metrics::of(&sg[i]) } else { pm };
-            let first_line = li_para == 0;
+            let first_line = li_para == 0 && !continued;
             let (ind_l, ind_r) = line_indents(para, first_line, mirror);
             // Measured before Mojikumi narrows an opening bracket, as the composer measures it.
             let word = word_width(&sg, i);
@@ -2543,9 +2555,12 @@ fn on_path(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, path: &Path
         let bidi = para_bidi_with(text.get(pr.clone()).unwrap_or_default(), para.direction, &cx.char_directions(pr));
         rtl.get_or_insert(is_rtl(bidi.as_ref()) && !cx.vertical);
         let mut glyphs = cx.shape_para(pr.clone(), bidi.as_ref());
-        // Bullets and numbers: a list paragraph's text starts after its marker here too.
-        let marker_text = markers.get(pi).and_then(Option::as_deref);
-        cx.prepend_marker(pr, t.para_at(pi), marker_text, is_rtl(bidi.as_ref()) && !cx.vertical, &mut glyphs);
+        // Bullets and numbers: a list paragraph's text starts after its marker here too, unless
+        // the paragraph continues from the frame before in its thread.
+        if pi > 0 || !t.first_para_continues {
+            let marker_text = markers.get(pi).and_then(Option::as_deref);
+            cx.prepend_marker(pr, t.para_at(pi), marker_text, is_rtl(bidi.as_ref()) && !cx.vertical, &mut glyphs);
+        }
         shaped.push((pr.clone(), bidi.filter(|b| b.has_rtl() && !cx.vertical), glyphs));
     }
     let rtl = rtl.unwrap_or(false);

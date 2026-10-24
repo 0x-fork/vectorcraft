@@ -768,6 +768,10 @@ fn move_rows(s: &mut Session, p: &Value) -> Result<Value> {
         let ch = d.children_mut(parent)?;
         let index = index.min(ch.len());
         ch.splice(index..index, nodes);
+        // Copied type whose layout caches `reid` dropped has them again.
+        if copy {
+            super::typecmd::refresh_bounds_of(d, &out);
+        }
         sel.prune(d);
         sel.deselect_uneditable(d);
         Ok(out)

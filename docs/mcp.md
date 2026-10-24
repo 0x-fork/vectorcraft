@@ -4205,6 +4205,12 @@ that doesn't exist, a `from` that is point type, a `to` that is an open path, `f
 or already in a thread (`from` may be threaded already: the frame goes in beside it), coordinates that aren't finite
 numbers and a `before` that isn't true or false.
 
+In every thread, a paragraph that continues from one frame into the next has its first line, first-line indent and
+bullet or number in the frame where it starts. In the next frame its first line starts where its wrapped lines start,
+and it has no bullet or number. In a frame that is no longer threaded (after `text.thread.releaseSelection` or
+`text.thread.remove`), in a copy of a frame and in point type converted from one, the first paragraph has its first-line
+indent and bullet or number again.
+
 ```json
 {"name":"run_command","arguments":{"command":"text.thread.add","params":{"from":42,"at":[300,120]}}}
 ```
@@ -4398,8 +4404,8 @@ bullets and numbers. In a horizontal right-to-left list paragraph the indents ar
 indents are measured from the right edge, and the right indent from the left edge. Its marker starts the first line at
 the right, and the lines it wraps to start at the right where the first line's text starts after the marker. A
 right-to-left paragraph without a list keeps its left and first-line indents at the left, and vertical type keeps its
-indents as they are. In threaded type, a list paragraph that continues into the next frame starts that frame with its
-bullet or number again, as it starts it with its first-line indent.
+indents as they are. In threaded type, a list paragraph that continues into the next frame starts that frame where its
+wrapped lines start, without the bullet or number, and the paragraph after it takes the next number.
 
 The layout draws the marker (the bullet, or the number and its period) before the first line of each list paragraph
 that has text, in the font, size, scales and color of the paragraph's first character, without that character's

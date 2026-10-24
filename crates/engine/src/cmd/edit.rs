@@ -896,7 +896,7 @@ pub(crate) fn duplicate_in(d: &mut Document, sel: &mut vectorcraft_doc::Selectio
 /// document, each original and its copy before the copy goes in, and must leave the document's
 /// tree as it is. The copies take new ids in the order of `roots`. Roots listed twice, or inside
 /// another root, are copied one at a time: each copy is made from the document as the copies
-/// before it left it.
+/// before it left it. Copied type whose layout caches [`Document::reid`] dropped has them again.
 pub(crate) fn copy_above(d: &mut Document, roots: &[NodeId], mut change: impl FnMut(&mut Document, &Node, &mut Node)) -> Result<Vec<NodeId>> {
     let paths = d.index_paths(roots.iter().copied());
     let mut found: Vec<_> = roots.iter().filter_map(|id| paths.get(id)).collect();
@@ -923,6 +923,7 @@ pub(crate) fn copy_above(d: &mut Document, roots: &[NodeId], mut change: impl Fn
         }
         out
     };
+    super::typecmd::refresh_bounds_of(d, &out);
     Ok(out)
 }
 
