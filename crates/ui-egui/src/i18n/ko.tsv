@@ -4501,6 +4501,8 @@ theme	Appearance	외관
 @msg	{key} must be an array of non-negative integer object ids	{key}은(는) 음이 아닌 정수인 개체 id의 배열이어야 합니다
 @msg	invalid object id {value}: expected a non-negative integer	개체 id {value}이(가) 올바르지 않습니다: 음이 아닌 정수여야 합니다
 @msg	no such object id {value}	id가 {value}인 개체가 없습니다
+@msg	id {value} is a layer, not an object	id {value}은(는) 개체가 아닌 레이어입니다
+@msg	id {value} is a layer, not an object; move layers with layer.move	id {value}은(는) 개체가 아닌 레이어입니다. 레이어는 layer.move로 이동하세요
 @msg	automation filesystem access is not granted: read authority is absent: {path}	자동화 파일 시스템 접근이 허용되지 않았습니다: 읽기 권한이 없습니다: {path}
 @msg	automation filesystem access is not granted: write authority is absent: {path}	자동화 파일 시스템 접근이 허용되지 않았습니다: 쓰기 권한이 없습니다: {path}
 @msg	automation path rejected: outside the read root {root}: {path}	자동화 경로가 거부되었습니다: 읽기 루트 {root} 밖입니다: {path}
