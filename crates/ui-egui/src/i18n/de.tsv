@@ -4288,6 +4288,7 @@ theme	Appearance	Erscheinungsbild
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} ist ein Export-Plug-in (Datei › Exportieren › Exportieren als…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` ist {size} Byte groß (Grenze {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} wird bereits von {_2} verwendet
+@msg	{_1} is reserved by the system	{_1} ist vom System reserviert
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} verknüpfte Datei(en) können hier nicht gelesen werden: Ihre Vorschauen werden angezeigt
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} verknüpfte(s) Bild(er) wurde(n) auf dem Datenträger geändert: „Verknüpfungen aktualisieren“ zeigt die neuen Versionen
 @msg	{_1}: not saved, so not closed	{_1}: nicht gespeichert, daher nicht geschlossen
@@ -4968,6 +4969,7 @@ effect	Soft	Weich
 @msg	Persistent libraries not found: {files}	Dauerhafte Bibliotheken nicht gefunden: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` ist kein Bibliotheksbedienfeld (siehe window.swatchLibrary)
 @msg	library panel `{given}` isn't open	Bibliotheksbedienfeld `{given}` ist nicht geöffnet
+@msg	too many changed shortcuts	zu viele geänderte Tastaturbefehle
 @msg	library panel `{given}` isn't missing its library	dem Bibliotheksbedienfeld `{given}` fehlt seine Bibliothek nicht
 @msg	too many library panels were opened in this session	in dieser Sitzung wurden zu viele Bibliotheksbedienfelder geöffnet
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	Das Bild hat {_1} × {_2} Pixel, mehr als {LARGE_TRACE_SIDE} auf einer Seite: Es wird nachgezeichnet, aber langsamer. Eine Vorgabe mit geringerer Detailtreue oder eine kleinere Kopie des Bildes geht schneller.

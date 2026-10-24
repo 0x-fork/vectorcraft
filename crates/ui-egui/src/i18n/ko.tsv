@@ -4461,6 +4461,7 @@ theme	Appearance	외관
 @msg	unknown preset (one of {_1})	알 수 없는 프리셋({_1} 중 하나)
 @msg	unknown tool or command `{key}`	알 수 없는 도구 또는 명령 `{key}`
 @msg	{_1} is already used by {_2}	{_1}은(는) 이미 {_2}에서 사용 중입니다
+@msg	{_1} is reserved by the system	{_1}은(는) 시스템에서 예약되어 있습니다
 @msg	Couldn't copy to the system clipboard: {e}	시스템 클립보드로 복사할 수 없습니다: {e}
 @msg	Couldn't paste from the clipboard: {e}	클립보드에서 붙여넣을 수 없습니다: {e}
 @msg	nothing selected	선택된 항목이 없습니다
@@ -4965,6 +4966,7 @@ lighting	Light	광원
 @msg	Persistent libraries not found: {files}	지속 라이브러리를 찾을 수 없습니다: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}`은(는) 라이브러리 패널이 아닙니다(window.swatchLibrary 참조)
 @msg	library panel `{given}` isn't open	라이브러리 패널 `{given}`이(가) 열려 있지 않습니다
+@msg	too many changed shortcuts	변경된 단축키가 너무 많습니다
 @msg	library panel `{given}` isn't missing its library	라이브러리 패널 `{given}`의 라이브러리가 누락되지 않았습니다
 @msg	too many library panels were opened in this session	이 세션에서 라이브러리 패널을 너무 많이 열었습니다
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	이미지가 {_1} × {_2}픽셀로 한 변이 {LARGE_TRACE_SIDE}을 넘습니다. 추적은 되지만 더 느립니다. 충실도가 낮은 사전 설정이나 이미지의 작은 사본을 사용하면 더 빠릅니다.

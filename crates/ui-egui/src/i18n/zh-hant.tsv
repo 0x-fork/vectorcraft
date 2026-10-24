@@ -2230,6 +2230,7 @@ file-filter	Templates	範本
 @msg	unknown preset (one of {_1})	未知的預設集 (應為 {_1} 其中之一)
 @msg	unknown tool or command `{key}`	未知的工具或指令 `{key}`
 @msg	{_1} is already used by {_2}	{_1} 已由 {_2} 使用
+@msg	{_1} is reserved by the system	{_1} 已被系統保留
 @msg	Couldn't copy to the system clipboard: {e}	無法複製到系統剪貼簿：{e}
 @msg	Couldn't paste from the clipboard: {e}	無法從剪貼簿貼上：{e}
 @msg	nothing selected	未選取任何物件
@@ -2370,6 +2371,7 @@ file-filter	Templates	範本
 @msg	Persistent libraries not found: {files}	找不到持久資料庫：{files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` 不是資料庫面板 (請參閱 window.swatchLibrary)
 @msg	library panel `{given}` isn't open	資料庫面板 `{given}` 未開啟
+@msg	too many changed shortcuts	已變更的快速鍵過多
 @msg	library panel `{given}` isn't missing its library	資料庫面板 `{given}` 的資料庫未遺失
 @msg	too many library panels were opened in this session	本次工作階段開啟的資料庫面板過多
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	影像為 {_1} × {_2} 像素，有一邊超過 {LARGE_TRACE_SIDE}：仍會描圖，但速度較慢。使用精確度較低的預設集或較小的影像拷貝，描圖會較快。

@@ -3768,6 +3768,8 @@ axis	Both	Her İkisi
 @msg	bad colour `{hex}` (#rrggbb)	kötü renk `{hex}` (#rrggbb)
 @msg	bad page tree	kötü sayfa ağacı
 @msg	bad shortcut	kötü kısayol
+@msg	{_1} is reserved by the system	{_1} sistem tarafından ayrılmıştır
+@msg	too many changed shortcuts	değiştirilen kısayol sayısı çok fazla
 @msg	bad stream length	Kötü akış uzunluğu
 @msg	bad trailer	kötü römork
 @msg	balance must be between 0 and 100	bakiye 0 ile 100 arasında olmalıdır

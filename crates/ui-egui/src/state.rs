@@ -432,9 +432,10 @@ pub struct UiState {
     /// Recording in progress: (set index, action name, journal length when recording started).
     #[serde(skip)]
     pub recording: Option<(usize, String, usize)>,
-    /// Keyboard shortcut overrides: command id or `tool:<id>` → chord ("" = none).
-    #[serde(default)]
-    pub shortcut_overrides: std::collections::BTreeMap<String, String>,
+    /// Keyboard shortcut overrides: command id, `tool:<id>` or `panel:<id>` → chord ("" = none),
+    /// stored in the form every earlier version reads.
+    #[serde(default, with = "crate::keymap::stored")]
+    pub shortcut_overrides: craft_keymap::Overrides,
     /// Name of the shortcut set (preset or "Custom").
     #[serde(default = "default_shortcut_set", deserialize_with = "crate::shortcut_editor::deserialize_set_name")]
     pub shortcut_set: String,
@@ -821,7 +822,15 @@ impl UiState {
         self.workspace_changes.truncate(64);
         // Overrides that can't fire (modifier-only chords recorded by older versions, #487) give
         // the default back.
-        self.shortcut_overrides.retain(|_, c| c.is_empty() || crate::shortcut_editor::normalize(c).is_some());
+        let unusable: Vec<String> = self
+            .shortcut_overrides
+            .iter()
+            .filter(|(_, texts)| !texts.iter().all(|t| craft_keymap::Binding::parse(t).is_ok()))
+            .map(|(k, _)| k.to_string())
+            .collect();
+        for k in unusable {
+            self.shortcut_overrides.remove(&k);
+        }
         self
     }
 }

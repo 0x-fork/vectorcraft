@@ -4490,6 +4490,7 @@ imageTrace	Outline	Kontur
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} to wtyczka eksportu (Plik › Eksportuj › Eksportuj jako…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` ma {size} bajtów (limit {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} jest już używany przez {_2}
+@msg	{_1} is reserved by the system	Skrót {_1} jest zarezerwowany przez system
 @msg	{_1} linked file(s) can't be read here: their previews show	połączonych plików nie można tu odczytać ({_1}): wyświetlane są ich podglądy
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	połączone obrazy zmienione na dysku: {_1} — Aktualizuj łącza pokaże nowe wersje
 @msg	{_1}: not saved, so not closed	{_1}: nie zapisano, więc nie zamknięto
@@ -5241,6 +5242,7 @@ mark-style	Japanese	Japońskie
 @msg	Persistent libraries not found: {files}	Nie znaleziono trwałych bibliotek: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` nie jest panelem biblioteki (zobacz window.swatchLibrary)
 @msg	library panel `{given}` isn't open	panel biblioteki `{given}` nie jest otwarty
+@msg	too many changed shortcuts	zbyt wiele zmienionych skrótów
 @msg	library panel `{given}` isn't missing its library	panelowi biblioteki `{given}` nie brakuje biblioteki
 @msg	too many library panels were opened in this session	w tej sesji otwarto zbyt wiele paneli bibliotek
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	Obraz ma {_1} × {_2} pikseli, ponad {LARGE_TRACE_SIDE} na jednym boku: zostanie obrysowany, ale wolniej. Ustawienie wstępne o niższej wierności lub mniejsza kopia obrazu obrysuje się szybciej.

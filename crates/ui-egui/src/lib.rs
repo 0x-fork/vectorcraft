@@ -36,6 +36,7 @@ pub mod i18n;
 pub mod icon_data;
 pub mod icons;
 pub mod io;
+pub mod keymap;
 pub mod menus;
 pub mod native_menu;
 pub mod opening;
@@ -523,6 +524,8 @@ pub struct VectorcraftApp {
     font_install_check_at: f64,
     /// Keyboard pastes of something other than text (see [`shortcuts::PasteChord`]).
     pub(crate) paste_chord: shortcuts::PasteChord,
+    /// Runs the frame's key presses against the keymap ([`shortcuts::handle`]).
+    pub(crate) dispatcher: craft_keymap::egui::Dispatcher,
     /// Saves and exports running in the background (Preferences → File Handling).
     pub background: background::Background,
     /// Documents being read off the UI thread ([`opening`]).
@@ -659,6 +662,8 @@ impl VectorcraftApp {
             #[cfg(not(target_arch = "wasm32"))]
             font_install_check_at: f64::NEG_INFINITY,
             paste_chord: Default::default(),
+            // Held keys repeat their command (Cmd+= keeps zooming in).
+            dispatcher: craft_keymap::egui::Dispatcher::new().with_repeat(true),
             background: Default::default(),
             opening: Default::default(),
             plugin_runs: Default::default(),
@@ -1408,6 +1413,7 @@ impl VectorcraftApp {
             // The timer and heartbeat run in an idle window too.
             ctx.request_repaint_after(std::time::Duration::from_secs_f64(wait));
         }
+        crate::keymap::note_os(ctx);
         shortcut_editor::sync(&self.ui);
         prefs_dialog::apply_runtime(self, ctx);
         // The OS title bar (and the taskbar / Alt-Tab entry) follows the active file; with the

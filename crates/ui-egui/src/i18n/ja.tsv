@@ -4529,6 +4529,7 @@ swatch	Bright Violet	ビビッドバイオレット
 @msg	unknown preset (one of {_1})	不明なプリセットです ({_1} のいずれかを指定してください)
 @msg	unknown tool or command `{key}`	`{key}` は不明なツールまたはコマンドです
 @msg	{_1} is already used by {_2}	{_1} はすでに {_2} で使用されています
+@msg	{_1} is reserved by the system	{_1} はシステムで予約されています
 @msg	Couldn't copy to the system clipboard: {e}	システムのクリップボードにコピーできませんでした: {e}
 @msg	Couldn't paste from the clipboard: {e}	クリップボードから貼り付けられませんでした: {e}
 @msg	nothing selected	何も選択されていません
@@ -5042,6 +5043,7 @@ lighting	Light	ライト
 @msg	Persistent libraries not found: {files}	永続ライブラリが見つかりません: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` はライブラリパネルではありません (window.swatchLibrary を参照)
 @msg	library panel `{given}` isn't open	ライブラリパネル `{given}` は開いていません
+@msg	too many changed shortcuts	変更したショートカットが多すぎます
 @msg	library panel `{given}` isn't missing its library	ライブラリパネル `{given}` のライブラリは欠落していません
 @msg	too many library panels were opened in this session	このセッションで開いたライブラリパネルが多すぎます
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	画像は {_1} × {_2} ピクセルで、一辺が {LARGE_TRACE_SIDE} を超えています。トレースはできますが、時間がかかります。忠実度の低いプリセットや画像の小さいコピーを使うと速くなります。

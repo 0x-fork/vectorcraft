@@ -4403,6 +4403,7 @@ axis	Both	Entrambi
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} è un plug-in di esportazione (File › Esporta › Esporta come…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` occupa {size} byte (limite {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} è già usato da {_2}
+@msg	{_1} is reserved by the system	{_1} è riservato dal sistema
 @msg	{_1} linked file(s) can't be read here: their previews show	file collegati non leggibili qui: {_1}; vengono mostrate le loro anteprime
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	immagini collegate modificate su disco: {_1}; Aggiorna collegamenti mostra le nuove versioni
 @msg	Updated {_1} linked file(s) changed on disk	File collegati modificati su disco aggiornati: {_1}
@@ -5002,6 +5003,7 @@ lighting	Light	Luce
 @msg	Persistent libraries not found: {files}	Librerie persistenti non trovate: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` non è un pannello libreria (vedi window.swatchLibrary)
 @msg	library panel `{given}` isn't open	il pannello libreria `{given}` non è aperto
+@msg	too many changed shortcuts	troppe scelte rapide modificate
 @msg	library panel `{given}` isn't missing its library	la libreria del pannello libreria `{given}` non è mancante
 @msg	too many library panels were opened in this session	in questa sessione sono stati aperti troppi pannelli libreria
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	L’immagine è di {_1} × {_2} pixel, più di {LARGE_TRACE_SIDE} su un lato: viene vettorializzata, ma più lentamente. Un predefinito a fedeltà più bassa o una copia più piccola dell’immagine è più veloce.

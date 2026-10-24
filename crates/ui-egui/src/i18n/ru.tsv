@@ -4399,6 +4399,7 @@ axis	Both	Оба
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} — модуль экспорта (Файл › Экспорт › Экспортировать как…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` занимает {size} байт (предел {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} уже используется {_2}
+@msg	{_1} is reserved by the system	Сочетание {_1} зарезервировано системой
 @msg	{_1} linked file(s) can't be read here: their previews show	здесь невозможно прочитать связанных файлов: {_1}: отображаются их предварительные просмотры
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	связанных изображений ({_1}) изменились на диске: «Обновить связи» покажет новые версии
 @msg	Updated {_1} linked file(s) changed on disk	Обновлено связанных файлов, измененных на диске: {_1}
@@ -4998,6 +4999,7 @@ lighting	Light	Свет
 @msg	Persistent libraries not found: {files}	Постоянные библиотеки не найдены: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` — не панель библиотеки (см. window.swatchLibrary)
 @msg	library panel `{given}` isn't open	панель библиотеки `{given}` не открыта
+@msg	too many changed shortcuts	слишком много изменённых сочетаний
 @msg	library panel `{given}` isn't missing its library	библиотека панели библиотеки `{given}` не отсутствует
 @msg	too many library panels were opened in this session	в этом сеансе открыто слишком много панелей библиотек
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	Изображение {_1} × {_2} пикселей, больше {LARGE_TRACE_SIDE} по одной стороне: трассировка выполняется, но медленнее. Стиль с меньшей точностью или уменьшенная копия изображения трассируются быстрее.

@@ -4272,6 +4272,7 @@ axis	Both	Båda
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} är ett exportinsticksprogram (Fil › Exportera › Exportera som…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` är {size} byte (gräns {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} används redan av {_2}
+@msg	{_1} is reserved by the system	{_1} är reserverat av systemet
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} länkade fil(er) kan inte läsas här: deras förhandsgranskningar visas
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} länkade bild(er) har ändrats på disken: Uppdatera länkar visar de nya versionerna
 @msg	Updated {_1} linked file(s) changed on disk	Uppdaterade {_1} länkade fil(er) som ändrats på disken
@@ -5384,6 +5385,7 @@ swatch	Yellow Green	Gulgrön
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` är inte en bibliotekspanel (se window.swatchLibrary)
 @msg	library panel `{given}` isn't open	bibliotekspanelen `{given}` är inte öppen
 	Locate Library…	Hitta bibliotek…
+@msg	too many changed shortcuts	för många ändrade kortkommandon
 @msg	library panel `{given}` isn't missing its library	bibliotekspanelen `{given}` saknar inte sitt bibliotek
 @msg	Persistent libraries not found: {files}	Beständiga bibliotek hittades inte: {files}
 @msg	too many library panels were opened in this session	för många bibliotekspaneler har öppnats under den här sessionen

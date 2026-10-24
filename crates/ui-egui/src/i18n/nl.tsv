@@ -4366,6 +4366,7 @@ imageTrace	Outline	Contour
 @msg	{_1} font families available	{_1} lettertypefamilies beschikbaar
 @msg	{_1} is a live effect (Effect › Plug-ins)	{_1} is een live-effect (Effect › Plug-ins)
 @msg	{_1} is already used by {_2}	{_1} wordt al gebruikt door {_2}
+@msg	{_1} is reserved by the system	{_1} is gereserveerd door het systeem
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} gekoppelde bestand(en) kunnen hier niet worden gelezen: hun voorbeelden worden weergegeven
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} gekoppelde afbeelding(en) zijn gewijzigd op de schijf: Koppelingen bijwerken toont de nieuwe versies
 @msg	{_1}: not saved, so not closed	{_1}: niet opgeslagen, dus niet gesloten

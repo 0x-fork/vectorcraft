@@ -12,7 +12,6 @@ pub mod guard;
 pub mod inspect;
 pub mod journal;
 pub mod link_watch;
-pub mod namematch;
 pub mod steps;
 pub mod store;
 mod tooling;

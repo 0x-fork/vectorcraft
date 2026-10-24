@@ -324,7 +324,7 @@ fn load_variable_library_asks_off_the_ui_thread() {
 #[test]
 fn keyboard_shortcuts_import_and_export_ask_off_the_ui_thread() {
     let (mut app, shown, written) = app();
-    let set = crate::shortcut_editor::export_json("Custom", &BTreeMap::from([("view.grid".to_string(), "Ctrl+Alt+G".to_string())]));
+    let set = crate::shortcut_editor::export_json("Custom", &crate::keymap::overrides_from(&[("view.grid", "Ctrl+Alt+G")]));
     let (_, want) = crate::shortcut_editor::import_json(&set).unwrap();
     let bytes = serde_json::to_vec(&set).unwrap();
     app.services.read = Some(Box::new(move |_: &str| Ok(bytes.clone())));

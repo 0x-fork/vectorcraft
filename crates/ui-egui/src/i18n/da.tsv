@@ -4354,6 +4354,7 @@ imageTrace	Outline	Kontur
 @msg	{_1} font families available	{_1} skrifttypefamilier tilgængelige
 @msg	{_1} is a live effect (Effect › Plug-ins)	{_1} er en live-effekt (Effekt › Plug-ins)
 @msg	{_1} is already used by {_2}	{_1} bruges allerede af {_2}
+@msg	{_1} is reserved by the system	{_1} er reserveret af systemet
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} linket(e) fil(er) kan ikke læses her: deres forhåndsvisninger vises
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} linket(e) billede(r) er ændret på disken: Opdatér links viser de nye versioner
 @msg	{_1}: not saved, so not closed	{_1}: ikke gemt, derfor ikke lukket

@@ -4354,6 +4354,7 @@ imageTrace	Outline	Kontur
 @msg	{_1} font families available	{_1} keluarga font tersedia
 @msg	{_1} is a live effect (Effect › Plug-ins)	{_1} adalah efek langsung (Efek › Plug-in)
 @msg	{_1} is already used by {_2}	{_1} sudah digunakan oleh {_2}
+@msg	{_1} is reserved by the system	{_1} dicadangkan oleh sistem
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} berkas tertaut tidak dapat dibaca di sini: yang ditampilkan adalah pratinjaunya
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} gambar tertaut di disk telah berubah: Perbarui Tautan menampilkan versi barunya
 @msg	{_1}: not saved, so not closed	{_1}: tidak disimpan, sehingga tidak ditutup

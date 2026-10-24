@@ -4336,6 +4336,7 @@ theme	Appearance	Εμφάνιση
 @msg	{_1} is an exporter (File › Export › Export As…)	το {_1} είναι πρόσθετο εξαγωγής (Αρχείο › Εξαγωγή › Εξαγωγή ως…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	το `documentData` έχει {size} byte (όριο {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	το {_1} χρησιμοποιείται ήδη από το {_2}
+@msg	{_1} is reserved by the system	Το {_1} είναι δεσμευμένο από το σύστημα
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} συνδεδεμένα αρχεία δεν μπορούν να διαβαστούν εδώ: εμφανίζονται οι προεπισκοπήσεις τους
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} συνδεδεμένες εικόνες άλλαξαν στον δίσκο: η Ενημέρωση συνδέσμων εμφανίζει τις νέες εκδόσεις
 @msg	Updated {_1} linked file(s) changed on disk	Ενημερώθηκαν {_1} συνδεδεμένα αρχεία που άλλαξαν στον δίσκο
@@ -5341,6 +5342,7 @@ effect	Points	Σημεία
 @msg	Persistent libraries not found: {files}	Δεν βρέθηκαν μόνιμες βιβλιοθήκες: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	Το `{given}` δεν είναι πίνακας βιβλιοθήκης (δείτε window.swatchLibrary)
 @msg	library panel `{given}` isn't open	ο πίνακας βιβλιοθήκης `{given}` δεν είναι ανοιχτός
+@msg	too many changed shortcuts	πάρα πολλές τροποποιημένες συντομεύσεις
 @msg	library panel `{given}` isn't missing its library	η βιβλιοθήκη του πίνακα βιβλιοθήκης `{given}` δεν λείπει
 @msg	too many library panels were opened in this session	άνοιξαν πάρα πολλοί πίνακες βιβλιοθηκών σε αυτή τη συνεδρία
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	Η εικόνα είναι {_1} × {_2} εικονοστοιχεία, πάνω από {LARGE_TRACE_SIDE} σε μία πλευρά: ανιχνεύεται, αλλά πιο αργά. Μια προρύθμιση χαμηλότερης πιστότητας ή ένα μικρότερο αντίγραφο της εικόνας ανιχνεύεται γρηγορότερα.

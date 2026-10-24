@@ -4572,6 +4572,7 @@ imageTrace	Outline	Ääriviiva
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} on vientilaajennus (Tiedosto › Vie › Vie muodossa…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` on {size} tavua (raja {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} on jo käytössä kohteella {_2}
+@msg	{_1} is reserved by the system	{_1} on järjestelmän varaama
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} linkitettyä tiedostoa ei voi lukea täällä: niiden esikatselut näytetään
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} linkitettyä kuvaa muuttui levyllä: Päivitä linkit näyttää uudet versiot
 @msg	{_1}: not saved, so not closed	{_1}: ei tallennettu, joten ei suljettu
@@ -5353,6 +5354,7 @@ mark-style	Japanese	Japanilainen
 @msg	Persistent libraries not found: {files}	Pysyviä kirjastoja ei löytynyt: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` ei ole kirjastopaneeli (katso window.swatchLibrary)
 @msg	library panel `{given}` isn't open	kirjastopaneeli `{given}` ei ole auki
+@msg	too many changed shortcuts	liian monta muutettua pikanäppäintä
 @msg	library panel `{given}` isn't missing its library	kirjastopaneelin `{given}` kirjasto ei puutu
 @msg	too many library panels were opened in this session	tässä istunnossa on avattu liian monta kirjastopaneelia
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	Kuva on {_1} × {_2} kuvapistettä, yhdeltä sivultaan yli {LARGE_TRACE_SIDE}: se jäljitetään, mutta hitaammin. Pienemmän tarkkuuden esiasetus tai kuvan pienempi kopio jäljittyy nopeammin.
