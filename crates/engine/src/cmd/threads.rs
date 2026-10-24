@@ -153,11 +153,17 @@ pub(crate) fn reflow(before: &Document, doc: &mut Document) {
                 next.runs = part.runs;
                 next.set_paragraph_styles(part.paras);
                 let optical = optical.unwrap_or(t.optical_margin);
-                if next.runs != t.runs || next.para != t.para || next.paras != t.paras || optical != t.optical_margin {
+                if next.runs != t.runs
+                    || next.para != t.para
+                    || next.paras != t.paras
+                    || optical != t.optical_margin
+                    || part.list_count != t.list_count
+                {
                     t.runs = next.runs;
                     t.para = next.para;
                     t.paras = next.paras;
                     t.optical_margin = optical;
+                    t.list_count = part.list_count;
                     refresh_bounds(t);
                 }
             }
@@ -167,6 +173,36 @@ pub(crate) fn reflow(before: &Document, doc: &mut Document) {
         }
     }
     doc.text_threads = kept;
+}
+
+/// Type that is not a frame of a thread is a story of its own: its numbered list paragraphs count
+/// from 1. Each such type object with another [`TextObject::list_count`] (a copy of a frame, a
+/// frame taken out of its thread, a frame converted to point type, which [`reflow`] takes out of
+/// its thread) gets 0 and is laid out again.
+pub(crate) fn restart_unthreaded_counts(doc: &mut std::sync::Arc<Document>) {
+    let mut stale = vec![];
+    doc.walk(|n| {
+        if let NodeKind::Text(t) = &n.kind
+            && t.list_count != 0
+        {
+            stale.push(n.id);
+        }
+    });
+    if stale.is_empty() {
+        return;
+    }
+    let threaded: std::collections::HashSet<NodeId> = doc.text_threads.iter().flatten().copied().filter(|id| text_of(doc, *id).is_some()).collect();
+    stale.retain(|id| !threaded.contains(id));
+    if stale.is_empty() {
+        return;
+    }
+    let doc = std::sync::Arc::make_mut(doc);
+    for id in stale {
+        if let Some(NodeKind::Text(t)) = doc.node_mut(id).map(|n| &mut n.kind) {
+            t.list_count = 0;
+            refresh_bounds(t);
+        }
+    }
 }
 
 /// The Optical Margin Alignment setting that every frame of a thread with the frames `live` takes:
@@ -478,6 +514,7 @@ fn release(s: &mut Session, _: &Value) -> Result<Value> {
                 vectorcraft_text::edit::normalize(&mut story);
                 t.runs = story;
                 t.set_paragraph_styles(paras);
+                refresh_bounds(t);
             }
             let i = d.text_threads.iter().position(|t| *t == thread).unwrap_or(0);
             d.text_threads[i] = keep;
@@ -1129,5 +1166,179 @@ mod tests {
             assert_eq!(threads(&s), [[a, b]], "{name}");
             assert_eq!((optical(&s, a), optical(&s, b)), ((first, first), (first, first)), "{name}, first frame {first}");
         }
+    }
+
+    /// One count runs through a thread: the second frame's numbered paragraphs go on from the
+    /// first frame's, also after an edit, a save and a reopen. A pasted or duplicated copy of a
+    /// frame, a frame converted to point type, the frames of a thread that Remove Threading breaks
+    /// and the frame a Release Selection leaves alone count from 1.
+    #[test]
+    fn numbered_list_paragraphs_count_on_through_a_thread() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({"width": 600, "height": 300})).unwrap();
+        let items = (1..=10).map(|i| format!("Item {i}")).collect::<Vec<_>>().join("\n");
+        let a = new_id(s.execute("text.create", &json!({"x": 10, "y": 10, "text": items, "area": {"width": 150, "height": 60}})).unwrap());
+        let b = new_id(s.execute("shape.rectangle", &json!({"x": 200, "y": 10, "width": 150, "height": 200})).unwrap());
+        s.execute("select.set", &json!({"ids": [a, b]})).unwrap();
+        s.execute("text.thread.create", &json!({})).unwrap();
+        s.execute("text.setFormat", &json!({"ids": [a, b], "list": "number"})).unwrap();
+        let numbers = |s: &Session, id: u64| {
+            let Some(NodeKind::Text(t)) = s.doc().unwrap().doc.node(NodeId(id)).map(|n| &n.kind) else { panic!("text") };
+            vectorcraft_text::layout(vectorcraft_text::FontDb::global(), t).markers.iter().map(|m| m.text.clone()).collect::<Vec<_>>()
+        };
+        let all = |from: usize| (from..=10).map(|n| format!("{n}.")).collect::<Vec<_>>();
+        let first = numbers(&s, a);
+        assert!((2..10).contains(&first.len()), "both frames hold items: {first:?}");
+        assert_eq!([first.clone(), numbers(&s, b)].concat(), all(1));
+        // Typing a paragraph into the first frame numbers it and moves the rest on.
+        s.execute("text.editRange", &json!({"id": a, "start": 0, "end": 0, "insert": "Item 0\n"})).unwrap();
+        assert_eq!([numbers(&s, a), numbers(&s, b)].concat(), [vec!["1.".to_string()], all(2), vec!["11.".to_string()]].concat());
+        s.execute("edit.undo", &json!({})).unwrap();
+        let reopened = vectorcraft_format::load(&vectorcraft_format::save(&s.doc().unwrap().doc, false)).unwrap();
+        let Some(NodeKind::Text(back)) = reopened.node(NodeId(b)).map(|n| &n.kind) else { panic!("text") };
+        let after: Vec<String> = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), back).markers.iter().map(|m| m.text.clone()).collect();
+        assert_eq!(after, all(first.len() + 1), "reopened");
+        // A pasted copy of the second frame is in no thread.
+        s.execute("select.set", &json!({"ids": [b]})).unwrap();
+        s.execute("edit.copy", &json!({})).unwrap();
+        s.execute("edit.paste", &json!({})).unwrap();
+        let copy = s.doc().unwrap().selection.objects.first().copied().unwrap();
+        assert_ne!(copy, NodeId(b));
+        assert_eq!(numbers(&s, copy.0).first().map(String::as_str), Some("1."));
+        s.execute("select.set", &json!({"ids": [b]})).unwrap();
+        let duplicate = s.execute("edit.duplicate", &json!({"dx": 10})).unwrap()["ids"][0].as_u64().unwrap();
+        assert_eq!(numbers(&s, duplicate).first().map(String::as_str), Some("1."), "a duplicate");
+        let layer = s.doc().unwrap().doc.layers[0].id.0;
+        let moved = s.execute("layer.move", &json!({"ids": [b], "target": layer, "copy": true})).unwrap()["ids"][0].as_u64().unwrap();
+        assert_eq!(numbers(&s, moved).first().map(String::as_str), Some("1."), "a copy dragged in the Layers panel");
+        assert_eq!(numbers(&s, b), all(first.len() + 1), "the frame itself");
+        // Convert To Point Type takes the second frame out of the thread with its text.
+        s.execute("type.convertToPointType", &json!({"ids": [b]})).unwrap();
+        assert!(threads(&s).is_empty());
+        assert_eq!(numbers(&s, b).first().map(String::as_str), Some("1."), "the frame converted to point type");
+        s.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(numbers(&s, b), all(first.len() + 1), "undo");
+        // Remove Threading: each frame is a story of its own.
+        s.execute("select.set", &json!({"ids": [a]})).unwrap();
+        s.execute("text.thread.remove", &json!({})).unwrap();
+        assert!(threads(&s).is_empty());
+        assert_eq!(numbers(&s, b).first().map(String::as_str), Some("1."));
+        s.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(numbers(&s, b), all(first.len() + 1), "undo");
+        // Release Selection of the first frame: the second one holds the whole story, from 1.
+        s.execute("select.set", &json!({"ids": [a]})).unwrap();
+        s.execute("text.thread.releaseSelection", &json!({})).unwrap();
+        assert!(threads(&s).is_empty());
+        assert_eq!(numbers(&s, b), all(1), "the frame left holds the story");
+    }
+
+    /// New Symbol from a numbered thread keeps each frame's count in the symbol's art, so the art
+    /// looks as it did; Break Link puts the frames in no thread, and each counts from 1.
+    #[test]
+    fn a_symbol_made_of_a_numbered_thread_keeps_its_numbers() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({"width": 600, "height": 300})).unwrap();
+        let items = (1..=10).map(|i| format!("Item {i}")).collect::<Vec<_>>().join("\n");
+        let a = new_id(s.execute("text.create", &json!({"x": 10, "y": 10, "text": items, "area": {"width": 150, "height": 60}})).unwrap());
+        let b = new_id(s.execute("shape.rectangle", &json!({"x": 200, "y": 10, "width": 150, "height": 200})).unwrap());
+        s.execute("select.set", &json!({"ids": [a, b]})).unwrap();
+        s.execute("text.thread.create", &json!({})).unwrap();
+        s.execute("text.setFormat", &json!({"ids": [a, b], "list": "number"})).unwrap();
+        let count = |t: &TextObject| t.list_count;
+        let carried = text_of(&s.doc().unwrap().doc, NodeId(b)).map(count).unwrap();
+        assert!(carried > 0);
+        let instance = new_id(s.execute("symbol.new", &json!({"name": "Numbered"})).unwrap());
+        let counts = |n: &Node| {
+            let mut counts = vec![];
+            n.walk(&mut |n| {
+                if let NodeKind::Text(t) = &n.kind {
+                    counts.push(t.list_count);
+                }
+            });
+            counts.sort_unstable();
+            counts
+        };
+        let doc = &s.doc().unwrap().doc;
+        assert_eq!(counts(&doc.symbols.iter().find(|x| x.name == "Numbered").unwrap().art), [0, carried]);
+        // Break Link puts the frames on the artboard in no thread: each counts from 1.
+        s.execute("select.set", &json!({"ids": [instance]})).unwrap();
+        s.execute("symbol.breakLink", &json!({})).unwrap();
+        let doc = &s.doc().unwrap().doc;
+        assert_eq!(doc.layers.iter().flat_map(|l| counts(l)).collect::<Vec<_>>(), [0, 0]);
+    }
+
+    /// A frame of a numbered thread pasted while an opacity mask is edited numbers from 1 in the
+    /// mask art too.
+    #[test]
+    fn a_frame_pasted_into_an_edited_opacity_mask_numbers_from_1() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({"width": 600, "height": 300})).unwrap();
+        let items = (1..=10).map(|i| format!("Item {i}")).collect::<Vec<_>>().join("\n");
+        let a = new_id(s.execute("text.create", &json!({"x": 10, "y": 10, "text": items, "area": {"width": 150, "height": 60}})).unwrap());
+        let b = new_id(s.execute("shape.rectangle", &json!({"x": 200, "y": 10, "width": 150, "height": 200})).unwrap());
+        s.execute("select.set", &json!({"ids": [a, b]})).unwrap();
+        s.execute("text.thread.create", &json!({})).unwrap();
+        s.execute("text.setFormat", &json!({"ids": [a, b], "list": "number"})).unwrap();
+        assert!(text_of(&s.doc().unwrap().doc, NodeId(b)).is_some_and(|t| t.list_count > 0));
+        s.execute("select.set", &json!({"ids": [b]})).unwrap();
+        s.execute("edit.copy", &json!({})).unwrap();
+        let obj = new_id(s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 400, "height": 280})).unwrap());
+        let m = new_id(s.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 100, "height": 200})).unwrap());
+        s.execute("select.set", &json!({"ids": [obj, m]})).unwrap();
+        s.execute("transparency.makeOpacityMask", &json!({})).unwrap();
+        s.execute("transparency.editOpacityMask", &json!({})).unwrap();
+        s.execute("edit.paste", &json!({})).unwrap();
+        let doc = &s.doc().unwrap().doc;
+        let mut counts = vec![];
+        doc.node(NodeId(obj)).unwrap().extras().mask.as_ref().unwrap().art.walk(&mut |n| {
+            if let NodeKind::Text(t) = &n.kind {
+                counts.push(t.list_count);
+            }
+        });
+        assert_eq!(counts, [0], "the pasted frame in the mask art");
+    }
+
+    /// A duplicate of a frame that carried a count of 99 or more numbers from 1 and has the layout
+    /// bounds of what it draws: "01." leaves the text at the left indent, where a three-digit
+    /// number pushed it on to the next tab stop and the paragraph took more lines.
+    #[test]
+    fn a_duplicated_frame_numbers_from_1_with_its_own_bounds() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({"width": 600, "height": 300})).unwrap();
+        let story = format!("{}Itemized lists paragraph text", "x\n".repeat(110));
+        let a = new_id(s.execute("text.create", &json!({"x": 10, "y": 10, "text": story, "area": {"width": 150, "height": 1500}})).unwrap());
+        let b = new_id(s.execute("shape.rectangle", &json!({"x": 200, "y": 10, "width": 100, "height": 300})).unwrap());
+        s.execute("select.set", &json!({"ids": [a, b]})).unwrap();
+        s.execute("text.thread.create", &json!({})).unwrap();
+        s.execute("text.setFormat", &json!({"ids": [a, b], "number": "twoDigits"})).unwrap();
+        s.execute("select.set", &json!({"ids": [b]})).unwrap();
+        let copy = s.execute("edit.duplicate", &json!({"dx": 200})).unwrap()["ids"][0].as_u64().unwrap();
+        let laid = |s: &Session, id: u64| {
+            let Some(t) = text_of(&s.doc().unwrap().doc, NodeId(id)) else { panic!("area type") };
+            let lay = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), t);
+            (lay.markers[0].text.clone(), lay.lines.len(), lay.bounds, t.cached_bounds.unwrap())
+        };
+        let (number, lines, _, _) = laid(&s, b);
+        let (copy_number, copy_lines, bounds, cached) = laid(&s, copy);
+        assert!(number.len() == 4 && number.starts_with('1'), "a three-digit number: {number}");
+        assert_eq!(copy_number, "01.");
+        assert!(copy_lines < lines, "{copy_lines} {lines}");
+        assert!((cached.y1 - bounds.y1).abs() < 1e-6, "the copy's bounds: {cached:?} {bounds:?}");
+    }
+
+    /// Release Selection that leaves one frame of a thread gives that frame the whole story and
+    /// the layout bounds of its new text.
+    #[test]
+    fn the_frame_a_release_leaves_alone_has_the_bounds_of_the_whole_story() {
+        let (mut s, a, b) = setup();
+        s.execute("text.thread.create", &json!({})).unwrap();
+        s.execute("select.set", &json!({"ids": [a]})).unwrap();
+        s.execute("text.thread.releaseSelection", &json!({})).unwrap();
+        assert!(threads(&s).is_empty());
+        assert_eq!(text(&s, b), TEXT.repeat(4));
+        let Some(t) = text_of(&s.doc().unwrap().doc, NodeId(b)) else { panic!("area type") };
+        let bounds = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), t).bounds;
+        let cached = t.cached_bounds.unwrap();
+        assert!((cached.y0 - bounds.y0).abs() < 1e-6 && (cached.y1 - bounds.y1).abs() < 1e-6, "{cached:?} {bounds:?}");
     }
 }

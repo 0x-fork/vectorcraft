@@ -1017,19 +1017,22 @@ fn variable_font_settings_are_warned_as_left_out() {
     assert!(String::from_utf8(out.bytes).unwrap().contains("(H\\351llo \\2005\\r) Tx\n"), "still written as text");
 }
 
-/// A legacy `.ai` paragraph has no list: type with a bulleted list is written as its text, with the
-/// warning that the bullets are left out.
+/// A legacy `.ai` paragraph has no list: type with a bulleted or numbered list is written as its
+/// text, with the warning that the bullets and numbers are left out.
 #[test]
-fn bulleted_lists_are_warned_as_left_out() {
-    let mut doc = typed();
-    let id = texts(&doc)[0].0.id;
-    if let Some(NodeKind::Text(t)) = doc.node_mut(id).map(|n| &mut n.kind) {
-        t.para.list = Some(vectorcraft_doc::text::ParaList::bulleted(vectorcraft_doc::text::Bullet::Square));
-        t.normalize_paras();
+fn bulleted_and_numbered_lists_are_warned_as_left_out() {
+    use vectorcraft_doc::text::{Bullet, NumberStyle, ParaList};
+    for list in [ParaList::bulleted(Bullet::Square), ParaList::numbered(NumberStyle::UpperRoman)] {
+        let mut doc = typed();
+        let id = texts(&doc)[0].0.id;
+        if let Some(NodeKind::Text(t)) = doc.node_mut(id).map(|n| &mut n.kind) {
+            t.para.list = Some(list);
+            t.normalize_paras();
+        }
+        let out = write(&doc);
+        assert!(out.warnings.iter().any(|w| w == TYPE_ATTRIBUTES && w.contains("bulleted and numbered lists")), "{list:?}: {:?}", out.warnings);
+        assert!(String::from_utf8(out.bytes).unwrap().contains("(H\\351llo \\2005\\r) Tx\n"), "still written as text");
     }
-    let out = write(&doc);
-    assert!(out.warnings.iter().any(|w| w == TYPE_ATTRIBUTES && w.contains("bulleted lists")), "{:?}", out.warnings);
-    assert!(String::from_utf8(out.bytes).unwrap().contains("(H\\351llo \\2005\\r) Tx\n"), "still written as text");
 }
 
 #[test]

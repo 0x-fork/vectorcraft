@@ -1997,6 +1997,9 @@ impl Session {
                     cmd::inline::refresh(&before, Arc::make_mut(&mut st.doc));
                     // Text Wrap: area type follows its wrap objects; then threads re-flow.
                     cmd::textwrap::refresh(Arc::make_mut(&mut st.doc));
+                    // Type in no thread numbers its list paragraphs from 1 (before the mask copies
+                    // its editing layer's art).
+                    cmd::threads::restart_unthreaded_counts(&mut st.doc);
                     // Opacity-mask editing: the mask follows its art on the editing layer.
                     if st.doc.mask_edit.is_some() {
                         cmd::maskedit::sync(Arc::make_mut(&mut st.doc));
