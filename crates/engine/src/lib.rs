@@ -869,6 +869,19 @@ pub(crate) fn deselect_guides(d: &Document, sel: &mut Selection) -> bool {
     any
 }
 
+/// Deselect what the View menu keeps from being selected: the guides while Lock Guides is on
+/// ([`deselect_guides`]), and the slices that the Slice Selection tool or a slice command selected
+/// ([`Selection::slices`]) while Lock Slices or Hide Slices is on. A selected object that is an
+/// object slice stays selected. → whether any was selected.
+pub(crate) fn deselect_hidden(menu: &cmd::menucmds::MenuState, d: &Document, sel: &mut Selection) -> bool {
+    let guides = menu.guides_locked && deselect_guides(d, sel);
+    let slices = (menu.slices_locked || menu.slices_hidden) && !sel.slices.is_empty();
+    if slices {
+        sel.slices.clear();
+    }
+    guides || slices
+}
+
 /// The error of an edit that would nest objects deeper than [`vectorcraft_doc::MAX_DEPTH`].
 pub const TOO_DEEP: &str = "objects can't be nested more than 32 deep";
 const _: () = assert!(vectorcraft_doc::MAX_DEPTH == 32, "TOO_DEEP (and its catalog rows) names the cap");
@@ -1920,7 +1933,7 @@ impl Session {
         if !self.previewing && cmd::typing_in_progress(self) {
             cmd::settle_interaction(self)?;
         }
-        let guides_locked = self.menu.guides_locked;
+        let menu = self.menu.clone();
         let st = self.doc_mut()?;
         let before = st.doc.clone();
         let before_sel = st.selection.clone();
@@ -1977,10 +1990,10 @@ impl Session {
         match result {
             Ok(v) => {
                 st.selection.prune(&st.doc);
-                // An edit that selects what it unlocks, shows or pastes leaves locked guides out.
-                if guides_locked {
-                    deselect_guides(&st.doc, &mut st.selection);
-                }
+                // An edit that selects what it unlocks, shows or pastes leaves locked guides out,
+                // and one that selects the slices it makes leaves them out while they are locked
+                // or hidden.
+                deselect_hidden(&menu, &st.doc, &mut st.selection);
                 // The art on a locked artboard can't stay selected, however it got there, except
                 // the new art this edit made and new art still selected.
                 st.protect_locked_artboards(&before_sel.objects, &before_sel.new_art, Some(&*before));
@@ -2033,16 +2046,15 @@ impl Session {
     /// Change only the selection (not an undo step).
     pub fn select(&mut self, f: impl FnOnce(&Document, &mut Selection)) -> Result<()> {
         self.active_appearance_item = None;
-        let guides_locked = self.menu.guides_locked;
+        let menu = self.menu.clone();
         let st = self.doc_mut()?;
         let before = st.selection.objects.clone();
         let new_art = st.selection.new_art.clone();
         f(&st.doc, &mut st.selection);
         st.selection.prune(&st.doc);
-        // Lock Guides locks the paths made into guides too (#1534), whatever selects them.
-        if guides_locked {
-            deselect_guides(&st.doc, &mut st.selection);
-        }
+        // Lock Guides locks the paths made into guides too (#1534), and Lock Slices and Hide
+        // Slices keep the slices out, whatever selects them.
+        deselect_hidden(&menu, &st.doc, &mut st.selection);
         // The art on a locked artboard can't be selected, whatever selects it, except new art
         // that was selected and still is.
         st.protect_locked_artboards(&before, &new_art, None);
@@ -2104,6 +2116,7 @@ impl Session {
     /// Re-apply `cmd` on top of the interaction snapshot (replacing the previous preview).
     pub fn preview(&mut self, cmd: &str, params: &Value) -> Result<Value> {
         {
+            let menu = self.menu.clone();
             let st = self.doc_mut()?;
             let Some(it) = &st.interaction else { return Err(EngineError::Other("no interaction in progress".into())) };
             // Undoing the previous preview counts as a change, so views redraw even when the command
@@ -2116,6 +2129,9 @@ impl Session {
             if selection_changed {
                 st.selection.clone_from(&it.selection);
             }
+            // Guides locked and slices locked or hidden during the interaction stay deselected,
+            // even when the preview fails.
+            deselect_hidden(&menu, &st.doc, &mut st.selection);
             cmd::globaledit::follow_history(st);
         }
         // The previous preview's paint is undone with it.
@@ -2191,13 +2207,11 @@ impl Session {
     pub fn cancel_interaction(&mut self) -> Result<()> {
         self.clear_deferred_overlay_cache();
         self.pending_paint = None;
-        let guides_locked = self.menu.guides_locked;
+        let menu = self.menu.clone();
         let st = self.doc_mut()?;
         st.undo_interaction();
-        // Guides locked during the interaction stay deselected.
-        if guides_locked {
-            deselect_guides(&st.doc, &mut st.selection);
-        }
+        // Guides locked and slices locked or hidden during the interaction stay deselected.
+        deselect_hidden(&menu, &st.doc, &mut st.selection);
         Ok(())
     }
 
@@ -2269,9 +2283,7 @@ impl Session {
             {
                 st.doc = e.doc;
                 st.selection = Arc::unwrap_or_clone(e.selection);
-                if self.menu.guides_locked {
-                    deselect_guides(&st.doc, &mut st.selection);
-                }
+                deselect_hidden(&self.menu, &st.doc, &mut st.selection);
                 st.sync_new_art();
                 cmd::globaledit::follow_history(st);
                 st.revision += 1;
@@ -2333,7 +2345,7 @@ impl Session {
             self.end_document_undo_group(scope.uid, cancel);
             return;
         };
-        let guides_locked = self.menu.guides_locked;
+        let menu = self.menu.clone();
         let Some(st) = self.document_mut(scope.uid) else { return };
         let Some(g) = &mut st.undo_group else { return };
         let newest = g.first.as_ref().is_some_and(|f| st.history.undo.last().is_some_and(|e| Arc::ptr_eq(&e.doc, f)));
@@ -2352,9 +2364,7 @@ impl Session {
         st.doc = doc;
         st.selection = selection;
         cmd::globaledit::follow_history(st);
-        if guides_locked {
-            deselect_guides(&st.doc, &mut st.selection);
-        }
+        deselect_hidden(&menu, &st.doc, &mut st.selection);
         st.history.recost_last(&st.doc);
         st.revision += 1;
         self.journal.truncate(scope.journal);
