@@ -580,6 +580,8 @@ their content). `version: 2` or `1` writes a file older VectorCraft versions ope
 compressed), and `preview: true` embeds a PNG of the first artboard, at most 256 px on its longer side. A save writes
 a temporary file and renames it over the old one, so a failed save never damages the file; only the images the
 document uses are written, and document keys written by a newer version are kept.
+An uncompressed file is indented JSON when the document has at most 2,000 layers and objects and the indented
+document, as the chosen version writes it, is at most 1 MiB; otherwise the file is compact JSON.
 
 ## Resources
 

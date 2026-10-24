@@ -253,17 +253,25 @@ impl SaveOptions {
         Ok(())
     }
 
-    /// The defaults for saving `doc` to disk: pretty when small (see [`PRETTY_MAX_OBJECTS`] and
-    /// [`PRETTY_MAX_BYTES`]).
+    /// The defaults for saving `doc` to disk: pretty when small (see [`Self::pretty_fits`]).
     pub fn for_doc(doc: &Document) -> Self {
+        let o = Self::default();
+        Self { pretty: o.pretty_fits(doc), ..o }
+    }
+
+    /// Is `doc` small enough to save pretty-printed with these options: at most
+    /// [`PRETTY_MAX_OBJECTS`] objects, and at most [`PRETTY_MAX_BYTES`] of pretty-printed JSON
+    /// as [`save_to`] writes the document with them (in their version)?
+    pub fn pretty_fits(&self, doc: &Document) -> bool {
         let objects: usize = doc.layers.iter().map(|l| l.count()).sum();
-        Self { pretty: objects <= PRETTY_MAX_OBJECTS && compact_size_at_most(doc, PRETTY_MAX_BYTES), ..Self::default() }
+        objects <= PRETTY_MAX_OBJECTS && body(doc, self).is_ok_and(|b| pretty_size_at_most(&b, PRETTY_MAX_BYTES))
     }
 }
 
-/// Is `doc` at most `limit` bytes as compact JSON? Serializing stops as soon as it is past the
-/// limit, so a large document costs no more than `limit` bytes of work.
-fn compact_size_at_most(doc: &Document, limit: usize) -> bool {
+/// Is the document in `b` at most `limit` bytes as pretty-printed JSON, indented as a pretty file
+/// holds it? Serializing stops as soon as it is past the limit, so a large document costs no more
+/// than `limit` bytes of work.
+fn pretty_size_at_most(b: &Body, limit: usize) -> bool {
     struct Capped {
         left: usize,
     }
@@ -276,7 +284,47 @@ fn compact_size_at_most(doc: &Document, limit: usize) -> bool {
             Ok(())
         }
     }
-    serde_json::to_writer(Capped { left: limit }, doc).is_ok()
+    // The document is a member of the file's top-level object, indented one level more.
+    write_body(Indent { inner: Capped { left: limit }, on: true }, b.v1.as_ref(), &b.d, true).is_ok()
+}
+
+/// The document as [`save_to`] writes it, with the images it lists outside the document.
+struct Body {
+    d: Document,
+    /// The version 1 form of `d`, written instead of it.
+    v1: Option<serde_json::Value>,
+    blobs: BTreeMap<String, ImageBlob>,
+    /// Images only linked images show (see [`Document::linked_only_images`]).
+    linked: std::collections::BTreeSet<String>,
+}
+
+/// `doc` as [`save_to`] writes it with `o`: without editing-mode working copies, with placed
+/// documents as their art for older versions, and its images taken out.
+fn body(doc: &Document, o: &SaveOptions) -> Result<Body, FormatError> {
+    let version = o.version;
+    let mut d = doc.without_edit_modes().into_owned();
+    // Older apps don't know placed documents: they get the art the objects show, with its
+    // resources. Otherwise resources only exporting adds are never saved.
+    if version < VERSION && d.has_placed() {
+        d = d.with_placed_art().into_owned();
+        d.placed_as_groups();
+    } else {
+        d.drop_placed_resources();
+    }
+    let linked = d.linked_only_images();
+    // The blobs go in the file's `images` (only those the document uses).
+    let blobs = std::mem::take(&mut d.images);
+    if version < 3 {
+        d.store_legacy_color_profiles();
+    }
+    let v1 = if version == 1 {
+        let mut v = serde_json::to_value(&d).map_err(encode_err)?;
+        legacy::anchors_to_v1(&mut v);
+        Some(v)
+    } else {
+        None
+    };
+    Ok(Body { d, v1, blobs, linked })
 }
 
 /// Serialize a document (pretty = human-diffable) in the current version. Editing-mode working
@@ -289,9 +337,9 @@ pub fn save(doc: &Document, pretty: bool) -> Vec<u8> {
 /// compact, where indentation would multiply the file size and slow opening down.
 pub const PRETTY_MAX_OBJECTS: usize = 2000;
 
-/// Documents whose compact JSON is larger than this are saved compact even with few objects:
-/// pretty-printing spreads every path anchor over several lines, so traced or generated art (in
-/// layers, symbols or patterns alike) would grow about tenfold.
+/// Documents whose pretty-printed JSON is larger than this are saved compact even with few
+/// objects: pretty-printing spreads every path anchor over several lines, so traced or generated
+/// art (in layers, symbols or patterns alike) grows about fivefold.
 pub const PRETTY_MAX_BYTES: usize = 1 << 20;
 
 /// Serialize for saving to disk: pretty when small, compact when large.
@@ -317,28 +365,7 @@ const JSON_CHUNK: usize = 64 << 10;
 pub fn save_to(doc: &Document, o: &SaveOptions, w: impl Write) -> Result<(), FormatError> {
     o.check()?;
     let pretty = o.pretty && !o.compress;
-    let mut d = doc.without_edit_modes().into_owned();
-    // Older apps don't know placed documents: they get the art the objects show, with its
-    // resources. Otherwise resources only exporting adds are never saved.
-    if o.version < VERSION && d.has_placed() {
-        d = d.with_placed_art().into_owned();
-        d.placed_as_groups();
-    } else {
-        d.drop_placed_resources();
-    }
-    let linked = d.linked_only_images();
-    // The blobs go in the file's `images` (only those the document uses).
-    let blobs = std::mem::take(&mut d.images);
-    if o.version < 3 {
-        d.store_legacy_color_profiles();
-    }
-    let v1 = if o.version == 1 {
-        let mut v = serde_json::to_value(&d).map_err(encode_err)?;
-        legacy::anchors_to_v1(&mut v);
-        Some(v)
-    } else {
-        None
-    };
+    let Body { d, v1, blobs, linked } = body(doc, o)?;
     let entries = Entries { blobs: &blobs, linked: &linked, include_linked: o.include_linked };
     let mut out_blobs = Blobs { tail: vec![], at: 0, outside: o.version >= 4 };
     // Images are only referenced by image objects' `key` (wherever the objects are: layers,
