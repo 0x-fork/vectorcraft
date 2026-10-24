@@ -93,7 +93,7 @@ pub use appearance::{
 };
 pub use assets::ExportAsset;
 pub use corners::LiveCorners;
-pub use depth::MAX_DEPTH;
+pub use depth::{MAX_DEPTH, MAX_SYMBOL_NODES};
 pub use graph::{
     ColumnDesign, ColumnType, Fractions, GraphDesign, GraphKind, GraphSpec, LabelStyles, MAX_GRAPH_CATEGORIES, MAX_GRAPH_SERIES, PiePosition,
     PieSort, SeriesPaint, TickLength, ValueAxisSide,
