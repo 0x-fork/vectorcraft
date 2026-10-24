@@ -1296,6 +1296,95 @@ fn live_objects_draw_symbol_and_pattern_art_edits() {
     edit_draws_as_new(with_art(d, vec![envelope]), red_bar);
 }
 
+/// Symbol `S` ([`symbol_art`]) at twice its size: bent by an envelope on the page at (50, 50), as
+/// the opacity mask of a black square at (350, 50) and in a clip group at (450, 50); not bent, in a
+/// group with a drop shadow at (150, 50); and an instance at (250, 50), at twice its size, of
+/// symbol `Bent`, whose art is an envelope bending a copy of `S`'s art.
+fn symbol_in_live_and_effect_art() -> Document {
+    use vectorcraft_geom::shapes::rectangle;
+    let mut d = Document::new(500.0, 100.0);
+    let art = symbol_art(&mut d);
+    d.symbols.push(vectorcraft_doc::Symbol { name: "S".into(), art: Arc::new(art) });
+    let bent = |d: &mut Document, x: f64| {
+        let xf = Affine::translate((x, 50.0)) * Affine::scale(2.0);
+        let s = Node::new(d.alloc_id(), NodeKind::SymbolInstance { symbol: "S".into(), xf });
+        arc_envelope(d, vec![s], false)
+    };
+    let envelope = bent(&mut d, 50.0);
+    let xf = Affine::translate((150.0, 50.0)) * Affine::scale(2.0);
+    let shadowed = Node::new(d.alloc_id(), NodeKind::SymbolInstance { symbol: "S".into(), xf });
+    let mut group = Node::group(d.alloc_id(), vec![Arc::new(shadowed)]);
+    group.appearance.effects.push(drop_shadow());
+    let copy = symbol_art(&mut d);
+    let art = arc_envelope(&mut d, vec![copy], false);
+    d.symbols.push(vectorcraft_doc::Symbol { name: "Bent".into(), art: Arc::new(art) });
+    let xf = Affine::translate((250.0, 50.0)) * Affine::scale(2.0);
+    let symbol = Node::new(d.alloc_id(), NodeKind::SymbolInstance { symbol: "Bent".into(), xf });
+    let mask = bent(&mut d, 350.0);
+    let mut masked = filled(&mut d, rectangle(Rect::new(310.0, 10.0, 390.0, 90.0)), Paint::solid(Color::BLACK), vec![]);
+    masked.extras_mut().mask = Some(Box::new(vectorcraft_doc::OpacityMask::new(mask, true)));
+    let clip = filled(&mut d, rectangle(Rect::new(410.0, 10.0, 490.0, 90.0)), Paint::None, vec![]);
+    let member = bent(&mut d, 450.0);
+    let clipped = Node::new(d.alloc_id(), NodeKind::Group { children: vec![Arc::new(clip), Arc::new(member)], clip: true });
+    with_art(d, vec![envelope, group, symbol, masked, clipped])
+}
+
+/// A renderer draws [`symbol_in_live_and_effect_art`] a second time, in Preview and in Outline
+/// view, from what it kept, without walking any of its envelopes or its group with a drop shadow
+/// again.
+#[test]
+fn unchanged_live_objects_and_effect_art_are_not_walked_again() {
+    let _fonts = fonts_steady();
+    let d = symbol_in_live_and_effect_art();
+    let preview = RenderOptions { background: Some([255, 255, 255, 255]), ..Default::default() };
+    let outline = RenderOptions { outline: true, ..preview.clone() };
+    for (view, opts) in [("Preview", &preview), ("Outline", &outline)] {
+        let mut r = Renderer::new();
+        let first = r.render(&d, 500, 100, Affine::IDENTITY, opts).pixels;
+        let walked = r.live.walked;
+        assert!(walked >= 3, "{view}: the first frame walks the envelopes: {walked}");
+        let second = r.render(&d, 500, 100, Affine::IDENTITY, opts).pixels;
+        assert_eq!(r.live.walked, walked, "{view}: the second frame walks nothing again");
+        assert!(second == first, "{view}: the second frame draws the same");
+    }
+}
+
+/// A thumbnail of an envelope around a symbol instance evaluates a copy of the envelope that the
+/// live cache does not keep, without walking it for the symbols it shows.
+#[test]
+fn live_objects_evaluated_without_the_cache_are_not_walked() {
+    let _fonts = fonts_steady();
+    let d = symbol_in_live_and_effect_art();
+    let envelope = d.layers[0].children().unwrap()[0].clone();
+    let mut r = Renderer::new();
+    r.render_node_thumbnail(&d, &envelope, 32, None).unwrap();
+    assert!(r.live.evaluated >= 1, "the thumbnail evaluates the envelope");
+    assert_eq!(r.live.walked, 0, "the thumbnail walks nothing");
+}
+
+/// After two frames of [`symbol_in_live_and_effect_art`], the second drawn from what the renderer
+/// kept, an edit of `S`'s art draws in Preview and in Outline view as a new renderer draws it.
+#[test]
+fn live_objects_and_effect_art_kept_without_a_walk_draw_symbol_edits() {
+    let _fonts = fonts_steady();
+    let preview = RenderOptions { background: Some([255, 255, 255, 255]), ..Default::default() };
+    let outline = RenderOptions { outline: true, ..preview.clone() };
+    for (view, opts) in [("Preview", &preview), ("Outline", &outline)] {
+        let mut d = symbol_in_live_and_effect_art();
+        let mut r = Renderer::new();
+        r.render(&d, 500, 100, Affine::IDENTITY, opts);
+        let before = r.render(&d, 500, 100, Affine::IDENTITY, opts).pixels;
+        // `S` becomes a wide red bar.
+        let bar = vectorcraft_geom::shapes::rectangle(Rect::new(-20.0, -4.0, 20.0, 4.0));
+        let red = vectorcraft_doc::Appearance::basic(Paint::solid(Color::rgb(1.0, 0.0, 0.0)), Paint::None, 0.0);
+        d.symbols[0].art = Arc::new(Node::path(d.alloc_id(), bar, red));
+        let after = r.render(&d, 500, 100, Affine::IDENTITY, opts).pixels;
+        assert!(after != before, "{view}: the edit changes the frame");
+        let fresh = Renderer::new().render(&d, 500, 100, Affine::IDENTITY, opts).pixels;
+        assert!(after == fresh, "{view}: a new renderer draws the same");
+    }
+}
+
 /// Installs live-effect plug-in `id`, replacing one with the same id: its effect draws `shape` in
 /// place of the geometry it is given.
 fn install_shape(id: &str, shape: &vectorcraft_geom::PathData) {
