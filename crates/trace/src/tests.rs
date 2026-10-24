@@ -222,6 +222,128 @@ fn transparent_pixels_are_not_traced() {
     assert!((net_area(&res.paths[0].path) - 800.0).abs() < 1.0);
 }
 
+/// A light square cut out of a transparent background, with a blue and a black block on it and a
+/// semi-transparent tan pixel row and column along two of its cut edges. `alpha` is the tan pixels'
+/// alpha.
+fn cut_out_with_edge(alpha: u8) -> Raster {
+    Raster::from_fn(200, 200, |x, y| {
+        if (60..140).contains(&x) && (40..90).contains(&y) {
+            [40, 120, 240, 255]
+        } else if (60..140).contains(&x) && (110..150).contains(&y) {
+            BLACK
+        } else if (20..180).contains(&x) && (20..180).contains(&y) {
+            [240, 240, 220, 255]
+        } else if (y == 180 && (30..170).contains(&x)) || (x == 180 && (30..110).contains(&y)) {
+            [160, 120, 80, alpha]
+        } else {
+            [0, 0, 0, 0]
+        }
+    })
+}
+
+#[test]
+fn a_cut_out_edge_traces_as_the_color_beside_it() {
+    // The tan of the edge pixels is nearer to the blue than to the light color beside them, but
+    // it is a darker shade of the light color, blended with the transparent background.
+    for mode in [Mode::Color, Mode::Grayscale] {
+        let params = TraceParams {
+            mode,
+            palette: Palette::Limited,
+            colors: 3,
+            paths: 90.0,
+            corners: 60.0,
+            noise: 25,
+            method: Method::Abutting,
+            ..TraceParams::default()
+        };
+        let res = trace(&cut_out_with_edge(192), &params);
+        // The blue block's color: that of the smallest path around the block's center.
+        let around = |p: &&TracedPath| p.path.bounds().is_some_and(|b| b.x0 < 100.0 && b.x1 > 100.0 && b.y0 < 65.0 && b.y1 > 65.0);
+        let size = |p: &TracedPath| p.path.bounds().map_or(f64::INFINITY, |b| b.width() * b.height());
+        let block = res.paths.iter().filter(around).min_by(|a, b| size(a).total_cmp(&size(b))).unwrap().color;
+        for p in res.paths.iter().filter(|p| p.color == block) {
+            let b = p.path.bounds().unwrap();
+            assert!(b.x0 > 59.0 && b.y0 > 39.0 && b.x1 < 141.0 && b.y1 < 91.0, "{mode:?}: a path of the blue block's color reaches {b:?}");
+        }
+    }
+}
+
+#[test]
+fn an_opaque_edge_keeps_its_own_color() {
+    // The same art with the edge pixels opaque: they are a tan line of their own, and stay so.
+    let img = cut_out_with_edge(255);
+    for mode in [Mode::Color, Mode::Grayscale] {
+        let q = quantize(&img, &TraceParams { mode, colors: 3, ..TraceParams::default() });
+        let mut settled = q.clone();
+        crate::quantize::settle_cut_edges(&mut settled, &img, mode == Mode::Grayscale);
+        assert_eq!(settled, q, "{mode:?}");
+    }
+}
+
+#[test]
+fn a_cut_out_edge_in_grayscale_ties_by_its_gray() {
+    // A red edge pixel between two opaque red pixels, one in a dark and one in a light gray of the
+    // palette: its gray (76) is nearer to the dark one, though its color looks nearer to the light
+    // one.
+    let img = Raster::from_fn(3, 2, |x, y| match (x, y) {
+        (0, 0) | (2, 0) => [255, 0, 0, 255],
+        (1, 0) => [255, 0, 0, 192],
+        _ => [0, 0, 0, 0],
+    });
+    let t = TRANSPARENT;
+    let q = Quantized { labels: vec![0, 2, 1, t, t, t], palette: vec![[50, 50, 50], [150, 150, 150], [90, 90, 90]] };
+    let mut gray = q.clone();
+    crate::quantize::settle_cut_edges(&mut gray, &img, true);
+    assert_eq!(gray.palette.get(gray.labels[1] as usize), Some(&[50, 50, 50]));
+    let mut color = q;
+    crate::quantize::settle_cut_edges(&mut color, &img, false);
+    assert_eq!(color.palette.get(color.labels[1] as usize), Some(&[150, 150, 150]));
+}
+
+#[test]
+fn a_semi_transparent_line_across_a_gap_keeps_its_own_color() {
+    // A light block, a transparent column, then a semi-transparent tan line: the block lies within
+    // two pixels of the line, but across the gap, so the line is no edge of it.
+    let img = Raster::from_fn(20, 10, |x, _| match x {
+        0..=9 => [240, 240, 220, 255],
+        11 => [160, 120, 80, 192],
+        _ => [0, 0, 0, 0],
+    });
+    let labels = (0..200).map(|i| match i % 20 {
+        0..=9 => 0,
+        11 => 1,
+        _ => TRANSPARENT,
+    });
+    let q = Quantized { labels: labels.collect(), palette: vec![[240, 240, 220], [160, 120, 80]] };
+    let mut settled = q.clone();
+    crate::quantize::settle_cut_edges(&mut settled, &img, false);
+    assert_eq!(settled, q);
+}
+
+#[test]
+fn a_thin_semi_transparent_outline_keeps_its_own_color() {
+    // A blue square on a transparent background with a one-pixel, partly transparent yellow
+    // outline around it: the yellow is no shade of the blue, so the outline stays yellow.
+    for alpha in [128, 192, 254] {
+        let img = Raster::from_fn(60, 60, |x, y| {
+            if (10..50).contains(&x) && (10..50).contains(&y) {
+                [40, 120, 240, 255]
+            } else if (9..51).contains(&x) && (9..51).contains(&y) {
+                [250, 200, 40, alpha]
+            } else {
+                [0, 0, 0, 0]
+            }
+        });
+        for mode in [Mode::Color, Mode::Grayscale] {
+            let q = quantize(&img, &TraceParams { mode, colors: 3, ..TraceParams::default() });
+            assert_ne!(q.labels[9 * 60 + 30], q.labels[30 * 60 + 30], "{mode:?}, alpha {alpha}: the outline has a color of its own");
+            let mut settled = q.clone();
+            crate::quantize::settle_cut_edges(&mut settled, &img, mode == Mode::Grayscale);
+            assert_eq!(settled, q, "{mode:?}, alpha {alpha}");
+        }
+    }
+}
+
 #[test]
 fn threshold_controls_black_and_white() {
     let img = Raster::from_fn(40, 40, |x, _| if x < 20 { [100, 100, 100, 255] } else { WHITE });
