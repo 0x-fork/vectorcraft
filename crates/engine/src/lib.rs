@@ -401,6 +401,10 @@ pub struct DocState {
     /// Transform Again after a perspective move or scale (Perspective Selection tool): the
     /// `perspective.transform` params it repeats. `None` once an ordinary transform follows.
     pub last_perspective: Option<Value>,
+    /// The folders a confined (automation) caller that opened or made the document may read: the
+    /// paths the document links to are looked at within them later too, when the Links panel
+    /// asks about a link outside any caller's scope.
+    pub opened_by: Option<Arc<file_access::AutomationRoots>>,
 }
 
 static NEXT_DOC_UID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
@@ -574,6 +578,7 @@ impl DocState {
             imported_from: None,
             import_losses: vec![],
             last_perspective: None,
+            opened_by: file_access::current(),
         }
     }
     /// Unsaved changes: the document differs from the saved one (selection changes and changes that
