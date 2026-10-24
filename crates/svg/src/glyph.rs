@@ -99,11 +99,10 @@ fn glyph(svg: &str, id: &str, color: &str) -> Option<Glyph> {
     // Edits: byte ranges to cut and what to put in their place, in order.
     let mut edits: Vec<(Range<usize>, String)> = vec![];
     // Cut with the left-out elements: images of SVG documents, as the table asks (a glyph draws no
-    // documents inside it).
+    // documents inside it). Their link is `href`, else `xlink:href`, as the importer reads it.
     let svg_image = |n: &roxmltree::Node| {
-        n.tag_name().name() == "image"
-            && n.attributes()
-                .any(|a| a.name() == "href" && a.value().trim_start().get(..14).is_some_and(|v| v.eq_ignore_ascii_case("data:image/svg")))
+        let href = n.attribute("href").or_else(|| n.attribute(("http://www.w3.org/1999/xlink", "href")));
+        n.tag_name().name() == "image" && href.and_then(|h| h.trim_start().get(..14)).is_some_and(|v| v.eq_ignore_ascii_case("data:image/svg"))
     };
     for n in root.descendants().filter(|n| n.is_element() && (LEFT_OUT.contains(&n.tag_name().name()) || svg_image(n))) {
         edits.push((n.range(), String::new()));
