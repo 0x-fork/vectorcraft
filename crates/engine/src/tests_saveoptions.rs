@@ -161,6 +161,31 @@ fn pdf_compatible_files_carry_a_pdf() {
 }
 
 #[test]
+fn save_option_errors_name_the_save_command() {
+    let mut s = three_boards();
+    for (cmd, p) in [
+        ("file.saveCopy", json!({"format": "pdf", "range": "5"})),
+        ("file.saveCopy", json!({"format": "svg", "artboard": 5})),
+        ("file.saveAs", json!({"format": "svg", "range": "4"})),
+        ("document.save", json!({"format": "pdf", "artboards": [3]})),
+        ("file.saveCopy", json!({"format": "ai", "compress": "yes"})),
+        ("file.saveCopy", json!({"format": "ai", "pdfCompatible": false, "artboard": "B"})),
+        ("file.saveCopy", json!({"format": "ai", "aiVersion": 7, "artboard": "B"})),
+        ("file.saveCopy", json!({"format": "ait", "compress": "yes"})),
+    ] {
+        let e = s.execute(cmd, &p).unwrap_err().to_string();
+        assert!(e.contains(&format!("`{cmd}`")) && !e.contains("document.export"), "{p}: {e}");
+    }
+    // A native file written to a path.
+    let dir = Folder::new("save-errors");
+    for (cmd, name) in [("document.save", "a.vectorcraft"), ("file.saveAs", "b.vectorcraft"), ("file.saveCopy", "c.vectorcraft")] {
+        let p = json!({"path": dir.file(name), "compress": "yes"});
+        let e = s.execute(cmd, &p).unwrap_err().to_string();
+        assert!(e.contains(&format!("`{cmd}`")) && !e.contains("document.export"), "{p}: {e}");
+    }
+}
+
+#[test]
 fn ai_without_pdf_content_and_compression() {
     let mut s = three_boards();
     let ai = |s: &mut Session, p: Value| -> (Vec<u8>, Value) {
