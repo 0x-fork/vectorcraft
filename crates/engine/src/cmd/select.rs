@@ -104,7 +104,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Fill Color",
             ["Select", "Same"],
             None,
-            "{} the objects filled with the first selected object's fill colour (any tint of its global or spot swatch, the same tint with prefs selectSameTintPercent)",
+            "{} the objects filled with the first selected object's fill colour (any tint of its global or spot swatch, the same tint with prefs selectSameTintPercent); a member path of a compound path selected first compares as its compound path, except in isolation mode inside that compound path",
             has_selection,
             |s, _| {
                 let tint = s.prefs.select_same_tint_percent;
@@ -116,7 +116,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Stroke Color",
             ["Select", "Same"],
             None,
-            "{} the objects stroked with the first selected object's stroke colour (tints as select.same.fillColor)",
+            "{} the objects stroked with the first selected object's stroke colour (tints and compound paths as select.same.fillColor)",
             has_selection,
             |s, _| {
                 let tint = s.prefs.select_same_tint_percent;
@@ -133,7 +133,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Fill & Stroke",
             ["Select", "Same"],
             None,
-            "{} the objects with the first selected object's fill and stroke colours (tints as select.same.fillColor)",
+            "{} the objects with the first selected object's fill and stroke colours (tints and compound paths as select.same.fillColor)",
             has_selection,
             |s, _| {
                 let tint = s.prefs.select_same_tint_percent;
@@ -180,7 +180,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Graphic Style",
             ["Select", "Same"],
             None,
-            "{} the objects linked to the graphic style the first selected object is linked to",
+            "{} the objects linked to the graphic style the first selected object is linked to (compound paths as select.same.fillColor)",
             has_selection,
             same_graphic_style
         ),
@@ -189,7 +189,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Appearance Attribute",
             ["Select", "Same"],
             None,
-            "{item?: appearance item index} the objects sharing an appearance attribute of the first selected object: its fill or stroke `item` (default: the Appearance panel's active item), else its first effect, else its topmost fill",
+            "{item?: appearance item index} the objects sharing an appearance attribute of the first selected object: its fill or stroke `item` (default: the Appearance panel's active item), else its first effect, else its topmost fill (compound paths as select.same.fillColor)",
             has_selection,
             same_attribute
         ),
