@@ -20,7 +20,7 @@ const FIELD_CELLS_MAX: usize = 6_000_000;
 const MIN_FLAT: f64 = 0.93;
 /// Most outlines of one colour (above the noise threshold) we will fit; more is refused, not truncated.
 const MAX_LOOPS_PER_CLASS: usize = if cfg!(test) { 500 } else { 20_000 };
-/// Most pixels `unmix` may have to work on (those that are not exactly one colour). A busier image is
+/// Most distinct pixel values `unmix` may have to work on (those that are not exactly one color). A busier image is
 /// averaged down further first, which bounds the time on pathological input.
 const EDGE_BUDGET: usize = 150_000;
 /// Palette colours closer than this (RGB distance) are one colour.
