@@ -24,6 +24,8 @@
 //!   modified document: `ui.dialog.confirm` saves, set `discard: true` then confirm to discard)
 //! - `app.export {path?, format?, …document.export options}`: encoded by the engine, written through
 //!   the host; the document keeps its path. No path → `{dataBase64, format, bytes}` (as headless)
+//! - `wait: true` on `app.save` and `app.export`: the file is written before the reply, even with
+//!   Background Save or Background Export on. A `wait` other than true, false or null is refused
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -453,16 +455,37 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
             }
         }
         "app.open" => wrap(app.run("file.open", json!({"path": s("path")}))),
-        "app.save" => wrap(app.run("file.save", if p.is_object() { p.clone() } else { json!({}) })),
-        "app.export" => match s("path") {
-            Some(path) => wrap(crate::io::export(app, s("format"), Some(path.to_string()), p)),
-            // No save dialog for an agent: the bytes come back, as in headless mode.
-            None => wrap(app.run("document.export", p.clone())),
-        },
+        "app.save" | "app.export" => {
+            let mut p = if p.is_object() { p.clone() } else { json!({}) };
+            // `wait: true`: the file is written before the reply, whatever Background Save and
+            // Background Export are set to, so the reply is the written file or the error.
+            let wait = match crate::menus::opt_bool(&p, "wait") {
+                Ok(w) => w == Some(true),
+                Err(e) => return err(e),
+            };
+            if let Some(o) = p.as_object_mut() {
+                o.remove("wait");
+            }
+            let method = req.method.as_str();
+            wrap(if wait { crate::background::in_foreground(app, |app| save_or_export(app, method, &p)) } else { save_or_export(app, method, &p) })
+        }
         // As the menu's Quit: `{"pending": "saveChanges"}` while a modified document is asked
         // about; otherwise null, and the host closes the window (#830).
         "app.quit" => wrap(app.run("app.quit", json!({}))),
         other => err(format!("unknown method `{other}`")),
+    }
+}
+
+/// `app.save` (`method`) or `app.export` with params `p`.
+fn save_or_export(app: &mut VectorcraftApp, method: &str, p: &Value) -> Result<Value, String> {
+    if method == "app.save" {
+        return app.run("file.save", p.clone());
+    }
+    let s = |k: &str| p.get(k).and_then(Value::as_str);
+    match s("path") {
+        Some(path) => crate::io::export(app, s("format"), Some(path.to_string()), p),
+        // No save dialog for an agent: the bytes come back, as in headless mode.
+        None => app.run("document.export", p.clone()),
     }
 }
 
