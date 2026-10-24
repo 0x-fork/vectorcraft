@@ -2480,7 +2480,9 @@ always tagged, whatever `profiles` says). `outputIntent` embeds a profile as the
 `/GTS_PDFX` output intent with `outputCondition`, `outputConditionId` and `registry`, and `trapped` sets `/Trapped`
 (PDF/A files keep their own output intent). Type is written as selectable, searchable text in embedded subset fonts
 with a ToUnicode map (fonts whose licence forbids embedding stay outlines, with a warning); `advanced: {outlineText:
-true}` writes every glyph as an outline instead. Type that Transform effects only move and copy (no scale, rotation,
+true}` writes every glyph as an outline instead. The hyphen that ends a line broken inside a word (`hyphenate`, or a
+soft hyphen) is written as text where the line draws it: the character `-`, or U+2010 when the font gives the hyphen's
+glyph to U+2010 and not to `-`. Kashidas are drawn as paths. Type that Transform effects only move and copy (no scale, rotation,
 reflection or Random) is written as text once in each place when its characters are in solid colors without underline
 or strikethrough, the type object has no fills or strokes of its own, no inline graphics and no perspective, its
 transform does not scale or shear stroked characters, and the copies do not overlap. When the effect is on the type
