@@ -42,9 +42,9 @@ pub trait PrintService {
     fn shared_print(&self) -> Option<SharedPrintFn> {
         None
     }
-    /// Whether the system turns a page wider than tall to fit the paper. The desktop's print
-    /// queues put each page on the paper as it is, so their jobs are written upright
-    /// (`file.print`'s `forPrinter`); the browser's print dialog turns them itself.
+    /// Whether the system turns a landscape page to fit the paper. macOS's print queues put
+    /// each page on the paper as it is, so their jobs are written upright (`file.print`'s
+    /// `forPrinter`); Windows and the browser's print dialog turn them themselves.
     fn turns_landscape(&self) -> bool {
         true
     }

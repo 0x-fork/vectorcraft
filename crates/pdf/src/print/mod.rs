@@ -68,8 +68,9 @@ pub struct PrintOptions {
     /// warnings that they are left to the device.
     pub postscript: bool,
     /// The job goes to a print queue, which puts each page on the paper as it is (macOS does
-    /// not turn a landscape page to the paper): a page wider than tall is written upright, the
-    /// art turned a quarter anticlockwise, as a printer driver turns a landscape job.
+    /// not turn a landscape page to the paper): a page whose paper the layout turned to landscape
+    /// is written upright, the art turned a quarter anticlockwise, as a printer driver turns a
+    /// landscape job. Paper that is wide in Portrait, and transverse pages, stay as they are.
     pub for_printer: bool,
 }
 
@@ -392,15 +393,17 @@ pub fn plan<'a>(doc: &'a Document, opts: &PrintOptions) -> Result<PrintPlan<'a>,
                 plate: *plate,
                 ink: ink.cloned(),
             };
-            Some(if opts.for_printer { upright(sheet) } else { sheet })
+            // Only the paper the layout turned: custom paper can be wide in Portrait.
+            let turned = l.orientation.landscape() && !set.transverse;
+            Some(if opts.for_printer && turned { upright(sheet) } else { sheet })
         })
         .collect();
     let order = job.order(set);
     Ok(PrintPlan { plates, sheets, order, title, created, warnings: job.warnings, doc: job.doc })
 }
 
-/// `s` upright on the paper ([`PrintOptions::for_printer`]): a page wider than tall turns a
-/// quarter anticlockwise, its top to the paper's left edge.
+/// Landscape sheet `s` upright on the paper ([`PrintOptions::for_printer`]): a page wider than
+/// tall turns a quarter anticlockwise, its top to the paper's left edge.
 fn upright(mut s: PlannedSheet) -> PlannedSheet {
     let (w, h) = s.size;
     if w <= h {

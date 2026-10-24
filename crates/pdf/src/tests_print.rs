@@ -462,6 +462,20 @@ fn for_a_printer_landscape_pages_print_upright_turned_anticlockwise() {
     let mut t = s;
     t["transverse"] = json!(true);
     assert_eq!(spooled(t).0, (612.0, 792.0));
+    // Transverse in Portrait is wide on purpose: it stays wide.
+    assert_eq!(spooled(json!({"autoRotate": false, "transverse": true})).0, (792.0, 612.0));
+}
+
+#[test]
+fn for_a_printer_paper_wide_in_portrait_stays_as_it_is() {
+    // A 4 × 2 in label in Portrait: the queue's media is wide too.
+    let d = doc(288.0, 144.0, &[(Rect::new(0.0, 0.0, 144.0, 144.0), rgb(1.0, 0.0, 0.0))]);
+    let v =
+        json!({"media": "custom", "width": 288, "height": 144, "orientation": "portrait", "autoRotate": false, "placement": {"origin": "topLeft"}});
+    let opts = PrintOptions { settings: settings(v), uncompressed: true, for_printer: true, ..Default::default() };
+    let p = pages(&print(&d, &opts).unwrap().bytes).remove(0);
+    assert_eq!(p.0, (288.0, 144.0));
+    assert!(near(p.1[0].0, Rect::new(0.0, 0.0, 144.0, 144.0)), "{:?}", p.1);
 }
 
 #[test]
