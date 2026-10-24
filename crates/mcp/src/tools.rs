@@ -1235,7 +1235,7 @@ fn render_preview(b: &mut dyn Backend, a: &Args) -> Result<ToolResult, String> {
     let encoded = r.get("pngBase64").and_then(Value::as_str).ok_or("renderer returned no image")?;
     let png = vectorcraft_format::base64_decode(encoded).ok_or("renderer returned bad base64")?;
     let img = image::load_from_memory_with_format(&png, image::ImageFormat::Png).map_err(|e| format!("read preview: {e}"))?;
-    let img = img.thumbnail(max as u32, max as u32);
+    let img = if img.width() > max as u32 || img.height() > max as u32 { img.thumbnail(max as u32, max as u32) } else { img };
     let mut out = std::io::Cursor::new(Vec::new());
     img.write_to(&mut out, image::ImageFormat::Png).map_err(|e| format!("encode preview: {e}"))?;
     Ok(image_result(out.get_ref(), json!({"width":img.width(),"height":img.height()})))
