@@ -614,6 +614,9 @@ fn services(parent: Parent, ui: egui::Context) -> Services {
         // macOS reads it from AppKit's events (#852).
         #[cfg(target_os = "macos")]
         stylus: mac_tablet::start(),
+        // Windows reads it from the pen's pointer messages (`windows_stylus`).
+        #[cfg(all(windows, not(target_vendor = "win7")))]
+        stylus: Some(windows_stylus::start()),
         read: Some(Box::new(|p: &str| std::fs::read(p).map_err(|e| e.to_string()))),
         write: Some(Box::new(write_file)),
         exists: Some(Box::new(|p: &str| std::path::Path::new(p).exists())),
@@ -974,9 +977,9 @@ fn main() -> std::process::ExitCode {
         }
         options
     };
-    // With Windows Ink, winit reports a pen as a touch and drops its barrel button; the message
-    // hook notes each pointer contact and whether it starts with the barrel button held
-    // (`windows_stylus`).
+    // With Windows Ink, winit reports a pen as a touch and drops its barrel button and which end
+    // is down; the message hook notes each pointer contact and whether it starts with the barrel
+    // button held, and writes the pen's end into the pen feed (`windows_stylus`).
     #[cfg(all(windows, not(target_vendor = "win7")))]
     let options = {
         use winit::platform::windows::EventLoopBuilderExtWindows as _;
