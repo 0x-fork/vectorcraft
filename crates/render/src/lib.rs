@@ -466,11 +466,12 @@ pub struct Renderer {
     /// Expanded stroke outlines keyed by ([`Self::stroke_owner`], stroke layer address, width bits,
     /// tolerance level): panning re-renders reuse them instead of re-expanding every stroke.
     strokes: PtrMap<(usize, usize, u64, i32), StrokeEntry>,
-    /// The node being drawn on the plain-path fast path (owner of cached stroke outlines).
+    /// The node being drawn on the plain-path fast path, or the path of brush art being drawn
+    /// ([`Self::draw_brush_pieces`]): the owner of cached stroke outlines.
     cur: Option<Arc<Node>>,
     /// Whether the art being drawn is made again in every frame: symbol art that
-    /// [`Self::placed_art`] did not keep, and evaluations of live objects and effect art that their
-    /// caches did not keep.
+    /// [`Self::placed_art`] did not keep, evaluations of live objects and effect art that their
+    /// caches did not keep, and brush art that the brush cache did not keep.
     made_again: bool,
     /// The node `draw_shape_fx` may cache the live-effect geometry of (the one `draw_arc` is drawing).
     /// In Outline view its path comes from `geom` too ([`Self::outline_path`]), and
@@ -478,8 +479,8 @@ pub struct Renderer {
     /// Trace object that it draws.
     fx_owner: Option<Arc<Node>>,
     /// The live object [`Self::draw_kept_node`] is drawing (kept symbol art, an opacity mask's art,
-    /// a member of a clip group in Outline view): [`Self::draw_content`] draws its evaluation from
-    /// the live cache.
+    /// a member of a clip group in Outline view, kept brush art): [`Self::draw_content`] draws its
+    /// evaluation from the live cache.
     live_root: Option<Arc<Node>>,
     /// Live-effect geometry per node ([`fx::FxGeom`]), keyed by `Arc` identity like `geom`.
     fx_geom: PtrMap<usize, fx::FxGeom>,
@@ -1736,11 +1737,11 @@ impl Renderer {
         }
     }
 
-    /// The line part of a stroke of the fast-path node `self.cur` (see
-    /// [`effects::stroke::line_outline`]), cached across frames under [`Self::stroke_owner`] and
-    /// the stroke layer. The tolerance (vello's 0.25 device px) is bucketed to powers of two, never
-    /// coarser than needed, so zooming reuses outlines until the level changes. Only the node's own
-    /// strokes are cached: for the strokes of the brush art drawn for it, this returns `None`.
+    /// The line part of a stroke of `self.cur` (see [`effects::stroke::line_outline`]), cached
+    /// across frames under [`Self::stroke_owner`] and the stroke layer. The tolerance (vello's 0.25
+    /// device px) is bucketed to powers of two, never coarser than needed, so zooming reuses
+    /// outlines until the level changes. Only `self.cur`'s own strokes are cached: for other
+    /// strokes, this returns `None`.
     fn cached_stroke(&mut self, f: &Frame, line: &BezPath, st: &StrokeLayer, width: f64) -> Option<Arc<BezPath>> {
         let node = self.cur.clone().filter(|n| owns_stroke(n, st))?;
         let level = (f.px * 0.25).log2().floor() as i32;
@@ -1756,7 +1757,7 @@ impl Renderer {
         Some(outline)
     }
 
-    /// What the `strokes` and `stroke_slices` keys hold for the fast-path node `node`: its address,
+    /// What the `strokes` and `stroke_slices` keys hold for `node` (`self.cur`): its address,
     /// or 0 while art made again in every frame is drawn ([`Self::made_again`]).
     fn stroke_owner(&self, node: &Arc<Node>) -> usize {
         if self.made_again { 0 } else { Arc::as_ptr(node) as usize }
