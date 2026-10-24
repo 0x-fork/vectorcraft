@@ -264,6 +264,22 @@ impl FolderStore {
         builder.create(dir).map_err(|e| format!("{}: {e}", dir.display()))
     }
 
+    /// Refuse area folder `dir` unless it is a folder itself, not a link to one, and (on Unix)
+    /// belongs to this account. Listing areas leaves links out, so a name another account had
+    /// linked to a folder of its own in a shared recovery folder looked free, and claiming it
+    /// wrote the copies through the link.
+    fn own_area(dir: &std::path::Path) -> std::result::Result<(), String> {
+        let m = std::fs::symlink_metadata(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        if !m.file_type().is_dir() {
+            return Err(format!("{}: not a folder of its own", dir.display()));
+        }
+        #[cfg(unix)]
+        if std::os::unix::fs::MetadataExt::uid(&m) != rustix::process::geteuid().as_raw() {
+            return Err(format!("{}: belongs to another account", dir.display()));
+        }
+        Ok(())
+    }
+
     /// The plain names of the files (or, `dirs`, folders) in `dir`; none when it doesn't exist.
     fn names(dir: &std::path::Path, dirs: bool) -> std::result::Result<Vec<String>, String> {
         let entries = match std::fs::read_dir(dir) {
@@ -298,6 +314,7 @@ impl RecoveryStore for FolderStore {
         let f = self.file(name)?;
         if let Some(dir) = f.parent() {
             Self::create_area(dir)?;
+            Self::own_area(dir)?;
         }
         vectorcraft_format::write_atomic(&f, bytes).map_err(|e| format!("{}: {e}", f.display()))
     }
@@ -317,6 +334,7 @@ impl RecoveryStore for FolderStore {
     fn lock(&self, area: &str) -> std::result::Result<Lock, String> {
         let dir = self.area(area)?;
         Self::create_area(&dir)?;
+        Self::own_area(&dir)?;
         let path = dir.join(LOCK_FILE);
         let file = std::fs::OpenOptions::new()
             .read(true)
