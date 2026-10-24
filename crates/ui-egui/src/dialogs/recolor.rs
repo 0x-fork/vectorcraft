@@ -787,6 +787,8 @@ mod tests {
         assert_eq!(fill(&app, &all[i]), previewed, "the art previews the row's new color");
 
         double_click(&mut app, &ctx, rect, 0.1, i);
+        frame(&mut app, &ctx, 0.3, vec![], i);
+        assert_eq!(fill(&app, &all[0]), to_color(&all[0]), "the picker previews nothing itself");
         let d = app.ui.dialog.as_ref().unwrap();
         assert_eq!(d.kind, "colorPicker", "a double-click opens the Color Picker");
         assert_eq!(d.fields.get("color").and_then(color_value), previewed, "on the row's new color");
