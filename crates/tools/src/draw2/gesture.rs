@@ -137,6 +137,12 @@ impl GestureTool {
         }
     }
 
+    /// Would a press with `m` held draw a straight Pencil line? Shift held, unless Alt lends the
+    /// Smooth tool: the rule `PointerKind::Down` sets `straight` by.
+    fn straight_at_press(&self, m: Mods) -> bool {
+        self.id == "pencil" && !(self.alt_smooth && m.alt) && m.shift
+    }
+
     /// Where the stroke takes a pointer at `p`. For the Blob Brush with Shift held, that is the
     /// horizontal or vertical line through the press point that is nearer in angle to `p` (90°
     /// steps from the Constrain Angle), at `p`'s distance from the press point. The points dragged
@@ -489,6 +495,10 @@ impl Tool for GestureTool {
         if self.smoothing || (self.id == "pencil" && self.alt_smooth && m.alt && !self.began) {
             return Cursor::Smooth;
         }
+        // Before a press that would draw a straight line.
+        if !self.active && self.straight_at_press(m) {
+            return Cursor::PencilStraight;
+        }
         // Alt held at the release closes the path (`finish`).
         // A straight line stays open, so its release has nothing to close, and before a press Alt
         // gives the Pencil a straight line.
@@ -835,6 +845,51 @@ mod tests {
         let shift_alt = Mods { shift: true, alt: true, ..Default::default() };
         let acts = t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 300.0, 140.0).with_mods(shift_alt));
         assert!(matches!(&acts[0], Action::Preview(_, v) if v["closed"] == false && v["points"].as_array().unwrap().len() == 2), "{acts:?}");
+    }
+
+    /// Before a press, the Pencil shows its straight-line cursor exactly when the press would draw a
+    /// straight line; once the press is down, and with the Paintbrush, Shift leaves the tool's own
+    /// cursor.
+    #[test]
+    fn pencil_shows_the_straight_line_cursor_when_a_press_draws_a_line() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let mut cx = cx(&d, &s, &p);
+        cx.smart_guides = false;
+        let at = Point::new(0.0, 0.0);
+        let shift = Mods { shift: true, ..Default::default() };
+        let shift_alt = Mods { shift: true, alt: true, ..Default::default() };
+        // The last drag's preview: two points for a line, all three for a freehand stroke, none
+        // for a smoothing drag.
+        let straight = |acts: &[Vec<Action>]| {
+            acts[acts.len() - 2].iter().any(|a| matches!(a, Action::Preview(_, v) if v["points"].as_array().is_some_and(|q| q.len() == 2)))
+        };
+        for alt_smooth in [false, true] {
+            for m in [Mods::default(), shift, shift_alt] {
+                let mut t = GestureTool::new("pencil");
+                t.set_option("altSmooth", &json!(alt_smooth));
+                let shown = t.cursor(&cx, at, m) == Cursor::PencilStraight;
+                let drawn = straight(&drag_held(&mut t, &cx, &[(0.0, 0.0), (30.0, -10.0), (50.0, -60.0)], m));
+                assert_eq!(shown, drawn, "altSmooth {alt_smooth}, {m:?}");
+            }
+        }
+        let mut t = GestureTool::new("pencil");
+        assert_eq!(t.cursor(&cx, at, Mods::default()), Cursor::Pencil);
+        assert_eq!(t.cursor(&cx, at, shift), Cursor::PencilStraight);
+        assert_eq!(t.cursor(&cx, at, shift_alt), Cursor::PencilStraight, "Alt at the release leaves a straight line open");
+        // While the line is drawn, the Pencil's own cursor; after the release, Shift shows it again.
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0).with_mods(shift));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 40.0, -10.0).with_mods(shift));
+        assert_eq!(t.cursor(&cx, at, shift), Cursor::Pencil, "while the line is drawn");
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 40.0, -10.0).with_mods(shift));
+        assert_eq!(t.cursor(&cx, at, shift), Cursor::PencilStraight, "after the release");
+        // Shift pressed during a freehand stroke doesn't make it a line.
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 40.0, -10.0).with_mods(shift));
+        assert_eq!(t.cursor(&cx, at, shift), Cursor::Pencil, "a freehand stroke");
+        assert_eq!(GestureTool::new("paintbrush").cursor(&cx, at, shift), Cursor::Paintbrush);
+        assert_eq!(Cursor::PencilStraight.precise(), Cursor::Crosshair, "Use Precise Cursors");
     }
 
     /// #3799: a Shift line started on an end of a selected open path continues the path from that

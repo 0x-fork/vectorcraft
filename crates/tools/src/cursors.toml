@@ -541,6 +541,13 @@ hotspot = "The lead tip."
 look = "The Pencil cursor with a ring badge (closing the loop), like PenClose."
 
 [[cursor]]
+id = "PencilStraight"
+group = "Drawing and editing tools"
+shown_when = ["The Pencil tool with Shift held before a press: the press draws a straight line at 45° steps."]
+hotspot = "The lead tip."
+look = "The Pencil cursor with a short straight-line badge, where PencilClose has its ring."
+
+[[cursor]]
 id = "Paintbrush"
 group = "Drawing and editing tools"
 shown_when = ["The Paintbrush tool: draws a brushed freeform path (with pen pressure), continuing a selected path from its end; Alt closes it."]

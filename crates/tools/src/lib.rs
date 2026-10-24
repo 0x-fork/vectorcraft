@@ -578,6 +578,9 @@ pub enum Cursor {
     /// releasing the mouse button with Alt still held closes the path. A drag started with Shift or
     /// Alt held draws an open straight line instead. A crosshair with a ring.
     PencilClose,
+    /// The Pencil tool before a press that draws a straight line (Shift held). A crosshair with a
+    /// short straight line.
+    PencilStraight,
     /// The Paintbrush tool.
     Paintbrush,
     /// The Paintbrush tool with Alt held: releasing the mouse button with Alt still held closes
@@ -694,6 +697,7 @@ impl Cursor {
             | Cursor::MagicWand
             | Cursor::Pencil
             | Cursor::PencilClose
+            | Cursor::PencilStraight
             | Cursor::Paintbrush
             | Cursor::PaintbrushClose
             | Cursor::BlobBrush
