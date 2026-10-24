@@ -70,7 +70,7 @@ Character Styles menu New/Redefine and footer New capture the first selected cha
 
 | Date | Change | Summary |
 |---|---|---|
-| 2026-10-24 | minor | Ruby: Type › Create Outlines, EPS, EMF/WMF, legacy `.ai` and type that effects, Expand Appearance and flattening outline keep the reading's glyphs where the canvas draws them (they were dropped); legacy `.ai` writes type with ruby as outlines; scores unchanged |
+| 2026-10-24 | minor | Ruby: Type › Create Outlines, EPS, EMF/WMF, legacy `.ai` and type that effects, Expand Appearance and flattening outline keep the reading's glyphs where the canvas draws them (they were dropped), stacked with their run as the canvas paints it (Create Outlines puts each run's reading right after that run's glyphs, below later runs); legacy `.ai` writes type with ruby as outlines; scores unchanged |
 | 2026-10-24 | minor | Colour fonts: images in OpenType SVG glyph documents draw, export and outline with the glyph, holding their pixels until a document takes them in; the SVG table's rules are now all followed but palette variables; scores unchanged |
 | 2026-10-23 | minor | Colour fonts: bitmap glyphs (emoji) go with type that effects reshape, into Expand Appearance, envelope Expand and EMF/WMF export, as images that hold their own pixels (art made outside a document) until a document takes them in; scores unchanged |
 | 2026-10-23 | minor | Threading ports (#2572): every selected area type and type on a path shows its in and out ports, empty, with an arrow where threaded or with the red "+" of overflow; a click on the out port of any of them, overflowing or not, loads the Selection tool with the text, and a click on the in port threads a new or clicked frame before it (`text.thread.add` `before`); scores unchanged |

@@ -550,38 +550,46 @@ fn create_outlines(s: &mut Session, _: &Value) -> Result<Value> {
             let NodeKind::Text(t) = &n.kind else { continue };
             let lay = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), t);
             let mut children = vec![];
+            // Where each run's glyphs end among `children`: the canvas paints a run's ruby with the
+            // run, before the runs after it, so its outlines go there too.
+            let mut run_end: std::collections::BTreeMap<usize, usize> = Default::default();
             for (gi, g) in lay.glyphs.iter().enumerate() {
-                // Inline graphics become instances of their symbols, in place.
-                if let Some(ig) = lay.inlines.iter().find(|i| i.glyph == gi)
-                    && let Some(art) = t.runs.get(ig.run).and_then(|r| r.inline.as_ref())
-                {
-                    let id = d.alloc_id();
-                    let xf = t.xf * ig.xf * d.symbol_natural_xf(&art.symbol);
-                    children.push(Arc::new(Node::new(id, NodeKind::SymbolInstance { symbol: art.symbol.clone(), xf })));
-                    continue;
+                'glyph: {
+                    // Inline graphics become instances of their symbols, in place.
+                    if let Some(ig) = lay.inlines.iter().find(|i| i.glyph == gi)
+                        && let Some(art) = t.runs.get(ig.run).and_then(|r| r.inline.as_ref())
+                    {
+                        let id = d.alloc_id();
+                        let xf = t.xf * ig.xf * d.symbol_natural_xf(&art.symbol);
+                        children.push(Arc::new(Node::new(id, NodeKind::SymbolInstance { symbol: art.symbol.clone(), xf })));
+                        break 'glyph;
+                    }
+                    // Colour bitmap glyphs (emoji) become embedded images, in place, their pixels
+                    // taken into the document: glyphs that show the same image share them.
+                    if let Some(image) = g.placed_image_node(t.xf) {
+                        children.push(Arc::new(d.reid(&image)));
+                        break 'glyph;
+                    }
+                    // COLR glyphs become groups of their layers, in place, with ids of the document's.
+                    if let Some(art) = g.placed_colour(t.xf) {
+                        children.push(Arc::new(d.reid(&art)));
+                        break 'glyph;
+                    }
+                    let path = PathData::from_bezpath(&g.outline).transformed(t.xf);
+                    if path.is_empty() {
+                        break 'glyph;
+                    }
+                    let st = t.runs.get(g.run).map(|r| r.style.clone()).unwrap_or_else(|| t.first_style());
+                    let mut node = shape_node(d, path, None);
+                    node.appearance = st.appearance().into();
+                    children.push(Arc::new(node));
                 }
-                // Colour bitmap glyphs (emoji) become embedded images, in place, their pixels taken
-                // into the document: glyphs that show the same image share them.
-                if let Some(image) = g.placed_image_node(t.xf) {
-                    children.push(Arc::new(d.reid(&image)));
-                    continue;
-                }
-                // COLR glyphs become groups of their layers, in place, with ids of the document's.
-                if let Some(art) = g.placed_colour(t.xf) {
-                    children.push(Arc::new(d.reid(&art)));
-                    continue;
-                }
-                let path = PathData::from_bezpath(&g.outline).transformed(t.xf);
-                if path.is_empty() {
-                    continue;
-                }
-                let st = t.runs.get(g.run).map(|r| r.style.clone()).unwrap_or_else(|| t.first_style());
-                let mut node = shape_node(d, path, None);
-                node.appearance = st.appearance().into();
-                children.push(Arc::new(node));
+                run_end.insert(g.run, children.len());
             }
             // Ruby (furigana) glyphs, where the layout put them, in their base text's run's paint,
-            // as the canvas draws them (colour glyphs in ruby draw nothing there either).
+            // right after that run's glyphs, as the canvas draws them (colour glyphs in ruby draw
+            // nothing there either).
+            let mut ruby: Vec<(usize, Arc<Node>)> = vec![];
             for g in &lay.ruby {
                 let path = PathData::from_bezpath(&g.outline).transformed(t.xf);
                 if path.is_empty() {
@@ -590,8 +598,21 @@ fn create_outlines(s: &mut Session, _: &Value) -> Result<Value> {
                 let st = t.runs.get(g.run).map(|r| r.style.clone()).unwrap_or_else(|| t.first_style());
                 let mut node = shape_node(d, path, None);
                 node.appearance = st.appearance().into();
-                children.push(Arc::new(node));
+                // After the glyphs of its run and of the runs before it.
+                let at = run_end.range(..=g.run).map(|(_, end)| *end).max().unwrap_or(0);
+                ruby.push((at, Arc::new(node)));
             }
+            ruby.sort_by_key(|(at, _)| *at);
+            let mut ruby = ruby.into_iter().peekable();
+            let mut placed = Vec::with_capacity(children.len() + ruby.len());
+            for (i, c) in children.into_iter().enumerate() {
+                while let Some((_, r)) = ruby.next_if(|(at, _)| *at == i) {
+                    placed.push(r);
+                }
+                placed.push(c);
+            }
+            placed.extend(ruby.map(|(_, r)| r));
+            let mut children = placed;
             // Underline and strikethrough bars become paths of their run's paint too (#847).
             for (run, bar) in vectorcraft_text::decorations(&lay, vectorcraft_text::FontDb::global(), t) {
                 let st = t.runs.get(run).map(|r| r.style.clone()).unwrap_or_else(|| t.first_style());
@@ -2216,6 +2237,45 @@ mod ruby_tests {
         // Undo brings the type back with its ruby.
         s.execute("edit.undo", &json!({})).unwrap();
         assert_eq!(text_of(&s, id).ruby.len(), 1);
+    }
+
+    /// The outlines stack as the canvas paints type, run by run (`render`'s `TextGeom::run`): a
+    /// run's reading goes right after its base glyphs, below the glyphs of the runs after it. Here
+    /// the red 漢's wide reading hangs over the big blue 字.
+    #[test]
+    fn create_outlines_stacks_each_reading_with_its_run() {
+        use kurbo::Shape;
+        let (mut s, id) = session_with_text();
+        s.execute("text.setText", &json!({"id": id, "text": "漢字"})).unwrap();
+        s.execute("text.setRangeStyle", &json!({"id": id, "start": 0, "end": 3, "fill": "#ff0000"})).unwrap();
+        s.execute("text.setRangeStyle", &json!({"id": id, "start": 3, "end": 6, "size": 60, "fill": "#0000ff"})).unwrap();
+        s.execute("type.ruby", &json!({"text": "かんじかんじ", "start": 0, "end": 3, "size": 100})).unwrap();
+        let t = text_of(&s, id).clone();
+        assert_eq!(t.runs.len(), 2, "{:?}", t.runs);
+        let (red, blue) = (t.runs[0].style.fill.clone(), t.runs[1].style.fill.clone());
+        let lay = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), &t);
+        let ink = |gs: &mut dyn Iterator<Item = &vectorcraft_text::PositionedGlyph>| {
+            gs.filter(|g| !g.outline.elements().is_empty()).map(|g| g.outline.bounding_box()).reduce(|a, b| a.union(b)).unwrap()
+        };
+        let (reading, big) = (ink(&mut lay.ruby.iter()), ink(&mut lay.glyphs.iter().filter(|g| g.run == 1)));
+        assert!(reading.intersect(big).area() > 0.0, "the reading {reading:?} hangs over 字 {big:?}");
+        let g = s.execute("type.createOutlines", &json!({})).unwrap()["ids"][0].as_u64().unwrap();
+        let d = &s.doc().unwrap().doc;
+        let paints: Vec<String> = d
+            .node(NodeId(g))
+            .unwrap()
+            .children()
+            .unwrap()
+            .iter()
+            .map(|c| match c.appearance.fill().map(|f| &f.paint) {
+                Some(p) if *p == red => "red".into(),
+                Some(p) if *p == blue => "blue".into(),
+                p => format!("{p:?}"),
+            })
+            .collect();
+        // 漢 and its six kana, then 字 over them.
+        let want: Vec<String> = ["red"; 7].into_iter().chain(["blue"]).map(String::from).collect();
+        assert_eq!(paints, want);
     }
 
     /// Ruby is written to SVG and PDF with its text: SVG outlines the type where ruby is present
