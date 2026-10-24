@@ -23,6 +23,10 @@ impl PrintService for SystemPrint {
     fn shared_print(&self) -> Option<vectorcraft_ui_egui::print::SharedPrintFn> {
         Some(std::sync::Arc::new(|job| SystemPrint.print(job)))
     }
+    fn turns_landscape(&self) -> bool {
+        // `lp` doesn't turn a landscape page to the paper (macOS cuts it off on upright paper).
+        false
+    }
     fn has_setup(&self) -> bool {
         true
     }
