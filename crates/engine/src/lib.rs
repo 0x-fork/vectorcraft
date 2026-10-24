@@ -1753,6 +1753,24 @@ impl Session {
         r
     }
 
+    /// Error, under the command's own id, at the first of `ids` that is malformed, names no node, or
+    /// names a layer or sublayer: a command in [`SELECTS_GIVEN_IDS`] acts on objects.
+    fn check_given_ids(&self, id: &str, params: &Value) -> Result<()> {
+        let (Some(st), Some(ids)) = (self.active(), params.get("ids")) else { return Ok(()) };
+        let Some(given) = ids.as_array() else { return cmd::checked_ids_param(self, params, "ids", id).map(drop) };
+        for value in given {
+            let node = cmd::checked_id(self, value, id)?;
+            if st.doc.node(node).is_some_and(|n| n.is_layer()) {
+                return Err(if id.starts_with("object.arrange.") {
+                    cmd::bad(id, format!("id {value} is a layer, not an object; move layers with layer.move"))
+                } else {
+                    cmd::bad(id, format!("id {value} is a layer, not an object"))
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// Execute a command by id. This is THE entry point for every frontend.
     pub fn execute(&mut self, id: &str, params: &Value) -> Result<Value> {
         let spec = find_command(id).ok_or_else(|| EngineError::UnknownCommand(id.to_string()))?;
@@ -1770,6 +1788,9 @@ impl Session {
             && params.get("id").and_then(Value::as_str).is_some_and(|e| !e.starts_with('$'));
         if cmd::params::id_stands_for_ids(spec.params) && !effect_named && self.active().is_some() {
             cmd::given_objects(self, params, id)?;
+        }
+        if SELECTS_GIVEN_IDS.contains(&id) {
+            self.check_given_ids(id, params)?;
         }
         // Clear's menu needs a selection; an agent supplying explicit targets only needs a
         // document. The command validates those targets before making any edit.

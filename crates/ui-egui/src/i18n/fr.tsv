@@ -4502,6 +4502,8 @@ axis	Both	Les deux
 @msg	{key} must be an array of non-negative integer object ids	{key} doit être un tableau d’identifiants d’objet, entiers positifs ou nuls
 @msg	invalid object id {value}: expected a non-negative integer	identifiant d’objet {value} non valide (un entier positif ou nul est attendu)
 @msg	no such object id {value}	aucun objet ne porte l’identifiant {value}
+@msg	id {value} is a layer, not an object	l’identifiant {value} désigne un calque, pas un objet
+@msg	id {value} is a layer, not an object; move layers with layer.move	l’identifiant {value} désigne un calque, pas un objet ; déplacez les calques avec layer.move
 @msg	automation filesystem access is not granted: read authority is absent: {path}	l’automatisation n’a pas accès au système de fichiers : aucune autorisation de lecture : {path}
 @msg	automation filesystem access is not granted: write authority is absent: {path}	l’automatisation n’a pas accès au système de fichiers : aucune autorisation d’écriture : {path}
 @msg	automation path rejected: outside the read root {root}: {path}	chemin d’automatisation refusé : hors du dossier racine de lecture {root} : {path}

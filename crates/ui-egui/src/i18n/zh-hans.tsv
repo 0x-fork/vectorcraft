@@ -4288,6 +4288,8 @@ imageTrace	Outline	轮廓
 @msg	{key} must be an array of non-negative integer object ids	{key} 必须是由非负整数对象 id 组成的数组
 @msg	invalid object id {value}: expected a non-negative integer	无效的对象 id {value}：应为非负整数
 @msg	no such object id {value}	没有 id 为 {value} 的对象
+@msg	id {value} is a layer, not an object	id {value} 是图层，不是对象
+@msg	id {value} is a layer, not an object; move layers with layer.move	id {value} 是图层，不是对象；请使用 layer.move 移动图层
 @msg	automation filesystem access is not granted: read authority is absent: {path}	未授予自动化文件系统访问权限：缺少读取权限：{path}
 @msg	automation filesystem access is not granted: write authority is absent: {path}	未授予自动化文件系统访问权限：缺少写入权限：{path}
 @msg	automation path rejected: outside the read root {root}: {path}	已拒绝自动化路径：位于读取根目录 {root} 之外：{path}
