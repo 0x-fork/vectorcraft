@@ -1020,6 +1020,36 @@ pub(crate) fn map(shapes: &[Shape]) -> Option<Map> {
     }
     let close = |a: usize, b: usize| matches!((points.get(a), points.get(b)), (Some(p), Some(q)) if p.distance(*q) <= tol);
     let mut joined: Vec<usize> = (0..points.len()).collect();
+    // Where two passes of one path cross another (an open path's way there and back, coincident
+    // outlines), the sweep can also join its two cuts, a rounding error apart, with a stub of that
+    // length: a speck of a piece, and a vertex twice over. Such stubs are no edges: their ends are
+    // one vertex. The sweep moves points by a few `eps` at most up and down its frame; along a path
+    // that runs nearly level in it (where the height a cut is found at pins its position down
+    // least) a cut can slide further, here up to a small fraction of the precision results are
+    // tidied to, below which no edge is drawn anyway. A vertex's cluster stays within those bounds
+    // as a whole: a run of short, nearly level segments (a finely flattened or traced path) is real
+    // geometry, not one stub after another, and must not collapse into one vertex.
+    let (stub_y, stub_x) = (4.0 * eps, (DEFAULT_PRECISION / 16.0).max(4.0 * eps));
+    let mut extent: Vec<kurbo::Rect> = points.iter().map(|&p| kurbo::Rect::from_points(p, p)).collect();
+    for (segs, [v0, v1]) in &pieces {
+        let Some(&p0) = points.get(*v0) else { continue };
+        if !segs.iter().flat_map(|s| [s.c.p1, s.c.p2, s.c.p3]).all(|p| (p.y - p0.y).abs() <= stub_y && (p.x - p0.x).abs() <= stub_x) {
+            continue;
+        }
+        let (a, b) = (find(&mut joined, *v0), find(&mut joined, *v1));
+        let (Some(&ra), Some(&rb)) = (extent.get(a), extent.get(b)) else { continue };
+        let both = ra.union(rb);
+        if a == b || both.width() > stub_x || both.height() > stub_y {
+            continue;
+        }
+        let (root, child) = (a.min(b), a.max(b));
+        if let Some(p) = joined.get_mut(child) {
+            *p = root;
+        }
+        if let Some(r) = extent.get_mut(root) {
+            *r = both;
+        }
+    }
     for (k, (_, [a, b])) in pieces.iter().enumerate() {
         let Some(&Some(m)) = mids.get(k) else { continue };
         let (cx, cy) = cell_of(m);
@@ -1946,6 +1976,102 @@ mod tests {
 
     fn ends(sp: &SubPath) -> (Point, Point) {
         (sp.anchors[0].p, sp.anchors[sp.anchors.len() - 1].p)
+    }
+
+    /// Each piece cuts out of the input it is keyed by, losing just its own length (what erasing
+    /// it does), and none is a speck.
+    fn assert_pieces_cut_out(shapes: &[Shape], arr: &BuilderArrangement) {
+        for e in arr.edges.iter().chain(&arr.lines) {
+            let len = e.path.length();
+            assert!(len > 1e-3, "a speck of a piece, keyed {}: {:?}", e.key, e.path);
+            let s = &shapes[e.key as usize];
+            let cut = cut_out(&s.path, &e.path.subpaths[0], false, 0.05).unwrap_or_else(|| panic!("{:?} not on input {}", e.path, e.key));
+            let lost = s.path.length() - cut.length();
+            assert!((lost - len).abs() <= 1e-6 * s.path.length(), "input {} lost {lost} for a piece {len} long", e.key);
+        }
+    }
+
+    #[test]
+    fn a_line_crossed_where_its_two_passes_part_is_cut_once() {
+        // The shrunk case of `pieces_cut_out_of_their_inputs`: the sweep cut the first line's way
+        // there and its way back by the third line a rounding error (1.2e-6) apart, joined by a
+        // stub. The line came back as a speck keyed by the third line and a piece running from
+        // the crossing out to (10, 70) and back to the other cut, which erasing took twice over.
+        let s = [line((10.0, 70.0), (80.0, 20.0), 0), line((10.0, 40.0), (70.0, 90.0), 0), line((20.0, 80.0), (20.0, 50.0), 0)];
+        let arr = shape_builder(&s, true);
+        assert_pieces_cut_out(&s, &arr);
+        // The first line cut by both others, the other two once each.
+        let count = |k: u64| arr.lines.iter().filter(|l| l.key == k).count();
+        assert_eq!((count(0), count(1), count(2)), (3, 2, 2), "{:?}", arr.lines);
+        let at = Point::new(20.0, 70.0 - 50.0 / 7.0);
+        for k in [0, 2] {
+            assert!(arr.lines.iter().filter(|l| l.key == k).all(|l| {
+                let (a, b) = ends(&l.path.subpaths[0]);
+                a.distance(b) > 1.0 && l.path.subpaths[0].anchors.len() == 2
+            }));
+            assert_eq!(
+                arr.lines
+                    .iter()
+                    .filter(|l| l.key == k && [ends(&l.path.subpaths[0]).0, ends(&l.path.subpaths[0]).1].iter().any(|p| p.distance(at) < 1e-9))
+                    .count(),
+                2
+            );
+        }
+    }
+
+    #[test]
+    fn a_run_of_tiny_level_segments_is_not_contracted_as_stubs() {
+        // 2000 segments of 1e-4 (0.2 pt in all), nearly level: each one alone is as short as a
+        // stub the sweep leaves between two cuts, but chained they are real geometry, and the
+        // stub contraction must not pull them into one vertex.
+        let pts: Vec<Point> = (0..=2000).map(|k| Point::new(f64::from(k) * 1e-4, f64::from(k) * 1e-8)).collect();
+        let run = Shape::new(PathData::single(SubPath::polyline(&pts, false)), FillRule::NonZero, 0);
+        let whole = run.path.length();
+        let s = [run, line((0.1003, -1.0), (0.1003, 1.0), 0)];
+        let arr = shape_builder(&s, false);
+        let pieces: Vec<&Shape> = arr.lines.iter().filter(|l| l.key == 0).collect();
+        assert_eq!(pieces.len(), 2, "cut once by the line: {}", pieces.len());
+        let total: f64 = pieces.iter().map(|l| l.path.length()).sum();
+        // Where the line crosses, one segment may be taken for a stub (it is as short as one),
+        // moving the cut by less than a stub's reach; the rest of the run stays.
+        assert!((total - whole).abs() <= DEFAULT_PRECISION / 16.0, "{total} of {whole}");
+        for l in &pieces {
+            let (a, b) = ends(&l.path.subpaths[0]);
+            assert!(a.distance(b) > 0.09, "a piece collapsed: {a:?} {b:?}");
+        }
+        assert_eq!(arr.lines.iter().filter(|l| l.key == 1).count(), 2);
+    }
+
+    #[test]
+    fn a_dense_hatch_at_exact_binary_steps_cuts_each_line_once_per_crossing() {
+        // Lines every 0.25 or 0.5 pt (exact in binary) cut a crossing line or a circle where two
+        // passes of each line met it a rounding error apart, adding a speck and a piece there.
+        let hatch = |n: i32, step: f64, f: &dyn Fn(f64) -> Shape| -> Vec<Shape> { (1..=n).map(|k| f(step * f64::from(k))).collect() };
+        // Horizontal lines across a diagonal: each in two pieces, the diagonal in n + 1.
+        let mut s = vec![line((-3.0, -2.0), (33.0, 31.0), 0)];
+        s.extend(hatch(119, 0.25, &|y| line((-5.0, y), (35.0, y), 0)));
+        let arr = shape_builder(&s, false);
+        assert_pieces_cut_out(&s, &arr);
+        assert_eq!(arr.lines.iter().filter(|l| l.key == 0).count(), 120);
+        assert!((1..=119).all(|k| arr.lines.iter().filter(|l| l.key == k).count() == 2));
+        assert_eq!(arr.lines.len(), 120 + 2 * 119);
+        // Sloping lines across a 45° one.
+        let mut s = vec![line((-3.0, -3.0), (33.0, 33.0), 0)];
+        s.extend(hatch(59, 0.5, &|v| line((v - 40.0, -5.0), (v + 40.0, 35.0), 0)));
+        let arr = shape_builder(&s, false);
+        assert_pieces_cut_out(&s, &arr);
+        assert_eq!(arr.lines.len(), 60 + 2 * 59, "{}", arr.lines.len());
+        // Vertical lines across a circle: n + 1 strips, each line in three pieces, the circle's
+        // outline in two per line.
+        let mut s = vec![Shape::new(shapes::ellipse(Rect::new(0.0, 0.0, 30.0, 30.0)), FillRule::NonZero, 0)];
+        s.extend(hatch(119, 0.25, &|x| line((x, -5.0), (x, 35.0), 0)));
+        let arr = shape_builder(&s, true);
+        assert_pieces_cut_out(&s, &arr);
+        assert_eq!(arr.regions.len(), 120);
+        assert!(arr.regions.iter().all(|r| r.sources == [0]));
+        assert!((1..=119).all(|k| arr.lines.iter().filter(|l| l.key == k).count() == 3));
+        assert_eq!(arr.lines.len(), 3 * 119);
+        assert_eq!(arr.edges.len(), 2 * 119);
     }
 
     #[test]
