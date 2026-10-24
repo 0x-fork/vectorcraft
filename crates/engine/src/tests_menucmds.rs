@@ -977,6 +977,24 @@ fn convert_to_artboards_and_rearrange() {
     assert_eq!(bounds(&s, b), Rect::new(50.0, 675.0, 60.0, 685.0));
 }
 
+/// Convert to Artboards names an artboard one past the highest artboard id the document has, also
+/// after a delete of the last artboard or an undo of a new one.
+#[test]
+fn convert_to_artboards_names_by_the_artboards_the_document_has() {
+    let name_after = |change: &dyn Fn(&mut Session)| {
+        let mut s = session();
+        s.execute("artboard.new", &json!({})).unwrap();
+        s.execute("artboard.new", &json!({})).unwrap();
+        change(&mut s);
+        let a = rect(&mut s, 3000.0, 0.0, 200.0, 100.0);
+        sel(&mut s, &[a]);
+        s.execute("artboard.convertToArtboards", &json!({})).unwrap();
+        s.doc().unwrap().doc.artboards.last().map(|b| b.name.clone()).unwrap()
+    };
+    assert_eq!(name_after(&|s| _ = s.execute("artboard.delete", &json!({"index": 2})).unwrap()), "Artboard 3");
+    assert_eq!(name_after(&|s| _ = s.execute("edit.undo", &json!({})).unwrap()), "Artboard 3");
+}
+
 /// Rearrange All Artboards refuses `columns` that are not a whole number (a fraction, a negative number or a string),
 /// and the artboards stay where they were; 1.0, as the Rearrange All Artboards dialog sends a count, is one column.
 #[test]
