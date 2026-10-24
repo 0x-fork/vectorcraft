@@ -1415,6 +1415,9 @@ pub struct Session {
     /// The depth of the command whose values [`Session::note_journal`] keeps: 1 (the top-level
     /// command), or a step's while a batch runs it ([`Session::execute_step`]).
     note_depth: u32,
+    /// The running top-level query command changed the selection and is journaled like any other
+    /// command ([`Session::journal_query`]).
+    journal_query: bool,
     /// While `command.batch` runs: the documents its steps closed or replaced (Revert), which an
     /// error brings back; `None` otherwise.
     pub(crate) batch_stash: Option<Vec<DocState>>,
@@ -1546,6 +1549,7 @@ impl Session {
             ui_language: None,
             journal_note: Default::default(),
             note_depth: 1,
+            journal_query: false,
             batch_stash: None,
             place_hand_off: None,
             queue_hand_off: None,
@@ -1762,6 +1766,7 @@ impl Session {
         if self.depth == 0 {
             self.journal_note.clear();
             self.note_depth = 1;
+            self.journal_query = false;
             self.batch_stash = None;
         }
         // A selection-only command given `ids` selects them first, in the same undo step (#2130);
@@ -1792,7 +1797,8 @@ impl Session {
         if self.depth == 0 {
             self.inherit_new_art();
         }
-        if spec.journal && self.depth == 0 && self.active().is_none_or(|d| d.interaction.is_none()) {
+        let journaled = spec.journal || (self.depth == 0 && std::mem::take(&mut self.journal_query));
+        if journaled && self.depth == 0 && self.active().is_none_or(|d| d.interaction.is_none()) {
             let p = self.noted(params);
             self.journal.push((id.to_string(), p));
         }
@@ -1815,6 +1821,14 @@ impl Session {
     pub fn note_journal(&mut self, key: &str, value: Value) {
         if self.depth == self.note_depth {
             self.journal_note.insert(key.to_string(), value);
+        }
+    }
+
+    /// Journal the running query command when it is the top-level command: it changed the
+    /// selection (`document.find {select: true}`), so an action recorded around it repeats that.
+    pub(crate) fn journal_query(&mut self) {
+        if self.depth == 1 {
+            self.journal_query = true;
         }
     }
 

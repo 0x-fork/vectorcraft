@@ -269,11 +269,11 @@ fn candidates(s: &Session, f: impl Fn(&Node) -> bool) -> Result<Vec<NodeId>> {
 }
 
 fn finish_same(s: &mut Session, cmd: &str, ids: Vec<NodeId>) -> Result<Value> {
-    let n = ids.len();
     let from = s.doc()?.selection.objects.clone();
     s.select(|_, sel| sel.set(ids))?;
-    s.doc_mut()?.last_selection_cmd = Some((cmd.to_string(), json!({}), from));
-    Ok(json!({ "count": n }))
+    let st = s.doc_mut()?;
+    st.last_selection_cmd = Some((cmd.to_string(), json!({}), from));
+    Ok(json!({ "count": st.selection.objects.len() }))
 }
 
 fn same(s: &mut Session, cmd: &str, eq: fn(&Node, &Node) -> bool) -> Result<Value> {
@@ -312,9 +312,9 @@ fn same_text(s: &mut Session, cmd: &str, eq: fn(&CharStyle, &CharStyle) -> bool)
 
 fn by_kind(s: &mut Session, f: impl Fn(&Node) -> bool) -> Result<Value> {
     let ids = candidates(s, f)?;
-    let n = ids.len();
     s.select(|_, sel| sel.set(ids))?;
-    Ok(json!({ "count": n }))
+    // The objects selected, after Lock Guides has left out guide paths.
+    Ok(json!({ "count": s.doc()?.selection.objects.len() }))
 }
 
 fn direction_handles(s: &mut Session, _: &Value) -> Result<Value> {
