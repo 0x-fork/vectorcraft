@@ -589,16 +589,34 @@ static WRITES: Mutex<()> = Mutex::new(());
 type Named = (Weak<Vec<u8>>, String);
 
 /// The entry names of image bytes already hashed ([`blob_name`]), so an image is hashed once,
-/// not at every interval. Bytes behind a live `Weak` never change (`Arc::make_mut` copies them).
-static NAMES: Mutex<Vec<Named>> = Mutex::new(Vec::new());
+/// not at every interval, keyed by the bytes' address. Bytes behind a live `Weak` never change
+/// (`Arc::make_mut` copies them).
+static NAMES: Mutex<Names> = Mutex::new(Names { by_address: None, live_after_sweep: 0 });
+
+struct Names {
+    by_address: Option<std::collections::HashMap<usize, Named>>,
+    /// How many entries were live at the last sweep of dead ones: the next sweep waits until there
+    /// are twice as many, so sweeping costs a constant per name, not a pass over all of them.
+    live_after_sweep: usize,
+}
 
 /// The name of the entry holding `bytes`: from their content (128 bits of hash and the length), so
 /// identical images share one entry and one written before isn't written again.
 fn blob_name(bytes: &Arc<Vec<u8>>) -> String {
-    let mut names = NAMES.lock().unwrap_or_else(|e| e.into_inner());
-    names.retain(|(w, _)| w.strong_count() > 0);
-    if let Some((_, name)) = names.iter().find(|(w, _)| std::ptr::eq(w.as_ptr(), Arc::as_ptr(bytes))) {
+    let mut guard = NAMES.lock().unwrap_or_else(|e| e.into_inner());
+    let Names { by_address, live_after_sweep } = &mut *guard;
+    let names = by_address.get_or_insert_with(Default::default);
+    let address = Arc::as_ptr(bytes) as usize;
+    // A dead entry at this address named other bytes that were freed there before.
+    if let Some((w, name)) = names.get(&address)
+        && w.strong_count() > 0
+        && std::ptr::eq(w.as_ptr(), Arc::as_ptr(bytes))
+    {
         return name.clone();
+    }
+    if names.len() >= (*live_after_sweep * 2).max(64) {
+        names.retain(|_, (w, _)| w.strong_count() > 0);
+        *live_after_sweep = names.len();
     }
     let hash = |seed: u8| {
         let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -607,7 +625,7 @@ fn blob_name(bytes: &Arc<Vec<u8>>) -> String {
         h.finish()
     };
     let name = format!("img-{:016x}{:016x}-{}{BLOB_EXT}", hash(1), hash(2), bytes.len());
-    names.push((Arc::downgrade(bytes), name.clone()));
+    names.insert(address, (Arc::downgrade(bytes), name.clone()));
     name
 }
 

@@ -21,6 +21,8 @@ use crate::guides::DrawSnap;
 use crate::{Action, Cursor, Mods, Overlay, PointerEvent, PointerKind, Tool, ToolContext, ToolKey};
 
 pub struct GestureTool {
+    /// How many points the last preview of the stroke had ([`crate::previews_at`]).
+    previewed: usize,
     id: &'static str,
     points: Vec<Point>,
     /// The pen pressure of each of `points` (the Paintbrush only).
@@ -79,6 +81,7 @@ impl GestureTool {
         let fidelity = if id == "smooth" { 2.5 } else { 1.5 };
         Self {
             id,
+            previewed: 0,
             points: vec![],
             pressures: vec![],
             active: false,
@@ -161,6 +164,7 @@ impl GestureTool {
     fn clear(&mut self) {
         self.points.clear();
         self.pressures.clear();
+        self.previewed = 0;
     }
 
     /// The stroke's points, each `[x, y, pressure]` when a pen pressed less than fully anywhere
@@ -340,7 +344,7 @@ impl Tool for GestureTool {
                         return if std::mem::take(&mut self.began) { vec![Action::Cancel] } else { vec![] };
                     }
                     self.points.truncate(1);
-                } else if self.points.last().is_some_and(|l| l.distance(p) < cx.tol(1.0)) {
+                } else if self.points.last().is_some_and(|l| l.distance(p) < cx.tol(1.0)) || self.points.len() >= crate::MAX_STROKE_SAMPLES {
                     return vec![];
                 }
                 self.push(p, ev.pressure);
@@ -352,7 +356,10 @@ impl Tool for GestureTool {
                     self.began = true;
                     out.push(Action::Begin(self.label().into()));
                 }
-                out.push(Action::Preview("path.freehand".into(), self.freehand_params(false)));
+                if crate::previews_at(self.points.len()) {
+                    self.previewed = self.points.len();
+                    out.push(Action::Preview("path.freehand".into(), self.freehand_params(false)));
+                }
                 out
             }
             PointerKind::Up => {
@@ -422,12 +429,15 @@ impl Tool for GestureTool {
     }
     fn deactivate(&mut self, _cx: &ToolContext) -> Vec<Action> {
         let began = self.began;
+        // Drags past the last preview are in the stroke kept, too.
+        let stale = (began && self.previewed != self.points.len() && self.draws_path() && !self.smoothing)
+            .then(|| Action::Preview("path.freehand".into(), self.freehand_params(false)));
         self.snap.clear();
         self.active = false;
         self.began = false;
         self.straight = false;
         self.clear();
-        if began { vec![Action::Commit] } else { vec![] }
+        if began { stale.into_iter().chain([Action::Commit]).collect() } else { vec![] }
     }
     fn overlays(&self, cx: &ToolContext) -> Vec<Overlay> {
         let mut o = self.snap.guides().to_vec();

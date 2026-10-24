@@ -887,6 +887,20 @@ impl Tool for NoopTool {
     }
 }
 
+/// The most samples a drawn stroke (freehand, Liquify) keeps: later drags add nothing to it.
+pub(crate) const MAX_STROKE_SAMPLES: usize = 100_000;
+
+/// Samples up to which every drag previews the whole stroke; past it, a drag previews it every
+/// `n / PREVIEW_ALL_UNTIL` samples. Each preview carries every sample so far, so previewing at
+/// every sample cost the square of the stroke's length (a gesture of many drags sent at once
+/// spent seconds); this way it is about `PREVIEW_ALL_UNTIL` per sample.
+const PREVIEW_ALL_UNTIL: usize = 1000;
+
+/// Whether a drag that made the stroke `n` samples long previews it ([`PREVIEW_ALL_UNTIL`]).
+pub(crate) fn previews_at(n: usize) -> bool {
+    n <= PREVIEW_ALL_UNTIL || n.is_multiple_of(n / PREVIEW_ALL_UNTIL)
+}
+
 pub(crate) fn json_ids(ids: &[NodeId]) -> Value {
     Value::Array(ids.iter().map(|i| Value::from(i.0)).collect())
 }
