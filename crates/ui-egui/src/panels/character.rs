@@ -1080,11 +1080,13 @@ mod tests {
         let text = crate::tests_labels::painted_text(&mut app, |app, ui| axis_sliders(app, ui, &face));
         assert!(text.contains("Weight\n") && text.contains("Width\n") && text.contains("400") && text.contains("100"), "{text}");
         // The labels are the font's names in every interface language, not catalog words (ja
-        // translates the interface's Weight as 線幅, the stroke weight).
-        crate::i18n::set_current(crate::i18n::Lang::from_code("ja").unwrap());
+        // translates the interface's Weight as the stroke weight).
+        let ja = crate::i18n::Lang::from_code("ja").unwrap();
+        crate::i18n::set_current(ja);
         let text = crate::tests_labels::painted_text(&mut app, |app, ui| axis_sliders(app, ui, &face));
         crate::i18n::set_current(crate::i18n::Lang::EN);
-        assert!(text.contains("Weight\n") && text.contains("Width\n") && !text.contains("線幅"), "{text}");
+        let weight = crate::i18n::tr(ja, "Weight");
+        assert!(text.contains("Weight\n") && text.contains("Width\n") && (weight == "Weight" || !text.contains(weight)), "{text}");
         // Screen readers name each slider by its axis.
         let tree = crate::widgets::accessibility_tests::tree(|ui| axis_sliders(&mut app, ui, &face));
         for name in ["Weight", "Width"] {

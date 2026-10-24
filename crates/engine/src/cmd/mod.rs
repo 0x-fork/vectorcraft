@@ -28,6 +28,7 @@ pub mod flatten;
 pub mod fontfiles;
 mod fonts;
 pub(crate) mod freeform;
+pub mod globaledit;
 pub(crate) mod gradient;
 pub(crate) mod graph;
 mod halftone;
@@ -79,6 +80,7 @@ mod style;
 pub mod stylelib;
 mod swatch;
 pub mod swatchlib;
+pub mod symbollib;
 pub(crate) mod tabs;
 mod textedit;
 pub mod textstyles;
@@ -214,6 +216,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
         v.extend(object::specs());
         v.extend(path::specs());
         v.extend(select::specs());
+        v.extend(globaledit::specs());
         v.extend(wand::specs());
         v.extend(paint::specs());
         // Split out of `paint` (M3.8); kept next to it so lists in registry order (the command
@@ -267,6 +270,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
         v.extend(freeform::specs());
         v.extend(flatten::specs());
         v.extend(stylelib::specs());
+        v.extend(symbollib::specs());
         v.extend(library::specs());
         v.extend(expand::specs());
         v.extend(attributes::specs());

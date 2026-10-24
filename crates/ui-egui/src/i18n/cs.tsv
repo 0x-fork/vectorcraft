@@ -13,7 +13,7 @@
 # režim míchání (blending mode), přednastavení (preset), rozložit (expand), uvolnit (release),
 # vektorizace obrazu (Image Trace). Counts without a plural row read "Label: {n}".
 #
-# Coverage: every menu string, tl! literal, plural, status and error message (enforced in tests:
+# Coverage: every menu string, tl! literal, plural, status and error message (`untranslated_report` lists gaps:
 # `complete_menus` and `COMPLETE_MESSAGES`). Left in English on purpose (`MENU_KEEP_AS_IS` in the
 # tests): the product name, language names, OpenType, the built-in workspace names and the
 # bracketed perspective grid preset names. Keep placeholders, ellipses and the leading/trailing
@@ -322,6 +322,13 @@
 	Glyphs	Glyfy
 	Insert Special Character	Vložit speciální znak
 	Bullet	Odrážka
+	Bullets	Odrážky
+	Bullets and Numbering	Odrážky a číslování
+	Apply Bullets	Použít odrážky
+	Filled Dot	Plná tečka
+	Dash	Pomlčka
+	Hollow Circle	Prázdný kruh
+	Filled Square	Plný čtverec
 	Copyright Symbol	Symbol copyrightu
 	Ellipsis	Výpustka
 	Paragraph Symbol	Symbol odstavce
@@ -1537,7 +1544,7 @@ lighting	Light	Světlo
 	Clear History	Vymazat historii
 	Set History Limit…	Nastavit limit historie…
 	Open a document to see its history.	Otevřete dokument, abyste viděli jeho historii.
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Použít sadu dat
 	Cancel Pattern Editing	Zrušit úpravy vzorku
 	Copy Appearance	Kopírovat vzhled
@@ -1792,6 +1799,13 @@ lighting	Light	Světlo
 	Repeat Pathfinder	Zopakovat operaci s cestami
 	Repeat {name}	Zopakovat {name}
 	Trap…	Přesah barev…
+	Trap	Přesah barev
+	Height/Width	Výška/šířka
+	Tint Reduction	Snížení tónu
+	Traps with Process Color	Přesahy s procesními barvami
+	Reverse Traps	Obrácené přesahy
+	Precision	Přesnost
+	Remove Redundant Points	Odstranit nadbytečné body
 	Bottom in Front	Spodní vpředu
 	Brick by Column	Cihly po sloupcích
 	Brick by Row	Cihly po řádcích
@@ -1918,7 +1932,6 @@ lighting	Light	Světlo
 	{kind}, {model}	{kind}, {model}
 	No symbols in this document	V tomto dokumentu nejsou žádné symboly
 	Select art and click New Symbol to make one.	Vyberte kresbu a symbol vytvořte tlačítkem Nový symbol.
-	Symbol Libraries (on the roadmap)	Knihovny symbolů (v plánu)
 	Align On:	Zarovnat na:
 	Bottom-Justified Tab	Tabulátor zarovnaný dolů
 	Center-Justified Tab	Tabulátor zarovnaný na střed
@@ -2438,6 +2451,9 @@ lighting	Light	Světlo
 	Background Color:	Barva pozadí:
 	Show Center Mark	Zobrazit středovou značku
 	Show Cross Hairs	Zobrazit nitkový kříž
+	Show Video Safe Areas	Zobrazit bezpečné oblasti videa
+	Video Ruler Pixel Aspect Ratio:	Poměr stran pixelu video pravítek:
+	Hide Video Rulers	Skrýt video pravítka
 	Client-side (.html)	Na straně klienta (.html)
 	Color Reduction:	Redukce barev:
 	Lossless (lossy WebP isn't available yet)	Bezeztrátový (ztrátový WebP zatím není k dispozici)
@@ -3511,6 +3527,7 @@ theme	Appearance	Motiv
 	Size/Leading	Velikost/proklad
 	Snapping Tolerance	Tolerance přichytávání
 	Spacing Guides	Vodítka rozestupů
+	Invoke Distance Guides	Vyvolat vodítka vzdálenosti
 	Spanish	Španělština
 	Subdivisions	Dělení
 	Templates Folder	Složka šablon
@@ -3818,6 +3835,8 @@ effect	Regular	Pravidelný
 	Put back in the dock	Vrátit do doku
 	All Scripts	Všechny systémy písma
 	Any Kind	Libovolný druh
+	Font Technology	Technologie písma
+font-technology	Variable	Variabilní
 	Decorative	Dekorativní
 	Favorites	Oblíbené
 	Latin	Latinka
@@ -4131,6 +4150,7 @@ imageTrace	Outline	Obrys
 @msg	Opened {url}	Otevřeno {url}
 @msg	Outline Stroke: no stroked paths selected	Převést tah na obrys: nejsou vybrány žádné cesty s tahem
 @msg	PDF settings are not an object	nastavení PDF nejsou objekt
+@msg	PDF security settings are not an object	nastavení zabezpečení PDF nejsou objekt
 @msg	PDF writer error: {0}	chyba zápisu PDF: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	Zabaleno souborů: {n} do {folder}{note}
 @msg	Packaged {n} file(s){note}	Zabaleno souborů: {n}{note}
@@ -4252,6 +4272,7 @@ imageTrace	Outline	Obrys
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	osa musí být "vertical", "horizontal" nebo úhel ve stupních, ne `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	pozadí {other}: transparent, white, black nebo barva jako "#ff8800"
 @msg	bad color {v}	chybná barva {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio musí být číslo od 0,1 do 10
 @msg	the Color Picker is not open	Výběr barvy není otevřený
 @msg	the Simplify slider is not open	Posuvník Zjednodušit není otevřený
 @msg	the screen color sampler is already open	nástroj pro nabírání barvy z obrazovky už je otevřený
@@ -4329,7 +4350,7 @@ imageTrace	Outline	Obrys
 @msg	missing index	chybí index
 @msg	missing number `{key}`	chybí číslo `{key}`
 @msg	missing integer `{key}`	chybí celé číslo `{key}`
-@msg	multiple windows land with M11.5	více oken přijde s M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nové okno zatím není k dispozici: dokument se otevírá v jednom okně
 @msg	name the file	pojmenujte soubor
 @msg	no CSS to copy: select objects with CSS of their own	žádné CSS ke kopírování: vyberte objekty s vlastním CSS
 @msg	no Live Paint edge near that point	poblíž tohoto bodu není žádná hrana živé malby
@@ -4836,6 +4857,7 @@ imageTrace	Outline	Obrys
 	Logo 1000×1000	Logo 1000×1000
 	Business Card 3.5 × 2 in	Vizitka 3,5 × 2 in
 	Business Card 85 × 55 mm	Vizitka 85 × 55 mm
+	Business Card 91 × 55 mm	Vizitka 91 × 55 mm
 	Letterhead Letter	Hlavičkový papír Letter
 	Letterhead A4	Hlavičkový papír A4
 	Envelope DL	Obálka DL
@@ -5460,3 +5482,54 @@ axis	Y Axis	osa Y
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	živý efekt běží během vykreslování dokumentu, takže nemůže být `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	exportní zásuvný modul dostává vždy rozpočet exportu: klíč `budget` vynechte
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	„{_1}“ žádá o velký výpočetní rozpočet (každé spuštění až {minutes} minut a {times}krát víc instrukcí než obvykle): nainstalujte ho s `allowHeavy: true`, jakmile uživatel souhlasí
+# Actions panel: action sets (#3712).
+	New Set…	Nová sada…
+	New Set	Nová sada
+	Set Options…	Možnosti sady…
+	Set Options	Možnosti sady
+	Create New Set	Vytvořit novou sadu
+	Stop Global Edit	Ukončit globální úpravy
+	Global Edit Options	Možnosti globálních úprav
+	Match	Shoda
+	On Artboards	Na pracovních plochách
+	All Artboards	Všechny pracovní plochy
+	Include Objects On Canvas	Zahrnout objekty na plátně
+	Result(s): {count}	Výsledky: {count}
+@msg	select one object	vyberte jeden objekt
+@msg	Global Edit works on paths, compound paths and symbol instances	Globální úpravy pracují s cestami, složenými cestami a instancemi symbolů
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	nebyly nalezeny žádné podobné objekty (otočené a zrcadlené kopie se nevyhledávají); změňte možnosti globálních úprav a zkuste to znovu
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all nebo rozsah, například 1, 3-5, ne {v}
+	Add to Symbols	Přidat do symbolů
+	Basic Shapes	Základní tvary
+	Open Symbol Library	Otevřít knihovnu symbolů
+	Save Symbol Library	Uložit knihovnu symbolů
+	Save Symbol Library…	Uložit knihovnu symbolů…
+	Save Symbols…	Uložit symboly…
+	Selected Symbols Only	Pouze vybrané symboly
+	Symbol Libraries Menu	Nabídka knihoven symbolů
+	Symbol Library	Knihovna symbolů
+	User Symbol Library 1	Uživatelská knihovna symbolů 1
+	User Symbol Library 2	Uživatelská knihovna symbolů 2
+	User Symbol Library 3	Uživatelská knihovna symbolů 3
+	User Symbol Library 4	Uživatelská knihovna symbolů 4
+	User Symbol Library 5	Uživatelská knihovna symbolů 5
+	User Symbol Library 6	Uživatelská knihovna symbolů 6
+	User Symbol Library 7	Uživatelská knihovna symbolů 7
+	User Symbol Library 8	Uživatelská knihovna symbolů 8
+	User Symbol Library 9	Uživatelská knihovna symbolů 9
+	User Symbol Library 10	Uživatelská knihovna symbolů 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` nemá žádné symboly k umístění
+@msg	missing `library` (see symbol.libraries)	chybí `library` (viz symbol.libraries)
+@msg	no symbol `{n}`	žádný symbol `{n}`
+@msg	no symbol `{n}` in `{_1}`	žádný symbol `{n}` v `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	žádná knihovna symbolů `{key}` (viz symbol.libraries)
+@msg	the document has no symbols to save	dokument nemá žádné symboly k uložení
+@msg	Trap: select two or more objects filled with solid colours	Přesah barev: vyberte dva nebo více objektů vyplněných plnými barvami
+@msg	Trap: no edges of different colours meet among the selected objects	Přesah barev: mezi vybranými objekty se nestýkají žádné okraje různých barev
+@msg	thickness must be from 0.01 to 5000 pt	thickness musí být od 0,01 do 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth musí být od 1 do 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction musí být od 0 do 100 %
+	Rectangular Grid Tool Options	Možnosti nástroje Obdélníková mřížka
+	Polar Grid Tool Options	Možnosti nástroje Polární mřížka
+	Fill Line	Výplň úsečky

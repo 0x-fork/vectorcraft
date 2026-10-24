@@ -41,6 +41,9 @@ pub struct FamilyTool {
     pub compound: bool,
     /// The grids take the current fill.
     pub fill: bool,
+    /// The grids' Default Size (width, height): the size a click's dialog opens with (a drag sets
+    /// its own). The Reference Point is `reference`.
+    pub grid_size: (f64, f64),
     snap: DrawSnap,
 }
 
@@ -74,6 +77,7 @@ impl FamilyTool {
             frame: true,
             compound: false,
             fill: false,
+            grid_size: (100.0, 100.0),
             snap: DrawSnap::default(),
         }
     }
@@ -99,6 +103,20 @@ impl FamilyTool {
         matches!(self.id, "rectangularGrid" | "polarGrid")
     }
 
+    /// A grid's options a drag draws with: its dividers, skews and switches (the Default Size and
+    /// Reference Point are for a click's dialog).
+    fn grid_options(&self) -> Value {
+        if self.id == "polarGrid" {
+            json!({
+                "concentric": self.rows, "radial": self.columns, "concentricSkew": self.skew[0], "radialSkew": self.skew[1], "compound": self.compound, "fill": self.fill,
+            })
+        } else {
+            json!({
+                "rows": self.rows, "columns": self.columns, "rowSkew": self.skew[0], "columnSkew": self.skew[1], "frame": self.frame, "fill": self.fill,
+            })
+        }
+    }
+
     /// The command for a drag from `start` to `p`.
     pub fn command(&self, start: Point, p: Point, m: Mods) -> (String, Value) {
         self.command_at(start, p, m, 0.0)
@@ -117,7 +135,7 @@ impl FamilyTool {
             }
             // The grids: the dragged box (along the Constrain Angle's axes) with the tool's options.
             "rectangularGrid" | "polarGrid" => {
-                let mut params = self.options();
+                let mut params = self.grid_options();
                 if let (Some(o), Value::Object(b)) = (params.as_object_mut(), box_params(start, p, m, base)) {
                     o.extend(b);
                 }
@@ -252,12 +270,13 @@ impl Tool for FamilyTool {
     fn options(&self) -> Value {
         match self.id {
             "spiral" => json!({"decay": self.decay, "segments": self.segments, "clockwise": self.clockwise}),
-            "rectangularGrid" => json!({
-                "rows": self.rows, "columns": self.columns, "rowSkew": self.skew[0], "columnSkew": self.skew[1], "frame": self.frame, "fill": self.fill,
-            }),
-            "polarGrid" => json!({
-                "concentric": self.rows, "radial": self.columns, "concentricSkew": self.skew[0], "radialSkew": self.skew[1], "compound": self.compound, "fill": self.fill,
-            }),
+            "rectangularGrid" | "polarGrid" => {
+                let mut o = self.grid_options();
+                o["width"] = json!(self.grid_size.0);
+                o["height"] = json!(self.grid_size.1);
+                o["reference"] = json!(self.reference);
+                o
+            }
             _ => json!({
                 "closed": self.closed,
                 "lengthX": self.length_x,
@@ -292,6 +311,8 @@ impl Tool for FamilyTool {
             "frame" => self.frame = v.as_bool().unwrap_or(self.frame),
             "compound" => self.compound = v.as_bool().unwrap_or(self.compound),
             "fill" => self.fill = v.as_bool().unwrap_or(self.fill),
+            "width" => self.grid_size.0 = grid_length(v, self.grid_size.0),
+            "height" => self.grid_size.1 = grid_length(v, self.grid_size.1),
             _ => {}
         }
     }
@@ -300,6 +321,12 @@ impl Tool for FamilyTool {
 /// Arc segment length from a dialog or preference value.
 fn arc_length(v: &Value, current: f64) -> f64 {
     v.as_f64().filter(|n| n.is_finite()).map_or(current, |n| n.abs().max(1e-9))
+}
+
+/// A grid's Default Size side from option value `v`: a finite positive length (at most 1e6 pt),
+/// else `current`.
+fn grid_length(v: &Value, current: f64) -> f64 {
+    v.as_f64().filter(|n| n.is_finite() && *n > 0.0).map_or(current, |n| n.min(1e6))
 }
 
 /// A grid divider skew from option value `v`: a finite number within the range, else `current`.
@@ -361,7 +388,9 @@ mod tests {
             t.set_option(key, &value);
         }
         let options = json!({"concentric": 2, "radial": 5, "concentricSkew": -40.0, "radialSkew": 500.0, "compound": true, "fill": true});
-        assert_eq!(t.options(), options);
+        let mut reported = options.clone();
+        reported.as_object_mut().unwrap().extend(json!({"width": 100.0, "height": 100.0, "reference": 0}).as_object().unwrap().clone());
+        assert_eq!(t.options(), reported);
         let (command, params) = t.command(Point::new(10.0, 20.0), Point::new(40.0, 80.0), Mods::default());
         assert_eq!(command, "shape.polarGrid");
         let mut want = options;
@@ -370,7 +399,10 @@ mod tests {
         let mut t = FamilyTool::new("rectangularGrid");
         t.set_option("frame", &json!(false));
         t.set_option("rowSkew", &json!(12.5));
-        assert_eq!(t.options(), json!({"rows": 5, "columns": 5, "rowSkew": 12.5, "columnSkew": 0.0, "frame": false, "fill": false}));
+        assert_eq!(
+            t.options(),
+            json!({"rows": 5, "columns": 5, "rowSkew": 12.5, "columnSkew": 0.0, "frame": false, "fill": false, "width": 100.0, "height": 100.0, "reference": 0})
+        );
     }
 
     #[test]
@@ -474,5 +506,22 @@ mod tests {
             "{a:?}"
         );
         assert!(t.overlays(&cx).iter().any(|o| matches!(o, Overlay::Label { text, .. } if text == "align")));
+    }
+
+    /// A grid's Default Size and Reference Point are options for a click's dialog; the drag
+    /// draws the box it is dragged to and leaves them out of its command.
+    #[test]
+    fn grid_default_size_is_an_option_the_drag_leaves_out() {
+        for id in ["rectangularGrid", "polarGrid"] {
+            let mut t = FamilyTool::new(id);
+            for (k, v) in [("width", json!(150.0)), ("height", json!(-3.0)), ("reference", json!(4))] {
+                t.set_option(k, &v);
+            }
+            let o = t.options();
+            assert_eq!((o["width"].clone(), o["height"].clone(), o["reference"].clone()), (json!(150.0), json!(100.0), json!(4)), "{id}");
+            let (_, p) = t.command(Point::new(0.0, 0.0), Point::new(40.0, 30.0), Mods::default());
+            assert!(p.get("reference").is_none(), "{id}: {p}");
+            assert_eq!((p["width"].clone(), p["height"].clone()), (json!(40.0), json!(30.0)), "{id}");
+        }
     }
 }

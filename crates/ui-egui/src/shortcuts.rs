@@ -390,6 +390,8 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context) {
                     let _ = app.run("object.pattern.done", json!({}));
                 } else if app.session.active().is_some_and(|d| d.isolation.is_some()) {
                     let _ = app.run("object.exitIsolation", json!({}));
+                } else if app.session.active().is_some_and(|d| d.global_edit.is_some()) {
+                    let _ = app.run("select.globalEdit", json!({}));
                 } else if app.ui.flyout.is_some() {
                     app.ui.flyout = None;
                 } else if escape_pair.is_some_and(|second| escape_resets_rotation(app, ctx, second)) {
@@ -627,6 +629,27 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context) {
             crate::menus::invoke(app, id, p);
         }
         return;
+    }
+    // Alt+arrows on selected type objects step their spacing as the Type tool does (Cmd/Ctrl:
+    // five steps); Alt+arrow copies and nudges every other selection.
+    let m = ctx.input(|i| i.modifiers);
+    if m.alt
+        && app.session.active().is_some_and(|st| {
+            st.selection.guides.is_empty()
+                && !st.selection.objects.is_empty()
+                && st.selection.objects.iter().all(|id| matches!(st.doc.node(*id).map(|n| &n.kind), Some(vectorcraft_doc::NodeKind::Text(_))))
+        })
+    {
+        let keys = [(Key::ArrowLeft, ToolKey::Left), (Key::ArrowRight, ToolKey::Right), (Key::ArrowUp, ToolKey::Up), (Key::ArrowDown, ToolKey::Down)];
+        for (key, tool_key) in keys {
+            if ctx.input_mut(|i| i.consume_key(m, key)) {
+                if let Some((attribute, by)) = vectorcraft_tools::text::step_key(tool_key, m.shift, false) {
+                    let by = if m.command { by * 5.0 } else { by };
+                    let _ = app.run("type.step", json!({"attribute": attribute, "by": by}));
+                }
+                return;
+            }
+        }
     }
     // Arrow nudges (Shift = ×10, Alt = copy).
     let arrows = [(Key::ArrowLeft, -1.0, 0.0), (Key::ArrowRight, 1.0, 0.0), (Key::ArrowUp, 0.0, -1.0), (Key::ArrowDown, 0.0, 1.0)];
@@ -1622,6 +1645,46 @@ mod tests {
         assert!(app.session.tool_wants_text());
         frame(&mut app, vec![press(Key::Period, five)]);
         assert_eq!(sizes(&mut app), [(json!("One "), json!(14.0)), (json!("Two"), json!(24.0))]);
+    }
+
+    /// #3786: Alt+arrows step a selected text object's spacing instead of copying and nudging it.
+    #[test]
+    fn alt_arrows_step_selected_type_object() {
+        let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 200, "height": 200})).unwrap();
+        let id = app.session.execute("text.create", &json!({"x": 20, "y": 50, "text": "One Two", "size": 20})).unwrap()["id"].as_u64().unwrap();
+        app.select_tool("selection");
+        app.session.execute("select.set", &json!({"ids": [id]})).unwrap();
+
+        let press = |key, modifiers| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
+        frame(&mut app, vec![egui::Event::ModifiersChanged(Modifiers::ALT), press(Key::ArrowRight, Modifiers::ALT)]);
+        let r = app.session.execute("text.getRange", &json!({"id": id})).unwrap();
+        assert_eq!(r["runs"][0]["style"]["tracking"], json!(20.0));
+        assert_eq!(app.session.active().unwrap().selection.objects, [vectorcraft_doc::NodeId(id)]);
+
+        frame(&mut app, vec![egui::Event::ModifiersChanged(Modifiers::ALT), press(Key::ArrowDown, Modifiers::ALT)]);
+        let r = app.session.execute("text.getRange", &json!({"id": id})).unwrap();
+        assert_eq!(r["runs"][0]["style"]["leading"], json!(26.0));
+
+        let alt_shift = Modifiers::ALT | Modifiers::SHIFT;
+        frame(&mut app, vec![egui::Event::ModifiersChanged(alt_shift), press(Key::ArrowUp, alt_shift)]);
+        let r = app.session.execute("text.getRange", &json!({"id": id})).unwrap();
+        assert_eq!(r["runs"][0]["style"]["baseline_shift"], json!(2.0));
+
+        // Shift+Alt+Left/Right have no text-spacing action; they must still be consumed instead of
+        // falling through to Alt+arrow's copy-and-nudge behaviour.
+        for key in [Key::ArrowLeft, Key::ArrowRight] {
+            frame(&mut app, vec![egui::Event::ModifiersChanged(alt_shift), press(key, alt_shift)]);
+            assert_eq!(app.session.active().unwrap().selection.objects, [vectorcraft_doc::NodeId(id)]);
+        }
+
+        // Other objects keep Alt+arrow's copy-and-nudge shortcut.
+        let rect = app.session.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 10, "height": 10})).unwrap()["id"].as_u64().unwrap();
+        app.session.execute("select.set", &json!({"ids": [rect]})).unwrap();
+        frame(&mut app, vec![egui::Event::ModifiersChanged(Modifiers::ALT), press(Key::ArrowRight, Modifiers::ALT)]);
+        let selected = &app.session.active().unwrap().selection.objects;
+        assert_eq!(selected.len(), 1);
+        assert_ne!(selected[0], vectorcraft_doc::NodeId(rect), "a non-type object is still copied by Alt+arrow");
     }
 
     /// #793: with a layout without Latin letters the one-key shortcuts go by the key's position:

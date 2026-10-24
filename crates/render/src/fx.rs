@@ -316,7 +316,7 @@ fn shape_bounds(symbols: &SymbolBoxes, n: &Node) -> Option<Rect> {
     };
     match &n.kind {
         _ if effects::has_container_appearance(n) => {
-            let art = effects::evaluate_container(n);
+            let art = effects::evaluate_container(Some(symbols.document()), n);
             let art = art.as_ref().unwrap_or(n);
             if art.clips() { art.visual_bounds_with(symbols) } else { union(art) }
         }
@@ -350,7 +350,7 @@ fn shape_bounds(symbols: &SymbolBoxes, n: &Node) -> Option<Rect> {
                 NodeKind::SymbolInstance { symbol, .. } => symbols.document().symbols.iter().find(|s| s.name == *symbol).map(|s| s.art.clone()),
                 _ => None,
             };
-            let reshaped = effects::reshape(n, symbol.as_deref());
+            let reshaped = effects::reshape(Some(symbols.document()), n, symbol.as_deref());
             let b = match &reshaped {
                 Some(r) if matches!(n.kind, NodeKind::Text(_)) || (matches!(n.kind, NodeKind::Image(_)) && !r.clips()) => {
                     r.children().into_iter().flatten().fold(None, |acc, c| vectorcraft_geom::union_opt(acc, painted_reach(symbols, c)))
@@ -430,7 +430,7 @@ fn cull_bounds_in(symbols: &SymbolBoxes, n: &Node, after_reshape: bool) -> Optio
         _ if effects::has_crop_marks(n) => effects::crop_marks_art(n).and_then(|art| inner(&art)),
         // The evaluated art (its fills, strokes and geometry effects) and the raster effects' reach.
         _ if effects::has_container_appearance(n) => {
-            let art = effects::evaluate_container(n);
+            let art = effects::evaluate_container(Some(symbols.document()), n);
             let art = art.as_ref().unwrap_or(n);
             let b = if art.clips() {
                 art.visual_bounds_with(symbols)
@@ -453,7 +453,7 @@ fn cull_bounds_in(symbols: &SymbolBoxes, n: &Node, after_reshape: bool) -> Optio
                 NodeKind::SymbolInstance { symbol, .. } => symbols.document().symbols.iter().find(|s| s.name == *symbol).map(|s| s.art.clone()),
                 _ => None,
             };
-            let reshaped = effects::reshape(n, symbol.as_deref());
+            let reshaped = effects::reshape(Some(symbols.document()), n, symbol.as_deref());
             let b = match &reshaped {
                 Some(r) if matches!(n.kind, NodeKind::Text(_)) || (matches!(n.kind, NodeKind::Image(_)) && !r.clips()) => {
                     r.children().into_iter().flatten().fold(None, |acc, c| vectorcraft_geom::union_opt(acc, inner(c)))
@@ -1483,14 +1483,14 @@ impl Renderer {
         let art = match effects::crop_marks_art(a)
             .or_else(|| effects::revolve_art(a))
             .or_else(|| effects::solid_art(a))
-            .or_else(|| effects::reshape(a, symbol.as_ref()))
+            .or_else(|| effects::reshape(Some(doc), a, symbol.as_ref()))
         {
             Some(r) => r,
-            None if container => effects::evaluate_container(a).unwrap_or_else(|| (**a).clone()),
+            None if container => effects::evaluate_container(Some(doc), a).unwrap_or_else(|| (**a).clone()),
             None if matches!(a.kind, NodeKind::Text(_) | NodeKind::Image(_) | NodeKind::Path { .. } | NodeKind::Compound { .. }) => (**a).clone(),
-            None => effects::outline_art(a, symbol.as_ref()).unwrap_or_else(|| Node::group(a.id, vec![])),
+            None => effects::outline_art(Some(doc), a, symbol.as_ref()).unwrap_or_else(|| Node::group(a.id, vec![])),
         };
-        let art = if effects::has_revolve(a) || effects::has_solid(a) { effects::evaluate_container(&art).unwrap_or(art) } else { art };
+        let art = if effects::has_revolve(a) || effects::has_solid(a) { effects::evaluate_container(Some(doc), &art).unwrap_or(art) } else { art };
         let mut art = self.adjusted_art(art, effects::color_map(&a.appearance.effects).as_ref());
         // A path's geometry effects still apply when it is drawn.
         let path = matches!(art.kind, NodeKind::Path { .. } | NodeKind::Compound { .. });
@@ -2964,8 +2964,15 @@ mod tests {
         let mut d = Document::new(100.0, 100.0);
         // A PNG signature with nothing after it.
         d.images.insert("cut".into(), ImageBlob::new("image/png", b"\x89PNG\r\n\x1a\n".to_vec()));
-        let im =
-            ImageObject { key: "cut".into(), width: 40, height: 40, xf: Affine::translate((30.0, 30.0)), link: None, placement: Default::default() };
+        let im = ImageObject {
+            key: "cut".into(),
+            width: 40,
+            height: 40,
+            xf: Affine::translate((30.0, 30.0)),
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        };
         let mut n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
         n.appearance.effects = vec![Effect { id: "blur.gaussian".into(), params: json!({"radius": 4.0}), visible: true }];
         d.insert(Some(d.layers[0].id), 0, n).unwrap();
@@ -2989,8 +2996,15 @@ mod tests {
         let mut d = Document::new(100.0, 100.0);
         // A PNG signature with nothing after it.
         d.images.insert("cut".into(), ImageBlob::new("image/png", b"\x89PNG\r\n\x1a\n".to_vec()));
-        let im =
-            ImageObject { key: "cut".into(), width: 40, height: 40, xf: Affine::translate((30.0, 30.0)), link: None, placement: Default::default() };
+        let im = ImageObject {
+            key: "cut".into(),
+            width: 40,
+            height: 40,
+            xf: Affine::translate((30.0, 30.0)),
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        };
         let mut n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)));
         n.appearance.effects = [
             ("rasterize", json!({"background": "white"})),

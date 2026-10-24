@@ -116,6 +116,31 @@ fn pencil_alt_closes_path() {
     assert!(ps[0].1.is_closed());
 }
 
+/// #3799: with Shift held, a wavy Pencil drag draws one straight segment at 45° steps from the
+/// Constrain Angle (here 30°: a drag at about 60° comes out at 75°).
+#[test]
+fn pencil_with_shift_draws_a_straight_line() {
+    let mut s = session();
+    s.execute("prefs.set", &json!({"key": "constrainAngle", "value": 30})).unwrap();
+    let v = view();
+    let shift = Mods { shift: true, ..Default::default() };
+    s.select_tool("pencil", v).unwrap();
+    s.pointer(&PointerEvent::new(PointerKind::Down, 100.0, 400.0).with_mods(shift), v).unwrap();
+    for (x, y) in [(120.0, 380.0), (125.0, 330.0), (160.0, 320.0), (150.0, 313.4)] {
+        s.pointer(&PointerEvent::new(PointerKind::Drag, x, y).with_mods(shift), v).unwrap();
+    }
+    s.pointer(&PointerEvent::new(PointerKind::Up, 150.0, 313.4).with_mods(shift), v).unwrap();
+    let ps = paths(&s);
+    assert_eq!(ps.len(), 1);
+    let sp = &ps[0].1.subpaths[0];
+    assert_eq!(sp.anchors.len(), 2, "{sp:?}");
+    assert!(sp.anchors.iter().all(|a| a.h_in == a.p && a.h_out == a.p), "no handles: {sp:?}");
+    let (a, b) = (sp.anchors[0].p, sp.anchors[1].p);
+    assert!(a.distance(Point::new(100.0, 400.0)) < 1e-6, "{a:?}");
+    let angle = (-(b.y - a.y)).atan2(b.x - a.x).to_degrees();
+    assert!((angle - 75.0).abs() < 1e-6, "{angle}");
+}
+
 #[test]
 fn pencil_continues_selected_open_path() {
     let mut s = session();

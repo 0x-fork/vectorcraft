@@ -558,10 +558,12 @@ pub(crate) fn expand_node(d: &mut Document, id: NodeId, brushes: &[vectorcraft_b
     let mut listed = vec![];
     let m = expanded_node(d, n, brushes, &mut listed);
     out.extend(listed.into_iter().map(|(id, _)| id));
-    if let Some(m) = m
-        && let Some(slot) = d.node_mut(id)
-    {
-        *slot = m;
+    if let Some(mut m) = m {
+        // Art made from type takes its emoji's pixels into the document.
+        d.adopt_pixels(&mut m);
+        if let Some(slot) = d.node_mut(id) {
+            *slot = m;
+        }
     }
 }
 
@@ -626,7 +628,7 @@ fn expanded_node(d: &mut Document, mut n: Node, brushes: &[vectorcraft_brush::Br
         image => {
             let m = if container {
                 // A group's or layer's own fills and strokes become art among its members.
-                effects::evaluate_container(&v).map(|mut m| {
+                effects::evaluate_container(Some(&*d), &v).map(|mut m| {
                     members = expand_pieces(d, &mut m, false, brushes, &mut stroke_art);
                     m
                 })
@@ -639,7 +641,7 @@ fn expanded_node(d: &mut Document, mut n: Node, brushes: &[vectorcraft_brush::Br
                     NodeKind::SymbolInstance { symbol, .. } => d.symbols.iter().find(|s| s.name == *symbol).map(|s| s.art.clone()),
                     _ => None,
                 };
-                effects::expand_outlined(&v, symbol.as_deref()).map(|mut m| {
+                effects::expand_outlined(Some(&*d), &v, symbol.as_deref()).map(|mut m| {
                     expand_pieces(d, &mut m, true, brushes, &mut stroke_art);
                     m
                 })
@@ -1111,7 +1113,7 @@ mod tests {
         let glyphs = effects::outline_text(&node(&s, t)).unwrap();
         let b = glyphs.geometric_bounds().unwrap();
         assert!(b.x0 > 105.0 && b.y0 > 105.0 && b.x1 < 195.0 && b.y1 < 195.0, "the type lies inside the square: {b:?}");
-        let area = |n: &vectorcraft_doc::Node| effects::member_shapes(n).iter().map(|(p, r)| vectorcraft_pathops::area(p, *r)).sum::<f64>();
+        let area = |n: &vectorcraft_doc::Node| effects::member_shapes(None, n).iter().map(|(p, r)| vectorcraft_pathops::area(p, *r)).sum::<f64>();
         let glyph_area = area(&glyphs);
         s.execute("select.set", &json!({"ids": [a.0, t.0]})).unwrap();
         let g = NodeId(s.execute("object.group", &json!({})).unwrap()["id"].as_u64().unwrap());

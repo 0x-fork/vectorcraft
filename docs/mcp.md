@@ -86,7 +86,7 @@ The two flags (PhotoCraft and the other Craft apps take the same ones, so one cl
 the suite) keep the agent to the folders you give it:
 
 - Every file a command reads must lie inside a **read root**: `open_file`, `file.place`, relinking and
-  updating links, the images an SVG links to, swatch library, graphic style library and colour-profile loads, plug-ins,
+  updating links, the images an SVG links to, swatch library, graphic style library, symbol library and colour-profile loads, plug-ins,
   `file.newFromTemplate`, preset imports, shortcut sets (`shortcutSet.read`), the folders `text.findFontFiles` and `links.findFiles` search, the
   scripts `script.check` reads and the files they include.
 - Every file a command writes must lie inside a **write root**: `save_file`, `export`, the save and
@@ -1203,6 +1203,12 @@ the document's (global rulers) or that artboard's (artboard rulers, kept relativ
 {"name":"run_command","arguments":{"command":"view.globalRulers","params":{"global":true}}}
 ```
 
+`view.videoRulers {}` (View → Rulers → Show / Hide Video Rulers) is a UI view flag, not saved with the document and not
+undoable. Show Video Rulers shows the rulers and has them count the active artboard in video pixels from its top-left
+corner, whatever the ruler origin: a pixel is as many points wide as the artboard's `videoRulerPixelAspectRatio`
+(`artboard.setProps`) and one point tall, so a 720 × 480 pt artboard at 0.9 reads 800 × 480. Hide Video Rulers puts the
+rulers back in the General unit from the ruler origin; they stay shown. It returns whether video rulers show.
+
 ## Clipping masks
 
 `object.clippingMask.make` clips the selected objects by the topmost one, which may be a path, a compound path or a
@@ -1281,6 +1287,27 @@ everything in it, and `select.all`, `select.allOnArtboard` and `select.inverse` 
 `select.nextAbove` and `select.nextBelow` select the nearest such object above or below the first selected object
 among the objects beside it in its group or layer, passing over hidden and locked objects and sublayers. When there
 is no such object, the selection stays as it is.
+
+## Global Edit
+
+Select › Start Global Edit is `select.globalEdit {appearance?, size?, artboards?, includeCanvas?}`. With one path,
+compound path or symbol instance selected, it finds the objects of the same shape (moved or scaled copies; not rotated
+ones), among those `select.all` would take and the objects in their groups, and returns
+`{active: true, count, ids}`, the selected object first. `appearance` also asks for the same fill and stroke, `size`
+for the same width and height; `artboards` is `"all"` or a range such as `"1, 3-5"`, and `includeCanvas: false`
+leaves out the objects on no artboard. Missing params come from `select.globalEditOptions` (the Global Edit Options,
+kept for the session; it returns them with `count`, the objects a start would take now). The selection stays the
+one object. Until the next `select.globalEdit` (Stop Global Edit, `{active: false}`), what an edit of a selected match
+changed is given to the other matches, in the same undo step, and nothing else. A changed outline or anchors go to
+each match in proportion to its size. A changed opacity or blending, and each changed setting of a fill or stroke
+(paint, weight, opacity, blending, effects…), are copied as they are to the match's fill or stroke of the same kind
+and rank; its other fills and strokes, and their unchanged settings, stay its own (a stroke weight change leaves the
+fills). A stroke weight set on the selected match is given as it is, and resizing the outline in proportion never
+scales a match's stroke weight. Hidden or locked matches are left as they are. A fill or stroke added or removed is
+added or removed on the matches whose fills and strokes lay in the same order; the others, and any other change to the
+list, take the whole list. Whenever the document is put back (Undo, Redo, a cancelled drag or scrub), the matches it no
+longer has leave the Global Edit, which ends when fewer than two are left. An edit that would take any match past the
+canvas fails with the coordinates-out-of-range error and changes nothing. Nothing of it is saved.
 
 ## Saved selections
 
@@ -1744,10 +1771,33 @@ with); without `path` it returns `{data}`, and `user: true` saves into the user 
 file, or another document's graphic styles, as a library to add from; a file in the user library folder, or a file
 with the same extension and bytes as one there, loads as that User Defined library.
 
+## Symbol libraries
+
+Symbol libraries are read-only sets of symbols: one generated in code (Basic Shapes), the `.vectorcraft` files in
+the user library folder of the desktop app (User Defined) and the symbols of any document loaded with
+`symbol.loadLibrary`. `symbol.libraries` lists them (`id`, `name`, `category`: `builtIn`, `user` or `loaded`, `count`)
+and `symbol.library {library}` returns one's symbols (`name`, `size`, `registration`, `exportType`; `library` is an
+id or a name). `symbol.addFromLibrary {library, name? | names?}` copies symbols into the document's Symbols as one
+undo step (no names: the whole library), with their Symbol Options and the resources they use: the symbols they nest,
+patterns, swatches (`swatchConflict` as for `edit.paste`), brushes, graphic styles and images. Symbols the document
+already has (same name and art) are reported under `existing`; a name another symbol has gets a number, and `names`
+gives each one's name in the document. The first one becomes the current symbol. `place: true` also places an
+instance of it with its registration point at `x`, `y` (default: the first artboard's centre) in the same step:
+what dragging a symbol out of the library panel onto the canvas does.
+
+```json
+{"name":"run_command","arguments":{"command":"symbol.addFromLibrary","params":{"library":"basic-shapes","name":"Star","place":true,"x":120,"y":80}}}
+```
+`symbol.saveLibrary {path?, names?, name?, user?}` writes the document's symbols as a symbol library: a `.vectorcraft`
+document holding only them and what they use; without `path` it returns `{dataBase64}`, and `user: true` saves into
+the user library folder (category `user`, User Defined). `symbol.loadLibrary {path? | data? | dataBase64?, name?}`
+loads the symbols of any document VectorCraft opens as a library to add from; a file it can't read is an error.
+
 ## Library panels
 
-Each swatch or graphic style library opens in a read-only panel of its own (#2603), as in Illustrator, and
-several can be open at once. `window.swatchLibrary {library}` and `window.graphicStyleLibrary {library}`
+Each swatch, graphic style or symbol library opens in a read-only panel of its own (#2603), as in Illustrator, and
+several can be open at once. `window.swatchLibrary {library}`, `window.graphicStyleLibrary {library}` and
+`window.symbolLibrary {library}`
 (remote mode, `invoke_menu`) open one floating, or bring its panel forward when it is already open, and answer
 `{open, panel, name, count}`; `library: null` closes every panel of that kind. The panel id is
 `library:<kind>:<library id>` (`library:swatches:pastels`, `library:graphicStyles:hand-drawn`,
@@ -2318,6 +2368,18 @@ whose tolerance is at most 1/400 of the selection's longer side, or level 100 wh
 {"name":"run_command","arguments":{"command":"object.path.simplify","params":{"auto":true}}}
 ```
 
+With segments of a path direct-selected (`select.segments`, or `select.anchors` with both anchors of a segment), Simplify
+refits only each run of consecutive selected segments, between the run's end anchors: they stay where they are, with
+their handles on the side away from the run, and every other anchor and segment of the path stays exactly as it was. A
+closed path's run may cross its start point; the path then starts at the run's end anchor. Separate runs on one path
+simplify independently, in one undo step, and the runs stay direct-selected (as segments when segments were picked).
+A path with only lone anchors selected, and every path with `wholePaths: true`, simplifies whole:
+
+```json
+{"name":"run_command","arguments":{"command":"select.anchors","params":{"id":12,"anchors":[[0,20],[0,21],[0,22],[0,23]]}}}
+{"name":"run_command","arguments":{"command":"object.path.simplify","params":{"auto":true}}}
+```
+
 In the desktop app, Object › Path › Simplify opens the slider (`ui.menuDialog {command: "object.path.simplify"}`,
 dialog `simplifySlider` with field `level`) at the Auto-Simplify level for the selection and previews the result until
 `ui.dialog.confirm`. `ui.simplifyAuto` moves the open slider back to the Auto-Simplify level, and `ui.simplifyMoreOptions`
@@ -2703,6 +2765,11 @@ Guides change where a snapped point lands:
 - `spacingGuides` (on by default): a moved selection (Selection tool / `pointer_gesture` with `selection`) snaps so
   the gap to a neighbour matches the equal spacing among other objects nearby; off, only alignment and construction
   guides pull.
+- `distanceGuides` (Invoke Distance Guides, on by default): with Smart Guides on, something selected and the Selection
+  tool hovering with `mods.alt` (a `pointer` event of kind `move`), the canvas measures the selection's bounds to the
+  object under the pointer (the gap between their facing edges on an axis on which they lie apart, else the offsets
+  of their two edges on it) or, over no object, to the left, right, top and bottom edges of the artboard under the
+  pointer: measured lines labelled in the General unit. Off, Alt-hovering shows none.
 
 With Smart Guides on, a bounding-box handle dragged with the Selection or Free Transform tool (`mods.shift`
 proportional, `mods.alt` from the centre) lands on another object's anchor or centre (labelled "anchor" or
@@ -2966,7 +3033,10 @@ pastes objects back into the layers they came from, by name, making missing ones
 too: in Draw Inside, `edit.paste`, `edit.pasteInPlace` and `edit.pasteOnAllArtboards` put the objects inside the
 object drawn into (its clip group, made on the first paste), whatever Paste Remembers Layers says; in Draw Behind,
 `edit.pasteInPlace` and `edit.pasteOnAllArtboards` put them just below the selection. `edit.pasteInFront` and
-`edit.pasteInBack` ignore the drawing mode.
+`edit.pasteInBack` ignore the drawing mode. When the object drawn into is the one isolation mode isolates (`object.isolate`,
+or a double-click on it with the Selection tool), art drawn or pasted inside it takes isolation mode into its clip group,
+so the new art can be picked and isn't dimmed; `edit.undo` or `edit.redo` that removes the isolated object ends
+isolation mode.
 
 Artboards copy with their art. `artboard.copy {index? | indices?, art?}` puts artboards on the clipboard together
 with the art fully inside each (`index` and `indices` default to the artboards the Artboard tool has selected; `art`
@@ -3005,7 +3075,7 @@ value: true}`; the Control bar's and Properties' Scale Artwork with Artboard che
 Artboard) makes its handle drags proportional and passes `scaleArt`, as do Properties' and the Transform panel's
 artboard size fields while the tool is in use.
 
-`artboard.setProps {artboards: [{index, name?, color?, locked?, showCenterMark?, showCrossHairs?, x?, y?, width?, height?}…], scaleArt?, moveArt?, …}` sets several
+`artboard.setProps {artboards: [{index, name?, color?, locked?, showCenterMark?, showCrossHairs?, showVideoSafeAreas?, videoRulerPixelAspectRatio?, x?, y?, width?, height?}…], scaleArt?, moveArt?, …}` sets several
 artboards in one undo step, each with its own fields; the other params apply to all of them. The art that moves or
 scales with each artboard is the art inside it before any of them changes, and an object inside several of them goes
 with the first one listed that moves or scales its art. An empty list and a list that names an artboard twice are
@@ -3063,6 +3133,16 @@ showCrossHairs?: bool}` (or each entry of `artboards`) turns them on or off for 
 hairs as lines from the middle of each side through the center, 1 point wide on screen at any zoom; exports and print
 leave them out. Duplicates, copies and the native format keep them, and `inspect_document` adds `showCenterMark: true`
 and `showCrossHairs: true` to an artboard that shows them.
+
+Artboard Options' video display options: `artboard.setProps {index, showVideoSafeAreas?: bool,
+videoRulerPixelAspectRatio?: number}` (or each entry of `artboards`) sets them for that artboard in one undo step, and
+`artboard.new` takes them too. Show Video Safe Areas outlines the artboard's action-safe area 3.5% and its title-safe
+area 5% in from each edge, as EBU R 95 sets them (https://tech.ebu.ch/docs/r/r095.pdf), 1 point wide on screen and only
+on the canvas. The Video Ruler Pixel Aspect Ratio, from 0.1 to 10 (default 1, square pixels; the commands refuse anything
+else, and a file's outside the range opens brought into it),
+is the width of one video pixel over its height, which `view.videoRulers` counts the artboard in. Duplicates, copies and
+the native format keep both (written only when on or not 1), and `inspect_document` adds `showVideoSafeAreas: true` and
+`videoRulerPixelAspectRatio` to an artboard that has them.
 
 ```json
 {"name":"run_command","arguments":{"command":"artboard.copy","params":{"index":0}}}
@@ -4036,23 +4116,30 @@ chosen artboards draw all of them. A PDF leaves out the layers that don't print 
 {"name":"run_command","arguments":{"command":"text.areaOptions","params":{"fit":"shrinkText","fitMinPercent":60}}}
 ```
 
-## Threading text from the out port
+## Threading text from the in and out ports
 
-As in the reference app, a click with the Selection tool on the red "+" out port of selected area type whose text
-overflows loads the pointer with that text (the port sits on the frame's right side, just above the bottom-right
-corner, so the corner handle stays free). The next click threads the text into the closed path or area type under the
-pointer, which becomes the next frame; a click on empty canvas makes a new frame of the first one's shape and size
-with its top-left corner at the click, and a drag draws a rectangle for the new frame. Escape or another tool drops
-the loaded text. Each placement is one undo step (`text.thread.add`), which agents can run directly:
+As in the reference app, selected area type and type on a path show an in port and an out port: area type's on the
+frame's left side just below the top-left corner and on its right side just above the bottom-right corner (so the
+corner handles stay free), type on a path's just before its start bracket and just past its end bracket. A port is
+empty while the frame isn't threaded on that side, shows an arrow when it is, and the out port shows a red "+" when
+the text doesn't fit (with more than 1,000 such objects selected no ports are drawn). A click with the Selection tool
+on the out port loads the pointer with the text. The next click
+threads it into the closed path, area type or type on a path under the pointer, which becomes the next frame; a click
+on empty canvas makes a new frame of the first one's kind, shape and size with its top-left corner at the click, and a
+drag draws a rectangle for the new frame. A click on the in port works the same way, but the frame placed comes
+before the clicked one: the story starts there and flows on into it. Escape or another tool drops the loaded text.
+Each placement is one undo step (`text.thread.add`), which agents can run directly:
 
-`text.thread.add {from, to? | rect?: [x, y, width, height] | at?: [x, y]}` threads area type `from` into one more
-frame, put right after it in its thread (a new thread of the two when `from` has none): `to`, a closed path (converted
-to an empty frame) or area type that is not threaded yet; `rect`, a new rectangular frame (positive width and height);
-or `at`, a new frame of `from`'s shape and size whose top-left is at `at`. Give exactly one of the three. New frames
-take `from`'s type options, paint and first character and paragraph attributes, and go just above it. The story
-reflows through the thread, the two frames are selected, and it returns `{id}`, the frame threaded into. It refuses
-an `id` that doesn't exist, a `from` that isn't area type (type on a path doesn't thread), an open path, `from`
-itself, an object inside a compound path, a frame already in a thread, and coordinates that aren't finite numbers.
+`text.thread.add {from, to? | rect?: [x, y, width, height] | at?: [x, y], before?}` threads area type or type on a
+path `from` into one more frame, put right after it in its thread (a new thread of the two when `from` has none), or
+right before it with `before: true` (the in port): `to`, a closed path (converted to an empty frame), area type or
+type on a path that is not threaded yet; `rect`, a new rectangular frame (positive width and height); or `at`, a new
+frame of `from`'s kind, shape and size whose top-left is at `at`. Give exactly one of the three. New frames take
+`from`'s type options, paint and first character and paragraph attributes, and go just above it. The story reflows
+through the thread, the two frames are selected, and it returns `{id}`, the frame threaded into. It refuses an `id`
+that doesn't exist, a `from` that is point type, a `to` that is an open path, `from` itself, inside a compound path
+or already in a thread (`from` may be threaded already: the frame goes in beside it), coordinates that aren't finite
+numbers and a `before` that isn't true or false.
 
 ```json
 {"name":"run_command","arguments":{"command":"text.thread.add","params":{"from":42,"at":[300,120]}}}
@@ -4065,7 +4152,9 @@ the middle of its bounding box's right side, hollow on point type and filled on 
 `type.convertToAreaType` (point type gets a frame around its text, which keeps its place and doesn't rewrap) or
 `type.convertToPointType` (soft line wraps become line breaks), the same commands as the Type menu's Convert To Area
 Type and Convert To Point Type. Either keeps the text and its styles and is one undo step; `ids` picks the objects
-(default: the selection).
+(default: the selection). A frame of threaded text that `type.convertToPointType` converts leaves its thread with the
+text it holds, and the story flows through the other frames without that text; a thread left with one frame is no
+longer a thread.
 
 ```json
 {"name":"run_command","arguments":{"command":"type.convertToAreaType","params":{"ids":[42]}}}
@@ -4217,6 +4306,48 @@ The menu item is checked while the paragraph the Paragraph panel shows has it on
 
 ```json
 {"name":"run_command","arguments":{"command":"text.setFormat","params":{"romanHangingPunctuation":true}}}
+```
+
+## Bulleted lists
+
+`text.setFormat {list: "none"|"bullet", bullet: "none"|"dot"|"dash"|"circle"|"square"}` (Paragraph panel › Bullets)
+makes the paragraphs of the selected type (or `ids`, or the paragraphs a `start` / `end` range touches) a bulleted list
+or takes them out of one. `bullet` sets the bullet: a filled dot (•), a dash (–), a hollow circle (◦) or a filled
+square (▪). `list: "bullet"` keeps the bullet of a paragraph that is already in a list and gives the others the dot.
+`"none"` in either key turns the list off and leaves the indents as they are. An unknown value is an error and changes
+nothing. A paragraph that joins a list while its left and first-line indents are both 0 gets a left indent of 18 pt and a
+first-line indent of -18 pt, unless the same call sets `leftIndent` or `firstLineIndent`; other indents stay as they are.
+In a horizontal right-to-left list paragraph the indents are mirrored: the left and first-line indents are measured
+from the right edge, and the right indent from the left edge. Its bullet starts the first line at the right, and the
+lines it wraps to start at the right where the first line's text starts after the bullet. A right-to-left paragraph
+without a list keeps its left and first-line indents at the left, and vertical type keeps its indents as they are. In
+threaded type, a list paragraph that continues into the next frame starts that frame with its bullet again, as it
+starts it with its first-line indent.
+
+The layout draws the bullet before the first line of each list paragraph that has text, in the font, size, scales and
+color of the paragraph's first character, without that character's baseline shift, rotation, superscript or subscript,
+tracking, manual kerning and tate-chu-yoko. The bullet is not a character of the text: copied text leaves it out, the
+caret before the paragraph's first character stands at the text, a selection does not highlight the bullet, and Touch
+Type moves that character without the bullet. The text after it starts at the next tab stop, the left indent counting
+as a stop when no explicit stop comes before it, measured from the right in a right-to-left list paragraph. The lines
+the paragraph wraps to start at the left indent. Type on a path draws the bullet and the same gap before the
+paragraph's text; a right-to-left item on a path has its bullet at the right of its text. Justification and Optical
+Margin Alignment leave the bullet and the gap after it as they are, and an underline or strikethrough starts at the
+text. Return at the end of a list item starts another item in the same list. The list is saved with the paragraph
+(`list` in `para`, for example `{"bullet": "square"}`) only when it is set, and paragraph styles carry it: a style
+captured from a paragraph without a list turns the list off. Reset Panel turns it off. The change is one undo step.
+
+The canvas, EPS, PDF and Type › Create Outlines draw the bullet; in PDF it is a path, not text. Live SVG text writes the
+bullet's character before the paragraph's text, except type on a path with bullets, which it writes as outlines with a
+warning. DXF writes the bullet as a TEXT entity of its own. Legacy `.ai` writes the
+paragraph's text without the bullet and warns that bulleted lists are left out.
+
+Type › Bullets and Numbering › Apply Bullets and the canvas context menu's Bullets and Numbering › Apply Bullets run
+`type.applyBullets {bullet?}` on the selected type's paragraphs, or on those the Type tool's selection touches: without
+`bullet` as `text.setFormat {list: "bullet"}`, with it as `text.setFormat {bullet}`.
+
+```json
+{"name":"run_command","arguments":{"command":"text.setFormat","params":{"bullet":"square"}}}
 ```
 
 ## Small Caps, Superscript and Subscript

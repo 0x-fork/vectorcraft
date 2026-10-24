@@ -20,7 +20,7 @@ use crate::shape::{
     Punct, SGlyph, Tcy, cap_x_heights, hyphen_glyph, is_cjk, mark_word_ends, no_line_end, no_line_start, punct, shape_range, soft_line_start,
     style_metrics,
 };
-use crate::{Composer, FirstBaseline, InlineGlyph, LayoutOptions, LineInfo, OtFeatures, PositionedGlyph, TextLayout, VerticalAlign};
+use crate::{Composer, FirstBaseline, InlineGlyph, LayoutOptions, LineInfo, ListMarker, OtFeatures, PositionedGlyph, TextLayout, VerticalAlign};
 
 const EPS: f64 = 1e-6;
 
@@ -46,7 +46,11 @@ struct Ctx<'a> {
 
 impl Ctx<'_> {
     fn style_at(&self, b: usize) -> &CharStyle {
-        let find = |b: usize| self.runs.iter().find(|(r, _)| r.start <= b && b < r.end).map(|(_, s)| *s);
+        // The runs follow one another: the first that ends after `b` is the only one that can hold it.
+        let find = |b: usize| {
+            let i = self.runs.partition_point(|(r, _)| r.end <= b);
+            self.runs.get(i).filter(|(r, _)| r.start <= b).map(|(_, s)| *s)
+        };
         find(b).or_else(|| b.checked_sub(1).and_then(find)).or_else(|| self.runs.first().map(|(_, s)| *s)).unwrap_or(&self.default)
     }
 
@@ -72,9 +76,17 @@ impl Ctx<'_> {
         let mut v = Vec::with_capacity(r.len());
         let levels = bidi.map_or(&[][..], |b| &b.levels);
         shape_range(self.db, self.text, r, &self.runs, &self.inlines, &self.opts.features, levels, &mut v);
+        self.finish_shaping(&mut v, |g| self.style_at(g.byte));
+        v
+    }
+
+    /// Set shaped glyphs `v` as the type sets them: in vertical type, tate-chu-yoko (by the size
+    /// and Tate-chu-yoko of each glyph's `style`) and the cells of upright glyphs; with System
+    /// Layout on or Fractional Widths off, whole-point advances.
+    fn finish_shaping<'s>(&self, v: &mut [SGlyph], style: impl Fn(&SGlyph) -> &'s CharStyle) {
         if self.vertical {
-            tate_chu_yoko(&mut v, |g| {
-                let st = self.style_at(g.byte);
+            tate_chu_yoko(v, |g| {
+                let st = style(g);
                 (st.size, st.tate_chu_yoko)
             });
             // An upright glyph advances down the column by its vertical advance (the font's vertical
@@ -98,9 +110,50 @@ impl Ctx<'_> {
         // System Layout or Fractional Widths off: whole-point advances, after tate-chu-yoko and the
         // upright cell have set the widths the line breaker will use. A zero advance stays zero.
         if self.system_layout || !self.fractional_widths {
-            whole_character_widths(&mut v);
+            whole_character_widths(v);
         }
-        v
+    }
+
+    /// Bullets: put the marker of list paragraph `pr` (attributes `para`, right to left when
+    /// `rtl`) before its glyphs `sg` and return how many glyphs went in (none for a paragraph
+    /// without a list or without text). The marker's characters are set in
+    /// [`vectorcraft_doc::text::ParaList::marker_style`], and a tab after them takes the text to
+    /// the next tab stop past them on the first line, the left indent counting as a stop when no
+    /// explicit stop comes before it. In a horizontal right-to-left paragraph, whose indents are
+    /// mirrored ([`line_indents`]), these are measured from the right. The tab keeps that width
+    /// however the line is aligned or justified. Each of these glyphs stands for no character of the text: length 0, at the
+    /// paragraph's first byte, in its first character's run, at the paragraph's embedding level.
+    fn prepend_marker(&self, pr: &Range<usize>, para: &ParaStyle, rtl: bool, sg: &mut Vec<SGlyph>) -> usize {
+        let Some(list) = para.list.filter(|_| !pr.is_empty()) else { return 0 };
+        let text = list.marker();
+        let st = vectorcraft_doc::text::ParaList::marker_style(self.style_at(pr.start));
+        let Some(run) = self.runs.iter().position(|(r, _)| r.start <= pr.start && pr.start < r.end) else { return 0 };
+        // The paragraph's direction: the marker starts a right-to-left paragraph at its right.
+        let level = if rtl { Level::rtl() } else { Level::ltr() };
+        let mut marker = Vec::with_capacity(text.len() + 1);
+        shape_range(self.db, &text, 0..text.len(), &[(0..text.len(), &st)], &[None], &self.opts.features, &vec![level; text.len()], &mut marker);
+        for g in &mut marker {
+            g.byte = pr.start;
+            g.len = 0;
+            g.run = run;
+        }
+        self.finish_shaping(&mut marker, |_| &st);
+        let Some(last) = marker.last() else { return 0 };
+        let mut tab = last.clone();
+        tab.ch = '\t';
+        tab.gid = 0;
+        tab.dx = 0.0;
+        tab.dy = 0.0;
+        tab.tcy = None;
+        tab.vpal = None;
+        let pen = para.left_indent + para.first_line_indent + marker.iter().map(|g| g.adv).sum::<f64>();
+        let to_indent = para.left_indent - pen;
+        let stop_before_indent = para.tabs.iter().any(|t| t.position > pen + EPS && t.position < para.left_indent - EPS);
+        tab.adv = if to_indent > EPS && !stop_before_indent { to_indent } else { tab_advance(&para.tabs, 0.0, pen, sg).0 };
+        marker.push(tab);
+        let n = marker.len();
+        sg.splice(0..0, marker);
+        n
     }
 
     fn emit(&mut self, g: &SGlyph, pre: Affine, origin: Point, angle: f64, advance: f64, line: usize) {
@@ -281,10 +334,20 @@ pub fn decorations(layout: &TextLayout, db: &FontDb, t: &TextObject) -> Vec<(usi
     let glyphs = &layout.glyphs;
     let mut i = 0;
     while let Some(g) = glyphs.get(i) {
-        // The stretch: the glyphs of this run on this line, in a row.
-        let end = glyphs.iter().skip(i).position(|h| h.run != g.run || h.line != g.line).map_or(glyphs.len(), |n| i + n);
+        // The stretch: the glyphs of this run on this line, in a row. A list marker has no
+        // underline or strikethrough.
+        let marker = layout.marker_of(i).is_some();
+        let end = glyphs
+            .iter()
+            .enumerate()
+            .skip(i)
+            .position(|(k, h)| h.run != g.run || h.line != g.line || layout.marker_of(k).is_some() != marker)
+            .map_or(glyphs.len(), |n| i + n);
         let stretch = glyphs.get(i..end).unwrap_or_default();
         i = end.max(i + 1);
+        if marker {
+            continue;
+        }
         let Some(style) = t.runs.get(g.run).map(|r| &r.style) else { continue };
         if !(style.underline || style.strikethrough) {
             continue;
@@ -885,13 +948,14 @@ fn align_vertically(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, re
             std::mem::take(&mut cx.out.glyphs),
             std::mem::take(&mut cx.out.lines),
             std::mem::take(&mut cx.out.inlines),
+            std::mem::take(&mut cx.out.markers),
             std::mem::replace(&mut cx.out.overflow, false),
         );
         flow(cx, paras, t, Some(regions));
         if laid_out(&cx.out) < before {
             // Text no longer fits (lines got narrower, or flow around a wrap object): undo the
             // pass and try a smaller step.
-            (cx.out.glyphs, cx.out.lines, cx.out.inlines, cx.out.overflow) = prev;
+            (cx.out.glyphs, cx.out.lines, cx.out.inlines, cx.out.markers, cx.out.overflow) = prev;
             for (r, (shift, gap)) in regions.iter_mut().zip(saved) {
                 r.shift = shift;
                 r.gap = gap;
@@ -1244,8 +1308,10 @@ impl Pen<'_> {
                 if baseline + est.desc > r.bottom() + 0.01 {
                     break;
                 }
-                // A rectangle's lines are all as wide: none below has more room for the word.
-                let min = if r.rect || r.polys.is_empty() { 0.0 } else { min };
+                // A rectangle's lines are all as wide: none below has more room for the word
+                // (until wrap shapes can narrow the first baseline: they stay bounded).
+                let constant = (r.rect || r.polys.is_empty()) && r.wraps.is_empty();
+                let min = if constant { 0.0 } else { min };
                 let fits = |&(a, b): &(f64, f64)| {
                     let room = b - a - ind_l - ind_r;
                     room > est.asc.max(1.0) && room + EPS >= min
@@ -1253,6 +1319,8 @@ impl Pen<'_> {
                 if r.wraps.is_empty() {
                     match r.span(baseline - est.asc, baseline + est.desc) {
                         Some(s) if fits(&s) => return Some((baseline, s.0, s.1, false)),
+                        // Too narrow here is too narrow all the way down the cell: next cell.
+                        Some(_) if constant => break,
                         _ => baseline += step,
                     }
                 } else {
@@ -1318,11 +1386,12 @@ fn tab_advance<'t>(tabs: &'t [vectorcraft_doc::TabStop], origin: f64, x: f64, re
 }
 
 /// The width of glyphs `from..to` of `sg` set on a line whose content starts `x_start` from the
-/// tab origin: tabs take what [`tab_advance`] gives them, not the width of their glyph.
+/// tab origin: tabs of the text take what [`tab_advance`] gives them, not the width of their
+/// glyph. The tab after a list marker (length 0) keeps its own width.
 fn set_width(sg: &[SGlyph], from: usize, to: usize, tabs: &[vectorcraft_doc::TabStop], x_start: f64) -> f64 {
     let mut x = x_start;
     for (j, g) in sg.iter().enumerate().take(to).skip(from) {
-        x += if g.ch == '\t' { tab_advance(tabs, 0.0, x, sg.get(j + 1..to).unwrap_or_default()).0 } else { g.adv };
+        x += if g.ch == '\t' && g.len > 0 { tab_advance(tabs, 0.0, x, sg.get(j + 1..to).unwrap_or_default()).0 } else { g.adv };
     }
     x - x_start
 }
@@ -1367,9 +1436,15 @@ fn leader_outline(db: &FontDb, g: &SGlyph, leader: &str, origin: f64, from: f64,
 
 /// Width of the word starting at glyph `i`: its advances up to the first break opportunity (spaces
 /// left out, the hyphen of a soft hyphen in), the least room a line needs not to break inside it.
+/// A list marker at `i` (glyphs of length 0) counts whole, with the word after it.
 fn word_width(g: &[SGlyph], i: usize) -> f64 {
-    let mut w = 0.0;
-    for gl in g.get(i..).unwrap_or_default() {
+    /// Glyphs measured at most: a word wrapped over many lines is measured again from each line's
+    /// start, and one this long is broken inside whatever cell it meets.
+    const MAX_GLYPHS: usize = 1024;
+    let rest = g.get(i..).unwrap_or_default();
+    let marker = rest.iter().take_while(|gl| gl.len == 0).count();
+    let mut w: f64 = rest.iter().take(marker).map(|gl| gl.adv).sum();
+    for gl in rest.iter().skip(marker).take(MAX_GLYPHS) {
         if gl.is_space() {
             break;
         }
@@ -1407,11 +1482,14 @@ fn break_line(
     }
     let mut x = 0.0;
     let mut last_break: Option<(usize, bool)> = None;
+    // A list marker (length 0) is a cluster of its own; the line holds it and at least the first
+    // cluster after it.
+    let first = i + g.get(i..).unwrap_or_default().iter().take_while(|h| h.len == 0).count();
     let mut j = i;
     while j < g.len() {
         let gl = &g[j];
         let mut cluster_end = j + 1;
-        while g.get(cluster_end).is_some_and(|next| next.byte == gl.byte) {
+        while g.get(cluster_end).is_some_and(|next| next.byte == gl.byte && (next.len == 0) == (gl.len == 0)) {
             cluster_end += 1;
         }
         // No Break: the marked characters stay on one line, including across a space inside the run.
@@ -1432,7 +1510,7 @@ fn break_line(
         } else {
             g[j..cluster_end].iter().map(|glyph| glyph.adv).sum()
         };
-        if j > i && !gl.is_space() && x + cluster_width > width + EPS {
+        if j > first && !gl.is_space() && x + cluster_width > width + EPS {
             // It ends the line with the spaces after it.
             if burasagari != Burasagari::None && hangs(gl) && kinsoku_allows(g, cluster_end - 1, kinsoku) {
                 let mut end = cluster_end;
@@ -1445,7 +1523,7 @@ fn break_line(
         }
         x += cluster_width;
         let last = &g[cluster_end - 1];
-        if last.break_after() && kinsoku_allows(g, cluster_end - 1, kinsoku) && !splits_no_break(g, cluster_end) {
+        if last.break_after() && last.len > 0 && kinsoku_allows(g, cluster_end - 1, kinsoku) && !splits_no_break(g, cluster_end) {
             if last.is_soft_hyphen() {
                 if x + hyphen_glyph(last).adv <= width + EPS {
                     last_break = Some((cluster_end, true));
@@ -1812,14 +1890,15 @@ fn hyphen_breaks(text: &str, g: &[SGlyph], ws: usize, we: usize, opts: &Hyphenat
     let (s, e) = (g[a].byte, g[b - 1].byte + g[b - 1].len);
     let Some(word) = text.get(s..e) else { return vec![] };
     let offs: Vec<usize> = word.char_indices().map(|(o, _)| s + o).collect();
-    hyphen_points_with(word, opts)
-        .into_iter()
-        .filter_map(|ci| {
-            let byte = *offs.get(ci)?;
-            // Only at cluster starts (not inside a ligature).
-            (a + 1..b).find(|&k| g[k].byte == byte && g[k - 1].byte != byte)
-        })
-        .collect()
+    // The first glyph of each cluster start (not inside a ligature), by its byte: one pass, not a
+    // search for each point.
+    let mut starts = std::collections::HashMap::new();
+    for k in a + 1..b {
+        if g[k].byte != g[k - 1].byte {
+            starts.entry(g[k].byte).or_insert(k);
+        }
+    }
+    hyphen_points_with(word, opts).into_iter().filter_map(|ci| starts.get(offs.get(ci)?).copied()).collect()
 }
 
 /// Break candidates for the every-line composer: hyphenation points under `hyphenate` (the
@@ -1876,7 +1955,8 @@ fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pe
     let may_hang = para.burasagari != Burasagari::None && sg.iter().any(hangs);
     // A tab's width depends on where it falls in its line, which the composer's fixed glyph widths
     // can't follow: such a paragraph is broken line by line ([`break_line`] measures its tabs).
-    let has_tab = sg.iter().any(|g| g.ch == '\t');
+    // The tab after a list marker always starts the first line and has a fixed width.
+    let has_tab = sg.iter().any(|g| g.ch == '\t' && g.len > 0);
     if composer != Composer::EveryLine || pen.regions.is_none() || sg.len() < 2 || sg.len() > MAX_COMPOSE_GLYPHS || may_hang || has_tab {
         return None;
     }
@@ -1895,6 +1975,8 @@ fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pe
     let mut sim = pen.clone();
     let mut widths = vec![];
     let mut acc = 0.0;
+    // A line's width and placement depend on the sum of its indents alone, which the mirrored
+    // indents of a right-to-left list ([`line_indents`]) keep.
     while widths.len() < sg.len() {
         let first = widths.is_empty();
         let ind_l = para.left_indent + if first { para.first_line_indent } else { 0.0 };
@@ -1934,6 +2016,21 @@ fn compose_para(cx: &Ctx<'_>, sg: &[SGlyph], flex: &[Flex], para: &ParaStyle, pe
     compose(sg, &width, &start_credit, &cands, flex, &params(strict)).or_else(|| compose(sg, &width, &start_credit, &cands, flex, &params(loose)))
 }
 
+/// Whether paragraph `para` (right to left when `rtl`) has its indents mirrored: a horizontal
+/// right-to-left list paragraph does.
+fn mirrors_indents(para: &ParaStyle, rtl: bool, vertical: bool) -> bool {
+    rtl && !vertical && para.list.is_some()
+}
+
+/// The indents at the left and at the right of a line of paragraph `para` (its first line when
+/// `first`). With `mirror` ([`mirrors_indents`]) the left and first-line indents are measured from
+/// the right and the right indent from the left: the bullet of a right-to-left list hangs at the
+/// right, and the lines it wraps to line up with the text after the bullet.
+fn line_indents(para: &ParaStyle, first: bool, mirror: bool) -> (f64, f64) {
+    let start = para.left_indent + if first { para.first_line_indent } else { 0.0 };
+    if mirror { (para.right_indent, start) } else { (start, para.right_indent) }
+}
+
 /// Flow paragraphs `paras` (byte ranges) of `t`, each with its own paragraph attributes
 /// (alignment, indents, spacing, direction, mojikumi, leading model…).
 fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Option<&[Region]>) {
@@ -1961,12 +2058,24 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
         // Thai, Lao, Khmer and Myanmar break lines between words, not at spaces.
         mark_word_ends(text.get(pr.clone()).unwrap_or_default(), pr.start, &mut sg);
         // Japanese composition: consecutive punctuation shares one half-em space.
-        let compressed = if para.mojikumi == Mojikumi::LineEndHalf { compress_punctuation(&mut sg) } else { vec![] };
+        let mut compressed = if para.mojikumi == Mojikumi::LineEndHalf { compress_punctuation(&mut sg) } else { vec![] };
         // …and a quarter em between Japanese and Latin text.
-        let wakan = if para.mojikumi == Mojikumi::LineEndHalf { space_japanese_and_latin(&mut sg) } else { vec![] };
+        let mut wakan = if para.mojikumi == Mojikumi::LineEndHalf { space_japanese_and_latin(&mut sg) } else { vec![] };
         // Justification…: the glyphs at Desired word and letter spacing and glyph scaling, and how
         // far a justified line may move each one from it.
-        let flex = apply_desired(&mut sg, &para.justification, !cx.vertical);
+        let mut flex = apply_desired(&mut sg, &para.justification, !cx.vertical);
+        // Bullets: the list marker's glyphs `0..marker` start the paragraph. Justification and
+        // Optical Margin Alignment leave them as they are.
+        let marker = cx.prepend_marker(pr, para, rtl, &mut sg);
+        if marker > 0 {
+            flex.splice(0..0, vec![Flex::default(); marker]);
+            if !compressed.is_empty() {
+                compressed.splice(0..0, vec![false; marker]);
+            }
+            if !wakan.is_empty() {
+                wakan.splice(0..0, vec![0.0; marker]);
+            }
+        }
         // …and Auto Leading: characters whose leading is Auto take this paragraph's share of their size.
         let auto_leading = |st: &CharStyle| st.leading.unwrap_or_else(|| para.justification.auto_leading_for(st.size));
         if para.justification.auto_leading != vectorcraft_doc::JustificationOptions::default().auto_leading {
@@ -1994,10 +2103,11 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
         let mut hyphen_run = 0;
         let mut li_para = 0;
         let mut i = 0;
+        let mirror = mirrors_indents(para, rtl, cx.vertical);
         loop {
             let est = if i < n { Metrics::of(&sg[i]) } else { pm };
             let first_line = li_para == 0;
-            let ind_l = para.left_indent + if first_line { para.first_line_indent } else { 0.0 };
+            let (ind_l, ind_r) = line_indents(para, first_line, mirror);
             // Measured before Mojikumi narrows an opening bracket, as the composer measures it.
             let word = word_width(&sg, i);
             // Mojikumi: an opening bracket starting a line is set flush with the line's start (the
@@ -2016,11 +2126,11 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             // next row/column if it no longer fits).
             let (baseline, x0, x1, end, hyph, m) = loop {
                 let first_in_region = pen.prev.is_none();
-                let Some((mut baseline, x0, x1, same_baseline)) = pen.place(est, ind_l, para.right_indent, word) else {
+                let Some((mut baseline, x0, x1, same_baseline)) = pen.place(est, ind_l, ind_r, word) else {
                     cx.out.overflow = cx.text.len() > if i < n { sg[i].byte } else { pr.start };
                     break 'paras;
                 };
-                let width = x1 - x0 - ind_l - para.right_indent;
+                let width = x1 - x0 - ind_l - ind_r;
                 let hyphenate = (para.hyphenate && (hyphen_limit == 0 || hyphen_run < hyphen_limit)).then_some((&para.hyphenation, zone));
                 let (end, hyph) = match composed.as_ref().and_then(|c| c.get(li_para)) {
                     Some(&(e, h)) if e > i => (e, h),
@@ -2050,7 +2160,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
                 break (baseline, x0, x1, end, hyph, m);
             };
             hyphen_run = if hyph && end > i { hyphen_run + 1 } else { 0 };
-            let (ax0, ax1) = if regions.is_some() { (x0 + ind_l, x1 - para.right_indent) } else { (x0, x1) };
+            let (ax0, ax1) = if regions.is_some() { (x0 + ind_l, x1 - ind_r) } else { (x0, x1) };
             let width = ax1 - ax0;
             pen.pending = 0.0;
             let last_of_para = end >= n;
@@ -2075,10 +2185,20 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             // Optical Margin Alignment or Roman Hanging Punctuation: the share of a glyph that hangs.
             let share: Option<fn(&SGlyph) -> f64> =
                 (t.optical_margin || para.roman_hanging).then_some(if t.optical_margin { optical_share } else { roman_share });
-            // The glyphs before `stop` in visual order, each with the advance it is set with.
+            // The glyphs before `stop` in visual order, each with the advance it is set with. A list
+            // marker does not hang: it is counted with no width.
+            let set = |j: usize, g: &SGlyph| {
+                if j < marker {
+                    0.0
+                } else if j + 1 == trimmed {
+                    g.adv - end_trim
+                } else {
+                    g.adv
+                }
+            };
             let visible = |stop: usize| -> (Vec<usize>, Vec<(&SGlyph, f64)>) {
                 let at: Vec<usize> = order.iter().map(|&offset| i + offset).filter(|&j| j < stop).collect();
-                let glyphs = at.iter().filter_map(|&j| sg.get(j).map(|g| (g, if j + 1 == trimmed { g.adv - end_trim } else { g.adv }))).collect();
+                let glyphs = at.iter().filter_map(|&j| sg.get(j).map(|g| (g, set(j, g)))).collect();
                 (at, glyphs)
             };
             // Burasagari: a comma or full stop ending an area type line hangs outside it (Standard:
@@ -2138,6 +2258,9 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             } else {
                 (0.0, 0.0, vec![], vec![])
             };
+            // Justification adds nothing to the list marker's glyphs.
+            let mut held = held;
+            held.extend(i..marker.min(body));
             // What justification may change of glyph `j`: nothing of a `held` glyph, and no glyph
             // scaling of a `hung` one.
             let line_flex = |j: usize| {
@@ -2164,7 +2287,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             let justify = justify && regions.is_some();
             let (mut per_space, mut per_gap, mut per_cjk) = (0.0, 0.0, 0.0);
             let mut fit = LineFit::default();
-            let spaces = sg[i..body].iter().filter(|g| g.is_space()).count();
+            let spaces = (i..body).filter(|&j| j >= marker && sg[j].is_space()).count();
             // A gap that justification adds between two glyphs goes into the advance of the one
             // drawn first: `drawn_after(j)` is the glyph drawn right after glyph `j`, which in a
             // right-to-left line comes before it in the text.
@@ -2207,7 +2330,7 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
                     // Word spacing, letter spacing and glyph scaling within their ranges, then the
                     // word spaces alone; composed lines may shrink word spaces (never below zero).
                     let line: Vec<Flex> = (i..body).map(line_flex).collect();
-                    let floor = sg[i..body].iter().filter(|g| g.is_space()).map(|g| g.adv).fold(f64::MAX, f64::min);
+                    let floor = (i..body).filter(|&j| j >= marker && sg[j].is_space()).map(|j| sg[j].adv).fold(f64::MAX, f64::min);
                     fit = fit_line(&line, room - w, spaces, floor);
                 } else if room > w {
                     // One word: its letter spacing and glyph scaling, then the gaps between its glyphs.
@@ -2228,8 +2351,8 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             } else if regions.is_none() {
                 match align {
                     0 => ind_l - opt_l,
-                    1 => (ind_l - opt_l - para.right_indent + opt_r - w) * 0.5,
-                    _ => -para.right_indent + opt_r - w,
+                    1 => (ind_l - opt_l - ind_r + opt_r - w) * 0.5,
+                    _ => -ind_r + opt_r - w,
                 }
             } else {
                 match align {
@@ -2253,6 +2376,9 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
             let leading_space_width: f64 =
                 order.iter().take_while(|&&offset| i + offset >= trimmed).filter_map(|&offset| sg.get(i + offset)).map(|g| g.adv).sum();
             let mut x = start_x - leading_space_width;
+            // The glyphs drawn for the list marker, and the index of its tab's glyph, when the line starts the paragraph.
+            let mut marker_glyphs: Option<Range<usize>> = None;
+            let mut marker_tab = 0;
             for (oi, &offset) in order.iter().enumerate() {
                 let j = i + offset;
                 let Some(g) = sg.get(j) else { continue };
@@ -2264,7 +2390,10 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
                 let mut scale = 1.0;
                 let mut leader = "";
                 if g.ch == '\t' {
-                    (adv, leader) = tab_advance(&para.tabs, tab_origin, x - tab_shift, &sg[j + 1..trimmed.max(j + 1)]);
+                    // The tab after a list marker keeps the width `prepend_marker` gave it.
+                    if g.len > 0 {
+                        (adv, leader) = tab_advance(&para.tabs, tab_origin, x - tab_shift, &sg[j + 1..trimmed.max(j + 1)]);
+                    }
                 } else if j < body {
                     let f = line_flex(j);
                     if is_word_space(g) {
@@ -2296,6 +2425,13 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
                 adv += kashida.unwrap_or(0.0);
                 let y = baseline - align_shift(g, cx.style_at(g.byte).char_align, line_em, cx.vertical);
                 let place = if scale != 1.0 { Affine::translate((x, y)) * Affine::scale_non_uniform(scale, 1.0) } else { Affine::translate((x, y)) };
+                if j < marker {
+                    let at = cx.out.glyphs.len();
+                    marker_glyphs = Some(marker_glyphs.map_or(at..at + 1, |r: Range<usize>| r.start.min(at)..r.end.max(at + 1)));
+                    if j + 1 == marker {
+                        marker_tab = at;
+                    }
+                }
                 cx.emit(g, place, Point::new(x, y), 0.0, adv, li);
                 if let Some(out) = cx.out.glyphs.last_mut() {
                     out.scale = flex.get(j).map_or(1.0, |f| f.scale) * scale;
@@ -2315,6 +2451,9 @@ fn flow(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, regions: Optio
                 if j < trimmed {
                     x_end = x;
                 }
+            }
+            if let (Some(glyphs), Some(list)) = (marker_glyphs, para.list) {
+                cx.out.markers.push(ListMarker { glyphs, tab: marker_tab, text: list.marker() });
             }
             if let Some(h) = &hyphen {
                 // The hyphen follows the last non-space glyph.
@@ -2381,11 +2520,13 @@ fn on_path(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, path: &Path
     // The first paragraph's direction aligns the line (Auto) and sets the caret's.
     let mut rtl = None;
     let mut shaped = Vec::new();
-    for pr in paras {
+    for (pi, pr) in paras.iter().enumerate() {
         let text = cx.text;
         let bidi = para_bidi_with(text.get(pr.clone()).unwrap_or_default(), para.direction, &cx.char_directions(pr));
         rtl.get_or_insert(is_rtl(bidi.as_ref()) && !cx.vertical);
-        let glyphs = cx.shape_para(pr.clone(), bidi.as_ref());
+        let mut glyphs = cx.shape_para(pr.clone(), bidi.as_ref());
+        // Bullets: a list paragraph's text starts after its marker here too.
+        cx.prepend_marker(pr, t.para_at(pi), is_rtl(bidi.as_ref()) && !cx.vertical, &mut glyphs);
         shaped.push((pr.clone(), bidi.filter(|b| b.has_rtl() && !cx.vertical), glyphs));
     }
     let rtl = rtl.unwrap_or(false);
@@ -2447,7 +2588,8 @@ fn on_path(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, path: &Path
             return (0.0, 0.0, 0);
         }
         let share: fn(&SGlyph) -> f64 = if t.optical_margin { optical_share } else { roman_share };
-        let line: Vec<(&SGlyph, f64)> = sg.iter().zip(steps).map(|(g, &step)| (g, step)).collect();
+        // A list marker (the glyphs of length 0) does not hang: it is counted with no width.
+        let line: Vec<(&SGlyph, f64)> = sg.iter().zip(steps).map(|(g, &step)| (g, if g.len == 0 { 0.0 } else { step })).collect();
         let (l, r, _, hung_r) = if rtl { optical_hangs_rtl(&line, share) } else { optical_hangs(&line, share) };
         let (l, r) = if ap.is_closed() {
             let gap = (ap.len() - avail).max(0.0);
@@ -2592,6 +2734,23 @@ fn on_path(cx: &mut Ctx<'_>, paras: &[Range<usize>], t: &TextObject, path: &Path
         };
         // The caret's baseline moves with the type.
         let origin = p - dir * (g.adv * 0.5) + Vec2::new(-dir.y, dir.x) * rise;
+        // A list marker's glyphs (the only glyphs here with no length) are in a row at the byte of
+        // their paragraph's start.
+        if g.len == 0 {
+            let at = cx.out.glyphs.len();
+            let starts_paragraph = |b: usize| paras.iter().position(|p| p.start == b);
+            match cx.out.markers.last_mut() {
+                Some(m) if m.glyphs.end == at && cx.out.glyphs.get(m.glyphs.start).is_some_and(|h| h.byte == g.byte) => m.glyphs.end = at + 1,
+                _ => {
+                    if let Some(list) = starts_paragraph(g.byte).and_then(|pi| t.para_at(pi).list) {
+                        cx.out.markers.push(ListMarker { glyphs: at..at + 1, tab: at, text: list.marker() });
+                    }
+                }
+            }
+            if let Some(m) = cx.out.markers.last_mut().filter(|m| m.glyphs.end == at + 1 && g.ch == '\t') {
+                m.tab = at;
+            }
+        }
         cx.emit(g, pre, origin, angle, g.adv, 0);
         x += step;
     }
@@ -2689,9 +2848,10 @@ fn visual_order(bidi: Option<&BidiInfo<'_>>, paragraph_start: usize, line: Range
         return vec![];
     }
     let levels = bidi.reordered_levels(para, line.start.saturating_sub(paragraph_start)..line.end.saturating_sub(paragraph_start));
+    // A list marker (length 0) is a cluster of its own.
     let mut clusters: Vec<Range<usize>> = Vec::new();
     for (i, g) in glyphs.iter().enumerate() {
-        if i > 0 && glyphs.get(i - 1).is_some_and(|p| p.byte == g.byte) {
+        if i > 0 && glyphs.get(i - 1).is_some_and(|p| p.byte == g.byte && (p.len == 0) == (g.len == 0)) {
             if let Some(c) = clusters.last_mut() {
                 c.end = i + 1;
             }
@@ -2699,12 +2859,25 @@ fn visual_order(bidi: Option<&BidiInfo<'_>>, paragraph_start: usize, line: Range
             clusters.push(i..i + 1);
         }
     }
+    // A list marker is at the paragraph's level, and at a right-to-left one its tab is drawn
+    // before (left of) its characters.
     let cluster_levels: Vec<_> = clusters
         .iter()
         .filter_map(|c| glyphs.get(c.start))
-        .map(|g| levels.get(g.byte.saturating_sub(paragraph_start)).copied().unwrap_or(g.level))
+        .map(|g| if g.len == 0 { g.level } else { levels.get(g.byte.saturating_sub(paragraph_start)).copied().unwrap_or(g.level) })
         .collect();
-    unicode_bidi::BidiInfo::reorder_visual(&cluster_levels).into_iter().filter_map(|i| clusters.get(i)).flat_map(|c| c.clone()).collect()
+    let reversed = |i: usize| glyphs.get(clusters.get(i).map_or(0, |c| c.start)).is_some_and(|g| g.len == 0 && g.level.is_rtl());
+    unicode_bidi::BidiInfo::reorder_visual(&cluster_levels)
+        .into_iter()
+        .filter_map(|i| clusters.get(i).map(|c| (c.clone(), reversed(i))))
+        .flat_map(|(c, rev)| {
+            let mut v: Vec<usize> = c.collect();
+            if rev {
+                v.reverse();
+            }
+            v
+        })
+        .collect()
 }
 
 /// Ruby (furigana): lays each reading out over its base text in line space, grows the line's
@@ -2743,17 +2916,28 @@ fn ruby_layout(cx: &mut Ctx<'_>, t: &TextObject) {
         overhang: bool,
     }
     let mut pieces: Vec<Piece> = Vec::new();
+    // The glyphs by their byte, to find a span's without a scan of them all for each span.
+    let byte_of = |i: usize| cx.out.glyphs.get(i).map_or(0, |g| g.byte);
+    let mut by_byte: Vec<usize> = (0..cx.out.glyphs.len()).collect();
+    by_byte.sort_by_key(|&i| byte_of(i));
+    let longest = cx.out.glyphs.iter().map(|g| g.len.max(1)).max().unwrap_or(1);
     for span in &t.ruby {
         let (start, end) = (span.start.min(text_len), span.end.min(text_len));
         if start >= end || span.text.trim().is_empty() {
             continue;
         }
         // The base glyphs of the span, by line; a glyph's cluster is its byte range (`len`, or
-        // one byte for generated glyphs).
+        // one byte for generated glyphs). A list marker is not part of the base.
         let mut by_line: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-        for (i, g) in cx.out.glyphs.iter().enumerate() {
+        let hi = by_byte.partition_point(|&i| byte_of(i) < end);
+        let lo = by_byte.partition_point(|&i| byte_of(i).saturating_add(longest) <= start).min(hi);
+        let mut hits: Vec<usize> = by_byte.get(lo..hi).unwrap_or_default().to_vec();
+        // In glyph order, as the scan found them.
+        hits.sort_unstable();
+        for i in hits {
+            let Some(g) = cx.out.glyphs.get(i) else { continue };
             let b = g.byte.saturating_add(g.len.max(1));
-            if g.byte < end && b > start {
+            if g.byte < end && b > start && cx.out.marker_of(i).is_none() {
                 by_line.entry(g.line).or_default().push(i);
             }
         }

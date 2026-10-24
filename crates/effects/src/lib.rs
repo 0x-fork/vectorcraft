@@ -51,6 +51,7 @@ mod revolve;
 mod solids;
 pub mod stroke;
 mod stylize;
+pub mod trap;
 mod util;
 mod warp;
 
@@ -89,6 +90,7 @@ pub use solids::{
     EXTRUDE, INFLATE, ROTATE, ROTATION_PRESETS, SOLIDS, extrude_options, has_solid, inflate_options, is_three_d, solid_art, validate_solid,
     validate_three_d, view_options,
 };
+pub use trap::TRAP;
 pub use warp::{WarpStyle, warp_point};
 
 /// Catalogue entry for one effect.
@@ -169,6 +171,7 @@ fn lengths_of(id: &str) -> Lengths {
         "sketch.notePaper" => always(&["relief"]),
         "sketch.tornEdges" => always(&["smoothness"]),
         "sketch.waterPaper" => always(&["fiberLength"]),
+        TRAP => always(&["thickness", "precision"]),
         RASTERIZE => always(&["addAround"]),
         _ => Lengths::default(),
     }
@@ -850,6 +853,7 @@ pub fn effect_catalog() -> Vec<EffectInfo> {
             v.push(g(id, label, PATHFINDER, "{} (groups and layers: live Pathfinder over the members)", json!({})));
         }
     }
+    v.push(g(TRAP, "Trap…", PATHFINDER, trap::EFFECT_PARAMS_DOC, trap::effect_defaults()));
     v.push(g(
         CROP_MARKS,
         "Crop Marks",

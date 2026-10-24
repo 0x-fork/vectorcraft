@@ -66,24 +66,33 @@ pub fn dash_fields(pattern: &[f64]) -> [Option<f64>; 6] {
     out
 }
 
-/// The dash/gap fields and alignment the Dashed Line section shows: the stroke's dashes, or with
+/// The full pattern and alignment the Dashed Line section shows: the stroke's dashes, or with
 /// dashes off the last ones turned off (`last`), at first 12 pt dashes fitted to corners.
-fn dash_state(dash: Option<&Dash>, last: Option<([Option<f64>; 6], bool)>) -> ([Option<f64>; 6], bool) {
+fn dash_state(dash: Option<&Dash>, last: Option<(Vec<f64>, bool)>) -> (Vec<f64>, bool) {
     match dash {
-        Some(d) => (dash_fields(&d.pattern), d.align_corners),
-        None => last.unwrap_or(([Some(12.0), None, None, None, None, None], true)),
+        Some(d) => (d.pattern.clone(), d.align_corners),
+        None => last.unwrap_or((vec![12.0], true)),
     }
 }
 
 /// Six dash/gap fields → a dash pattern: stops at the first empty dash; a dash without a gap
 /// repeats its length as the gap (Illustrator's behaviour).
 pub fn dash_pattern(fields: &[Option<f64>; 6]) -> Vec<f64> {
+    edited_dash_pattern(fields, &[])
+}
+
+/// Edit the visible fields without dropping entries the panel cannot show. Clearing a dash
+/// still ends the pattern there; a mixed selection supplies no shared pattern to preserve.
+pub(crate) fn edited_dash_pattern(fields: &[Option<f64>; 6], previous: &[f64]) -> Vec<f64> {
     let mut out = vec![];
     for pair in 0..3 {
         let Some(d) = fields[pair * 2] else { break };
         let g = fields[pair * 2 + 1].unwrap_or(d);
         out.push(d.max(0.0));
         out.push(g.max(0.0));
+    }
+    if out.len() == fields.len() {
+        out.extend(previous.iter().skip(fields.len()).copied());
     }
     if out.iter().all(|v| *v == 0.0) {
         out.clear();
@@ -103,6 +112,13 @@ fn set(app: &mut VectorcraftApp, p: Value) {
     } else {
         app.run("stroke.set", p).ok();
     }
+}
+
+/// A mixed selection starts a new shared pattern instead of copying one object's hidden tail.
+fn set_dash_fields(app: &mut VectorcraftApp, fields: &[Option<f64>; 6], previous: &[f64], mixed: bool) {
+    let previous = if mixed { &[][..] } else { previous };
+    // The command keeps each stroke's dash offset and alignment.
+    set(app, json!({"dash": edited_dash_pattern(fields, previous)}));
 }
 
 /// The weight the Stroke panel, Control bar and Properties panel show: blank where the selected
@@ -203,15 +219,16 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     widgets::divider(ui);
     // Dashed line.
     let dash = st.as_ref().and_then(|s| s.dash.as_ref());
-    let (fields, align_corners) = dash_state(dash, pstate(ui.ctx(), "stroke-dash-last"));
+    let (pattern, align_corners) = dash_state(dash, pstate(ui.ctx(), "stroke-dash-last"));
+    let fields = dash_fields(&pattern);
     let shown = if mixed.dash { [None; 6] } else { fields };
     ui.horizontal(|ui| {
         if widgets::check(ui, tl!("Dashed Line"), dash.is_some(), st.is_some()) {
             if dash.is_some() {
-                set_pstate(ui.ctx(), "stroke-dash-last", Some((fields, align_corners)));
+                set_pstate(ui.ctx(), "stroke-dash-last", Some((pattern.clone(), align_corners)));
                 set(app, json!({"dash": null}));
             } else {
-                set(app, json!({"dash": dash_pattern(&fields), "alignDashes": align_corners}));
+                set(app, json!({"dash": edited_dash_pattern(&fields, &pattern), "alignDashes": align_corners}));
             }
         }
         ui.add_space((ui.available_width() - 56.0).max(0.0));
@@ -236,8 +253,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             }
         }
         if changed && dash.is_some() {
-            // The command keeps the dash offset and alignment.
-            set(app, json!({"dash": dash_pattern(&nf)}));
+            set_dash_fields(app, &nf, &pattern, mixed.dash);
         }
     });
     ui.horizontal(|ui| {
@@ -300,10 +316,12 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             set(app, json!({"profile": id}));
         }
         let can_flip = st.as_ref().is_some_and(|s| s.profile.is_some());
-        if widgets::icon_button_enabled(ui, "flip-horizontal-2", tl!("Flip Along"), false, can_flip, 22.0).clicked() {
+        // Lucide names these icons for their mirror line: the vertical-line icon flips the
+        // profile along the path, while the horizontal-line icon flips it across the path.
+        if widgets::icon_button_enabled(ui, "flip-vertical-2", tl!("Flip Along"), false, can_flip, 22.0).clicked() {
             app.run("stroke.setAdvanced", json!({"flipProfile": "along"})).ok();
         }
-        if widgets::icon_button_enabled(ui, "flip-vertical-2", tl!("Flip Across"), false, can_flip, 22.0).clicked() {
+        if widgets::icon_button_enabled(ui, "flip-horizontal-2", tl!("Flip Across"), false, can_flip, 22.0).clicked() {
             app.run("stroke.setAdvanced", json!({"flipProfile": "across"})).ok();
         }
     });
@@ -491,6 +509,101 @@ mod tests {
         assert_eq!(dash_pattern(&[Some(5.0), None, None, Some(9.0), None, None]), vec![5.0, 5.0]);
         assert!(dash_pattern(&[None; 6]).is_empty());
         assert!(dash_pattern(&[Some(0.0), Some(0.0), None, None, None, None]).is_empty());
+    }
+
+    #[test]
+    fn dash_edits_keep_unshown_entries_and_the_existing_empty_field_rules() {
+        for pattern in [
+            vec![12.0, 6.0, 2.0, 3.0, 4.0, 5.0],
+            vec![12.0, 6.0, 2.0, 3.0, 4.0, 5.0, 20.0],
+            vec![12.0, 6.0, 2.0, 3.0, 4.0, 5.0, 20.0, 10.0],
+            vec![0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 9.0],
+        ] {
+            let mut fields = dash_fields(&pattern);
+            assert_eq!(edited_dash_pattern(&fields, &pattern), pattern);
+            fields[0] = Some(14.0);
+            let mut expected = pattern.clone();
+            expected[0] = 14.0;
+            assert_eq!(edited_dash_pattern(&fields, &pattern), expected);
+            // An empty gap repeats its dash; an empty dash deliberately shortens the pattern.
+            fields[1] = None;
+            expected[1] = 14.0;
+            assert_eq!(edited_dash_pattern(&fields, &pattern), expected);
+            fields[2] = None;
+            assert_eq!(edited_dash_pattern(&fields, &pattern), vec![14.0, 14.0]);
+        }
+        assert!(edited_dash_pattern(&[None; 6], &[12.0; 8]).is_empty());
+        assert!(edited_dash_pattern(&[Some(0.0); 6], &[0.0; 8]).is_empty());
+        let invalid = [12.0, 6.0, 2.0, 3.0, 4.0, 5.0, -1.0, 10.0];
+        let pattern = edited_dash_pattern(&dash_fields(&invalid), &invalid);
+        assert_eq!(pattern, invalid);
+        assert!(!Dash { pattern, ..Default::default() }.is_dashed());
+    }
+
+    #[test]
+    fn turning_dashes_off_keeps_the_full_pattern_for_turning_them_back_on() {
+        let dash = Dash { pattern: vec![0.0, 6.0, 0.0, 7.0, 0.0, 8.0, 0.0, 9.0], align_corners: true, ..Default::default() };
+        let saved = dash_state(Some(&dash), None);
+        let (pattern, align) = dash_state(None, Some(saved));
+        assert_eq!(edited_dash_pattern(&dash_fields(&pattern), &pattern), dash.pattern);
+        assert!(align);
+        let (pattern, align) = dash_state(None, None);
+        assert_eq!(dash_pattern(&dash_fields(&pattern)), vec![12.0, 12.0]);
+        assert!(align);
+    }
+
+    #[test]
+    fn editing_an_extended_dash_keeps_other_stroke_options_and_is_undoable() {
+        use vectorcraft_engine::Session;
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 100, "height": 100})).unwrap();
+        app.session.execute("shape.line", &json!({"x1": 10, "y1": 50, "x2": 90, "y2": 50})).unwrap();
+        set(&mut app, json!({"dash": [0, 6, 0, 7, 0, 8, 0, 9], "dashOffset": 3, "alignDashes": true, "cap": "round"}));
+        let before = current_stroke(&app).unwrap();
+        frame(&mut app);
+        assert_eq!(current_stroke(&app).unwrap(), before, "viewing the panel changes nothing");
+        let dash = before.dash.as_ref().unwrap();
+        let mut fields = dash_fields(&dash.pattern);
+        fields[5] = Some(10.0);
+        set_dash_fields(&mut app, &fields, &dash.pattern, false);
+        let after = current_stroke(&app).unwrap();
+        let mut expected = before.clone();
+        expected.dash.as_mut().unwrap().pattern[5] = 10.0;
+        assert_eq!(after, expected, "the tail, offset, alignment, cap and other options stay");
+        app.run("edit.undo", json!({})).unwrap();
+        assert_eq!(current_stroke(&app).unwrap(), before);
+        app.run("edit.redo", json!({})).unwrap();
+        assert_eq!(current_stroke(&app).unwrap(), after);
+    }
+
+    #[test]
+    fn mixed_dashes_stay_mixed_until_an_edit_replaces_the_shared_fields() {
+        use vectorcraft_doc::NodeId;
+        use vectorcraft_engine::Session;
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 100, "height": 100})).unwrap();
+        let mut ids = vec![];
+        let mut before = vec![];
+        for tail in [10.0, 20.0] {
+            let r = app.session.execute("shape.line", &json!({"x1": 10, "y1": tail, "x2": 90, "y2": tail})).unwrap();
+            ids.push(NodeId(r["id"].as_u64().unwrap()));
+            set(&mut app, json!({"dash": [12, 6, 2, 3, 4, 5, tail, 9], "dashOffset": tail, "alignDashes": true}));
+            before.push(current_stroke(&app).unwrap());
+        }
+        app.session.execute("select.set", &json!({"ids": ids.iter().map(|id| id.0).collect::<Vec<_>>()})).unwrap();
+        assert!(app.session.active().unwrap().stroke_mixed().dash);
+        frame(&mut app);
+        for (id, expected) in ids.iter().zip(&before) {
+            assert_eq!(app.session.active().unwrap().doc.node(*id).unwrap().appearance.stroke(), Some(expected));
+        }
+        let fields = [Some(4.0), None, None, None, None, None];
+        set_dash_fields(&mut app, &fields, &before[0].dash.as_ref().unwrap().pattern, true);
+        for (id, original) in ids.iter().zip(&before) {
+            let st = app.session.active().unwrap().doc.node(*id).unwrap().appearance.stroke().unwrap();
+            let mut expected = original.clone();
+            expected.dash.as_mut().unwrap().pattern = vec![4.0, 4.0];
+            assert_eq!(st, &expected, "no hidden tail is copied to the mixed selection");
+        }
     }
 
     /// #909: a profile many times the stroke's weight (made with the Width tool) draws inside its

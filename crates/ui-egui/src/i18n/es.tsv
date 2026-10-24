@@ -9,7 +9,7 @@
 # sentences address the user as "tú". Shortcut keys keep their key-cap names (Shift, Alt, Ctrl, Esc).
 #
 # Coverage: the whole interface — every menu string and every `tl!` literal (`complete_menus`,
-# tested). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
+# `untranslated_report` lists gaps). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
 # names, OpenType, the built-in workspace names and the bracketed perspective grid preset names.
 # Photoshop-style raster effects (Effect menu, their dialogs).
 	Glowing Edges…	Bordes resplandecientes…
@@ -194,6 +194,8 @@
 	Anti-aliased Artwork	Ilustración suavizada
 	Anti-aliasing:	Suavizado:
 	Any Kind	Cualquier tipo
+	Font Technology	Tecnología de fuente
+font-technology	Variable	Variables
 	Appearance	Apariencia
 	Appearance Attribute	Atributo de apariencia
 	Appearance Item	Elemento de apariencia
@@ -279,6 +281,9 @@
 	Background Color:	Color de fondo:
 	Show Center Mark	Mostrar marca central
 	Show Cross Hairs	Mostrar líneas en cruz
+	Show Video Safe Areas	Mostrar áreas seguras de video
+	Video Ruler Pixel Aspect Ratio:	Proporción de píxel de las reglas de video:
+	Hide Video Rulers	Ocultar reglas de video
 	Background Contents	Contenido de fondo
 	Background Contents:	Contenido de fondo:
 	Background:	Fondo:
@@ -347,6 +352,13 @@
 	Built-in presets don't change: New… starts an editable copy.	Los preajustes integrados no cambian: Nuevo… crea una copia editable.
 	Bulge…	Abultamiento…
 	Bullet	Viñeta
+	Bullets	Viñetas
+	Bullets and Numbering	Viñetas y numeración
+	Apply Bullets	Aplicar viñetas
+	Filled Dot	Punto relleno
+	Dash	Guion
+	Hollow Circle	Círculo vacío
+	Filled Square	Cuadrado relleno
 	Butt Cap	Extremo a tope
 	Byte Order:	Orden de bytes:
 	Calligraphic	Caligráfico
@@ -1383,7 +1395,7 @@
 	Clear History	Borrar historial
 	Set History Limit…	Definir límite de historial…
 	History States	Estados de historial
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Aplicar conjunto de datos
 	Cancel Pattern Editing	Cancelar edición de motivo
 	Copy Appearance	Copiar apariencia
@@ -3091,6 +3103,7 @@
 	Space Before Paragraph	Espacio antes del párrafo
 	Spaces	Espacios
 	Spacing Guides	Guías de espaciado
+	Invoke Distance Guides	Invocar guías de distancia
 	Spacing:	Espaciado:
 	Spanish	Español
 	Specified Distance	Distancia especificada
@@ -3228,7 +3241,6 @@
 	Show all open documents	Mostrar todos los documentos abiertos
 	Symbol Instance	Instancia de símbolo
 	Symbol Libraries	Bibliotecas de símbolos
-	Symbol Libraries (on the roadmap)	Bibliotecas de símbolos (en la hoja de ruta)
 	Symbol Screener Tool	Herramienta Transparencia de símbolos
 	Symbol Scruncher Tool	Herramienta Concentración de símbolos
 	Symbol Shifter Tool	Herramienta Desplazamiento de símbolos
@@ -3356,6 +3368,13 @@
 	Transparent Background	Fondo transparente
 	Transverse (the page a quarter turn on the paper)	Transversal (la página gira un cuarto de vuelta sobre el papel)
 	Trap…	Reventar…
+	Trap	Reventar
+	Height/Width	Altura/anchura
+	Tint Reduction	Reducción de tinta
+	Traps with Process Color	Reventados con colores de cuatricromía
+	Reverse Traps	Invertir reventados
+	Precision	Precisión
+	Remove Redundant Points	Quitar puntos redundantes
 	Trim	Cortar
 	Trim mark weight:	Grosor de marcas de recorte:
 	Trim marks	Marcas de recorte
@@ -3752,7 +3771,7 @@ axis	Both	Ambos
 
 # Status and error messages (`@msg`), translated where the status bar shows them; the message itself
 # stays English for agents and tests. `{_1}`, `{_2}` … stand for the `{}` of the format string, in order
-# (`complete_languages_translate_every_message` lists any that are missing). Command ids, parameter
+# (`untranslated_report` lists any that are missing). Command ids, parameter
 # names and values in backticks or code (`colorModel rgb`, `document.export`) stay as they are.
 @msg	no library `{id}`	no hay ninguna biblioteca `{id}`
 @msg	select some type first	selecciona primero algún texto
@@ -3827,6 +3846,7 @@ axis	Both	Ambos
 @msg	Opened {url}	Se abrió {url}
 @msg	Outline Stroke: no stroked paths selected	Contornear trazo: no hay trazados con trazo seleccionados
 @msg	PDF settings are not an object	los ajustes de PDF no son un objeto
+@msg	PDF security settings are not an object	los ajustes de seguridad de PDF no son un objeto
 @msg	PDF writer error: {0}	error del escritor de PDF: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	Se empaquetaron {n} archivo(s) en {folder}{note}
 @msg	Packaged {n} file(s){note}	Se empaquetaron {n} archivo(s){note}
@@ -3949,6 +3969,7 @@ axis	Both	Ambos
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	axis debe ser "vertical", "horizontal" o un ángulo en grados, no `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	fondo {other}: transparent, white, black o un color como "#ff8800"
 @msg	bad color {v}	color no válido {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio debe ser un número de 0,1 a 10
 @msg	the Color Picker is not open	el Selector de color no está abierto
 @msg	the Simplify slider is not open	el regulador de Simplificar no está abierto
 @msg	the screen color sampler is already open	el muestreador de color de la pantalla ya está abierto
@@ -4026,7 +4047,7 @@ axis	Both	Ambos
 @msg	missing index	falta index
 @msg	missing number `{key}`	falta el número `{key}`
 @msg	missing integer `{key}`	falta el número entero `{key}`
-@msg	multiple windows land with M11.5	las ventanas múltiples llegan con M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nueva ventana aún no está disponible: un documento se abre en una sola ventana
 @msg	name the file	ponle nombre al archivo
 @msg	no CSS to copy: select objects with CSS of their own	no hay CSS que copiar: selecciona objetos con CSS propio
 @msg	no Live Paint edge near that point	no hay ningún borde de pintura interactiva cerca de ese punto
@@ -4764,6 +4785,7 @@ effect	Regular	Regular
 	Logo 1000×1000	Logotipo 1000×1000
 	Business Card 3.5 × 2 in	Tarjeta de presentación de 3.5 × 2 pulgadas
 	Business Card 85 × 55 mm	Tarjeta de presentación de 85 × 55 mm
+	Business Card 91 × 55 mm	Tarjeta de presentación de 91 × 55 mm
 	Letterhead Letter	Membrete Carta
 	Letterhead A4	Membrete A4
 	Envelope DL	Sobre DL
@@ -5402,3 +5424,54 @@ axis	Y Axis	Eje Y
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	un efecto interactivo se ejecuta mientras se dibuja el documento, así que no puede ser `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	un plugin de exportación siempre recibe el presupuesto de una exportación: omite `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	“{_1}” pide un presupuesto de cálculo grande (cada ejecución hasta {minutes} minutos y {times} veces las instrucciones habituales): instálalo con `allowHeavy: true` cuando el usuario lo acepte
+# Actions panel: action sets (#3712).
+	New Set…	Nuevo conjunto…
+	New Set	Nuevo conjunto
+	Set Options…	Opciones de conjunto…
+	Set Options	Opciones de conjunto
+	Create New Set	Crear nuevo conjunto
+	Stop Global Edit	Detener edición global
+	Global Edit Options	Opciones de edición global
+	Match	Coincidir
+	On Artboards	En mesas de trabajo
+	All Artboards	Todas las mesas de trabajo
+	Include Objects On Canvas	Incluir objetos en el lienzo
+	Result(s): {count}	Resultado(s): {count}
+@msg	select one object	seleccione un objeto
+@msg	Global Edit works on paths, compound paths and symbol instances	La edición global funciona con trazados, trazados compuestos e instancias de símbolos
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	no se encontraron objetos similares (las copias giradas o reflejadas no coinciden); cambie las opciones de edición global e inténtelo de nuevo
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all o un intervalo como 1, 3-5, no {v}
+	Add to Symbols	Agregar a símbolos
+	Basic Shapes	Formas básicas
+	Open Symbol Library	Abrir biblioteca de símbolos
+	Save Symbol Library	Guardar biblioteca de símbolos
+	Save Symbol Library…	Guardar biblioteca de símbolos…
+	Save Symbols…	Guardar símbolos…
+	Selected Symbols Only	Solo símbolos seleccionados
+	Symbol Libraries Menu	Menú Bibliotecas de símbolos
+	Symbol Library	Biblioteca de símbolos
+	User Symbol Library 1	Biblioteca de símbolos del usuario 1
+	User Symbol Library 2	Biblioteca de símbolos del usuario 2
+	User Symbol Library 3	Biblioteca de símbolos del usuario 3
+	User Symbol Library 4	Biblioteca de símbolos del usuario 4
+	User Symbol Library 5	Biblioteca de símbolos del usuario 5
+	User Symbol Library 6	Biblioteca de símbolos del usuario 6
+	User Symbol Library 7	Biblioteca de símbolos del usuario 7
+	User Symbol Library 8	Biblioteca de símbolos del usuario 8
+	User Symbol Library 9	Biblioteca de símbolos del usuario 9
+	User Symbol Library 10	Biblioteca de símbolos del usuario 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` no tiene símbolos para colocar
+@msg	missing `library` (see symbol.libraries)	falta `library` (consulte symbol.libraries)
+@msg	no symbol `{n}`	no hay ningún símbolo `{n}`
+@msg	no symbol `{n}` in `{_1}`	no hay ningún símbolo `{n}` en `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	no hay ninguna biblioteca de símbolos `{key}` (consulte symbol.libraries)
+@msg	the document has no symbols to save	el documento no tiene símbolos para guardar
+@msg	Trap: select two or more objects filled with solid colours	Reventar: seleccione dos o más objetos rellenos con colores sólidos
+@msg	Trap: no edges of different colours meet among the selected objects	Reventar: entre los objetos seleccionados no se tocan bordes de colores distintos
+@msg	thickness must be from 0.01 to 5000 pt	thickness debe estar entre 0,01 y 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth debe estar entre 1 y 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction debe estar entre 0 y 100 %
+	Rectangular Grid Tool Options	Opciones de la herramienta Cuadrícula rectangular
+	Polar Grid Tool Options	Opciones de la herramienta Cuadrícula polar
+	Fill Line	Rellenar línea

@@ -342,7 +342,7 @@ fn choose_palette(params: &TraceParams, pix: &[Px], w: usize, h: usize) -> Resul
 /// Trace a flat-colour logo.
 pub(crate) fn trace_logo(img: &Raster, params: &TraceParams, max_anchors: usize) -> Result<TraceResult, TraceError> {
     let (w0, h0) = (img.width as usize, img.height as usize);
-    if w0 == 0 || h0 == 0 || img.rgba.len() != w0 * h0 * 4 {
+    if w0 == 0 || h0 == 0 || w0.checked_mul(h0).and_then(|n| n.checked_mul(4)) != Some(img.rgba.len()) {
         return Ok(TraceResult::default());
     }
     let (mut pix, mut w, mut h, mut factor) = working_copy(img, 1);

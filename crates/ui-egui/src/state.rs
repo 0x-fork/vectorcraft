@@ -214,6 +214,10 @@ pub const ICON_PANEL_GROUPS: &[&[&str]] = &[
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ViewFlags {
     pub rulers: bool,
+    /// View › Rulers › Show Video Rulers: while the rulers show, they count the active artboard in
+    /// video pixels, honouring its Video Ruler Pixel Aspect Ratio.
+    #[serde(default)]
+    pub video_rulers: bool,
     pub grid: bool,
     pub guides: bool,
     pub smart_guides: bool,
@@ -252,6 +256,7 @@ impl Default for ViewFlags {
     fn default() -> Self {
         Self {
             rulers: false,
+            video_rulers: false,
             grid: false,
             guides: true,
             smart_guides: true,
@@ -420,6 +425,10 @@ pub struct UiState {
     /// Recorded actions (Actions panel), persisted with the UI preferences.
     #[serde(default = "crate::panels::actions::default_sets")]
     pub action_sets: Vec<crate::panels::actions::ActionSet>,
+    /// The current set of the Actions panel (its name clicked, one of its actions clicked, or made
+    /// with New Set): a recording goes into it and Set Options renames it. Not saved.
+    #[serde(skip)]
+    pub action_set: Option<usize>,
     /// Recording in progress: (set index, action name, journal length when recording started).
     #[serde(skip)]
     pub recording: Option<(usize, String, usize)>,
@@ -855,6 +864,7 @@ impl Default for UiState {
             draw_mode: 0,
             about: false,
             action_sets: crate::panels::actions::default_sets(),
+            action_set: None,
             recording: None,
             shortcut_overrides: Default::default(),
             shortcut_set: default_shortcut_set(),

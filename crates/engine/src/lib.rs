@@ -348,6 +348,9 @@ pub struct DocState {
     pub variables_highlight: Option<String>,
     /// Isolation mode container.
     pub isolation: Option<NodeId>,
+    /// Select › Start Global Edit: the objects edited together until Stop Global Edit or Escape
+    /// ([`cmd::globaledit`]). Editing state: not saved, not undoable.
+    pub global_edit: Option<cmd::globaledit::GlobalEdit>,
     pub interaction: Option<Interaction>,
     /// Edits made while this is open are one undo step (a scrubbed numeric field).
     pub undo_group: Option<UndoGroup>,
@@ -551,6 +554,7 @@ impl DocState {
             layer_rows: vec![],
             variables_highlight: None,
             isolation: None,
+            global_edit: None,
             interaction: None,
             undo_group: None,
             last_transform: None,
@@ -644,6 +648,7 @@ impl DocState {
             self.doc = it.doc;
             self.selection = Arc::unwrap_or_clone(it.selection);
             self.sync_new_art();
+            cmd::globaledit::follow_history(self);
             self.active_layer = it.active_layer;
             self.layer_rows = it.layer_rows;
             self.variables_highlight = it.variables_highlight;
@@ -861,16 +866,22 @@ const _: () = assert!(vectorcraft_doc::MAX_DEPTH == 32, "TOO_DEEP (and its catal
 /// Cheap sanity check after an edit: artboards and the objects just touched (the selection) must
 /// have finite, in-range geometry, so saved files always reload and renderers never see NaN/∞.
 fn doc_sane(d: &Document, sel: &Selection) -> bool {
-    let ok = |r: vectorcraft_geom::Rect| [r.x0, r.y0, r.x1, r.y1].iter().all(|v| v.is_finite() && v.abs() <= MAX_COORD);
     d.ruler_origin.is_finite()
         && d.ruler_origin.x.abs() <= MAX_COORD
         && d.ruler_origin.y.abs() <= MAX_COORD
-        && d.artboards.iter().all(|a| ok(a.rect))
+        && d.artboards.iter().all(|a| rect_in_range(a.rect))
         && d.guides.iter().all(|g| g.pos.is_finite() && g.pos.abs() <= MAX_COORD)
-        && {
-            let paths = d.index_paths(sel.objects.iter().copied());
-            sel.objects.iter().all(|id| paths.get(id).and_then(|p| d.node_at(p)).and_then(|n| n.geometric_bounds()).is_none_or(ok))
-        }
+        && objects_in_range(d, &sel.objects)
+}
+
+fn rect_in_range(r: vectorcraft_geom::Rect) -> bool {
+    [r.x0, r.y0, r.x1, r.y1].iter().all(|v| v.is_finite() && v.abs() <= MAX_COORD)
+}
+
+/// Do the objects `ids` have finite geometry within [`MAX_COORD`] (the ones not there pass)?
+fn objects_in_range(d: &Document, ids: &[NodeId]) -> bool {
+    let paths = d.index_paths(ids.iter().copied());
+    ids.iter().all(|id| paths.get(id).and_then(|p| d.node_at(p)).and_then(|n| n.geometric_bounds()).is_none_or(rect_in_range))
 }
 
 /// Where new art goes (Illustrator's drawing modes, Shift+D cycles).
@@ -970,6 +981,7 @@ pub struct Prefs {
     pub anchor_path_labels: bool,
     pub measurement_labels: bool,
     pub spacing_guides: bool,
+    pub distance_guides: bool,
     pub snapping_tolerance: f64,
     pub snap_tangent: bool,
     pub snap_perpendicular: bool,
@@ -1221,6 +1233,7 @@ impl Default for Prefs {
             anchor_path_labels: true,
             measurement_labels: true,
             spacing_guides: true,
+            distance_guides: true,
             snapping_tolerance: 4.0,
             snap_tangent: true,
             snap_perpendicular: true,
@@ -1364,6 +1377,8 @@ pub struct Session {
     pub(crate) freeform_point: Option<(usize, cmd::gradient::StopOwner)>,
     /// User Defined and loaded graphic style libraries (Window → Graphic Style Libraries); not saved.
     pub style_libraries: cmd::stylelib::Libraries,
+    /// User Defined and loaded symbol libraries (Window → Symbol Libraries); not saved.
+    pub symbol_libraries: cmd::symbollib::Libraries,
     /// The Libraries panel's libraries of graphics, colours and text styles (`library.*`).
     pub libraries: cmd::library::Libraries,
     /// Where the saved PDF presets are kept, one file each; `None`: only for the session
@@ -1425,10 +1440,13 @@ pub struct Session {
     pub(crate) liquify_stroke: Option<Box<cmd::distortcmds::LiquifyStroke>>,
     /// A press on the Plane Switching Widget is under way: its drag and release are the widget's.
     pub(crate) plane_widget_press: bool,
+    /// The pointer button is held: the last pointer event was a press or a drag, not a release or
+    /// a move ([`Session::pointer_held`]).
+    pub(crate) pointer_held: bool,
     /// A guide being dragged out of a ruler ([`Session::ruler_guide`]).
     pub(crate) ruler_guide: Option<vectorcraft_tools::rulerguide::NewGuide>,
-    /// Which selected type overflows its frame, for the markers every tool but the Type tools shows.
-    pub(crate) overflow_marks: vectorcraft_tools::text::OverflowMarks,
+    /// Which selected type overflows its frame, for the ports every tool but the Type tools shows.
+    pub(crate) port_marks: vectorcraft_tools::text::PortMarks,
     /// The last search for the files of missing fonts (`text.findFontFiles`), until another
     /// starts; dropping it stops it.
     pub(crate) font_search: Option<cmd::fontfiles::FontSearch>,
@@ -1449,6 +1467,9 @@ pub struct Session {
     pub link_stamps: std::collections::HashMap<(u64, String), link_watch::Stamp>,
     /// The stamps being taken on a worker thread ([`Session::start_link_scan`]).
     pub link_scan: Option<link_watch::LinkScan>,
+    /// The Global Edit Options Start Global Edit matches with (`select.globalEditOptions`); not
+    /// saved.
+    pub global_edit_options: cmd::globaledit::Options,
 }
 
 impl Default for Session {
@@ -1465,6 +1486,12 @@ impl Session {
         // Placed documents are read by the native format's loader.
         vectorcraft_doc::placed_document::set_loader(cmd::place::document::read_document);
         vectorcraft_doc::placed_document::set_file_reader(cmd::place::document::read_file_again);
+        vectorcraft_doc::placed_document::set_read_check(|path| file_access::check_read(path).is_ok());
+        // The background workers of placed documents read files in the scope that asked.
+        vectorcraft_render::placed_document::set_scope_capture(|| {
+            let scope = file_access::ScopeHandle::capture();
+            Box::new(move |f: &mut dyn FnMut()| scope.run(f))
+        });
         // Clicks find an image's own fills and strokes where their effects draw them.
         vectorcraft_doc::hit::set_image_paint(vectorcraft_render::effects::image_paint);
         // OpenType SVG glyphs are drawn as the SVG importer reads their documents.
@@ -1499,6 +1526,7 @@ impl Session {
             swatch_libraries: Default::default(),
             freeform_point: None,
             style_libraries: Default::default(),
+            symbol_libraries: Default::default(),
             libraries: Default::default(),
             pdf_preset_dir: None,
             profile_dir: None,
@@ -1520,8 +1548,9 @@ impl Session {
             envelope_defaults: None,
             liquify_stroke: None,
             plane_widget_press: false,
+            pointer_held: false,
             ruler_guide: None,
-            overflow_marks: Default::default(),
+            port_marks: Default::default(),
             font_search: None,
             link_search: None,
             search_rules: None,
@@ -1529,6 +1558,7 @@ impl Session {
             search_threads: None,
             link_stamps: Default::default(),
             link_scan: None,
+            global_edit_options: Default::default(),
         }
     }
 
@@ -1713,13 +1743,25 @@ impl Session {
             self.note_depth = 1;
             self.batch_stash = None;
         }
-        // A selection-only command given `ids` selects them first, in the same undo step (#2130).
+        // A selection-only command given `ids` selects them first, in the same undo step (#2130);
+        // when the command then fails, the selection (and the current layer selecting them made
+        // current) goes back to how it was, as when the ids are refused.
         let select_first = SELECTS_GIVEN_IDS.contains(&id).then(|| params.get("ids")).flatten();
+        let selected_before = select_first.and(self.active()).map(|d| (d.uid, d.selection.clone(), d.active_layer));
         let run = |s: &mut Session| {
             if let Some(ids) = select_first {
                 s.execute("select.set", &serde_json::json!({ "ids": ids }))?;
             }
-            (spec.run)(s, params)
+            let r = (spec.run)(s, params);
+            if r.is_err()
+                && let Some((uid, selection, layer)) = selected_before
+                && let Some(st) = s.docs.iter_mut().find(|d| d.uid == uid)
+            {
+                st.selection = selection;
+                st.active_layer = layer;
+                st.revision += 1;
+            }
+            r
         };
         // The entries the command journals belong to the undo groups of the documents it edits, and to
         // the group of the document it starts in when it ends there too.
@@ -1818,6 +1860,7 @@ impl Session {
                     st.doc = doc;
                     st.selection = selection;
                     st.interaction = interaction;
+                    cmd::globaledit::follow_history(st);
                     st.revision += 1;
                 }
                 if active.is_some_and(|i| i < self.docs.len()) {
@@ -1847,8 +1890,14 @@ impl Session {
         let before = st.doc.clone();
         let before_sel = st.selection.clone();
         let doc = Arc::make_mut(&mut st.doc);
+        // The Global Edit members the edit reached besides the selection.
+        let mut spread = vec![];
         // Objects attached to a path follow it, and dimensions follow the art they measure.
         let result = match f(doc, &mut st.selection).and_then(|v| {
+            // Global Edit: the other members take what the edit changed about the one it edited.
+            if let Some(ge) = &st.global_edit {
+                spread = cmd::globaledit::propagate(&before, doc, ge, [&before_sel.objects, &st.selection.objects]);
+            }
             cmd::objects_on_path::refresh(&before, doc);
             cmd::dimension::refresh(&before, doc)?;
             Ok(v)
@@ -1881,7 +1930,7 @@ impl Session {
                     if st.doc.too_deep(Some(&before)) {
                         // Deeper trees overflow the stack of what walks them.
                         Err(EngineError::Other(TOO_DEEP.into()))
-                    } else if doc_sane(&st.doc, &st.selection) {
+                    } else if doc_sane(&st.doc, &st.selection) && objects_in_range(&st.doc, &spread) {
                         Ok(v)
                     } else {
                         Err(EngineError::Other("result would exceed the canvas (coordinates out of range)".into()))
@@ -1913,6 +1962,7 @@ impl Session {
             Err(e) => {
                 st.doc = before;
                 st.selection = before_sel;
+                cmd::globaledit::follow_history(st);
                 Err(e)
             }
         }
@@ -2031,6 +2081,7 @@ impl Session {
             if selection_changed {
                 st.selection.clone_from(&it.selection);
             }
+            cmd::globaledit::follow_history(st);
         }
         // The previous preview's paint is undone with it.
         self.pending_paint = None;
@@ -2187,6 +2238,7 @@ impl Session {
                     deselect_guides(&st.doc, &mut st.selection);
                 }
                 st.sync_new_art();
+                cmd::globaledit::follow_history(st);
                 st.revision += 1;
                 // The journal drops only the canceled groups' own entries and keeps the ones made in other documents meanwhile.
                 journal.extend(g.journal);
@@ -2264,6 +2316,7 @@ impl Session {
         }
         st.doc = doc;
         st.selection = selection;
+        cmd::globaledit::follow_history(st);
         if guides_locked {
             deselect_guides(&st.doc, &mut st.selection);
         }
@@ -2301,6 +2354,15 @@ fn refresh_tree_text_bounds(n: &mut Arc<vectorcraft_doc::Node>) {
     for c in n.children_mut().into_iter().flatten() {
         refresh_tree_text_bounds(c);
     }
+}
+
+/// Held by the tests that add fonts to the shared [`vectorcraft_text::FontDb::global`] for as long
+/// as they run: adding a font clears the database's caches, which would change how another such
+/// test's type resolves between its layout and its export.
+#[cfg(test)]
+pub(crate) fn adding_fonts() -> std::sync::MutexGuard<'static, ()> {
+    static FONTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    FONTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 #[cfg(test)]
@@ -2407,6 +2469,8 @@ mod tests_fontfiles;
 mod tests_fontlist;
 #[cfg(test)]
 mod tests_freeform;
+#[cfg(test)]
+mod tests_globaledit;
 #[cfg(test)]
 mod tests_gradient;
 #[cfg(test)]
@@ -2568,6 +2632,8 @@ mod tests_shaper;
 #[cfg(test)]
 mod tests_shortcutset;
 #[cfg(test)]
+mod tests_simplify_part;
+#[cfg(test)]
 mod tests_slices;
 #[cfg(test)]
 mod tests_smartguides;
@@ -2596,6 +2662,8 @@ mod tests_swatchlib;
 #[cfg(test)]
 mod tests_symbolbounds;
 #[cfg(test)]
+mod tests_symbollib;
+#[cfg(test)]
 mod tests_targeting;
 #[cfg(test)]
 mod tests_textcombos;
@@ -2613,6 +2681,8 @@ mod tests_toolsettings;
 mod tests_transformfx;
 #[cfg(test)]
 mod tests_transparencygrid;
+#[cfg(test)]
+mod tests_trap;
 #[cfg(test)]
 mod tests_typearea;
 #[cfg(test)]
@@ -2658,6 +2728,7 @@ pub(crate) const SELECTS_GIVEN_IDS: &[&str] = &[
     "object.pathfinder.minusBack",
     "object.pathfinder.minusFront",
     "object.pathfinder.outline",
+    "object.pathfinder.trap",
     "object.pathfinder.trim",
     "object.pathfinder.unite",
     "object.reflect",

@@ -39,11 +39,20 @@ type MeshEntry = (Arc<Node>, Quads, Arc<DocInputs>);
 pub(crate) struct LiveCache {
     expanded: FrameCache<usize, (Arc<Node>, Expanded, Found)>,
     meshes: FrameCache<(usize, usize), MeshEntry>,
+    /// How many live objects [`Renderer::live_expanded`] evaluated and how many meshes
+    /// [`Renderer::mesh_quads`] tessellated.
+    #[cfg(test)]
+    pub(crate) evaluated: usize,
 }
 
 impl Default for LiveCache {
     fn default() -> Self {
-        Self { expanded: FrameCache::new(lru::LIVE_BUDGET, 256), meshes: FrameCache::new(lru::MESH_BUDGET, 256) }
+        Self {
+            expanded: FrameCache::new(lru::LIVE_BUDGET, 256),
+            meshes: FrameCache::new(lru::MESH_BUDGET, 256),
+            #[cfg(test)]
+            evaluated: 0,
+        }
     }
 }
 
@@ -400,6 +409,10 @@ impl Renderer {
         {
             return e.1.clone();
         }
+        #[cfg(test)]
+        {
+            self.live.evaluated += 1;
+        }
         let v: Expanded = match crate::effects::pathfinder_children(a, crate::effects::text_outliner()) {
             Some(children) => Arc::new(children),
             None => Arc::new(crate::effects::expand_live(Some(doc), a).into_iter().map(Arc::new).collect()),
@@ -422,6 +435,10 @@ impl Renderer {
             && e.2.cms == inputs.cms
         {
             return e.1.clone();
+        }
+        #[cfg(test)]
+        {
+            self.live.evaluated += 1;
         }
         let q = Arc::new(m.quads(level));
         if cache {

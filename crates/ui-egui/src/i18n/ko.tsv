@@ -14,6 +14,8 @@
 	All Scripts	모든 스크립트
 	Anchors:	앵커:
 	Any Kind	모든 종류
+	Font Technology	글꼴 기술
+font-technology	Variable	가변
 	Ascender	어센더
 	Baseline	기준선
 	Bottom-to-Bottom Leading	아래쪽 기준 행간
@@ -306,6 +308,13 @@
 	Glyphs	글리프
 	Insert Special Character	특수 문자 삽입
 	Bullet	글머리 기호
+	Bullets	글머리 기호
+	Bullets and Numbering	글머리 기호 및 번호 매기기
+	Apply Bullets	글머리 기호 적용
+	Filled Dot	채운 점
+	Dash	대시
+	Hollow Circle	빈 원
+	Filled Square	채운 사각형
 	Copyright Symbol	저작권 기호
 	Ellipsis	줄임표
 	Paragraph Symbol	단락 기호
@@ -933,6 +942,9 @@
 	Background Color:	배경색:
 	Show Center Mark	중심 표시 보기
 	Show Cross Hairs	십자선 보기
+	Show Video Safe Areas	비디오 안전 영역 보기
+	Video Ruler Pixel Aspect Ratio:	비디오 눈금자 픽셀 종횡비:
+	Hide Video Rulers	비디오 눈금자 숨기기
 	Background Contents	배경 내용
 	Background Contents:	배경 내용:
 	Background:	배경:
@@ -1632,7 +1644,7 @@
 	Clear History	히스토리 지우기
 	Set History Limit…	히스토리 한도 설정…
 	History States	히스토리 상태
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	데이터 세트 적용
 	Area Type	영역 문자
 	Bloat	부풀리기
@@ -2885,6 +2897,7 @@ mark-style	Japanese	일본식
 	Space Before Paragraph	단락 앞 간격
 	Spaces	공백
 	Spacing Guides	간격 안내선
+	Invoke Distance Guides	거리 안내선 호출
 	Spacing:	간격:
 	Spanish	Español
 	Specify:	지정:
@@ -2978,7 +2991,6 @@ mark-style	Japanese	일본식
 	Use Library Item	라이브러리 항목 사용
 	Graphic	그래픽
 	Show all open documents	열린 문서 모두 표시
-	Symbol Libraries (on the roadmap)	심볼 라이브러리(예정)
 	Symbol Screener Tool	심볼 스크리너 도구
 	Symbol Scruncher Tool	심볼 스크런처 도구
 	Symbol Shifter Tool	심볼 시프터 도구
@@ -3063,6 +3075,13 @@ mark-style	Japanese	일본식
 	Transparent Background	투명 배경
 	Transverse (the page a quarter turn on the paper)	가로 방향(용지에서 페이지를 90도 돌림)
 	Trap…	트랩…
+	Trap	트랩
+	Height/Width	높이/폭
+	Tint Reduction	색조 감소
+	Traps with Process Color	프로세스 색상으로 트랩
+	Reverse Traps	트랩 반전
+	Precision	정밀도
+	Remove Redundant Points	불필요한 점 제거
 	Trim mark weight:	재단선 두께:
 	True colour needs version 2004 or later: the nearest of 256 colours is written.	트루 컬러는 2004 이상 버전이 필요합니다. 256색 중 가장 가까운 색으로 기록됩니다.
 	Turn off Data Recovery for complex documents	복잡한 문서는 데이터 복구 끄기
@@ -4245,6 +4264,7 @@ theme	Appearance	외관
 @msg	{label}…	{label}…
 @msg	no blend options	혼합 옵션이 없습니다
 @msg	bad color {v}	잘못된 색상 {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio은(는) 0.1에서 10 사이의 숫자여야 합니다
 @msg	the Color Picker is not open	색상 피커가 열려 있지 않습니다
 @msg	the Simplify slider is not open	단순화 슬라이더가 열려 있지 않습니다
 @msg	the screen color sampler is already open	화면 색상 추출기가 이미 열려 있습니다
@@ -4308,6 +4328,7 @@ theme	Appearance	외관
 @msg	name the file	파일 이름을 지정하세요
 @msg	unknown format	알 수 없는 형식
 @msg	PDF settings are not an object	PDF 설정이 개체가 아닙니다
+@msg	PDF security settings are not an object	PDF 보안 설정이 개체가 아닙니다
 @msg	no saved PDF preset named `{name}` (built-in presets are read-only: start a new one from them)	`{name}`이라는 저장된 PDF 프리셋이 없습니다(기본 제공 프리셋은 읽기 전용이니 이를 바탕으로 새로 만드세요)
 @msg	Saved to User Defined: {_1}	사용자 정의에 저장했습니다: {_1}
 @msg	choose a direction to divide in	나눌 방향을 선택하세요
@@ -4358,7 +4379,7 @@ theme	Appearance	외관
 @msg	missing index	index가 없습니다
 @msg	missing number `{key}`	숫자 `{key}`이(가) 없습니다
 @msg	missing integer `{key}`	정수 `{key}`이(가) 없습니다
-@msg	multiple windows land with M11.5	여러 창은 M11.5에서 지원됩니다
+@msg	New Window isn't available yet: a document opens in one window	새 창은 아직 사용할 수 없습니다: 문서는 하나의 창에서 열립니다
 @msg	no PNG encoder	PNG 인코더가 없습니다
 @msg	no document open	열린 문서가 없습니다
 @msg	no effect applied yet	아직 적용된 효과가 없습니다
@@ -5040,3 +5061,54 @@ axis	Y Axis	Y축
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	라이브 효과는 문서를 그리는 동안 실행되므로 `heavy`일 수 없습니다
 @msg	an exporter always gets an export's budget: leave `budget` out	내보내기 플러그인은 항상 내보내기 예산을 받습니다. `budget`은 생략하세요
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	“{_1}”은(는) 큰 계산 예산을 요청합니다(실행당 최대 {minutes}분, 평소의 {times}배 명령어). 사용자가 동의하면 `allowHeavy: true`로 설치하세요
+# Actions panel: action sets (#3712).
+	New Set…	새 세트…
+	New Set	새 세트
+	Set Options…	세트 옵션…
+	Set Options	세트 옵션
+	Create New Set	새 세트 만들기
+	Stop Global Edit	전체 편집 중지
+	Global Edit Options	전체 편집 옵션
+	Match	일치
+	On Artboards	아트보드에서
+	All Artboards	모든 아트보드
+	Include Objects On Canvas	캔버스의 개체 포함
+	Result(s): {count}	결과: {count}
+@msg	select one object	개체 하나를 선택하십시오
+@msg	Global Edit works on paths, compound paths and symbol instances	전체 편집은 패스, 컴파운드 패스, 심볼 인스턴스에서 작동합니다
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	유사한 개체를 찾을 수 없습니다(회전하거나 반사한 복사본은 일치하지 않습니다). 전체 편집 옵션을 변경한 후 다시 시도하십시오
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all 또는 1, 3-5 같은 범위여야 합니다({v}이(가) 아님)
+	Add to Symbols	심볼에 추가
+	Basic Shapes	기본 모양
+	Open Symbol Library	심볼 라이브러리 열기
+	Save Symbol Library	심볼 라이브러리 저장
+	Save Symbol Library…	심볼 라이브러리 저장…
+	Save Symbols…	심볼 저장…
+	Selected Symbols Only	선택한 심볼만
+	Symbol Libraries Menu	심볼 라이브러리 메뉴
+	Symbol Library	심볼 라이브러리
+	User Symbol Library 1	사용자 심볼 라이브러리 1
+	User Symbol Library 2	사용자 심볼 라이브러리 2
+	User Symbol Library 3	사용자 심볼 라이브러리 3
+	User Symbol Library 4	사용자 심볼 라이브러리 4
+	User Symbol Library 5	사용자 심볼 라이브러리 5
+	User Symbol Library 6	사용자 심볼 라이브러리 6
+	User Symbol Library 7	사용자 심볼 라이브러리 7
+	User Symbol Library 8	사용자 심볼 라이브러리 8
+	User Symbol Library 9	사용자 심볼 라이브러리 9
+	User Symbol Library 10	사용자 심볼 라이브러리 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}`에 배치할 심볼이 없습니다
+@msg	missing `library` (see symbol.libraries)	`library`가 없습니다(symbol.libraries 참조)
+@msg	no symbol `{n}`	심볼 `{n}`이(가) 없습니다
+@msg	no symbol `{n}` in `{_1}`	`{_1}`에 심볼 `{n}`이(가) 없습니다
+@msg	no symbol library `{key}` (see symbol.libraries)	심볼 라이브러리 `{key}`이(가) 없습니다(symbol.libraries 참조)
+@msg	the document has no symbols to save	문서에 저장할 심볼이 없습니다
+@msg	Trap: select two or more objects filled with solid colours	트랩: 단색으로 칠한 개체를 두 개 이상 선택하십시오
+@msg	Trap: no edges of different colours meet among the selected objects	트랩: 선택한 개체 사이에 서로 다른 색상이 맞닿는 가장자리가 없습니다
+@msg	thickness must be from 0.01 to 5000 pt	thickness는 0.01~5000pt여야 합니다
+@msg	heightWidth must be from 1 to 1000 %	heightWidth는 1~1000%여야 합니다
+@msg	tintReduction must be from 0 to 100 %	tintReduction은 0~100%여야 합니다
+	Rectangular Grid Tool Options	사각형 격자 도구 옵션
+	Polar Grid Tool Options	극좌표 격자 도구 옵션
+	Fill Line	선 채우기

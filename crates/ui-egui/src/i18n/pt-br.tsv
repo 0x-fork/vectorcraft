@@ -19,7 +19,7 @@
 # commands is kept.
 #
 # Coverage: the whole interface (every menu string and every `tl!` literal, `complete_menus`,
-# tested) and the status and error messages (`@msg` rows, `COMPLETE_MESSAGES`, tested). Left in
+# `untranslated_report` lists gaps) and the status and error messages (`@msg` rows, `COMPLETE_MESSAGES`, `untranslated_report` lists gaps). Left in
 # English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language names, OpenType,
 # the built-in workspace names and the bracketed perspective grid preset names.
 #
@@ -266,6 +266,9 @@
 	Background Color:	Cor do Plano de Fundo:
 	Show Center Mark	Mostrar Marca Central
 	Show Cross Hairs	Mostrar Linhas Cruzadas
+	Show Video Safe Areas	Mostrar Áreas Seguras de Vídeo
+	Video Ruler Pixel Aspect Ratio:	Proporção de Pixel das Réguas de Vídeo:
+	Hide Video Rulers	Ocultar Réguas de Vídeo
 	Background Contents	Conteúdo do Plano de Fundo
 	Background Contents:	Conteúdo do Plano de Fundo:
 	Background:	Plano de Fundo:
@@ -319,6 +322,13 @@
 	Built-in presets don't change: New… starts an editable copy.	Predefinidos integrados não mudam: Novo… inicia uma cópia editável.
 	Bulge…	Estufar…
 	Bullet	Marcador
+	Bullets	Marcadores
+	Bullets and Numbering	Marcadores e Numeração
+	Apply Bullets	Aplicar Marcadores
+	Filled Dot	Ponto Preenchido
+	Dash	Travessão
+	Hollow Circle	Círculo Vazado
+	Filled Square	Quadrado Preenchido
 	Butt Cap	Extremidade Reta
 	Byte Order:	Ordem dos Bytes:
 	CMYK	CMYK
@@ -1191,7 +1201,7 @@
 	Clear History	Limpar Histórico
 	Set History Limit…	Definir Limite do Histórico…
 	History States	Estados do Histórico
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Aplicar Conjunto de Dados
 	Cancel Pattern Editing	Cancelar Edição de Padrão
 	Copy Appearance	Copiar Aparência
@@ -2561,6 +2571,7 @@
 	Space Before Paragraph	Espaço Antes do Parágrafo
 	Spaces	Espaços
 	Spacing Guides	Guias de Espaçamento
+	Invoke Distance Guides	Invocar Guias de Distância
 	Spacing:	Espaçamento:
 	Spanish	Espanhol
 	Specify:	Especificar:
@@ -2632,7 +2643,6 @@
 	Switch workspace	Trocar espaço de trabalho
 	Symbol Instance	Instância de Símbolo
 	Symbol Libraries	Bibliotecas de Símbolos
-	Symbol Libraries (on the roadmap)	Bibliotecas de Símbolos (no roadmap)
 	Symbol Screener Tool	Ferramenta Peneira de Símbolos
 	Symbol Scruncher Tool	Ferramenta Amontoar Símbolos
 	Symbol Shifter Tool	Ferramenta Deslocador de Símbolos
@@ -2735,6 +2745,13 @@
 	Transparent Background	Fundo Transparente
 	Transverse (the page a quarter turn on the paper)	Transversal (a página um quarto de volta no papel)
 	Trap…	Armadilha…
+	Trap	Armadilha
+	Height/Width	Altura/largura
+	Tint Reduction	Redução de matiz
+	Traps with Process Color	Armadilhas com cores de escala
+	Reverse Traps	Inverter armadilhas
+	Precision	Precisão
+	Remove Redundant Points	Remover pontos redundantes
 	Trim	Aparar
 	Trim View	Modo de Aparar
 	Trim mark weight:	Peso da marca de corte:
@@ -3107,6 +3124,8 @@ lighting	Light	Luz
 	All Scripts	Todos os scripts
 	Anchors:	Âncoras:
 	Any Kind	Qualquer tipo
+	Font Technology	Tecnologia da Fonte
+font-technology	Variable	Variáveis
 	Apply	Aplicar
 	Ellipse Properties:	Propriedades da elipse:
 	Invert Pie	Inverter fatia
@@ -3410,6 +3429,7 @@ axis	Both	Ambos
 @msg	Opened {url}	{url} aberto
 @msg	Outline Stroke: no stroked paths selected	Contornar traço: nenhum traçado com traço selecionado
 @msg	PDF settings are not an object	as configurações de PDF não são um objeto
+@msg	PDF security settings are not an object	as configurações de segurança de PDF não são um objeto
 @msg	PDF writer error: {0}	Erro do gravador de PDF: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	{n} arquivo(s) empacotado(s) em {folder}{note}
 @msg	Packaged {n} file(s){note}	{n} arquivo(s) empacotado(s){note}
@@ -3529,6 +3549,7 @@ axis	Both	Ambos
 @msg	at this scale the drawing is {w} × {h} pt, more than the canvas holds: choose a smaller scale or fit it to the artboard	nesta escala o desenho tem {w} × {h} pt, mais do que a tela comporta: escolha uma escala menor ou ajuste-o à prancheta
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	plano de fundo {other}: transparent, white, black ou uma cor como "#ff8800"
 @msg	bad color {v}	cor inválida {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio deve ser um número de 0,1 a 10
 @msg	bad colour `{hex}` (#rrggbb)	cor inválida `{hex}` (#rrggbb)
 @msg	bad page tree	árvore de páginas inválida
 @msg	bad shortcut	atalho inválido
@@ -3601,7 +3622,7 @@ axis	Both	Ambos
 @msg	missing index	falta o índice
 @msg	missing number `{key}`	falta o número `{key}`
 @msg	missing integer `{key}`	falta o número inteiro `{key}`
-@msg	multiple windows land with M11.5	várias janelas chegam com o M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nova Janela ainda não está disponível: um documento abre em uma única janela
 @msg	name the file	dê um nome ao arquivo
 @msg	no CSS to copy: select objects with CSS of their own	não há CSS para copiar: selecione objetos que tenham CSS próprio
 @msg	no Live Paint edge near that point	nenhuma aresta de Pintura dinâmica perto desse ponto
@@ -4764,6 +4785,7 @@ effect	Regular	Regular
 	Logo 1000×1000	Logotipo 1000×1000
 	Business Card 3.5 × 2 in	Cartão de Visita 3.5 × 2 pol
 	Business Card 85 × 55 mm	Cartão de Visita 85 × 55 mm
+	Business Card 91 × 55 mm	Cartão de Visita 91 × 55 mm
 	Letterhead Letter	Papel Timbrado Carta
 	Letterhead A4	Papel Timbrado A4
 	Envelope DL	Envelope DL
@@ -5377,3 +5399,54 @@ axis	Y Axis	Eixo Y
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	um efeito dinâmico é executado enquanto o documento é desenhado, então não pode ser `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	um plug-in de exportação sempre recebe o orçamento de uma exportação: omita `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	“{_1}” pede um orçamento de processamento grande (cada execução até {minutes} minutos e {times} vezes as instruções habituais): instale-o com `allowHeavy: true` depois que o usuário concordar
+# Actions panel: action sets (#3712).
+	New Set…	Novo Conjunto…
+	New Set	Novo Conjunto
+	Set Options…	Opções do Conjunto…
+	Set Options	Opções do Conjunto
+	Create New Set	Criar Novo Conjunto
+	Stop Global Edit	Parar Edição Global
+	Global Edit Options	Opções de Edição Global
+	Match	Corresponder
+	On Artboards	Nas Mesas de Trabalho
+	All Artboards	Todas as Mesas de Trabalho
+	Include Objects On Canvas	Incluir Objetos na Tela
+	Result(s): {count}	Resultado(s): {count}
+@msg	select one object	selecione um objeto
+@msg	Global Edit works on paths, compound paths and symbol instances	A edição global funciona com demarcadores, demarcadores compostos e instâncias de símbolos
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	nenhum objeto semelhante encontrado (cópias giradas ou refletidas não são correspondidas); altere as opções de edição global e tente novamente
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all ou um intervalo como 1, 3-5, não {v}
+	Add to Symbols	Adicionar aos Símbolos
+	Basic Shapes	Formas Básicas
+	Open Symbol Library	Abrir Biblioteca de Símbolos
+	Save Symbol Library	Salvar Biblioteca de Símbolos
+	Save Symbol Library…	Salvar Biblioteca de Símbolos…
+	Save Symbols…	Salvar Símbolos…
+	Selected Symbols Only	Somente Símbolos Selecionados
+	Symbol Libraries Menu	Menu de Bibliotecas de Símbolos
+	Symbol Library	Biblioteca de Símbolos
+	User Symbol Library 1	Biblioteca de Símbolos do Usuário 1
+	User Symbol Library 2	Biblioteca de Símbolos do Usuário 2
+	User Symbol Library 3	Biblioteca de Símbolos do Usuário 3
+	User Symbol Library 4	Biblioteca de Símbolos do Usuário 4
+	User Symbol Library 5	Biblioteca de Símbolos do Usuário 5
+	User Symbol Library 6	Biblioteca de Símbolos do Usuário 6
+	User Symbol Library 7	Biblioteca de Símbolos do Usuário 7
+	User Symbol Library 8	Biblioteca de Símbolos do Usuário 8
+	User Symbol Library 9	Biblioteca de Símbolos do Usuário 9
+	User Symbol Library 10	Biblioteca de Símbolos do Usuário 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` não tem símbolos para inserir
+@msg	missing `library` (see symbol.libraries)	falta `library` (consulte symbol.libraries)
+@msg	no symbol `{n}`	nenhum símbolo `{n}`
+@msg	no symbol `{n}` in `{_1}`	nenhum símbolo `{n}` em `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	nenhuma biblioteca de símbolos `{key}` (consulte symbol.libraries)
+@msg	the document has no symbols to save	o documento não tem símbolos para salvar
+@msg	Trap: select two or more objects filled with solid colours	Armadilha: selecione dois ou mais objetos preenchidos com cores sólidas
+@msg	Trap: no edges of different colours meet among the selected objects	Armadilha: nenhuma borda de cores diferentes se encontra entre os objetos selecionados
+@msg	thickness must be from 0.01 to 5000 pt	thickness deve estar entre 0,01 e 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth deve estar entre 1 e 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction deve estar entre 0 e 100 %
+	Rectangular Grid Tool Options	Opções da Ferramenta Grade Retangular
+	Polar Grid Tool Options	Opções da Ferramenta Grade Polar
+	Fill Line	Preencher linha

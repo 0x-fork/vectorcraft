@@ -189,6 +189,24 @@ fn the_foreground_layer_takes_the_runs_fill_and_black_for_a_gradient_fill() {
     assert_eq!(foreground(gradient), Paint::solid(Color::BLACK));
 }
 
+/// Fills that look alike but separate differently (a grey on the black plate, the same RGB grey on
+/// all four) each paint the foreground layer in their own colour.
+#[test]
+fn fills_that_only_look_alike_each_paint_the_foreground_layer() {
+    let db = colr_db(false);
+    let foreground = |fill: Color| {
+        let st = CharStyle { fill: Paint::solid(fill), ..colr_style(false) };
+        let l = layout(&db, &TextObject::point(KPoint::ZERO, &COLOUR_CHAR.to_string(), st));
+        let colour = l.glyphs[0].colour.clone().unwrap();
+        children(&colour)[1].appearance.fill_paint()
+    };
+    let grey = Color::gray(0.5);
+    let rgb = Color::rgb8(128, 128, 128);
+    assert_eq!(grey.to_rgba8(1.0), rgb.to_rgba8(1.0), "they look alike");
+    assert_eq!(foreground(grey), Paint::solid(grey));
+    assert_eq!(foreground(rgb), Paint::solid(rgb));
+}
+
 #[test]
 fn layout_bounds_take_in_the_colour_layers() {
     let db = colr_db(true);
@@ -357,4 +375,39 @@ fn a_glyph_without_the_foreground_colour_is_read_once_for_every_fill() {
     };
     assert!(tree(true, Color::rgb8(0, 0, 200)), "v1's glyph uses only its palette");
     assert!(!tree(false, Color::rgb8(0, 0, 200)), "v0's foreground layer follows the fill");
+}
+
+/// A variable font's COLR glyph draws its layers at the face's instance: at Bold, the layer's `l`
+/// is as much wider as the font widens it.
+#[test]
+fn a_variable_fonts_colr_layers_follow_its_instance() {
+    use crate::test_fonts::{COLR_VARIABLE_FAMILY, VARIABLE_WIDEN, colr_variable_font};
+    let db = FontDb::with_font_dirs(vec![]);
+    assert_eq!(db.add_font(colr_variable_font().expect("the test font builds")), 3, "Regular, SemiBold and Bold");
+    let width = |style: &str| {
+        let st = CharStyle { font_family: COLR_VARIABLE_FAMILY.into(), font_style: style.into(), size: 100.0, ..CharStyle::default() };
+        let l = layout(&db, &TextObject::point(KPoint::ZERO, &COLOUR_CHAR.to_string(), st));
+        l.glyphs[0].placed_colour(kurbo::Affine::IDENTITY).unwrap().geometric_bounds().unwrap().width()
+    };
+    let (regular, bold) = (width("Regular"), width("Bold"));
+    assert!((bold / regular - 1.0 - f64::from(VARIABLE_WIDEN)).abs() < 0.02, "{regular} → {bold}");
+}
+
+/// On a path, a colour glyph's layers turn with it: along a path going down, the tall `l` layer
+/// lies on its side, across the path.
+#[test]
+fn a_colour_glyph_on_a_path_turns_with_it() {
+    use crate::test_fonts::{COLR_VARIABLE_FAMILY, colr_variable_font};
+    use vectorcraft_doc::text::TextKind;
+    let db = FontDb::with_font_dirs(vec![]);
+    db.add_font(colr_variable_font().expect("the test font builds"));
+    let st = CharStyle { font_family: COLR_VARIABLE_FAMILY.into(), size: 100.0, ..CharStyle::default() };
+    let mut t = TextObject::point(KPoint::ZERO, &COLOUR_CHAR.to_string(), st);
+    let upright = layout(&db, &t).glyphs[0].placed_colour(kurbo::Affine::IDENTITY).unwrap().geometric_bounds().unwrap();
+    let down = kurbo::Shape::to_path(&kurbo::Line::new((0.0, 0.0), (0.0, 400.0)), 0.1);
+    t.kind = TextKind::OnPath { path: vectorcraft_geom::PathData::from_bezpath(&down), start: 0.0, end: None };
+    let b = layout(&db, &t).glyphs[0].placed_colour(kurbo::Affine::IDENTITY).unwrap().geometric_bounds().unwrap();
+    assert!(upright.height() > 2.0 * upright.width(), "upright, the `l` is tall: {upright:?}");
+    assert!((b.width() - upright.height()).abs() < 1.0 && (b.height() - upright.width()).abs() < 1.0, "on its side: {b:?}");
+    assert!(b.y0 >= -1.0 && b.y1 <= 400.0, "along the path: {b:?}");
 }

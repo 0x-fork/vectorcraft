@@ -212,6 +212,8 @@
 	Anti-aliased Artwork	Tác phẩm khử răng cưa
 	Anti-aliasing:	Khử răng cưa:
 	Any Kind	Bất kỳ loại
+	Font Technology	Công nghệ phông chữ
+font-technology	Variable	Biến thiên
 	Appearance	Diện mạo
 	Appearance Attribute	Thuộc tính diện mạo
 	Appearance Item	Mục diện mạo
@@ -302,6 +304,9 @@
 	Background Color:	Màu nền:
 	Show Center Mark	Hiện dấu tâm
 	Show Cross Hairs	Hiện đường chữ thập
+	Show Video Safe Areas	Hiện vùng an toàn video
+	Video Ruler Pixel Aspect Ratio:	Tỷ lệ khung điểm ảnh của thước video:
+	Hide Video Rulers	Ẩn thước video
 	Background Contents	Nội dung nền
 	Background Contents:	Nội dung nền:
 	Background:	Nền:
@@ -401,6 +406,13 @@
 	Built-in presets don't change: New… starts an editable copy.	Thiết lập sẵn tích hợp không thay đổi: Mới… tạo một bản sao có thể chỉnh sửa.
 	Bulge…	Phình…
 	Bullet	Dấu đầu dòng
+	Bullets	Dấu đầu dòng
+	Bullets and Numbering	Dấu đầu dòng và đánh số
+	Apply Bullets	Áp dụng dấu đầu dòng
+	Filled Dot	Chấm đặc
+	Dash	Gạch ngang
+	Hollow Circle	Hình tròn rỗng
+	Filled Square	Hình vuông đặc
 	Burasagari	Burasagari
 	Burlap	Vải thô
 	Butt Cap	Đầu nét vuông
@@ -1605,7 +1617,7 @@ file-filter	Templates	Mẫu
 	Clear History	Xóa lịch sử
 	Set History Limit…	Đặt giới hạn lịch sử…
 	History States	Trạng thái lịch sử
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Áp dụng tập dữ liệu
 	Area Type	Chữ vùng
 	Bloat	Phình
@@ -3457,6 +3469,7 @@ mark-style	Japanese	Kiểu Nhật
 	Spaces	Khoảng trắng
 	Spacing	Khoảng cách
 	Spacing Guides	Đường căn khoảng cách
+	Invoke Distance Guides	Gọi đường căn đo khoảng cách
 	Spacing:	Khoảng cách:
 	Spanish	Tiếng Tây Ban Nha
 	Spatter	Bắn tung tóe
@@ -3585,7 +3598,6 @@ mark-style	Japanese	Kiểu Nhật
 	Switch x/y	Đổi x/y
 	Symbol Instance	Thực thể ký hiệu
 	Symbol Libraries	Thư viện ký hiệu
-	Symbol Libraries (on the roadmap)	Thư viện ký hiệu (trong lộ trình)
 	Symbol Screener Tool	Công cụ Lọc ký hiệu
 	Symbol Scruncher Tool	Công cụ Thu gọn ký hiệu
 	Symbol Set Density:	Mật độ bộ ký hiệu:
@@ -3752,6 +3764,13 @@ mark-style	Japanese	Kiểu Nhật
 	Transpose	Chuyển vị
 	Transverse (the page a quarter turn on the paper)	Ngang (trang xoay 1/4 vòng trên giấy)
 	Trap…	Chồng màu…
+	Trap	Chồng màu
+	Height/Width	Cao/Rộng
+	Tint Reduction	Giảm sắc độ
+	Traps with Process Color	Chồng màu bằng màu process
+	Reverse Traps	Đảo chiều chồng màu
+	Precision	Độ chính xác
+	Remove Redundant Points	Xóa điểm thừa
 	Trim	Cắt xén
 	Trim covered geometry on Expand Appearance. Live preview keeps the full surface. Transparent paints and surfaces exceeding visibility limits retain all faces.	Cắt bỏ hình học bị che khi Mở rộng diện mạo. Xem trước trực tiếp giữ toàn bộ bề mặt. Sơn trong suốt và bề mặt vượt quá giới hạn hiển thị giữ nguyên tất cả các mặt.
 	Trim mark weight:	Độ dày dấu cắt:
@@ -4155,6 +4174,7 @@ theme	Appearance	Giao diện
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	axis phải là "vertical", "horizontal" hoặc góc theo độ, không phải `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	background {other}: transparent, white, black hoặc màu như "#ff8800"
 @msg	bad color {v}	màu không hợp lệ {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio phải là một số từ 0,1 đến 10
 @msg	the Color Picker is not open	Bộ chọn màu chưa được mở
 @msg	the Simplify slider is not open	Thanh trượt Đơn giản hóa chưa được mở
 @msg	the screen color sampler is already open	công cụ lấy mẫu màu trên màn hình đã được mở
@@ -4337,7 +4357,7 @@ theme	Appearance	Giao diện
 @msg	move requires a destination panel	move cần bảng đích
 @msg	move requires an existing destination panel	move cần bảng đích tồn tại
 @msg	Multichannel PSD files can't be read: save it in RGB, CMYK or Grayscale mode	Tệp PSD đa kênh không thể đọc: lưu ở chế độ RGB, CMYK hoặc Thang xám
-@msg	multiple windows land with M11.5	nhiều cửa sổ sẽ có trong M11.5
+@msg	New Window isn't available yet: a document opens in one window	Cửa sổ mới chưa khả dụng: tài liệu mở trong một cửa sổ
 @msg	name the file	hãy đặt tên tệp
 @msg	no active document	không có tài liệu đang hoạt động
 @msg	no active perspective plane	không có mặt phẳng phối cảnh đang hoạt động
@@ -4498,6 +4518,7 @@ theme	Appearance	Giao diện
 @msg	pattern missing	thiếu họa tiết
 @msg	patterns nested too deeply are filled with mid-grey	họa tiết lồng nhau quá sâu được tô bằng màu xám trung tính
 @msg	PDF settings are not an object	Cài đặt PDF không phải là đối tượng
+@msg	PDF security settings are not an object	Cài đặt bảo mật PDF không phải là đối tượng
 @msg	PDF writer error: {0}	Lỗi ghi PDF: {0}
 @msg	percent must be above 0 and at most 6400, not {p}	phần trăm phải lớn hơn 0 và tối đa 6400, không phải {p}
 @msg	pick a colour, gradient or pattern to save as a swatch	hãy chọn màu, chuyển sắc hoặc họa tiết để lưu làm mẫu màu
@@ -5057,3 +5078,54 @@ axis	Y Axis	Trục Y
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	hiệu ứng trực tiếp chạy trong lúc tài liệu được vẽ nên không thể là `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	plug-in xuất luôn nhận ngân sách của một lần xuất: hãy bỏ `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	“{_1}” yêu cầu ngân sách tính toán lớn (mỗi lần chạy tới {minutes} phút và gấp {times} lần số lệnh thông thường): hãy cài đặt với `allowHeavy: true` khi người dùng đồng ý
+# Actions panel: action sets (#3712).
+	New Set…	Bộ mới…
+	New Set	Bộ mới
+	Set Options…	Tùy chọn bộ…
+	Set Options	Tùy chọn bộ
+	Create New Set	Tạo bộ mới
+	Stop Global Edit	Dừng chỉnh sửa toàn cục
+	Global Edit Options	Tùy chọn chỉnh sửa toàn cục
+	Match	Khớp
+	On Artboards	Trên các bảng vẽ
+	All Artboards	Tất cả bảng vẽ
+	Include Objects On Canvas	Bao gồm đối tượng trên vùng vẽ
+	Result(s): {count}	Kết quả: {count}
+@msg	select one object	hãy chọn một đối tượng
+@msg	Global Edit works on paths, compound paths and symbol instances	Chỉnh sửa toàn cục hoạt động trên đường dẫn, đường dẫn phức hợp và phiên bản biểu tượng
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	không tìm thấy đối tượng tương tự (các bản sao đã xoay hoặc lật không được tính); hãy thay đổi tùy chọn chỉnh sửa toàn cục rồi thử lại
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all hoặc một phạm vi như 1, 3-5, không phải {v}
+	Add to Symbols	Thêm vào ký hiệu
+	Basic Shapes	Hình cơ bản
+	Open Symbol Library	Mở thư viện ký hiệu
+	Save Symbol Library	Lưu thư viện ký hiệu
+	Save Symbol Library…	Lưu thư viện ký hiệu…
+	Save Symbols…	Lưu ký hiệu…
+	Selected Symbols Only	Chỉ ký hiệu đã chọn
+	Symbol Libraries Menu	Menu thư viện ký hiệu
+	Symbol Library	Thư viện ký hiệu
+	User Symbol Library 1	Thư viện ký hiệu người dùng 1
+	User Symbol Library 2	Thư viện ký hiệu người dùng 2
+	User Symbol Library 3	Thư viện ký hiệu người dùng 3
+	User Symbol Library 4	Thư viện ký hiệu người dùng 4
+	User Symbol Library 5	Thư viện ký hiệu người dùng 5
+	User Symbol Library 6	Thư viện ký hiệu người dùng 6
+	User Symbol Library 7	Thư viện ký hiệu người dùng 7
+	User Symbol Library 8	Thư viện ký hiệu người dùng 8
+	User Symbol Library 9	Thư viện ký hiệu người dùng 9
+	User Symbol Library 10	Thư viện ký hiệu người dùng 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` không có ký hiệu nào để đặt
+@msg	missing `library` (see symbol.libraries)	thiếu `library` (xem symbol.libraries)
+@msg	no symbol `{n}`	không có ký hiệu `{n}`
+@msg	no symbol `{n}` in `{_1}`	không có ký hiệu `{n}` trong `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	không có thư viện ký hiệu `{key}` (xem symbol.libraries)
+@msg	the document has no symbols to save	tài liệu không có ký hiệu nào để lưu
+@msg	Trap: select two or more objects filled with solid colours	Chồng màu: hãy chọn hai đối tượng trở lên được tô màu đặc
+@msg	Trap: no edges of different colours meet among the selected objects	Chồng màu: không có cạnh khác màu nào tiếp giáp giữa các đối tượng đã chọn
+@msg	thickness must be from 0.01 to 5000 pt	thickness phải từ 0,01 đến 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth phải từ 1 đến 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction phải từ 0 đến 100 %
+	Rectangular Grid Tool Options	Tùy chọn công cụ Lưới chữ nhật
+	Polar Grid Tool Options	Tùy chọn công cụ Lưới cực
+	Fill Line	Tô đoạn thẳng

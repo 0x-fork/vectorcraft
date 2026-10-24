@@ -456,6 +456,42 @@ fn type_is_text_or_outlines() {
     }
 }
 
+/// A list paragraph's bullet is a TEXT entity of its own where it is drawn, and the paragraph's
+/// text starts after it, at the left indent.
+#[test]
+fn a_bullet_is_text_of_its_own_before_its_paragraph() {
+    let mut d = text_doc("Item", 20.0);
+    let id = d.layers[0].children().unwrap()[0].id;
+    if let Some(NodeKind::Text(t)) = d.node_mut(id).map(|n| &mut n.kind) {
+        t.para.list = Some(vectorcraft_doc::text::ParaList::bulleted(vectorcraft_doc::text::Bullet::Dot));
+        t.para.left_indent = 18.0;
+        t.para.first_line_indent = -18.0;
+    }
+    let out = export(&d, &DxfOptions { version: DxfVersion::R2018, preserve: Preserve::Editability, ..opts(&d) }).unwrap();
+    let e = entities(&out);
+    assert_eq!(kinds(&out), ["TEXT", "TEXT"]);
+    assert_eq!((get(&e[0], 1), get(&e[1], 1)), (Some("\u{2022}"), Some("Item")));
+    assert_eq!((all(&e[0], 10)[0], all(&e[1], 10)[0]), (10.0, 28.0), "the bullet at the anchor, the text 18 pt on");
+    // In a right-to-left paragraph the bullet is drawn after the text, at the right, and its tab
+    // lies between the two.
+    let mut d = text_doc("שלום", 20.0);
+    let id = d.layers[0].children().unwrap()[0].id;
+    let mut bullet_x = f64::NAN;
+    if let Some(NodeKind::Text(t)) = d.node_mut(id).map(|n| &mut n.kind) {
+        t.para.list = Some(vectorcraft_doc::text::ParaList::bulleted(vectorcraft_doc::text::Bullet::Dot));
+        let lay = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), t);
+        let m = &lay.markers[0];
+        let bullet = m.glyphs.clone().find(|&i| i != m.tab).unwrap();
+        assert!(lay.glyphs[m.tab].origin.x < lay.glyphs[bullet].origin.x, "the tab before the bullet");
+        bullet_x = 10.0 + lay.glyphs[bullet].origin.x;
+    }
+    let out = export(&d, &DxfOptions { version: DxfVersion::R2018, preserve: Preserve::Editability, ..opts(&d) }).unwrap();
+    let e = entities(&out);
+    assert_eq!(kinds(&out), ["TEXT", "TEXT"]);
+    assert_eq!((get(&e[0], 1), get(&e[1], 1)), (Some("שלום"), Some("\u{2022}")));
+    assert!((all(&e[1], 10)[0] - bullet_x).abs() < 1e-6, "the bullet where it is drawn: {} and {bullet_x}", all(&e[1], 10)[0]);
+}
+
 /// Area type that Shrink Text to Fit scales down is written at the height it draws at.
 #[test]
 fn shrunk_area_type_is_text_at_the_size_it_draws_at() {
@@ -500,6 +536,7 @@ fn images_link_png_or_jpeg_files() {
             xf: Affine::translate((10.0, 20.0)) * Affine::scale(5.0),
             link: None,
             placement: Default::default(),
+            pixels: None,
         };
         vec![Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)))]
     });
@@ -533,7 +570,15 @@ fn images_without_pixels_are_left_out_with_one_note() {
         ["raster-1", "raster-2"]
             .into_iter()
             .map(|key| {
-                let im = ImageObject { key: key.into(), width: 4, height: 2, xf: Affine::IDENTITY, link: None, placement: Default::default() };
+                let im = ImageObject {
+                    key: key.into(),
+                    width: 4,
+                    height: 2,
+                    xf: Affine::IDENTITY,
+                    link: None,
+                    placement: Default::default(),
+                    pixels: None,
+                };
                 Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)))
             })
             .collect()

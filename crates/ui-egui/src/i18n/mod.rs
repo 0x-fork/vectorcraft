@@ -9,8 +9,8 @@
 //!    English text, clean-room, see `zh-hant.tsv`).
 //! 2. Add one row to [`LANGUAGES`] (code, native name, catalog, plural rule).
 //!
-//! That is all: the Preferences dropdown, the system-locale match and the catalog tests (parse,
-//! placeholders, plural forms, menu coverage) pick it up from the registry.
+//! That is all: the Preferences dropdown, the system-locale match, the catalog tests (parse,
+//! placeholders, plural forms) and the untranslated report pick it up from the registry.
 //!
 //! # Looking strings up
 //! - [`t`] / the `tl!` macro: a plain string in the language the UI is drawn in. [`tr`] takes the
@@ -41,7 +41,7 @@ pub struct LangInfo {
     pub source: &'static str,
     /// Plural form index for a count (English: 0 = one, 1 = other; Chinese: always 0).
     pub plural: fn(u64) -> usize,
-    /// Must the catalog cover every menu string? (checked by the tests)
+    /// Does the catalog aim to cover every menu string? The untranslated report lists what it lacks.
     pub complete_menus: bool,
     catalog: OnceLock<Catalog>,
 }

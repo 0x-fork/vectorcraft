@@ -234,9 +234,10 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     });
 }
 
-/// The tabbed group's tab strip, showing `active`: a click on a tab shows it, a double-click
-/// collapses the group to its tabs or expands it, a tab dragged out of the strip floats on its own,
-/// and the strip right of the tabs floats the whole group. True when the shown panel floats now.
+/// The tabbed group's tab strip, showing `active`: a click on a tab shows it, a double-click on a
+/// tab or on the strip right of the tabs collapses the group to its tabs or expands it, a tab
+/// dragged out of the strip floats on its own, and the strip right of the tabs floats the whole
+/// group. True when the shown panel floats now.
 fn tab_strip(app: &mut VectorcraftApp, ui: &mut Ui, active: DockTab) -> bool {
     let t = Tokens::get(ui.ctx());
     let (strip, _) = ui.allocate_exact_size(vec2(ui.available_width(), 33.0), Sense::hover());
@@ -276,8 +277,12 @@ fn tab_strip(app: &mut VectorcraftApp, ui: &mut Ui, active: DockTab) -> bool {
     }
     let rest = Rect::from_min_max(egui::pos2(out.right, strip.top()), egui::pos2(menu.left() - 4.0, strip.bottom()));
     if rest.width() > 0.0 {
-        let resp = ui.interact(rest, ui.id().with("dock-group-bar"), Sense::drag());
-        if resp.dragged() && outside {
+        let resp = ui.interact(rest, ui.id().with("dock-group-bar"), Sense::click_and_drag());
+        if resp.double_clicked() {
+            if let Err(error) = app.run("window.panel.collapse", json!({ "panel": active.info().0 })) {
+                app.ui.status = error;
+            }
+        } else if resp.dragged() && outside {
             tear = Some((floating::docked_tabs(&app.ui).map(|t| t.info().0).collect(), active.info().0, strip.left()));
         }
         resp.on_hover_cursor(egui::CursorIcon::Grab).on_hover_text(tl!("Drag to float the panel group"));

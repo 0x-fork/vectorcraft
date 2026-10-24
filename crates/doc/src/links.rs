@@ -377,6 +377,7 @@ mod tests {
                     xf: Affine::IDENTITY,
                     link,
                     placement: Default::default(),
+                    pixels: None,
                 })),
             ),
         )

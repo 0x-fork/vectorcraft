@@ -481,6 +481,80 @@ fn default_align_on() -> char {
 /// Distance between default tab stops when no explicit stop applies (½ inch).
 pub const DEFAULT_TAB_INTERVAL: f64 = 36.0;
 
+/// The bullet of a bulleted list ([`ParaList::bullet`]): the Paragraph panel's Bullets presets.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Bullet {
+    /// A filled dot (•).
+    #[default]
+    Dot,
+    /// A dash (–).
+    Dash,
+    /// A hollow circle (◦).
+    Circle,
+    /// A filled square (▪).
+    Square,
+}
+
+impl Bullet {
+    /// The character the layout draws for the bullet.
+    pub fn character(self) -> char {
+        match self {
+            Bullet::Dot => '\u{2022}',
+            Bullet::Dash => '\u{2013}',
+            Bullet::Circle => '\u{25E6}',
+            Bullet::Square => '\u{25AA}',
+        }
+    }
+}
+
+/// The list a paragraph is in (Paragraph panel › Bullets). The layout draws the list's marker
+/// before the paragraph's first line, in the font, size and color of the paragraph's first
+/// character without its baseline shift, rotation, superscript or subscript, tracking, manual
+/// kerning, tate-chu-yoko, underline and strikethrough ([`Self::marker_style`]), and the text after
+/// it starts at the next tab stop, the left indent counting as a stop. The marker is not a
+/// character of the text, and an empty paragraph has none. A saved list reads the fields it leaves
+/// out as their defaults, and a build ignores the fields it doesn't know.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ParaList {
+    /// The bullet each paragraph of the list starts with.
+    pub bullet: Bullet,
+}
+
+impl ParaList {
+    /// A bulleted list with `bullet`.
+    pub fn bulleted(bullet: Bullet) -> Self {
+        Self { bullet }
+    }
+
+    /// The characters of the marker the layout draws before the paragraph.
+    pub fn marker(&self) -> String {
+        self.bullet.character().to_string()
+    }
+
+    /// The style the marker is set in: `first` (the style of the paragraph's first character)
+    /// without its baseline shift, rotation, superscript or subscript, tracking, manual kerning,
+    /// tate-chu-yoko, underline and strikethrough.
+    pub fn marker_style(first: &CharStyle) -> CharStyle {
+        CharStyle {
+            baseline_shift: 0.0,
+            rotation: 0.0,
+            position: CharPosition::Normal,
+            tracking: 0.0,
+            kerning: None,
+            tate_chu_yoko: false,
+            underline: false,
+            strikethrough: false,
+            ..first.clone()
+        }
+    }
+}
+
+/// The left and first-line indents (pt) a list gives a paragraph whose indents are both 0: the
+/// marker hangs in the first line's 18 pt before the text.
+pub const LIST_HANGING_INDENT: f64 = 18.0;
+
 /// Paragraph composer (Paragraph panel menu): how lines are broken.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -674,6 +748,9 @@ pub struct ParaStyle {
     pub composer: Composer,
     /// Tab stops (Tabs panel), sorted by position.
     pub tabs: Vec<TabStop>,
+    /// Bullets (Paragraph panel): the list the paragraph is in; None for a paragraph that is not
+    /// in a list.
+    pub list: Option<ParaList>,
     /// Paragraph style (Paragraph Styles panel) these attributes come from; None = Normal.
     pub style_name: Option<String>,
     /// Japanese composition: the spacing of punctuation (Paragraph panel › Mojikumi). Type made
@@ -762,6 +839,8 @@ struct ParaStyleFile {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     tabs: Vec<TabStop>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    list: Option<ParaList>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     style_name: Option<String>,
     #[serde(default, skip_serializing_if = "Mojikumi::is_none")]
     mojikumi: Mojikumi,
@@ -798,6 +877,7 @@ impl From<ParaStyle> for ParaStyleFile {
             justification,
             composer,
             tabs,
+            list,
             style_name,
             mojikumi,
             direction,
@@ -821,6 +901,7 @@ impl From<ParaStyle> for ParaStyleFile {
             justification,
             composer,
             tabs,
+            list,
             style_name,
             mojikumi,
             direction,
@@ -848,6 +929,7 @@ impl From<ParaStyleFile> for ParaStyle {
             hyphenation,
             composer,
             tabs,
+            list,
             style_name,
             mojikumi,
             direction,
@@ -870,6 +952,7 @@ impl From<ParaStyleFile> for ParaStyle {
             justification,
             composer,
             tabs,
+            list,
             style_name,
             mojikumi,
             direction,

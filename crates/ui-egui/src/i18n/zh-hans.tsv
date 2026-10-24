@@ -227,6 +227,9 @@
 	Background Color:	背景颜色：
 	Show Center Mark	显示中心标记
 	Show Cross Hairs	显示十字线
+	Show Video Safe Areas	显示视频安全区域
+	Video Ruler Pixel Aspect Ratio:	视频标尺像素长宽比：
+	Hide Video Rulers	隐藏视频标尺
 	Background Contents	背景内容
 	Background Contents:	背景内容：
 	Background:	背景：
@@ -298,6 +301,13 @@
 	Built-in presets don't change: New… starts an editable copy.	内置预设不会变动：“新建…”会创建可编辑的副本。
 	Bulge…	鼓起…
 	Bullet	项目符号
+	Bullets	项目符号
+	Bullets and Numbering	项目符号和编号
+	Apply Bullets	应用项目符号
+	Filled Dot	实心圆点
+	Dash	短划线
+	Hollow Circle	空心圆
+	Filled Square	实心方块
 	Butt Cap	平头端点
 	Byte Order:	字节顺序：
 	Calligraphic	书法
@@ -1328,7 +1338,7 @@ file-filter	Templates	模板
 	Clear History	清除历史记录
 	Set History Limit…	设置历史记录上限…
 	History States	历史记录步数
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	应用数据集
 	Bloat	膨胀
 	Cancel Pattern Editing	取消图案编辑
@@ -2959,6 +2969,7 @@ font-script	Japanese	汉字
 	Space Before Paragraph	段前间距
 	Spaces	空格
 	Spacing Guides	间距参考线
+	Invoke Distance Guides	调用距离参考线
 	Spacing:	间距：
 	Spanish	西班牙语
 	Specified Distance	指定距离
@@ -3096,7 +3107,6 @@ font-script	Japanese	汉字
 	Show all open documents	显示所有打开的文档
 	Symbol Instance	符号实例
 	Symbol Libraries	符号库
-	Symbol Libraries (on the roadmap)	符号库 (已列入路线图)
 	Symbol Screener Tool	符号透明度工具
 	Symbol Scruncher Tool	符号紧缩工具
 	Symbol Shifter Tool	符号移位工具
@@ -3226,6 +3236,13 @@ font-script	Japanese	汉字
 	Transparent Background	透明背景
 	Transverse (the page a quarter turn on the paper)	横向 (页面在纸张上转四分之一圈)
 	Trap…	陷印…
+	Trap	陷印
+	Height/Width	高度/宽度
+	Tint Reduction	色调减淡
+	Traps with Process Color	使用印刷色陷印
+	Reverse Traps	反向陷印
+	Precision	精度
+	Remove Redundant Points	删除冗余点
 	Trim	修边
 	Trim mark weight:	剪裁标记宽度：
 	Trim marks	剪裁标记
@@ -3595,7 +3612,7 @@ imageTrace	Outline	轮廓
 	Use Default	使用默认值
 # Status and error messages (`@msg`), translated where the status bar shows them; the message itself
 # stays English for agents and tests. `{_1}`, `{_2}` … stand for the `{}` of the format string, in order
-# (`complete_languages_translate_every_message` lists any that are missing). Command ids, parameter
+# (`untranslated_report` lists any that are missing). Command ids, parameter
 # names and values in backticks or code (`colorModel rgb`, `document.export`) stay as they are.
 # Simplified Chinese: no final 。 unless the English ends with a period; a space between Chinese text and
 # an adjacent Latin word, number or {placeholder}; 、 between the items of a list.
@@ -4043,6 +4060,7 @@ imageTrace	Outline	轮廓
 @msg	{label}…	{label}…
 @msg	no blend options	没有混合选项
 @msg	bad color {v}	颜色 {v} 无效
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio 必须是 0.1 到 10 之间的数字
 @msg	the Color Picker is not open	拾色器未打开
 @msg	the Simplify slider is not open	简化滑块未打开
 @msg	the screen color sampler is already open	屏幕取色器已打开
@@ -4103,6 +4121,7 @@ imageTrace	Outline	轮廓
 @msg	name the file	请为文件命名
 @msg	unknown format	未知格式
 @msg	PDF settings are not an object	PDF 设置不是对象
+@msg	PDF security settings are not an object	PDF 安全性设置不是对象
 @msg	no saved PDF preset named `{name}` (built-in presets are read-only: start a new one from them)	没有名为 `{name}` 的已保存 PDF 预设 (内置预设为只读：请以它们为基础新建一个)
 @msg	Saved to User Defined: {_1}	已保存到“用户定义”：{_1}
 @msg	choose a direction to divide in	请选择分割方向
@@ -4150,7 +4169,7 @@ imageTrace	Outline	轮廓
 @msg	missing `name`	缺少 `name`
 @msg	missing `tool`	缺少 `tool`
 @msg	missing index	缺少 index
-@msg	multiple windows land with M11.5	多窗口将在 M11.5 中提供
+@msg	New Window isn't available yet: a document opens in one window	新建窗口尚不可用：文档在一个窗口中打开
 @msg	no PNG encoder	没有 PNG 编码器
 @msg	no document open	没有打开的文档
 @msg	no effect applied yet	尚未应用任何效果
@@ -4608,6 +4627,8 @@ imageTrace	Outline	轮廓
 # The Layers panel, the graphics processor preference and the font menu's filters.
 	All Scripts	所有文字系统
 	Any Kind	所有类型
+	Font Technology	字体技术
+font-technology	Variable	可变
 	Applies the next time VectorCraft starts.	下次启动 VectorCraft 时生效。
 	Collapse to Icons	折叠为图标
 	Decorative	装饰
@@ -5300,3 +5321,54 @@ axis	Y Axis	Y 轴
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	实时效果在绘制文档时运行，因此不能为 `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	导出增效工具始终使用导出的预算：请省略 `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	“{_1}”需要大量计算预算（每次运行最多 {minutes} 分钟，指令数为通常的 {times} 倍）：请在用户同意后使用 `allowHeavy: true` 安装
+# Actions panel: action sets (#3712).
+	New Set…	新建组…
+	New Set	新建组
+	Set Options…	组选项…
+	Set Options	组选项
+	Create New Set	创建新组
+	Stop Global Edit	停止全局编辑
+	Global Edit Options	全局编辑选项
+	Match	匹配
+	On Artboards	在画板上
+	All Artboards	所有画板
+	Include Objects On Canvas	包括画布上的对象
+	Result(s): {count}	结果：{count}
+@msg	select one object	请选择一个对象
+@msg	Global Edit works on paths, compound paths and symbol instances	全局编辑适用于路径、复合路径和符号实例
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	未找到相似对象（旋转或镜像的副本不会匹配）；请更改全局编辑选项后重试
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`：应为 all 或 1, 3-5 这样的范围，而不是 {v}
+	Add to Symbols	添加到符号
+	Basic Shapes	基本形状
+	Open Symbol Library	打开符号库
+	Save Symbol Library	保存符号库
+	Save Symbol Library…	保存符号库…
+	Save Symbols…	保存符号…
+	Selected Symbols Only	仅限选择的符号
+	Symbol Libraries Menu	符号库菜单
+	Symbol Library	符号库
+	User Symbol Library 1	用户符号库 1
+	User Symbol Library 2	用户符号库 2
+	User Symbol Library 3	用户符号库 3
+	User Symbol Library 4	用户符号库 4
+	User Symbol Library 5	用户符号库 5
+	User Symbol Library 6	用户符号库 6
+	User Symbol Library 7	用户符号库 7
+	User Symbol Library 8	用户符号库 8
+	User Symbol Library 9	用户符号库 9
+	User Symbol Library 10	用户符号库 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` 中没有可置入的符号
+@msg	missing `library` (see symbol.libraries)	缺少 `library`（请参阅 symbol.libraries）
+@msg	no symbol `{n}`	没有符号 `{n}`
+@msg	no symbol `{n}` in `{_1}`	`{_1}` 中没有符号 `{n}`
+@msg	no symbol library `{key}` (see symbol.libraries)	没有符号库 `{key}`（请参阅 symbol.libraries）
+@msg	the document has no symbols to save	文档中没有可保存的符号
+@msg	Trap: select two or more objects filled with solid colours	陷印：请选择两个或更多用实色填充的对象
+@msg	Trap: no edges of different colours meet among the selected objects	陷印：所选对象中没有不同颜色相接的边缘
+@msg	thickness must be from 0.01 to 5000 pt	thickness 必须介于 0.01 到 5000 pt 之间
+@msg	heightWidth must be from 1 to 1000 %	heightWidth 必须介于 1 到 1000 % 之间
+@msg	tintReduction must be from 0 to 100 %	tintReduction 必须介于 0 到 100 % 之间
+	Rectangular Grid Tool Options	矩形网格工具选项
+	Polar Grid Tool Options	极坐标网格工具选项
+	Fill Line	填充线段

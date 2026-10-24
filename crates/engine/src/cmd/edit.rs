@@ -411,6 +411,8 @@ fn undo(s: &mut Session, _: &Value) -> Result<Value> {
     }
     st.sync_new_art();
     super::maskedit::follow_history(st, editing);
+    leave_isolation_if_gone(st);
+    super::globaledit::follow_history(st);
     Ok(json!({ "undone": label }))
 }
 
@@ -436,7 +438,18 @@ fn redo(s: &mut Session, _: &Value) -> Result<Value> {
     }
     st.sync_new_art();
     super::maskedit::follow_history(st, editing);
+    leave_isolation_if_gone(st);
+    super::globaledit::follow_history(st);
     Ok(json!({ "redone": label }))
+}
+
+/// After undo or redo, isolation mode ends when the isolated object is no longer in the document,
+/// such as the clip group Draw Inside made around the isolated object (#3705), rather than naming
+/// an id a later object may take.
+fn leave_isolation_if_gone(st: &mut crate::DocState) {
+    if st.isolation.is_some_and(|i| st.doc.node(i).is_none()) {
+        st.isolation = None;
+    }
 }
 
 /// History panel › Clear History: removes the steps after the current state and the steps before
@@ -724,7 +737,7 @@ fn paste_clip(s: &mut Session, p: &Value, mode: PasteMode, clip: &Clipboard, cho
         // In place, in front, in back: onto the active artboard when the UI names it.
         _ => vec![onto_artboard(&st.doc, p, clip)],
     };
-    let (ids, imported, artboards) = s.edit(mode.label(), |d, sel| {
+    let (ids, imported, artboards, into) = s.edit(mode.label(), |d, sel| {
         let imported = clip.import_into(d, choices, same_doc);
         // Draw Inside: the clip group of the object drawn into, made on the first paste.
         let into = inside.map(|t| super::create::draw_inside_group(d, t)).transpose()?;
@@ -771,8 +784,11 @@ fn paste_clip(s: &mut Session, p: &Value, mode: PasteMode, clip: &Clipboard, cho
         // Pasted type arrives without the layout bounds cache: fill it so boxes and alignment are
         // right away (opening the file later would, but paste must not depend on a reopen).
         super::typecmd::refresh_bounds_of(d, &new_ids);
-        Ok((new_ids, imported, artboards))
+        Ok((new_ids, imported, artboards, into))
     })?;
+    if let (Some(target), Some(group)) = (inside, into) {
+        super::create::isolate_draw_inside_group(s, target, group)?;
+    }
     // The Artboard tool selects the pasted artboards, the first one active.
     if !artboards.is_empty() && s.tool_id() == "artboard" {
         s.set_tool_option("selected", &json!(artboards));

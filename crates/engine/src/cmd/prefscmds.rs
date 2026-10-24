@@ -234,6 +234,7 @@ pub const PREF_SPECS: &[PrefSpec] = &[
     p!("anchorPathLabels", "Smart Guides", "Display Options", "Anchor/Path Labels", bool),
     p!("measurementLabels", "Smart Guides", "Display Options", "Measurement Labels", bool),
     p!("spacingGuides", "Smart Guides", "Display Options", "Spacing Guides", bool),
+    p!("distanceGuides", "Smart Guides", "Display Options", "Invoke Distance Guides", bool),
     p!("snappingTolerance", "Smart Guides", "", "Snapping Tolerance", num(0.0, 40.0, "pt")),
     p!("snapTangent", "Smart Guides", "Geometric Guides", "Snap to Tangent", bool),
     p!("snapPerpendicular", "Smart Guides", "Geometric Guides", "Snap to Perpendicular", bool),
@@ -471,13 +472,14 @@ impl Prefs {
 
     /// The folders the app reads (fonts, plug-ins) or writes (Data Recovery copies, the Templates
     /// folder it makes for its dialogs) on its own, with the access each needs.
-    fn folders_mut(&mut self) -> [(&mut String, crate::file_access::Access); 4] {
+    fn folders_mut(&mut self) -> [(&mut String, &'static [crate::file_access::Access]); 4] {
         use crate::file_access::Access;
         [
-            (&mut self.fonts_folder, Access::Read),
-            (&mut self.plugins_folder, Access::Read),
-            (&mut self.recovery_folder, Access::Write),
-            (&mut self.templates_folder, Access::Write),
+            (&mut self.fonts_folder, &[Access::Read][..]),
+            (&mut self.plugins_folder, &[Access::Read][..]),
+            // Data Recovery lists and restores what is in its folder too.
+            (&mut self.recovery_folder, &[Access::Write, Access::Read][..]),
+            (&mut self.templates_folder, &[Access::Write][..]),
         ]
     }
 
@@ -493,7 +495,7 @@ impl Prefs {
             if folder.is_empty() || folder == old.trim() {
                 continue;
             }
-            if let Err(e) = roots.check(folder, access) {
+            if let Err(e) = access.iter().try_for_each(|a| roots.check(folder, *a)) {
                 refused.push(e);
                 *new = old.clone();
             }

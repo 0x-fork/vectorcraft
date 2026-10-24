@@ -87,3 +87,37 @@ fn a_sweep_glyph_draws_its_image() {
     assert!(ink(&img, |p| p[0] > 180 && p[1] < 60 && p[2] < 120).is_some(), "red where the sweep starts");
     assert!(ink(&img, magenta).is_none());
 }
+
+/// Type with a geometry effect is drawn reshaped as its outlines: its colour glyphs go with them,
+/// as their art (here moved 40 pt by a Transform effect).
+#[test]
+fn colour_glyphs_go_with_type_that_a_geometry_effect_reshapes() {
+    let _adding = crate::tests_fontchange::adding_fonts();
+    vectorcraft_text::FontDb::global().add_font(colr_font(false).unwrap());
+    let mut d = Document::new(160.0, 160.0);
+    let st = CharStyle { font_family: colr_family(false).into(), size: 100.0, ..Default::default() };
+    let mut n = Node::new(d.alloc_id(), NodeKind::Text(Box::new(TextObject::point(Point::new(20.0, 120.0), &COLOUR_CHAR.to_string(), st))));
+    let moved = vectorcraft_doc::Effect { id: "distort.transform".into(), params: serde_json::json!({"moveH": 40}), visible: true };
+    let mut appearance = (*n.appearance).clone();
+    appearance.effects.push(moved);
+    n.appearance = appearance.into();
+    let l = d.layers[0].id;
+    d.insert(Some(l), 0, n).unwrap();
+    let img = Renderer::new().render(&d, 160, 160, Affine::IDENTITY, &RenderOptions { background: Some([255, 255, 255, 255]), ..Default::default() });
+    let red = ink(&img, |p| p == [255, 0, 0, 255]).expect("the `O` layer, in red");
+    assert!(red.0 >= 58, "moved right with the type: {red:?}");
+}
+
+/// Type's outlines stack as the canvas paints type: a run's colour glyphs under its fill, so a
+/// plain character set over a colour one stays on top.
+#[test]
+fn outlined_colour_glyphs_stay_under_their_runs_fill() {
+    let _adding = crate::tests_fontchange::adding_fonts();
+    vectorcraft_text::FontDb::global().add_font(colr_font(false).unwrap());
+    let mut d = Document::new(160.0, 160.0);
+    let st = CharStyle { font_family: colr_family(false).into(), size: 100.0, ..Default::default() };
+    let n = Node::new(d.alloc_id(), NodeKind::Text(Box::new(TextObject::point(Point::new(20.0, 120.0), &format!("{COLOUR_CHAR}F"), st))));
+    let outlined = vectorcraft_effects::outline_text(&n).unwrap();
+    let kinds: Vec<bool> = outlined.children().unwrap().iter().map(|c| matches!(c.kind, NodeKind::Group { .. })).collect();
+    assert_eq!(kinds, [true, false], "the colour glyph's group, then the run's path");
+}

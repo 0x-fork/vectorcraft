@@ -144,6 +144,24 @@ fn bad_ids_are_refused_and_change_nothing() {
 }
 
 #[test]
+fn a_command_that_fails_after_selecting_its_ids_puts_the_selection_back() {
+    let (mut s, ids) = doc();
+    let far = s.execute("shape.rectangle", &json!({"x": 300, "y": 200, "width": 20, "height": 20})).unwrap()["id"].as_u64().unwrap();
+    s.execute("select.set", &json!({"ids": [ids[3]]})).unwrap();
+    let (before, layer) = (s.doc().unwrap().doc.clone(), s.doc().unwrap().active_layer);
+    // The ids are fine, so they are selected; the shapes don't overlap, so Intersect then fails.
+    let e = s.execute("object.pathfinder.intersect", &json!({"ids": [ids[0], far]})).unwrap_err().to_string();
+    assert!(e.contains("empty result"), "{e}");
+    assert!(s.doc().unwrap().doc == before);
+    assert_eq!(s.doc().unwrap().selection.objects, vec![NodeId(ids[3])], "the selection stays");
+    assert_eq!(s.doc().unwrap().active_layer, layer);
+    // Without ids the failing command leaves the selection it ran on, as before.
+    s.execute("select.set", &json!({"ids": [ids[0], far]})).unwrap();
+    assert!(s.execute("object.pathfinder.intersect", &json!({})).is_err());
+    assert_eq!(s.doc().unwrap().selection.objects, vec![NodeId(ids[0]), NodeId(far)]);
+}
+
+#[test]
 fn without_ids_the_selection_is_used_as_before() {
     let (mut s, ids) = doc();
     s.execute("select.set", &json!({"ids": &ids[..2]})).unwrap();

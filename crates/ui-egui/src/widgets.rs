@@ -2266,6 +2266,10 @@ pub enum PanelDrag {
     /// A Symbols panel symbol: the canvas places an instance of it centred where it is dropped
     /// (`symbol.place`).
     Symbol(String),
+    /// A symbol of a symbol library panel (`name`: its name in `library`): the canvas adds it to the
+    /// document's Symbols and places an instance where it is dropped (`symbol.addFromLibrary` with
+    /// `place`).
+    LibrarySymbol { library: String, name: String },
     /// A Brushes panel brush (`def`: its definition, for the chip at the pointer): the path it is
     /// dropped on takes it (`brush.apply`).
     Brush { name: String, def: serde_json::Value },

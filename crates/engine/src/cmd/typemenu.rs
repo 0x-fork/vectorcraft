@@ -43,7 +43,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Convert To Point Type",
             ["Type"],
             None,
-            "{ids?|id?} area type → point type; soft line wraps become line breaks → {ids}",
+            "{ids?|id?} area type → point type; soft line wraps become line breaks, and a frame of threaded text leaves its thread with the text it holds → {ids}",
             has_selection,
             to_point
         ),

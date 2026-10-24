@@ -854,7 +854,8 @@ fn status_readouts(app: &VectorcraftApp, ui: &mut Ui, t: &Tokens) {
         let inspecting = ui.input(|i| i.pointer.hover_pos()).is_some_and(|p| coord_rect.contains(p)) && ui.rect_contains_pointer(coord_rect);
         let point = app.hover_doc.or_else(|| inspecting.then(|| ui.data(|data| data.get_temp::<vectorcraft_geom::Point>(point_id))).flatten());
         if let Some(p) = point {
-            for (id, x, value) in [("X", left, p.x), ("Y", left + axis_width, p.y)] {
+            let origin = app.ruler_origin();
+            for (id, x, value) in [("X", left, p.x - origin.x), ("Y", left + axis_width, p.y - origin.y)] {
                 let rect = egui::Rect::from_min_size(egui::pos2(x, area.top()), vec2(axis_width, area.height()));
                 status_field(ui, id, rect, format!("{id}: {}", unit.readout(value)), mono.clone(), t.text_dim);
             }
@@ -1659,6 +1660,110 @@ mod tests {
                 _ => None,
             })
             .collect()
+    }
+
+    /// Read the painted coordinates while checking that drawing never changes the source
+    /// position, document, selection or either branch of its edit history.
+    fn assert_status_coordinates(app: &mut crate::VectorcraftApp, expected: Option<&str>) {
+        let hover = app.hover_doc;
+        let before =
+            app.session.active().map(|st| (st.doc.clone(), st.selection.clone(), st.history.undo.len(), st.history.redo.len(), st.is_dirty()));
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let texts = status_texts(app, &ctx, vec![]);
+        let coordinates: Vec<&str> =
+            texts.iter().filter_map(|(text, _)| (text.starts_with("X: ") || text.starts_with("Y: ")).then_some(text.as_str())).collect();
+        let expected: Vec<&str> = expected.into_iter().flat_map(|text| text.split("  ")).collect();
+        assert_eq!(coordinates, expected, "{texts:?}");
+        assert_eq!(app.hover_doc, hover, "tools still receive the absolute document position");
+        let after =
+            app.session.active().map(|st| (st.doc.clone(), st.selection.clone(), st.history.undo.len(), st.history.redo.len(), st.is_dirty()));
+        assert_eq!(after, before, "painting is read-only");
+    }
+
+    #[test]
+    fn status_coordinates_follow_global_ruler_origins_and_general_units() {
+        use vectorcraft_geom::Point;
+        let mut app = crate::VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
+        app.run("view.globalRulers", json!({"global": true})).unwrap();
+        app.session.active_mut().unwrap().mark_saved();
+        app.hover_doc = Some(Point::new(72.0, 144.0));
+        assert_status_coordinates(&mut app, Some("X: 72.00 pt  Y: 144.00 pt"));
+        app.run("document.setRulerOrigin", json!({"x": 36, "y": 72})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 36.00 pt  Y: 72.00 pt"));
+        app.run("document.setRulerOrigin", json!({"x": -72, "y": 216})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 144.00 pt  Y: -72.00 pt"));
+        app.run("document.setUnits", json!({"units": "Inches"})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 2.00 in  Y: -1.00 in"));
+        app.run("document.setUnits", json!({"units": "Millimeters"})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 50.80 mm  Y: -25.40 mm"));
+        app.run("document.resetRulerOrigin", json!({})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 25.40 mm  Y: 50.80 mm"));
+        // Keep a nonempty Redo branch as well as Undo while painting.
+        app.run("edit.undo", json!({})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 50.80 mm  Y: -25.40 mm"));
+    }
+
+    #[test]
+    fn status_coordinates_follow_the_active_artboard_and_ruler_mode() {
+        use vectorcraft_geom::Point;
+        let mut app = crate::VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
+        app.run("artboard.new", json!({"x": 700, "y": -250, "width": 200, "height": 150})).unwrap();
+        app.hover_doc = Some(Point::new(760.0, -210.0));
+        app.run("document.setRulerOrigin", json!({"artboard": 0, "x": 25, "y": 30})).unwrap();
+        app.run("view.goToArtboard", json!({"index": 0})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 735.00 pt  Y: -240.00 pt"));
+        app.run("view.goToArtboard", json!({"index": 1})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 60.00 pt  Y: 40.00 pt"));
+        app.run("document.setRulerOrigin", json!({"artboard": 1, "x": 800, "y": -190})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: -40.00 pt  Y: -20.00 pt"));
+        app.run("view.globalRulers", json!({"global": true})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 760.00 pt  Y: -210.00 pt"));
+        app.run("document.setRulerOrigin", json!({"x": -20, "y": -10})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 780.00 pt  Y: -200.00 pt"));
+        app.run("view.globalRulers", json!({"global": false})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: -40.00 pt  Y: -20.00 pt"));
+        app.run("document.resetRulerOrigin", json!({"artboard": 1})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 60.00 pt  Y: 40.00 pt"));
+        app.run("view.goToArtboard", json!({"index": 0})).unwrap();
+        assert_status_coordinates(&mut app, Some("X: 735.00 pt  Y: -240.00 pt"));
+    }
+
+    #[test]
+    fn status_coordinates_handle_missing_pointer_or_document() {
+        let mut app = crate::VectorcraftApp::new(Session::new(), Default::default());
+        assert_status_coordinates(&mut app, None);
+        app.hover_doc = Some(vectorcraft_geom::Point::new(42.0, -21.0));
+        assert_status_coordinates(&mut app, Some("X: 42.00 pt  Y: -21.00 pt"));
+        app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
+        app.run("document.setRulerOrigin", json!({"x": 10, "y": 20})).unwrap();
+        app.hover_doc = None;
+        assert_status_coordinates(&mut app, None);
+    }
+
+    #[test]
+    fn status_coordinates_keep_the_inspected_point_relative_after_an_origin_change() {
+        let (mut app, ctx) = status_readout_app();
+        app.run("view.globalRulers", json!({"global": true})).unwrap();
+        app.run("document.setRulerOrigin", json!({"x": 36, "y": 72})).unwrap();
+        app.hover_doc = Some(vectorcraft_geom::Point::new(72.0, 144.0));
+        let first = status_readout_frame(&mut app, &ctx, 1400.0);
+        let at = status_text(&first, "X:").bounds.center();
+        app.hover_doc = None;
+        let inspecting = status_readout_frame_events(&mut app, &ctx, 1400.0, vec![egui::Event::PointerMoved(at)]);
+        assert_eq!(status_text(&inspecting, "X:").text, "X: 36.00 pt");
+        assert_eq!(status_text(&inspecting, "Y:").text, "Y: 72.00 pt");
+        app.run("document.setRulerOrigin", json!({"x": -72, "y": 216})).unwrap();
+        let before = app.session.active().unwrap().doc.clone();
+        let inspecting = status_readout_frame(&mut app, &ctx, 1400.0);
+        assert_eq!(status_text(&inspecting, "X:").text, "X: 144.00 pt");
+        assert_eq!(status_text(&inspecting, "Y:").text, "Y: -72.00 pt");
+        assert_eq!(app.hover_doc, None, "inspection never changes the absolute canvas hover state");
+        assert_eq!(app.session.active().unwrap().doc, before, "painting is read-only");
+        let gone = status_readout_frame_events(&mut app, &ctx, 1400.0, vec![egui::Event::PointerGone]);
+        assert!(!gone.iter().any(|field| field.text.starts_with("X:") || field.text.starts_with("Y:")));
     }
 
     /// A click at `at` in the status bar; returns the texts of the frame after it.

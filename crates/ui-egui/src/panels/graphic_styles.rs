@@ -213,7 +213,7 @@ fn paint_thumb(app: &VectorcraftApp, ui: &Ui, r: Rect, paints: Paints, g: &Graph
 }
 
 /// Outline thumbnail `r`: in the accent colour when selected (`on`), brighter when hovered.
-fn outline(ui: &Ui, r: Rect, on: bool, hovered: bool) {
+pub(super) fn outline(ui: &Ui, r: Rect, on: bool, hovered: bool) {
     let t = Tokens::get(ui.ctx());
     let color = if on {
         t.accent
@@ -353,6 +353,7 @@ fn zone_input(ui: &Ui, zone: &Response, d: &Document, ev: &mut Events) {
         PanelDrag::Appearance(id) => (None, Some(*id)),
         PanelDrag::Paint { .. }
         | PanelDrag::Symbol(_)
+        | PanelDrag::LibrarySymbol { .. }
         | PanelDrag::Brush { .. }
         | PanelDrag::LibraryGraphic { .. }
         | PanelDrag::LibraryItem { .. }

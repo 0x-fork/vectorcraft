@@ -29,6 +29,8 @@ ruzstd = { workspace = true }
 hayro-ccitt = { workspace = true }
 # Live effects' params, as the art styles that name them give them.
 serde_json = { workspace = true }
+# Substring search for PostScript `search`.
+memchr = { workspace = true }
 
 [dev-dependencies]
 vectorcraft-testkit = { workspace = true }

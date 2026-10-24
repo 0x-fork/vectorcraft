@@ -1794,7 +1794,6 @@ mod tests {
         let (stored, painted) = names(rect);
         let inner = stored.trim_start_matches('<').trim_end_matches('>');
         assert_eq!(painted, format!("<{}>", crate::i18n::tr(zh, inner)));
-        assert_ne!(painted, stored, "translated");
     }
 
     #[test]

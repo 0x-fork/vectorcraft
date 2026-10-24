@@ -174,6 +174,8 @@
 	Anti-aliased Artwork	Γραφικά με εξομαλυμένες ακμές
 	Anti-aliasing:	Εξομάλυνση ακμών:
 	Any Kind	Οποιοσδήποτε τύπος
+	Font Technology	Τεχνολογία γραμματοσειράς
+font-technology	Variable	Μεταβλητές
 	Appearance	Εμφάνιση
 	Appearance Attribute	Χαρακτηριστικό εμφάνισης
 	Appearance Item	Στοιχείο εμφάνισης
@@ -257,6 +259,9 @@
 	Background Color:	Χρώμα φόντου:
 	Show Center Mark	Εμφάνιση σημαδιού κέντρου
 	Show Cross Hairs	Εμφάνιση σταυρονήματος
+	Show Video Safe Areas	Εμφάνιση ασφαλών περιοχών βίντεο
+	Video Ruler Pixel Aspect Ratio:	Αναλογία διαστάσεων pixel χαράκων βίντεο:
+	Hide Video Rulers	Απόκρυψη χαράκων βίντεο
 	Background Contents	Περιεχόμενα φόντου
 	Background Contents:	Περιεχόμενο φόντου:
 	Background:	Φόντο:
@@ -322,6 +327,13 @@
 	Built-in Libraries	Ενσωματωμένες βιβλιοθήκες
 	Bulge…	Διόγκωση…
 	Bullet	Κουκκίδα
+	Bullets	Κουκκίδες
+	Bullets and Numbering	Κουκκίδες και αρίθμηση
+	Apply Bullets	Εφαρμογή κουκκίδων
+	Filled Dot	Γεμάτη κουκκίδα
+	Dash	Παύλα
+	Hollow Circle	Κενός κύκλος
+	Filled Square	Γεμάτο τετράγωνο
 	Butt Cap	Επίπεδο άκρο
 	Byte Order:	Σειρά byte:
 	Calligraphic	Καλλιγραφικό
@@ -1311,7 +1323,7 @@
 	Clear History	Εκκαθάριση ιστορικού
 	Set History Limit…	Ορισμός ορίου ιστορικού…
 	History States	Καταστάσεις ιστορικού
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Εφαρμογή συνόλου δεδομένων
 	Cancel Pattern Editing	Ακύρωση επεξεργασίας μοτίβου
 	Copy Appearance	Αντιγραφή εμφάνισης
@@ -1930,6 +1942,13 @@
 	Transparency	Διαφάνεια
 	Transparent	Διαφανές
 	Trap…	Παγίδευση χρωμάτων…
+	Trap	Παγίδευση χρωμάτων
+	Height/Width	Ύψος/Πλάτος
+	Tint Reduction	Μείωση απόχρωσης
+	Traps with Process Color	Παγιδεύσεις με χρώματα τετραχρωμίας
+	Reverse Traps	Αντίστροφες παγιδεύσεις
+	Precision	Ακρίβεια
+	Remove Redundant Points	Αφαίρεση περιττών σημείων
 	Trim	Περικοπή περιθωρίων
 	Twist…	Συστροφή…
 	Type	Κείμενο
@@ -2093,6 +2112,7 @@ axis	Both	Και τα δύο
 @msg	Opened {url}	Άνοιξε το {url}
 @msg	Outline Stroke: no stroked paths selected	Μετατροπή περιγράμματος σε διαδρομή: δεν επιλέχθηκαν διαδρομές με περίγραμμα
 @msg	PDF settings are not an object	Οι ρυθμίσεις PDF δεν είναι αντικείμενο
+@msg	PDF security settings are not an object	Οι ρυθμίσεις ασφαλείας PDF δεν είναι αντικείμενο
 @msg	PDF writer error: {0}	Σφάλμα εγγραφής PDF: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	Συσκευάστηκαν {n} αρχεία στον φάκελο {folder}{note}
 @msg	Packaged {n} file(s){note}	Συσκευάστηκαν {n} αρχεία{note}
@@ -3463,6 +3483,7 @@ theme	Appearance	Εμφάνιση
 	Space Before Paragraph	Διάστημα πριν από την παράγραφο
 	Spaces	Διαστήματα
 	Spacing Guides	Οδηγοί αποστάσεων
+	Invoke Distance Guides	Εμφάνιση οδηγών μέτρησης απόστασης
 	Spanish	Ισπανικά
 	Specified Distance	Καθορισμένη απόσταση
 	Specified Steps	Καθορισμένα βήματα
@@ -3568,7 +3589,6 @@ theme	Appearance	Εμφάνιση
 	Show all open documents	Εμφάνιση όλων των ανοιχτών εγγράφων
 	Symbol Instance	Στιγμιότυπο συμβόλου
 	Symbol Libraries	Βιβλιοθήκες συμβόλων
-	Symbol Libraries (on the roadmap)	Βιβλιοθήκες συμβόλων (προγραμματισμένη λειτουργία)
 	Symbol Screener Tool	Αραίωση συμβόλων (Symbol Screener Tool)
 	Symbol Scruncher Tool	Σύμπτυξη συμβόλων (Symbol Scruncher Tool)
 	Symbol Shifter Tool	Μετατόπιση συμβόλων (Symbol Shifter Tool)
@@ -3932,6 +3952,7 @@ theme	Appearance	Εμφάνιση
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	ο άξονας πρέπει να είναι "vertical", "horizontal" ή γωνία σε μοίρες, όχι `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	φόντο {other}: transparent, white, black ή χρώμα όπως "#ff8800"
 @msg	bad color {v}	μη έγκυρο χρώμα {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	Το videoRulerPixelAspectRatio πρέπει να είναι αριθμός από 0,1 έως 10
 @msg	bad colour `{hex}` (#rrggbb)	μη έγκυρο χρώμα `{hex}` (#rrggbb)
 @msg	bad page tree	μη έγκυρο δέντρο σελίδων
 @msg	bad shortcut	μη έγκυρη συντόμευση
@@ -4005,7 +4026,7 @@ theme	Appearance	Εμφάνιση
 @msg	missing index	λείπει ο δείκτης
 @msg	missing number `{key}`	λείπει ο αριθμός `{key}`
 @msg	missing integer `{key}`	λείπει ο ακέραιος `{key}`
-@msg	multiple windows land with M11.5	τα πολλαπλά παράθυρα θα προστεθούν στην έκδοση M11.5
+@msg	New Window isn't available yet: a document opens in one window	Το Νέο παράθυρο δεν είναι ακόμη διαθέσιμο: ένα έγγραφο ανοίγει σε ένα παράθυρο
 @msg	name the file	δώστε όνομα στο αρχείο
 @msg	no CSS to copy: select objects with CSS of their own	δεν υπάρχει CSS για αντιγραφή: επιλέξτε αντικείμενα με δικό τους CSS
 @msg	no Live Paint edge near that point	δεν υπάρχει ακμή δυναμικής βαφής κοντά σε αυτό το σημείο
@@ -4611,6 +4632,7 @@ theme	Appearance	Εμφάνιση
 	Brown	Καφέ
 	Business Card 3.5 × 2 in	Επαγγελματική κάρτα 3,5 × 2 ίντσες
 	Business Card 85 × 55 mm	Επαγγελματική κάρτα 85 × 55 mm
+	Business Card 91 × 55 mm	Επαγγελματική κάρτα 91 × 55 mm
 	CRLF (Windows)	CRLF (Windows)
 	Cap Height	Ύψος κεφαλαίων
 	Chevron	Σχήμα V
@@ -5412,3 +5434,54 @@ axis	Y Axis	Άξονας Y
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	ένα δυναμικό εφέ εκτελείται κατά τη σχεδίαση του εγγράφου, οπότε δεν μπορεί να είναι `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	ένα πρόσθετο εξαγωγής παίρνει πάντα τον προϋπολογισμό μιας εξαγωγής: παραλείψτε το `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	το «{_1}» ζητά μεγάλο υπολογιστικό προϋπολογισμό (κάθε εκτέλεση έως {minutes} λεπτά και {times} φορές τις συνήθεις εντολές): εγκαταστήστε το με `allowHeavy: true` μόλις συμφωνήσει ο χρήστης
+# Actions panel: action sets (#3712).
+	New Set…	Νέο σύνολο…
+	New Set	Νέο σύνολο
+	Set Options…	Επιλογές συνόλου…
+	Set Options	Επιλογές συνόλου
+	Create New Set	Δημιουργία νέου συνόλου
+	Stop Global Edit	Τερματισμός καθολικής επεξεργασίας
+	Global Edit Options	Επιλογές καθολικής επεξεργασίας
+	Match	Αντιστοίχιση
+	On Artboards	Σε πίνακες σχεδίασης
+	All Artboards	Όλοι οι πίνακες σχεδίασης
+	Include Objects On Canvas	Συμπερίληψη αντικειμένων στον καμβά
+	Result(s): {count}	Αποτέλεσμα(τα): {count}
+@msg	select one object	επιλέξτε ένα αντικείμενο
+@msg	Global Edit works on paths, compound paths and symbol instances	Η καθολική επεξεργασία λειτουργεί σε διαδρομές, σύνθετες διαδρομές και παρουσίες συμβόλων
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	δεν βρέθηκαν παρόμοια αντικείμενα (τα περιστραμμένα ή κατοπτρισμένα αντίγραφα δεν εντοπίζονται)· αλλάξτε τις επιλογές καθολικής επεξεργασίας και δοκιμάστε ξανά
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all ή ένα εύρος όπως 1, 3-5, όχι {v}
+	Add to Symbols	Προσθήκη στα σύμβολα
+	Basic Shapes	Βασικά σχήματα
+	Open Symbol Library	Άνοιγμα βιβλιοθήκης συμβόλων
+	Save Symbol Library	Αποθήκευση βιβλιοθήκης συμβόλων
+	Save Symbol Library…	Αποθήκευση βιβλιοθήκης συμβόλων…
+	Save Symbols…	Αποθήκευση συμβόλων…
+	Selected Symbols Only	Μόνο επιλεγμένα σύμβολα
+	Symbol Libraries Menu	Μενού βιβλιοθηκών συμβόλων
+	Symbol Library	Βιβλιοθήκη συμβόλων
+	User Symbol Library 1	Βιβλιοθήκη συμβόλων χρήστη 1
+	User Symbol Library 2	Βιβλιοθήκη συμβόλων χρήστη 2
+	User Symbol Library 3	Βιβλιοθήκη συμβόλων χρήστη 3
+	User Symbol Library 4	Βιβλιοθήκη συμβόλων χρήστη 4
+	User Symbol Library 5	Βιβλιοθήκη συμβόλων χρήστη 5
+	User Symbol Library 6	Βιβλιοθήκη συμβόλων χρήστη 6
+	User Symbol Library 7	Βιβλιοθήκη συμβόλων χρήστη 7
+	User Symbol Library 8	Βιβλιοθήκη συμβόλων χρήστη 8
+	User Symbol Library 9	Βιβλιοθήκη συμβόλων χρήστη 9
+	User Symbol Library 10	Βιβλιοθήκη συμβόλων χρήστη 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	Η `{_1}` δεν έχει σύμβολα για τοποθέτηση
+@msg	missing `library` (see symbol.libraries)	λείπει το `library` (δείτε symbol.libraries)
+@msg	no symbol `{n}`	δεν υπάρχει σύμβολο `{n}`
+@msg	no symbol `{n}` in `{_1}`	δεν υπάρχει σύμβολο `{n}` στη `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	δεν υπάρχει βιβλιοθήκη συμβόλων `{key}` (δείτε symbol.libraries)
+@msg	the document has no symbols to save	το έγγραφο δεν έχει σύμβολα για αποθήκευση
+@msg	Trap: select two or more objects filled with solid colours	Παγίδευση χρωμάτων: επιλέξτε δύο ή περισσότερα αντικείμενα με συμπαγές χρώμα γεμίσματος
+@msg	Trap: no edges of different colours meet among the selected objects	Παγίδευση χρωμάτων: δεν συναντώνται άκρες διαφορετικών χρωμάτων στα επιλεγμένα αντικείμενα
+@msg	thickness must be from 0.01 to 5000 pt	το thickness πρέπει να είναι από 0,01 έως 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	το heightWidth πρέπει να είναι από 1 έως 1000 %
+@msg	tintReduction must be from 0 to 100 %	το tintReduction πρέπει να είναι από 0 έως 100 %
+	Rectangular Grid Tool Options	Επιλογές εργαλείου ορθογώνιου πλέγματος
+	Polar Grid Tool Options	Επιλογές εργαλείου πολικού πλέγματος
+	Fill Line	Γέμισμα γραμμής

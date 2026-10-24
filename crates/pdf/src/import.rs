@@ -392,6 +392,8 @@ fn read_with_reader_options(bytes: &[u8], opts: &ImportOptions, reader: &craft_p
             locked: false,
             show_center_mark: false,
             show_cross_hairs: false,
+            show_video_safe_areas: false,
+            video_ruler_pixel_aspect_ratio: 1.0,
             color: None,
         });
         let page_layer = |b: &mut Builder<'_>, art: Vec<Arc<Node>>, shown: bool| {
@@ -481,6 +483,10 @@ fn read_with_reader_options(bytes: &[u8], opts: &ImportOptions, reader: &craft_p
         let list = b.missing_fonts.join(", ");
         b.warn(&format!("fonts that aren't available show in the fallback font until they are: {list}"));
     }
+    // Before anything walks the tree by recursion (`fix_next_id` does): nested clips can be deeper
+    // than the stack goes.
+    let mut depth_notes = vec![];
+    doc.limit_depth_noting(&mut depth_notes);
     doc.fix_next_id();
     doc.reserve_ids(b.next);
 
@@ -492,7 +498,7 @@ fn read_with_reader_options(bytes: &[u8], opts: &ImportOptions, reader: &craft_p
             }
         }
     }
-    doc.limit_depth_noting(&mut warnings);
+    warnings.extend(depth_notes);
     let user_unit = picked.first().and_then(|&n| pages.get(n)).map_or(1.0, |page| f64::from(page.user_unit()));
     Ok(ImportReport { document: doc, warnings, native: crate::editing::editing_in(&pdf), only_text, user_unit })
 }
@@ -980,11 +986,19 @@ fn stroke_layer(paint: Paint, opacity: f32, p: &StrokeProps, scale: f64) -> Stro
         kurbo::Join::Bevel => LineJoin::Bevel,
     };
     st.miter_limit = p.miter_limit as f64;
-    let dash = Dash { pattern: p.dash_array.iter().map(|v| *v as f64 * scale).collect(), offset: p.dash_offset as f64 * scale, align_corners: false };
+    // (Every stroke keeps its own copy: a dash array has a few entries, and one with thousands is cut.)
+    let dash = Dash {
+        pattern: p.dash_array.iter().take(MAX_DASH_ENTRIES).map(|v| *v as f64 * scale).collect(),
+        offset: p.dash_offset as f64 * scale,
+        align_corners: false,
+    };
     // An invalid dash array (a negative value, or all zeros) strokes solid.
     st.dash = dash.is_dashed().then_some(dash);
     st
 }
+
+/// The most entries of a dash array kept (an even count keeps it a pattern of dashes and gaps).
+const MAX_DASH_ENTRIES: usize = 64;
 
 pub(crate) fn round3(v: f32) -> f32 {
     (v * 1000.0).round() / 1000.0
@@ -1567,7 +1581,7 @@ impl<'p> Builder<'p> {
         let xf = transform * Affine::scale_non_uniform(f64::from(w) / f64::from(mw.max(1)), f64::from(h) / f64::from(mh.max(1)));
         let art = Node::new(
             self.id(),
-            NodeKind::Image(Box::new(ImageObject { key: k, width: mw, height: mh, xf, link: None, placement: Default::default() })),
+            NodeKind::Image(Box::new(ImageObject { key: k, width: mw, height: mh, xf, link: None, placement: Default::default(), pixels: None })),
         );
         Some(OpacityMask::new(art, true))
     }
@@ -1587,8 +1601,10 @@ impl<'p> Builder<'p> {
             (k, w, h)
         };
         let id = self.id();
-        let mut n =
-            Node::new(id, NodeKind::Image(Box::new(ImageObject { key: k, width: w, height: h, xf, link: None, placement: Default::default() })));
+        let mut n = Node::new(
+            id,
+            NodeKind::Image(Box::new(ImageObject { key: k, width: w, height: h, xf, link: None, placement: Default::default(), pixels: None })),
+        );
         n.extras_mut().mask = mask.map(Box::new);
         self.push_node(n);
     }

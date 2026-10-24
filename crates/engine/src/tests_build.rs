@@ -1976,7 +1976,15 @@ fn add_image(s: &mut Session, r: &vectorcraft_trace::Raster, xf: Affine) -> Node
             0,
             Node::new(
                 id,
-                NodeKind::Image(Box::new(ImageObject { key: "img1".into(), width: w, height: h, xf, link: None, placement: Default::default() })),
+                NodeKind::Image(Box::new(ImageObject {
+                    key: "img1".into(),
+                    width: w,
+                    height: h,
+                    xf,
+                    link: None,
+                    placement: Default::default(),
+                    pixels: None,
+                })),
             ),
         )?;
         sel.set([id]);

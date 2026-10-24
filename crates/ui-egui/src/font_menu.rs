@@ -4,10 +4,11 @@
 //! or reached with ↑/↓ previews its font on the selected text (one live interaction, nothing in
 //! the history); a click or Enter applies it as one step, Escape or closing the menu puts the text
 //! back. The Glyphs panel and Find Font only pick a font ([`picked`]): nothing is previewed on the
-//! document. A star marks a favourite family, and the ★ filter lists only those. Preferences ›
-//! Type › Enable in-menu font previews and Font Preview Size turn the samples off or size the
-//! rows. Recently used families appear first, in the order they were last applied, within the
-//! same search and filters as the remaining families.
+//! document. A star marks a favourite family, and the ★ filter lists only those. The Font
+//! Technology filter's Variable lists only variable font families. Preferences › Type › Enable
+//! in-menu font previews and Font Preview Size turn the samples off or size the rows. Recently
+//! used families appear first, in the order they were last applied, within the same search and
+//! filters as the remaining families.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -99,6 +100,12 @@ fn script_label(i: usize) -> &'static str {
         3 => tl!("Thai"),
         _ => tl!("All Scripts"),
     }
+}
+
+/// The Font Technology filter's one choice: variable fonts. An adjective for fonts, not the
+/// Variables panel's noun (`変数`), hence its context.
+fn variable_label() -> &'static str {
+    crate::i18n::tr_ctx(crate::i18n::current(), "font-technology", "Variable")
 }
 
 /// Does a family of `traits` pass script filter `script` ([`SCRIPTS`])? Latin: neither Japanese
@@ -193,9 +200,10 @@ fn remap_highlight(before: &[Row], selected: Option<usize>, after: &[Row]) -> Op
     after.iter().position(|candidate| candidate == row)
 }
 
-/// What the rows were listed for: the query, the script, kind and favourites filters, Show Font
-/// Names in English, the expanded families, favourites, recent history and font list generation.
-type RowsKey = (String, usize, Option<FontClass>, bool, bool, Vec<String>, Vec<String>, Vec<String>, u64);
+/// What the rows were listed for: the query, the script, kind, font technology (variable only) and
+/// favourites filters, Show Font Names in English, the expanded families, favourites, recent
+/// history and font list generation.
+type RowsKey = (String, usize, Option<FontClass>, bool, bool, bool, Vec<String>, Vec<String>, Vec<String>, u64);
 
 /// The menu's state between frames.
 #[derive(Clone, Default)]
@@ -210,10 +218,11 @@ struct MenuState {
     /// The highlighted row and the query and filters it belongs to.
     highlight: Option<usize>,
     query: String,
-    /// The filters (kept from one opening to the next): script (0..[`SCRIPTS`]), kind, and
-    /// favourites only.
+    /// The filters (kept from one opening to the next): script (0..[`SCRIPTS`]), kind, font
+    /// technology (variable fonts only) and favourites only.
     script: usize,
     class: Option<FontClass>,
+    variable_only: bool,
     favorites_only: bool,
     /// Families whose styles are listed (lowercase).
     expanded: Vec<String>,
@@ -287,7 +296,7 @@ fn list(ui: &mut Ui, state_id: egui::Id, st: &mut MenuState, current: &str, samp
         ui.memory_mut(|m| m.request_focus(field.with("edit")));
     }
     let query = widgets::search_field(ui, field, tl!("Search")).to_lowercase();
-    // The filters: script, then kind.
+    // The filters: script, then kind, then font technology.
     let mut refilter = false;
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing = vec2(4.0, 2.0);
@@ -315,6 +324,14 @@ fn list(ui: &mut Ui, state_id: egui::Id, st: &mut MenuState, current: &str, samp
             }
         }
     });
+    ui.horizontal_wrapped(|ui| {
+        ui.spacing_mut().item_spacing = vec2(4.0, 2.0);
+        ui.label(egui::RichText::new(tl!("Font Technology")).size(11.0).color(t.text_dim));
+        if ui.selectable_label(st.variable_only, egui::RichText::new(variable_label()).size(11.0)).clicked() {
+            st.variable_only = !st.variable_only;
+            refilter = true;
+        }
+    });
     let enter = ui.input(|i| i.key_pressed(egui::Key::Enter));
     let db = vectorcraft_text::FontDb::global();
     // The current family by its own name (a document may name it in Japanese: ヒラギノ角ゴシック),
@@ -327,6 +344,7 @@ fn list(ui: &mut Ui, state_id: egui::Id, st: &mut MenuState, current: &str, samp
         query.clone(),
         st.script,
         st.class,
+        st.variable_only,
         st.favorites_only,
         look.english_names,
         st.expanded.clone(),
@@ -343,11 +361,11 @@ fn list(ui: &mut Ui, state_id: egui::Id, st: &mut MenuState, current: &str, samp
             if st.favorites_only && !favorite(f) {
                 return false;
             }
-            if st.script == 0 && st.class.is_none() {
+            if st.script == 0 && st.class.is_none() && !st.variable_only {
                 return true;
             }
             let traits = db.family_traits(f);
-            script_matches(st.script, traits) && st.class.is_none_or(|c| c == traits.class)
+            script_matches(st.script, traits) && st.class.is_none_or(|c| c == traits.class) && (!st.variable_only || traits.variable)
         };
         let families: Vec<_> = db.menu_family_list().iter().filter(|f| wanted(f)).cloned().collect();
         let rows = grouped_rows(&families, look.recent, &st.expanded, |f| db.styles(f));
@@ -847,7 +865,7 @@ mod tests {
         assert_eq!(super::script_label(3), "Thai");
         let zh = crate::i18n::Lang::from_code("zh-hans").unwrap();
         crate::i18n::set_current(zh);
-        assert_eq!(super::script_label(1), "汉字");
+        assert_eq!(super::script_label(1), crate::i18n::tr_ctx(zh, "font-script", "Japanese"));
         crate::i18n::set_current(crate::i18n::Lang::EN);
         assert_eq!(super::script_label(1), "Japanese");
     }
@@ -1058,5 +1076,102 @@ mod tests {
         let after = [family("Alpha"), Row::Style("Alpha".into(), "Bold".into()), family("Bravo")];
         assert_eq!(remap_highlight(&before, Some(1), &after), Some(2));
         assert_eq!(remap_highlight(&after, Some(1), &before), None);
+    }
+
+    /// The Font Technology filter's Variable is the font adjective, not the Variables panel's noun.
+    #[test]
+    fn the_variable_filter_is_named_as_fonts_are() {
+        use crate::i18n::{Lang, tr, tr_ctx};
+        let (ja, zh) = (Lang::from_code("ja").unwrap(), Lang::from_code("zh-hans").unwrap());
+        assert_eq!((tr_ctx(ja, "font-technology", "Variable"), tr(ja, "Variable")), ("バリアブル", "変数"));
+        assert_eq!((tr_ctx(zh, "font-technology", "Variable"), tr(zh, "Variable")), ("可变", "变量"));
+        assert_eq!(tr(ja, "Font Technology"), "フォントテクノロジー");
+        assert_eq!(super::variable_label(), "Variable");
+    }
+
+    /// Font Technology › Variable lists only variable font families, together with the other
+    /// filters; clicked again, every family is back.
+    #[test]
+    fn the_variable_filter_lists_only_variable_families() {
+        use vectorcraft_text::FontClass;
+        use vectorcraft_text::test_fonts::{TWO_AXIS_FAMILY, two_axis_font};
+        let db = vectorcraft_text::FontDb::global();
+        db.add_font(two_axis_font().unwrap());
+        let ctx = egui::Context::default();
+        let mut st = super::MenuState::default();
+        let mut favorites: Vec<String> = vec![];
+        let frame = |st: &mut super::MenuState, events, favorites: &[String]| {
+            let mut out = ctx.run_ui(
+                egui::RawInput {
+                    events,
+                    screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 800.0))),
+                    ..Default::default()
+                },
+                |ui| {
+                    super::list(
+                        ui,
+                        egui::Id::new("variable-filter"),
+                        st,
+                        "Source Sans 3",
+                        None,
+                        super::MenuLook { samples: false, favorites, ..Default::default() },
+                    );
+                },
+            );
+            out.textures_delta.clear();
+            let button = out.shapes.iter().find_map(|c| match &c.shape {
+                egui::Shape::Text(t) if t.galley.text() == "Variable" => Some(t.visual_bounding_rect().center()),
+                _ => None,
+            });
+            let families: Vec<String> = st
+                .rows
+                .iter()
+                .filter_map(|r| match r {
+                    Row::Family(f) => Some(f.clone()),
+                    _ => None,
+                })
+                .collect();
+            (families, button)
+        };
+        let has = |list: &[String], f: &str| list.iter().any(|x| x == f);
+        let click = |st: &mut super::MenuState, favorites: &[String]| {
+            let (_, at) = frame(st, vec![], favorites);
+            let at = at.expect("the Variable filter is drawn");
+            let button =
+                |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+            frame(st, vec![egui::Event::PointerMoved(at), button(true)], favorites);
+            frame(st, vec![button(false)], favorites);
+            frame(st, vec![], favorites).0
+        };
+        for _ in 0..3 {
+            frame(&mut st, vec![], &favorites);
+        }
+        let all = frame(&mut st, vec![], &favorites).0;
+        assert!(has(&all, TWO_AXIS_FAMILY) && has(&all, "Source Sans 3") && has(&all, "JetBrains Mono"), "{all:?}");
+        let variable = click(&mut st, &favorites);
+        assert!(st.variable_only, "the click turns the filter on");
+        assert!(has(&variable, TWO_AXIS_FAMILY), "{variable:?}");
+        assert!(!has(&variable, "Source Sans 3") && !has(&variable, "Inter") && !has(&variable, "JetBrains Mono"), "static families: {variable:?}");
+        assert!(variable.iter().all(|f| db.family_traits(f).variable), "{variable:?}");
+        // With the kind, script and favourites filters: each must pass.
+        st.class = Some(FontClass::Sans);
+        assert!(has(&frame(&mut st, vec![], &favorites).0, TWO_AXIS_FAMILY));
+        st.class = Some(FontClass::Monospaced);
+        assert!(!has(&frame(&mut st, vec![], &favorites).0, TWO_AXIS_FAMILY), "a sans serif family under Monospaced");
+        st.class = None;
+        st.script = 3;
+        assert!(!has(&frame(&mut st, vec![], &favorites).0, TWO_AXIS_FAMILY), "a family without Thai under Thai");
+        st.script = 0;
+        st.favorites_only = true;
+        favorites.push("Source Sans 3".into());
+        assert!(frame(&mut st, vec![], &favorites).0.is_empty(), "the one favourite is static");
+        favorites.push(TWO_AXIS_FAMILY.into());
+        assert_eq!(frame(&mut st, vec![], &favorites).0, [TWO_AXIS_FAMILY]);
+        st.favorites_only = false;
+        // Off again: every family is listed.
+        let again = click(&mut st, &favorites);
+        assert!(!st.variable_only);
+        assert_eq!(again, frame(&mut st, vec![], &[]).0);
+        assert!(has(&again, TWO_AXIS_FAMILY) && has(&again, "Source Sans 3") && has(&again, "JetBrains Mono"), "{again:?}");
     }
 }

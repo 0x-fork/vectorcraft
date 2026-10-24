@@ -979,6 +979,10 @@ fn may_write(path: &str) -> Result<()> {
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn read_file(path: &str) -> Result<Vec<u8>> {
     may_read(path)?;
+    // A device or pipe may never end: only a regular file is read to its end.
+    if !std::fs::metadata(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))?.is_file() {
+        return Err(EngineError::Other(format!("{path}: not a file")));
+    }
     std::fs::read(path).map_err(|e| EngineError::Other(format!("{path}: {e}")))
 }
 
@@ -1184,7 +1188,7 @@ pub(crate) fn document_path_with(
 ) -> std::result::Result<String, craft_docpath::Refused> {
     use craft_docpath::Refused;
     let document = document.map(absolute_path);
-    let resolve = |document: Option<&str>| craft_docpath::resolve(stored, document.map(std::path::Path::new));
+    let resolve = |document: Option<&str>| craft_docpath::resolve_absolute(stored, document.map(std::path::Path::new));
     let path = match resolve(document.as_deref()) {
         Err(Refused::Network) => {
             let share = document.as_deref().and_then(share).ok_or(Refused::Network)?;
@@ -1192,9 +1196,6 @@ pub(crate) fn document_path_with(
         }
         path => path?,
     };
-    if !path.is_absolute() {
-        return Err(Refused::Invalid);
-    }
     path.into_os_string().into_string().map_err(|_| Refused::Invalid)
 }
 
@@ -1366,15 +1367,17 @@ pub(crate) fn unique_file_names<'a>(names: impl IntoIterator<Item = (&'a str, St
 /// `names` with `-2`, `-3`… after a name already used (compared without case).
 fn distinct_names(names: impl IntoIterator<Item = String>) -> Vec<String> {
     let mut taken = std::collections::HashSet::new();
+    // The next number to try for each base: a name repeated many times doesn't search the numbers
+    // taken before it.
+    let mut next: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     names
         .into_iter()
         .map(|base| {
             let mut name = base.clone();
-            for i in 2.. {
-                if taken.insert(name.to_lowercase()) {
-                    break;
-                }
-                name = format!("{base}-{i}");
+            while !taken.insert(name.to_lowercase()) {
+                let n = next.entry(base.to_lowercase()).or_insert(1);
+                *n += 1;
+                name = format!("{base}-{n}");
             }
             name
         })

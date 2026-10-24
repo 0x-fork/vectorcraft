@@ -117,6 +117,7 @@ pub static ICONS: &[(&str, &[u8])] = &[
     ("dc-new-stroke", include_bytes!("../../../assets/icons/dc-new-stroke.svg")),
     ("dc-objects-on-path", include_bytes!("../../../assets/icons/dc-objects-on-path.svg")),
     ("dc-options", include_bytes!("../../../assets/icons/dc-options.svg")),
+    ("dc-para-bullets", include_bytes!("../../../assets/icons/dc-para-bullets.svg")),
     ("dc-para-center", include_bytes!("../../../assets/icons/dc-para-center.svg")),
     ("dc-para-justify-all", include_bytes!("../../../assets/icons/dc-para-justify-all.svg")),
     ("dc-para-justify-center", include_bytes!("../../../assets/icons/dc-para-justify-center.svg")),

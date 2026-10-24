@@ -243,6 +243,13 @@
 	Glyphs	გლიფები
 	Insert Special Character	სპეციალური სიმბოლოს ჩასმა
 	Bullet	ბურთულა
+	Bullets	ბურთულები
+	Bullets and Numbering	ბურთულები და დანომრვა
+	Apply Bullets	ბურთულების გამოყენება
+	Filled Dot	სავსე წერტილი
+	Dash	ტირე
+	Hollow Circle	ცარიელი წრე
+	Filled Square	სავსე კვადრატი
 	Copyright Symbol	საავტორო უფლების სიმბოლო
 	Ellipsis	მრავალწერტილი
 	Paragraph Symbol	აბზაცის სიმბოლო
@@ -1510,6 +1517,13 @@ lighting	Light	სინათლე
 	Repeat Pathfinder	ტრაექტორიების ოპერაციის გამეორება
 	Repeat {name}	გამეორება: {name}
 	Trap…	ტრეპინგი…
+	Trap	ტრეპინგი
+	Height/Width	სიმაღლე/სიგანე
+	Tint Reduction	ტონის შემცირება
+	Traps with Process Color	ტრეპინგი პროცესული ფერებით
+	Reverse Traps	შებრუნებული ტრეპინგი
+	Precision	სიზუსტე
+	Remove Redundant Points	ზედმეტი წერტილების წაშლა
 	Bottom in Front	ქვედა წინ
 	Brick by Column	აგური სვეტებით
 	Brick by Row	აგური სტრიქონებით
@@ -1635,7 +1649,6 @@ lighting	Light	სინათლე
 	{kind}, {model}	{kind}, {model}
 	No symbols in this document	ამ დოკუმენტში სიმბოლოები არ არის
 	Select art and click New Symbol to make one.	მონიშნეთ ნახატი და შესაქმნელად დაწკაპეთ „ახალ სიმბოლოზე“.
-	Symbol Libraries (on the roadmap)	სიმბოლოების ბიბლიოთეკები (სამომავლო გეგმაშია)
 	Align On:	სწორება მიმართ:
 	Bottom-Justified Tab	ქვემოთ სწორებული ტაბულაცია
 	Center-Justified Tab	ცენტრით სწორებული ტაბულაცია
@@ -2132,6 +2145,9 @@ lighting	Light	სინათლე
 	Background Color:	ფონის ფერი:
 	Show Center Mark	ცენტრის ნიშნის ჩვენება
 	Show Cross Hairs	ჯვარედინი ხაზების ჩვენება
+	Show Video Safe Areas	ვიდეოს უსაფრთხო არეების ჩვენება
+	Video Ruler Pixel Aspect Ratio:	ვიდეოს სახაზავების პიქსელის თანაფარდობა:
+	Hide Video Rulers	ვიდეოს სახაზავების დამალვა
 	Client-side (.html)	კლიენტის მხარე (.html)
 	Color Reduction:	ფერების შემცირება:
 	Lossless (lossy WebP isn't available yet)	უდანაკარგო (დანაკარგიანი WebP ჯერ მიუწვდომელია)
@@ -3070,6 +3086,7 @@ theme	Appearance	იერსახე
 	Size/Leading	ზომა/სტრიქონთა დაშორება
 	Snapping Tolerance	მიბმის დაშვება
 	Spacing Guides	შუალედის დამხმარე ხაზები
+	Invoke Distance Guides	მანძილის დამხმარე ხაზების გამოძახება
 	Spanish	ესპანური
 	Subdivisions	ქვედანაყოფები
 	Templates Folder	შაბლონების საქაღალდე
@@ -3346,6 +3363,8 @@ effect	Regular	ჩვეულებრივი
 	Put back in the dock	დოკში დაბრუნება
 	All Scripts	ყველა დამწერლობა
 	Any Kind	ნებისმიერი ტიპი
+	Font Technology	შრიფტის ტექნოლოგია
+font-technology	Variable	ცვლადი
 	Decorative	დეკორატიული
 	Favorites	რჩეულები
 	Latin	ლათინური
@@ -3625,6 +3644,7 @@ effect	Regular	ჩვეულებრივი
 @msg	Opened {url}	გაიხსნა {url}
 @msg	Outline Stroke: no stroked paths selected	კონტურის ფიგურად გარდაქმნა: კონტურიანი ტრაექტორიები მონიშნული არ არის
 @msg	PDF settings are not an object	PDF-ის პარამეტრები ობიექტი არ არის
+@msg	PDF security settings are not an object	PDF-ის უსაფრთხოების პარამეტრები ობიექტი არ არის
 @msg	PDF writer error: {0}	PDF-ის ჩამწერის შეცდომა: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	შეფუთულია ფაილი ({n}) საქაღალდეში {folder}{note}
 @msg	Packaged {n} file(s){note}	შეფუთულია ფაილი ({n}){note}
@@ -3740,6 +3760,7 @@ effect	Regular	ჩვეულებრივი
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	axis უნდა იყოს "vertical", "horizontal" ან კუთხე გრადუსებში და არა `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	ფონი {other}: transparent, white, black ან ფერი, მაგალითად "#ff8800"
 @msg	bad color {v}	არასწორი ფერი {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio უნდა იყოს რიცხვი 0,1-დან 10-მდე
 @msg	bad colour `{hex}` (#rrggbb)	არასწორი ფერი `{hex}` (#rrggbb)
 @msg	bad page tree	გვერდების არასწორი ხე
 @msg	bad shortcut	არასწორი მალსახმობი
@@ -3807,7 +3828,7 @@ effect	Regular	ჩვეულებრივი
 @msg	missing `name`	აკლია `name`
 @msg	missing `tool`	აკლია `tool`
 @msg	missing index	ინდექსი აკლია
-@msg	multiple windows land with M11.5	რამდენიმე ფანჯარა M11.5-ში დაემატება
+@msg	New Window isn't available yet: a document opens in one window	ახალი ფანჯარა ჯერ მიუწვდომელია: დოკუმენტი ერთ ფანჯარაში იხსნება
 @msg	name the file	მიუთითეთ ფაილის სახელი
 @msg	no CSS to copy: select objects with CSS of their own	კოპირებისთვის CSS არ არის: მონიშნეთ საკუთარი CSS-ის მქონე ობიექტები
 @msg	no Live Paint edge near that point	ამ წერტილთან ცოცხალი შეღებვის კიდე არ არის
@@ -4276,6 +4297,7 @@ effect	Regular	ჩვეულებრივი
 	Logo 1000×1000	ლოგო 1000×1000
 	Business Card 3.5 × 2 in	სავიზიტო ბარათი 3.5 × 2 in
 	Business Card 85 × 55 mm	სავიზიტო ბარათი 85 × 55 mm
+	Business Card 91 × 55 mm	სავიზიტო ბარათი 91 × 55 mm
 	Letterhead Letter	ბლანკი Letter
 	Letterhead A4	ბლანკი A4
 	Envelope DL	კონვერტი DL
@@ -5376,3 +5398,54 @@ axis	Y Axis	Y ღერძი
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	ცოცხალი ეფექტი დოკუმენტის დახატვისას ეშვება, ამიტომ ის ვერ იქნება `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	ექსპორტის პლაგინი ყოველთვის ექსპორტის ბიუჯეტს იღებს: გამოტოვეთ `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	„{_1}“ დიდ გამოთვლით ბიუჯეტს ითხოვს (თითო გაშვება {minutes} წუთამდე და ჩვეულებრივზე {times}-ჯერ მეტი ინსტრუქცია): მომხმარებლის თანხმობის შემდეგ დააყენეთ ის `allowHeavy: true` პარამეტრით
+# Actions panel: action sets (#3712).
+	New Set…	ახალი ნაკრები…
+	New Set	ახალი ნაკრები
+	Set Options…	ნაკრების პარამეტრები…
+	Set Options	ნაკრების პარამეტრები
+	Create New Set	ახალი ნაკრების შექმნა
+	Stop Global Edit	გლობალური რედაქტირების დასრულება
+	Global Edit Options	გლობალური რედაქტირების პარამეტრები
+	Match	დამთხვევა
+	On Artboards	სამუშაო დაფებზე
+	All Artboards	ყველა სამუშაო დაფა
+	Include Objects On Canvas	ტილოზე არსებული ობიექტების ჩართვა
+	Result(s): {count}	შედეგ(ებ)ი: {count}
+@msg	select one object	აირჩიეთ ერთი ობიექტი
+@msg	Global Edit works on paths, compound paths and symbol instances	გლობალური რედაქტირება მუშაობს კონტურებზე, შედგენილ კონტურებსა და სიმბოლოს ეგზემპლარებზე
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	მსგავსი ობიექტები ვერ მოიძებნა (შემობრუნებული ან არეკლილი ასლები არ ემთხვევა); შეცვალეთ გლობალური რედაქტირების პარამეტრები და სცადეთ ხელახლა
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all ან დიაპაზონი, მაგალითად 1, 3-5, და არა {v}
+	Add to Symbols	სიმბოლოებში დამატება
+	Basic Shapes	ძირითადი ფიგურები
+	Open Symbol Library	სიმბოლოების ბიბლიოთეკის გახსნა
+	Save Symbol Library	სიმბოლოების ბიბლიოთეკის შენახვა
+	Save Symbol Library…	სიმბოლოების ბიბლიოთეკის შენახვა…
+	Save Symbols…	სიმბოლოების შენახვა…
+	Selected Symbols Only	მხოლოდ მონიშნული სიმბოლოები
+	Symbol Libraries Menu	სიმბოლოების ბიბლიოთეკების მენიუ
+	Symbol Library	სიმბოლოების ბიბლიოთეკა
+	User Symbol Library 1	მომხმარებლის სიმბოლოების ბიბლიოთეკა 1
+	User Symbol Library 2	მომხმარებლის სიმბოლოების ბიბლიოთეკა 2
+	User Symbol Library 3	მომხმარებლის სიმბოლოების ბიბლიოთეკა 3
+	User Symbol Library 4	მომხმარებლის სიმბოლოების ბიბლიოთეკა 4
+	User Symbol Library 5	მომხმარებლის სიმბოლოების ბიბლიოთეკა 5
+	User Symbol Library 6	მომხმარებლის სიმბოლოების ბიბლიოთეკა 6
+	User Symbol Library 7	მომხმარებლის სიმბოლოების ბიბლიოთეკა 7
+	User Symbol Library 8	მომხმარებლის სიმბოლოების ბიბლიოთეკა 8
+	User Symbol Library 9	მომხმარებლის სიმბოლოების ბიბლიოთეკა 9
+	User Symbol Library 10	მომხმარებლის სიმბოლოების ბიბლიოთეკა 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}`-ში განსათავსებელი სიმბოლოები არ არის
+@msg	missing `library` (see symbol.libraries)	`library` აკლია (იხ. symbol.libraries)
+@msg	no symbol `{n}`	სიმბოლო `{n}` არ არის
+@msg	no symbol `{n}` in `{_1}`	`{_1}`-ში სიმბოლო `{n}` არ არის
+@msg	no symbol library `{key}` (see symbol.libraries)	სიმბოლოების ბიბლიოთეკა `{key}` არ არის (იხ. symbol.libraries)
+@msg	the document has no symbols to save	დოკუმენტში შესანახი სიმბოლოები არ არის
+@msg	Trap: select two or more objects filled with solid colours	ტრეპინგი: აირჩიეთ ორი ან მეტი ობიექტი, შევსებული ერთგვაროვანი ფერით
+@msg	Trap: no edges of different colours meet among the selected objects	ტრეპინგი: არჩეულ ობიექტებს შორის განსხვავებული ფერის კიდეები არ ეხება ერთმანეთს
+@msg	thickness must be from 0.01 to 5000 pt	thickness უნდა იყოს 0,01-დან 5000 pt-მდე
+@msg	heightWidth must be from 1 to 1000 %	heightWidth უნდა იყოს 1-დან 1000 %-მდე
+@msg	tintReduction must be from 0 to 100 %	tintReduction უნდა იყოს 0-დან 100 %-მდე
+	Rectangular Grid Tool Options	მართკუთხა ბადის ხელსაწყოს პარამეტრები
+	Polar Grid Tool Options	პოლარული ბადის ხელსაწყოს პარამეტრები
+	Fill Line	ხაზის შევსება

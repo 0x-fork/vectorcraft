@@ -28,7 +28,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Thread Text",
             [],
             None,
-            "{from, to?, rect?: [x, y, width, height], at?: [x, y]} thread area type or type on a path `from` (a click on its out port) into one more frame, put after it in its thread: closed path, area type or type on a path `to`, a new rectangle `rect`, or a new frame of `from`'s kind, shape and size with its top-left at `at` (give one of the three) → {id}; the two frames are selected",
+            "{from, to?, rect?: [x, y, width, height], at?: [x, y], before?} thread area type or type on a path `from` (a click on its out port) into one more frame, put after it in its thread, or before it with `before: true` (a click on its in port: the story starts there and flows on into `from`): closed path, area type or type on a path `to`, a new rectangle `rect`, or a new frame of `from`'s kind, shape and size with its top-left at `at` (give one of the three) → {id}; the two frames are selected",
             has_doc,
             add
         ),
@@ -81,7 +81,8 @@ thread_local! {
 }
 
 /// Re-flow every thread with a frame that changed between `before` and `doc` (structural sharing
-/// makes "changed" a pointer comparison). Deleted frames' text flows into the remaining ones.
+/// makes "changed" a pointer comparison). Deleted frames' text flows into the remaining ones; a
+/// frame that is now point type leaves its thread with the text it holds.
 pub(crate) fn reflow(before: &Document, doc: &mut Document) {
     let threads = std::mem::take(&mut doc.text_threads);
     let mut kept = vec![];
@@ -116,6 +117,8 @@ pub(crate) fn reflow(before: &Document, doc: &mut Document) {
                     sources.push(t.clone());
                     live.push(*id);
                 }
+                // A frame converted to point type keeps the text it holds and leaves the thread.
+                (None, Some(_)) if matches!(doc.node(*id).map(|n| &n.kind), Some(NodeKind::Text(_))) => {}
                 (None, Some(old)) => {
                     story.extend(old.runs.iter().cloned());
                     later_wins.push(false);
@@ -260,11 +263,12 @@ fn create(s: &mut Session, _: &Value) -> Result<Value> {
     Ok(json!({ "ids": out.iter().map(|i| i.0).collect::<Vec<_>>() }))
 }
 
-/// `text.thread.add`: the out port's loaded text, placed.
+/// `text.thread.add`: the loaded text of a port, placed.
 fn add(s: &mut Session, p: &Value) -> Result<Value> {
     const C: &str = "text.thread.add";
     let given = |k: &str| p.get(k).filter(|v| !v.is_null());
     let from = checked_id(s, given("from").unwrap_or(&Value::Null), C)?;
+    let before = switch_or(p, "before", false, C)?;
     let d = &s.doc()?.doc;
     let src = text_of(d, from).ok_or_else(|| bad(C, "`from` must be area type or type on a path"))?;
     let style = src.first_style();
@@ -327,9 +331,10 @@ fn add(s: &mut Session, p: &Value) -> Result<Value> {
         };
         match d.text_threads.iter_mut().find(|t| t.contains(&from)) {
             Some(t) => {
-                let at = t.iter().position(|x| *x == from).map_or(t.len(), |i| i + 1);
+                let at = t.iter().position(|x| *x == from).map_or(t.len(), |i| if before { i } else { i + 1 });
                 t.insert(at, to);
             }
+            None if before => d.text_threads.push(vec![to, from]),
             None => d.text_threads.push(vec![from, to]),
         }
         // Force a re-flow of the thread on this edit: the edit leaves existing area type `to`
@@ -615,6 +620,35 @@ mod tests {
         assert_eq!(threads(&s), [[a, c, d]]);
     }
 
+    /// #2572: the text loaded from an in port threads back: the new frame or the path clicked comes
+    /// before the frame it was loaded from, so the story starts there and flows on into it; in the
+    /// middle of a thread the new frame goes in between, each in one undo step.
+    #[test]
+    fn add_before_threads_the_story_from_the_new_frame_into_the_clicked_one() {
+        let (mut s, a, b) = setup();
+        let c = new_id(s.execute("text.thread.add", &json!({"from": a, "at": [400, 200], "before": true})).unwrap());
+        assert_eq!(threads(&s), [[c, a]]);
+        assert_eq!(frame_box(&s, c), vectorcraft_geom::Rect::new(400.0, 200.0, 550.0, 260.0), "the clicked frame's size at the click");
+        assert!(TEXT.repeat(4).starts_with(&text(&s, c)) && !text(&s, c).is_empty(), "the story starts in the new frame: {:?}", text(&s, c));
+        assert_eq!(format!("{}{}", text(&s, c), text(&s, a)), TEXT.repeat(4));
+        assert_eq!(s.doc().unwrap().selection.objects, [NodeId(a), NodeId(c)]);
+        // In between the frame and the one before it.
+        let d = new_id(s.execute("text.thread.add", &json!({"from": a, "rect": [10, 100, 300, 150], "before": true})).unwrap());
+        assert_eq!(threads(&s), [[c, d, a]]);
+        assert_eq!(format!("{}{}{}", text(&s, c), text(&s, d), text(&s, a)), TEXT.repeat(4));
+        s.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(threads(&s), [[c, a]]);
+        // A closed path clicked with the in port's text comes first, with the start of the story.
+        s.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(new_id(s.execute("text.thread.add", &json!({"from": a, "to": b, "before": true})).unwrap()), b);
+        assert_eq!(threads(&s), [[b, a]]);
+        assert!(TEXT.repeat(4).starts_with(&text(&s, b)) && !text(&s, b).is_empty());
+        assert_eq!(format!("{}{}", text(&s, b), text(&s, a)), TEXT.repeat(4));
+        // `before: false` is the out port's.
+        let e = new_id(s.execute("text.thread.add", &json!({"from": a, "at": [0, 0], "before": false})).unwrap());
+        assert_eq!(threads(&s), [[b, a, e]]);
+    }
+
     /// Type on a path along a line beside the area type of [`setup`].
     fn type_on_a_line(s: &mut Session) -> u64 {
         let line = new_id(s.execute("shape.line", &json!({"x1": 10, "y1": 250, "x2": 110, "y2": 250})).unwrap());
@@ -689,6 +723,8 @@ mod tests {
             json!({"from": a, "rect": [0, 0, 10, 0]}),
             json!({"from": a, "rect": [0, 0, 10]}),
             json!({"from": a, "rect": "big"}),
+            json!({"from": a, "at": [0, 0], "before": "yes"}),
+            json!({"from": a, "at": [0, 0], "before": 1}),
         ] {
             assert!(s.execute("text.thread.add", &p).is_err(), "{p} was accepted");
             assert!(std::sync::Arc::ptr_eq(&s.doc().unwrap().doc, &before), "{p} changed the document");
@@ -712,6 +748,55 @@ mod tests {
         assert_eq!(threads(&s), [[a, b]]);
         assert!(text(&s, c).is_empty());
         assert_eq!(format!("{}{}", text(&s, a), text(&s, b)), TEXT.repeat(4));
+    }
+
+    /// A thread of `n` frames (2 or 3), each showing part of the story: area type `a` of [`setup`],
+    /// for 3 an area type frame that is empty until it is threaded, then the rectangle `b`.
+    fn thread_of(n: usize) -> (Session, Vec<u64>) {
+        let (mut s, a, b) = setup();
+        let frames = if n == 3 {
+            let c = new_id(s.execute("text.create", &json!({"x": 10, "y": 100, "text": "", "area": {"width": 150, "height": 40}})).unwrap());
+            s.execute("text.thread.add", &json!({"from": a, "to": c})).unwrap();
+            s.execute("text.thread.add", &json!({"from": c, "to": b})).unwrap();
+            vec![a, c, b]
+        } else {
+            s.execute("text.thread.add", &json!({"from": a, "to": b})).unwrap();
+            vec![a, b]
+        };
+        assert_eq!(threads(&s), std::slice::from_ref(&frames));
+        assert!(frames.iter().all(|id| !text(&s, *id).is_empty()), "each frame shows part of the story");
+        (s, frames)
+    }
+
+    /// Convert To Point Type on a frame of threaded text takes it out of its thread with the text
+    /// it holds, and the other frames keep the text they hold: the story holds each character once.
+    /// A thread left with one frame is no thread. Undo threads the frame again.
+    #[test]
+    fn a_frame_converted_to_point_type_leaves_its_thread_with_its_text() {
+        // Soft wraps of the point type become line breaks, so its characters are compared without
+        // white space.
+        let squeeze = |t: &str| t.split_whitespace().collect::<String>();
+        for n in [2, 3] {
+            for k in 0..n {
+                let (mut s, frames) = thread_of(n);
+                let shown: Vec<String> = frames.iter().map(|id| text(&s, *id)).collect();
+                let id = frames[k];
+                s.execute("type.convertToPointType", &json!({"ids": [id]})).unwrap();
+                let NodeKind::Text(t) = &s.doc().unwrap().doc.node(NodeId(id)).unwrap().kind else { panic!("not text") };
+                assert!(matches!(t.kind, TextKind::Point), "{n} frames, frame {k}: point type");
+                assert_eq!(squeeze(&text(&s, id)), squeeze(&shown[k]), "{n} frames, frame {k}: the point type keeps its text");
+                for (f, before) in frames.iter().zip(&shown).filter(|(f, _)| **f != id) {
+                    assert_eq!(text(&s, *f), *before, "{n} frames, frame {k}: frame {f} keeps its text");
+                }
+                let rest: Vec<u64> = frames.iter().copied().filter(|f| *f != id).collect();
+                assert_eq!(threads(&s), if rest.len() >= 2 { vec![rest] } else { vec![] }, "{n} frames, frame {k}");
+                let all: String = frames.iter().map(|f| text(&s, *f)).collect();
+                assert_eq!(squeeze(&all), squeeze(&TEXT.repeat(4)), "{n} frames, frame {k}: each character once");
+                s.execute("edit.undo", &json!({})).unwrap();
+                assert_eq!(threads(&s), std::slice::from_ref(&frames));
+                assert_eq!(frames.iter().map(|f| text(&s, *f)).collect::<Vec<_>>(), shown, "{n} frames, frame {k}: undo");
+            }
+        }
     }
 
     #[test]

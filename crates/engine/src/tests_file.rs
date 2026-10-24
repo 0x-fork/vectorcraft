@@ -242,6 +242,64 @@ fn pasting_in_draw_inside_puts_the_copies_inside_the_object() {
     assert_eq!((s.doc().unwrap().doc.node(g).unwrap().kind_label(), parent(&s, ids[0])), ("Clip Group", Some(g)));
 }
 
+/// #3705: in Draw Inside, with the object isolated by a double-click with the Selection tool, what
+/// is drawn or pasted inside it stays in isolation mode: isolation moves to the clip group Draw
+/// Inside makes around the object, so a click picks the pasted copy and it draws undimmed. It used
+/// to stay on the bare path, the new art locked and dimmed beside it, and double-clicks never
+/// reached the clip group. Undoing the step that made the clip group leaves isolation mode, as the
+/// group is gone.
+#[test]
+fn drawing_inside_an_isolated_object_keeps_the_new_art_in_isolation_mode() {
+    use vectorcraft_geom::Affine;
+    use vectorcraft_render::{RenderOptions, Renderer};
+    use vectorcraft_tools::{PointerEvent, PointerKind};
+    let mut s = session();
+    let a = s.execute("shape.rectangle", &json!({"x": 100, "y": 100, "width": 100, "height": 100})).unwrap()["id"].as_u64().unwrap();
+    let red = s.execute("shape.ellipse", &json!({"x": 20, "y": 20, "width": 50, "height": 50})).unwrap()["id"].as_u64().unwrap();
+    s.execute("paint.setFill", &json!({"color": "#ff0000", "ids": [red]})).unwrap();
+    s.execute("edit.copy", &json!({})).unwrap();
+    s.execute("select.set", &json!({"ids": [a]})).unwrap();
+    s.execute("view.drawMode", &json!({"mode": "inside"})).unwrap();
+    let ev = |s: &mut Session, kinds: &[PointerKind], x: f64, y: f64| {
+        for k in kinds {
+            s.pointer(&PointerEvent::new(*k, x, y), ViewInfo::default()).unwrap();
+        }
+    };
+    s.select_tool("selection", ViewInfo::default()).unwrap();
+    ev(&mut s, &[PointerKind::Down, PointerKind::Up, PointerKind::Down, PointerKind::Up, PointerKind::DoubleClick], 150.0, 150.0);
+    assert_eq!(s.doc().unwrap().isolation, Some(NodeId(a)), "the double-click isolates the object");
+    // An ellipse dragged out with the Ellipse tool (several previews) goes inside the object, and
+    // isolation mode with it.
+    s.select_tool("ellipse", ViewInfo::default()).unwrap();
+    ev(&mut s, &[PointerKind::Down], 110.0, 110.0);
+    for d in [5.0, 10.0, 15.0, 20.0] {
+        ev(&mut s, &[PointerKind::Drag], 110.0 + d, 110.0 + d);
+    }
+    ev(&mut s, &[PointerKind::Up], 130.0, 130.0);
+    let d = &s.doc().unwrap().doc;
+    let g = d.parent_of(NodeId(a)).unwrap();
+    assert_eq!(d.node(g).unwrap().kind_label(), "Clip Group");
+    assert_eq!(s.doc().unwrap().isolation, Some(g), "isolation mode follows the object into its clip group");
+    // A paste goes into it too, in isolation mode, and a click with the Selection tool picks it.
+    let pasted = s.execute("edit.paste", &json!({"center": [170, 170]})).unwrap()["ids"][0].as_u64().unwrap();
+    let st = s.doc().unwrap();
+    assert_eq!((st.doc.parent_of(NodeId(pasted)), st.isolation), (Some(g), Some(g)));
+    // Isolation mode draws the art around what is isolated dimmed: the red copy is not.
+    let opts = RenderOptions { background: Some([255, 255, 255, 255]), isolated: st.isolation, ..Default::default() };
+    let p = Renderer::new().render(&st.doc, 400, 300, Affine::IDENTITY, &opts).pixel(170, 170);
+    assert_eq!([p[0], p[1], p[2]], [255, 0, 0], "the pasted copy draws undimmed");
+    s.execute("select.none", &json!({})).unwrap();
+    s.select_tool("selection", ViewInfo::default()).unwrap();
+    ev(&mut s, &[PointerKind::Down, PointerKind::Up], 170.0, 170.0);
+    assert_eq!(s.doc().unwrap().selection.objects, vec![NodeId(pasted)], "a click picks the pasted copy");
+    // Undoing the paste keeps isolation mode; undoing the ellipse, which made the clip group, ends it.
+    s.execute("edit.undo", &json!({})).unwrap();
+    assert_eq!(s.doc().unwrap().isolation, Some(g));
+    s.execute("edit.undo", &json!({})).unwrap();
+    let st = s.doc().unwrap();
+    assert!(st.doc.node(g).is_none() && st.isolation.is_none(), "{:?}", st.isolation);
+}
+
 /// In Draw Behind, Paste in Place and Paste on All Artboards put the copies just below the
 /// selection, as Paste in Back does; Paste puts them on top, as in Draw Normal.
 #[test]

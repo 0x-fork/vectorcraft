@@ -41,6 +41,7 @@ mod mac_menu;
 mod mac_save_format;
 #[cfg(target_os = "macos")]
 mod mac_screen_color;
+mod mac_tablet;
 #[cfg(target_os = "macos")]
 mod mac_window;
 #[cfg(target_os = "macos")]
@@ -157,7 +158,11 @@ impl App {
         // again on its document when it answers.
         #[cfg(target_os = "macos")]
         if !self.app.file_dialog_open() {
-            open_files(&mut self.app, open_documents::take());
+            let files = open_documents::take();
+            if !files.is_empty() {
+                bring_window_forward(ctx);
+            }
+            open_files(&mut self.app, files);
         }
         self.app.logic(ctx);
         if self.pending_maximize {
@@ -189,6 +194,14 @@ fn end_before_teardown(frames: u64) {
         log::logger().flush();
         std::process::exit(0);
     }
+}
+
+/// Show the window when files are opened from the Finder or the Dock: a minimized window comes back
+/// out of the Dock and the app takes focus, as a document-based Mac app does (#3769).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn bring_window_forward(ctx: &egui::Context) {
+    ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(false));
+    ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
 }
 
 /// Open files handed to the app (command line, macOS Finder and Dock) as documents. A file that
@@ -568,6 +581,9 @@ fn services(parent: Parent, ui: egui::Context) -> Services {
         no_cursor_theme: wayland && cursor_theme::theme_missing(),
         #[cfg(target_os = "linux")]
         stylus: if x11 { tablet::start() } else { None },
+        // macOS reads it from AppKit's events (#852).
+        #[cfg(target_os = "macos")]
+        stylus: mac_tablet::start(),
         read: Some(Box::new(|p: &str| std::fs::read(p).map_err(|e| e.to_string()))),
         write: Some(Box::new(write_file)),
         exists: Some(Box::new(|p: &str| std::path::Path::new(p).exists())),
@@ -1012,11 +1028,13 @@ fn main() -> std::process::ExitCode {
                 }
                 // Linux may not map the window before the first frames, so a saved maximize is retried then (#3635).
                 let pending_maximize = cfg!(target_os = "linux") && app.ui.window.as_ref().is_some_and(|g| g.maximized);
-                // User Defined swatch and graphic style libraries live next to the preferences.
+                // User Defined swatch, graphic style and symbol libraries live next to the preferences.
                 let swatches = prefs_path().and_then(|p| Some(p.parent()?.join("Swatches").to_string_lossy().to_string()));
                 app.session.swatch_libraries.set_user_dir(swatches);
                 let styles = prefs_path().and_then(|p| Some(p.parent()?.join("Graphic Styles").to_string_lossy().to_string()));
                 app.session.style_libraries.set_user_dir(styles);
+                let symbols = prefs_path().and_then(|p| Some(p.parent()?.join("Symbols").to_string_lossy().to_string()));
+                app.session.symbol_libraries.set_user_dir(symbols);
                 // With the User Defined libraries listed, the persistent library panels reopen.
                 vectorcraft_ui_egui::panels::library_panel::restore(&mut app);
                 // So do the Libraries panel's libraries; runs without preferences (agents' test
@@ -1124,6 +1142,17 @@ mod tests {
 
     fn ui_state_with_prefs(engine_prefs: serde_json::Value) -> vectorcraft_ui_egui::UiState {
         vectorcraft_ui_egui::UiState { engine_prefs, ..Default::default() }
+    }
+
+    #[test]
+    fn opening_files_unminimizes_and_focuses_the_window() {
+        let ctx = egui::Context::default();
+        let mut out = ctx.run_ui(egui::RawInput::default(), |ui| bring_window_forward(ui.ctx()));
+        // Nothing paints in the test: drop the font atlas upload egui expects to be applied.
+        out.textures_delta.clear();
+        let cmds = &out.viewport_output[&egui::ViewportId::ROOT].commands;
+        assert!(cmds.contains(&egui::ViewportCommand::Minimized(false)));
+        assert!(cmds.contains(&egui::ViewportCommand::Focus));
     }
 
     #[test]

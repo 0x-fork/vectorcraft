@@ -1152,6 +1152,62 @@ fn artboard_options_show_center_mark_and_cross_hairs() {
     }
 }
 
+/// Artboard Options shows Show Video Safe Areas and Video Ruler Pixel Aspect Ratio (one row of
+/// it), set as the artboard has them whether it opens from the Artboards panel or from a
+/// double-click with the Artboard tool. OK sets them in one undo step (a typed ratio is read as a
+/// number), an out-of-range ratio keeps the dialog open and changes nothing, and a new artboard's
+/// Artboard Options gives it the ones set.
+#[test]
+fn artboard_options_show_video_display_options() {
+    use vectorcraft_tools::{PointerEvent, PointerKind};
+    let mut app = app();
+    let video = |app: &VectorcraftApp, i: usize| {
+        let a = &app.session.doc().unwrap().doc.artboards[i];
+        (a.show_video_safe_areas, a.video_ruler_pixel_aspect_ratio)
+    };
+    crate::dialogs::artboard_options::open(&mut app).unwrap();
+    let text = crate::tests_labels::painted_text(&mut app, |app, ui| show(app, ui.ctx()));
+    assert!(text.contains("Show Video Safe Areas"), "{text}");
+    assert_eq!(text.matches("Video Ruler Pixel Aspect Ratio").count(), 1, "one row: {text}");
+    let d = app.ui.dialog.as_mut().unwrap();
+    assert_eq!((d.bool("showVideoSafeAreas"), d.f64("videoRulerPixelAspectRatio", 0.0)), (false, 1.0));
+    d.fields.insert("showVideoSafeAreas".into(), json!(true));
+    d.fields.insert("videoRulerPixelAspectRatio".into(), json!("0.9"));
+    let undo = app.session.doc().unwrap().history.undo.len();
+    super::confirm(&mut app).unwrap();
+    assert_eq!(video(&app, 0), (true, 0.9));
+    assert_eq!(app.session.doc().unwrap().history.undo.len(), undo + 1);
+    // Opened again, it shows them; a ratio out of range is refused.
+    crate::dialogs::artboard_options::open(&mut app).unwrap();
+    let d = app.ui.dialog.as_mut().unwrap();
+    assert_eq!((d.bool("showVideoSafeAreas"), d.f64("videoRulerPixelAspectRatio", 0.0)), (true, 0.9));
+    d.fields.insert("videoRulerPixelAspectRatio".into(), json!(20));
+    assert!(super::confirm(&mut app).is_err());
+    assert_eq!(video(&app, 0), (true, 0.9), "nothing changed");
+    cancel(&mut app);
+    // A double-click with the Artboard tool on the artboard's empty space.
+    app.select_tool("artboard");
+    let view = app.view_info();
+    for kind in [PointerKind::Down, PointerKind::Up, PointerKind::Down, PointerKind::Up, PointerKind::DoubleClick] {
+        crate::canvas::dispatch(&mut app, &PointerEvent::new(kind, 100.0, 100.0), view);
+    }
+    let d = app.ui.dialog.clone().expect("Artboard Options opened");
+    assert_eq!((d.bool("showVideoSafeAreas"), d.f64("videoRulerPixelAspectRatio", 0.0)), (true, 0.9));
+    cancel(&mut app);
+    // A new artboard takes the ones set, and the defaults otherwise.
+    for (set, want) in [(true, (true, 2.0)), (false, (false, 1.0))] {
+        app.run("ui.newArtboard", json!({})).unwrap();
+        if set {
+            let d = app.ui.dialog.as_mut().unwrap();
+            d.fields.insert("showVideoSafeAreas".into(), json!(true));
+            d.fields.insert("videoRulerPixelAspectRatio".into(), json!(2));
+        }
+        super::confirm(&mut app).unwrap();
+        let last = app.session.doc().unwrap().doc.artboards.len() - 1;
+        assert_eq!(video(&app, last), want);
+    }
+}
+
 /// #1482: with Artboards 1 and 3 selected with the Artboard tool, a new Width in Artboard Options
 /// goes to both, each keeping its top-left corner and its height, in one undo step. The new name
 /// goes only to the artboard the dialog shows, and Artboard 2 keeps its size. A name alone resizes
@@ -1842,7 +1898,10 @@ fn polar_grid_dialog_edits_skews_compound_and_fill() {
     assert!((widths[0] - 100.0).abs() < 1e-6 && (widths[1] - 93.75).abs() < 1e-6, "outward: {widths:?}");
     let tips: Vec<f64> = children[3..].iter().map(|n| n.path_data().unwrap().subpaths[0].anchors[1].p.x).collect();
     assert!(tips.iter().all(|x| *x > 60.0), "right of the top divider: {tips:?}");
-    let saved = json!({"concentric": 3, "radial": 4, "concentricSkew": 100.0, "radialSkew": 500.0, "compound": true, "fill": true});
+    let saved = json!({
+        "concentric": 3, "radial": 4, "concentricSkew": 100.0, "radialSkew": 500.0, "compound": true, "fill": true,
+        "width": 100.0, "height": 100.0, "reference": 0,
+    });
     assert_eq!(app.session.tool_options_of("polarGrid"), saved);
 }
 

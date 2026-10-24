@@ -73,6 +73,9 @@ fn inside_or_near(p: Point, o: &Outer) -> bool {
     inside
 }
 
+/// The most paths grouped.
+const MAX_GROUPED_PATHS: usize = 20_000;
+
 /// For each of `paths` (bottom-most first), the path it lies inside, if any: the smallest filled
 /// path whose outer contour holds all of its own. The path that covers the whole `w` × `h` image
 /// (the paper) is nobody's parent: everything would be inside it.
@@ -81,6 +84,10 @@ fn inside_or_near(p: Point, o: &Outer) -> bool {
 /// `paths` paints in its own order: where the paths can overlap (`stacked`), a path only gets a parent below it, and only
 /// if no path that would then come after it instead of before it shares any of its box.
 pub(crate) fn parents(paths: &[TracedPath], w: usize, h: usize, stacked: bool) -> Vec<Option<usize>> {
+    // Each path is tested against the others (quadratic): past this many, they stay ungrouped.
+    if paths.len() > MAX_GROUPED_PATHS {
+        return vec![None; paths.len()];
+    }
     let outers: Vec<Option<Outer>> = paths.iter().map(outer).collect();
     let paper = Rect::new(1.0, 1.0, w as f64 - 1.0, h as f64 - 1.0);
     let mut parent: Vec<Option<usize>> = vec![None; paths.len()];

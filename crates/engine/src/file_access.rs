@@ -252,8 +252,9 @@ fn resolve(path: &str) -> Result<PathBuf, String> {
     }
 }
 
-/// Is `path` (resolved) `root` or inside it, component by component (without regard to case on
-/// Windows, whose file systems ignore it)?
+/// Is `path` (resolved) `root` or inside it, component by component (without regard to case in a
+/// Windows drive prefix only: resolved folder names have their real case, and a folder that differs
+/// in case alone may be another, on a case-sensitive Windows folder)?
 fn inside(path: &Path, root: &Path) -> bool {
     let mut path = path.components();
     root.components().all(|r| path.next().is_some_and(|p| same_component(p, r)))
@@ -263,7 +264,7 @@ fn same_component(a: Component, b: Component) -> bool {
     if a == b {
         return true;
     }
-    if !cfg!(windows) {
+    if !cfg!(windows) || !matches!((a, b), (Component::Prefix(_), Component::Prefix(_))) {
         return false;
     }
     match (a.as_os_str().to_str(), b.as_os_str().to_str()) {

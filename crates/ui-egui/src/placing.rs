@@ -153,16 +153,18 @@ fn spawn(
 }
 
 /// Place the files that are ready (each frame), in the order they were started: a file read
-/// sooner than one started before it waits for that one. Not while a dialog is open or a drag (a
-/// tool's interaction, or a tool busy with a drag of its own, such as the place cursor's) is under
-/// way, as [`crate::opening::poll`]: a placed file's document becomes the active one and the
-/// dialog's OK acts on the active document; a drag in another document is canceled when the
-/// active document changes, and a drag in the same one previews from the document as it was
-/// before the drag, without the placed art.
+/// sooner than one started before it waits for that one. Not while a dialog is open, an
+/// interaction is open, or a tool is busy with a drag of its own (the place cursor's) while the
+/// pointer button is held, as [`crate::opening::poll`]: a placed file's document becomes the
+/// active one and the dialog's OK acts on the active document; a drag in another document is
+/// canceled when the active document changes, and a drag or preview in the same one previews from
+/// the document as it was before it began, without the placed art. A tool that is busy while the
+/// button is not held is waiting between its clicks (the Dimension tool after its first point):
+/// the file is placed unless the tool has a preview open (the Flare tool after its center drag).
 pub fn poll(app: &mut VectorcraftApp) {
     while app.ui.dialog.is_none()
         && !app.session.in_interaction()
-        && !app.session.tool_busy()
+        && !(app.session.tool_busy() && app.session.pointer_held())
         && let Some(p) = app.placing.pending.first()
     {
         let r = match p.done.try_recv() {
@@ -605,5 +607,31 @@ mod tests {
         };
         assert_eq!(placed_in(0).iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>(), ["photo.tif"]);
         assert_eq!(placed_in(1), [("a.png".to_string(), Some(vectorcraft_geom::Rect::new(20.0, 20.0, 60.0, 60.0)))], "the drag placed its file");
+    }
+
+    /// A file read while a tool waits between its clicks (the Dimension tool after its first point),
+    /// in the file's document or in another one, is placed without waiting for the next click. In
+    /// the same document the tool keeps its point; in another one it starts afresh, as when the user
+    /// switches documents.
+    #[test]
+    fn a_file_read_between_a_tools_clicks_is_placed() {
+        use vectorcraft_tools::{PointerEvent, PointerKind};
+        let path = saved("clicks", "photo.tif", &picture(Tiff, 60, 40));
+        for other_document in [false, true] {
+            let mut app = app(true);
+            start(&mut app, &json!({"path": path, "at": [300, 200]}), false).unwrap();
+            if other_document {
+                app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
+            }
+            app.select_tool("dimension");
+            let view = vectorcraft_engine::ViewInfo::default();
+            for kind in [PointerKind::Down, PointerKind::Up] {
+                crate::canvas::dispatch(&mut app, &PointerEvent::new(kind, 20.0, 20.0), view);
+            }
+            assert!(app.session.tool_busy() && !app.session.in_interaction(), "other document: {other_document}");
+            placed(&mut app);
+            assert_eq!(names(&app), ["photo.tif"], "other document: {other_document}");
+            assert_eq!(app.session.tool_busy(), !other_document, "other document: {other_document}");
+        }
     }
 }

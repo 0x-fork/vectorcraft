@@ -715,7 +715,8 @@ fn touch_type(s: &mut Session, p: &Value) -> Result<Value> {
     if dx != 0.0 && g.rtl {
         return Err(bad(C, "a right-to-left character moves only up and down (dy)"));
     }
-    let prev = lay.glyphs.iter().find(|h| h.line == g.line && h.byte + h.len == a);
+    // A list marker's glyphs (length 0) stand for no character.
+    let prev = lay.glyphs.iter().find(|h| h.line == g.line && h.len > 0 && h.byte + h.len == a);
     let pr = prev.map(|h| (h.byte, h.byte + h.len));
     let em = glyph_em(&t, g).ok_or_else(|| bad(C, "the character's size can't be measured"))?;
     let em_prev = match prev {
@@ -771,7 +772,7 @@ fn touch_type(s: &mut Session, p: &Value) -> Result<Value> {
             let mut trial = t.clone();
             touch(&mut trial, None, None, to - shift);
             let l = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), &trial);
-            l.glyphs.iter().find(|h| h.byte == a).map(|h| h.xf * Point::ZERO)
+            l.glyphs.iter().find(|h| h.byte == a && h.len > 0).map(|h| h.xf * Point::ZERO)
         };
         let per_step = match (pen_at(from + step), pen_at(from + 2.0 * step)) {
             (Some(p), Some(q)) => linear(t.xf, q - p).hypot() / step.abs(),
@@ -788,7 +789,9 @@ fn touch_type(s: &mut Session, p: &Value) -> Result<Value> {
     // out alone, in point type of the same orientation, before and after the change.
     let grown = {
         let mut alone = TextObject { kind: TextKind::Point, runs: edit::slice_runs(&t.runs, a, b), paras: Vec::new(), ..t.clone() };
-        let advance = |o: &TextObject| vectorcraft_text::layout(vectorcraft_text::FontDb::global(), o).glyphs.iter().map(|h| h.advance).sum::<f64>();
+        let advance = |o: &TextObject| {
+            vectorcraft_text::layout(vectorcraft_text::FontDb::global(), o).glyphs.iter().filter(|h| h.len > 0).map(|h| h.advance).sum::<f64>()
+        };
         let old = advance(&alone);
         edit::style_range(&mut alone.runs, 0, b - a, |st| change.apply(st));
         (advance(&alone) - old) * lay.fit_scale
@@ -796,15 +799,15 @@ fn touch_type(s: &mut Session, p: &Value) -> Result<Value> {
     // The character lands `moved` further on, and the character after it on its line keeps its
     // distance from it, wider or narrower only by the character's new scales.
     let goal = pen(g) + moved;
-    let next_goal = lay.glyphs.iter().find(|h| h.byte == b && h.line == g.line).map(|h| pen(h) + grown);
+    let next_goal = lay.glyphs.iter().find(|h| h.byte == b && h.len > 0 && h.line == g.line).map(|h| pen(h) + grown);
     // How far the character and the character after it on its line miss their places, along the
     // line, with the kerning `k` (before, own) added.
     let miss = |k: (Option<f64>, Option<f64>)| {
         let mut trial = t.clone();
         touch(&mut trial, k.0, k.1, raise);
         let l = vectorcraft_text::layout(vectorcraft_text::FontDb::global(), &trial);
-        let h = l.glyphs.iter().find(|h| h.byte == a)?;
-        let next = match (l.glyphs.iter().find(|n| n.byte == b && n.line == h.line), next_goal) {
+        let h = l.glyphs.iter().find(|h| h.byte == a && h.len > 0)?;
+        let next = match (l.glyphs.iter().find(|n| n.byte == b && n.len > 0 && n.line == h.line), next_goal) {
             (Some(n), Some(at)) => pen(n) - at,
             _ => 0.0,
         };
@@ -1214,6 +1217,7 @@ fn discard_empty(s: &mut Session, p: &Value) -> Result<Value> {
             st.doc = created.doc.clone();
             st.history.undo.truncate(k);
             st.selection.prune(&st.doc);
+            super::globaledit::follow_history(st);
             st.revision += 1;
             return Ok(json!({"removed": true}));
         }

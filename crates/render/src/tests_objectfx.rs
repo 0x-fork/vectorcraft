@@ -285,6 +285,7 @@ fn image_doc(effects: Vec<Effect>) -> Document {
             xf: Affine::translate((20.0, 20.0)),
             link: None,
             placement: Default::default(),
+            pixels: None,
         })),
     );
     n.appearance.effects = effects;
@@ -593,7 +594,7 @@ fn geometry_effects_reshape_type_through_its_outlines() {
     assert!(changed > 100, "{changed} pixels changed");
     // The reshaped art is plain paths painted with the text's fill.
     let n = &d.layers[0].children().unwrap()[0];
-    let art = vectorcraft_effects::reshape(n, None).unwrap();
+    let art = vectorcraft_effects::reshape(None, n, None).unwrap();
     let (mut text, mut black) = (0, 0);
     art.walk(&mut |m| {
         text += usize::from(matches!(m.kind, NodeKind::Text(_)));
@@ -616,7 +617,7 @@ fn outline_object_draws_type_as_its_outlines_and_leaves_its_look() {
     // The type is drawn through its outlines: plain paths painted with the text's fill.
     let d = text_doc(vec![fx("path.outlineObject", json!({}))]);
     let n = &d.layers[0].children().unwrap()[0];
-    let art = vectorcraft_effects::reshape(n, None).unwrap();
+    let art = vectorcraft_effects::reshape(None, n, None).unwrap();
     let (mut text, mut black) = (0, 0);
     art.walk(&mut |m| {
         text += usize::from(matches!(m.kind, NodeKind::Text(_)));
@@ -649,7 +650,7 @@ fn outline_object_leaves_paths_and_images_as_they_are() {
     assert!(changed.iter().all(|&n| n < 10), "pixels changed: {changed:?}");
     // The image is drawn through its frame, as under any geometry effect.
     let d = image_doc(vec![fx("path.outlineObject", json!({}))]);
-    assert!(vectorcraft_effects::reshape(&d.layers[0].children().unwrap()[0], None).is_some());
+    assert!(vectorcraft_effects::reshape(None, &d.layers[0].children().unwrap()[0], None).is_some());
 }
 
 #[test]

@@ -1,7 +1,8 @@
-//! Paragraph panel: seven alignment buttons, Paragraph Direction (with the Indic options), indents,
-//! space before/after, Hyphenate, Insert Kashidas (with the Indic options), Mojikumi Set and Kinsoku
-//! Set (with the East Asian options); the panel menu turns Roman Hanging Punctuation on and off,
-//! opens Justification… and Hyphenation… and picks the Single-line or Every-line Composer.
+//! Paragraph panel: seven alignment buttons, Paragraph Direction (with the Indic options), the
+//! Bullets button and its presets, indents, space before/after, Hyphenate, Insert Kashidas (with
+//! the Indic options), Mojikumi Set and Kinsoku Set (with the East Asian options); the panel menu
+//! turns Roman Hanging Punctuation on and off, opens Justification… and Hyphenation… and picks the
+//! Single-line or Every-line Composer.
 
 use egui::{Ui, vec2};
 use serde_json::{Value, json};
@@ -332,6 +333,85 @@ pub fn alignment_buttons(app: &mut VectorcraftApp, ui: &mut Ui, para: &ParaStyle
     }
 }
 
+/// Type › Bullets and Numbering › Apply Bullets (`type.applyBullets {bullet?}`): the paragraphs of
+/// the selected type, or those the Type tool's selection touches, become a bulleted list with
+/// `bullet`; without it, a list keeps its bullet and other paragraphs take the dot.
+pub(crate) fn apply_bullets(app: &mut VectorcraftApp, p: &Value) -> Result<Value, String> {
+    text_style(app).ok_or("select some type first")?;
+    let params = match p.get("bullet") {
+        Some(b) => json!({ "bullet": b }),
+        None => json!({ "list": "bullet" }),
+    };
+    run_on_paragraphs(app, "text.setFormat", params)
+}
+
+/// The Bullets button and the arrow beside it (Paragraph panel). The button makes the paragraphs
+/// the panel acts on a bulleted list (`text.setFormat {list: "bullet"}`) and shows pressed while
+/// they all are one. The arrow lists the presets (`{bullet}`): None turns the list off, and the
+/// one every paragraph has is checked.
+pub fn bullets_button(app: &mut VectorcraftApp, ui: &mut Ui, size: f32) {
+    use vectorcraft_doc::text::Bullet;
+    let t = Tokens::get(ui.ctx());
+    let shown = shared_para(app, |p| p.list.map(|l| l.bullet));
+    if widgets::icon_button(ui, "dc-para-bullets", tl!("Bullets"), matches!(shown, Some(Some(_))), size).clicked() {
+        format(app, json!({"list": "bullet"}));
+    }
+    let (rect, arrow) = ui.allocate_exact_size(vec2(14.0, size), egui::Sense::click());
+    if arrow.hovered() {
+        ui.painter().rect_filled(rect, egui::CornerRadius::same(4), t.hover);
+    }
+    crate::icons::paint(ui, "chevron-down", egui::Rect::from_center_size(rect.center(), vec2(10.0, 10.0)), t.text_dim);
+    arrow.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Bullets")));
+    let arrow = arrow.on_hover_text(tl!("Bullets"));
+    let presets = [
+        (tl!("None"), "none", None),
+        (tl!("Filled Dot"), "dot", Some(Bullet::Dot)),
+        (tl!("Dash"), "dash", Some(Bullet::Dash)),
+        (tl!("Hollow Circle"), "circle", Some(Bullet::Circle)),
+        (tl!("Filled Square"), "square", Some(Bullet::Square)),
+    ];
+    let picked = egui::Popup::menu(&arrow).show(|ui| {
+        let mut picked = None;
+        for (name, key, bullet) in presets {
+            if bullet_row(ui, name, bullet, shown == Some(bullet)) {
+                picked = Some(key);
+            }
+        }
+        picked
+    });
+    if let Some(key) = picked.and_then(|r| r.inner) {
+        format(app, json!({ "bullet": key }));
+    }
+}
+
+/// A row of the Bullets presets: a check when `checked`, the bullet drawn (a slash for None), then
+/// its name. Whether it was clicked.
+fn bullet_row(ui: &mut Ui, name: &str, bullet: Option<vectorcraft_doc::text::Bullet>, checked: bool) -> bool {
+    use vectorcraft_doc::text::Bullet;
+    let t = Tokens::get(ui.ctx());
+    let (rect, resp) = ui.allocate_exact_size(vec2(130.0, 22.0), egui::Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(rect, egui::CornerRadius::same(4), t.hover);
+    }
+    let painter = ui.painter();
+    let font = egui::FontId::proportional(12.5);
+    if checked {
+        painter.text(rect.left_center() + vec2(6.0, 0.0), egui::Align2::LEFT_CENTER, "✓", font.clone(), t.text_strong);
+    }
+    let c = rect.left_center() + vec2(28.0, 0.0);
+    let stroke = egui::Stroke::new(1.5, t.text_strong);
+    match bullet {
+        None => painter.line_segment([c + vec2(-5.0, 5.0), c + vec2(5.0, -5.0)], stroke),
+        Some(Bullet::Dot) => painter.circle_filled(c, 3.0, t.text_strong),
+        Some(Bullet::Dash) => painter.line_segment([c - vec2(4.0, 0.0), c + vec2(4.0, 0.0)], stroke),
+        Some(Bullet::Circle) => painter.circle_stroke(c, 3.0, egui::Stroke::new(1.2, t.text_strong)),
+        Some(Bullet::Square) => painter.rect_filled(egui::Rect::from_center_size(c, vec2(6.0, 6.0)), 0.0, t.text_strong),
+    };
+    painter.text(rect.left_center() + vec2(42.0, 0.0), egui::Align2::LEFT_CENTER, name, font, t.text_strong);
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, ui.is_enabled(), checked, name));
+    resp.clicked()
+}
+
 /// The Hyphenate checkbox for the paragraphs the panel acts on.
 pub fn hyphenate_check(app: &mut VectorcraftApp, ui: &mut Ui, _para: &ParaStyle) {
     let hyphenate = shared_hyphenate(app);
@@ -362,6 +442,10 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                 }
             }
         }
+    });
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 0.0;
+        bullets_button(app, ui, 28.0);
     });
     ui.add_space(4.0);
     let fw = ((ui.available_width() - 66.0) / 2.0).clamp(60.0, 100.0);
@@ -523,10 +607,10 @@ pub fn menu(app: &mut VectorcraftApp, ui: &mut Ui) {
     }
 }
 
-/// Reset Panel: the paragraphs the panel acts on ([`format`]) take Auto alignment, no indents or
-/// paragraph spacing, Hyphenate off with the default Hyphenation and Justification options, Auto
-/// direction, Bottom-to-Bottom Leading, Regular burasagari, the Hard kinsoku set, the Every-line
-/// Composer, Roman Hanging Punctuation off and no kashidas.
+/// Reset Panel: the paragraphs the panel acts on ([`format`]) take Auto alignment, no list, no
+/// indents or paragraph spacing, Hyphenate off with the default Hyphenation and Justification
+/// options, Auto direction, Bottom-to-Bottom Leading, Regular burasagari, the Hard kinsoku set, the
+/// Every-line Composer, Roman Hanging Punctuation off and no kashidas.
 fn reset_panel(app: &mut VectorcraftApp) {
     let h = HyphenationOptions::default();
     let j = vectorcraft_doc::JustificationOptions::default();
@@ -534,7 +618,7 @@ fn reset_panel(app: &mut VectorcraftApp) {
     format(
         app,
         json!({
-            "leftIndent": 0, "rightIndent": 0, "firstLineIndent": 0, "spaceBefore": 0, "spaceAfter": 0, "hyphenate": false,
+            "list": "none", "leftIndent": 0, "rightIndent": 0, "firstLineIndent": 0, "spaceBefore": 0, "spaceAfter": 0, "hyphenate": false,
             "wordsLongerThan": h.words_longer_than, "afterFirst": h.after_first, "beforeLast": h.before_last,
             "hyphenLimit": h.hyphen_limit, "hyphenationZone": h.zone, "hyphenateCapitalized": h.capitalized, "kashida": "none",
             "wordSpacing": j.word_spacing, "letterSpacing": j.letter_spacing, "glyphScaling": j.glyph_scaling,
@@ -862,6 +946,53 @@ mod tests {
         assert_eq!(kashida(&app), vectorcraft_doc::text::Kashida::Medium);
         reset_panel(&mut app);
         assert_eq!(kashida(&app), vectorcraft_doc::text::Kashida::None);
+    }
+
+    /// The Bullets button makes the paragraphs the Type tool's selection touches a bulleted list
+    /// with the dot and shows pressed; the arrow's presets pick another bullet, None turns the list
+    /// off, Type › Bullets and Numbering › Apply Bullets applies a list, and Reset Panel turns it
+    /// off.
+    #[test]
+    fn the_bullets_button_and_its_presets_set_the_list_and_reset_panel_clears_it() {
+        use vectorcraft_doc::text::{Bullet, ParaList};
+        crate::i18n::set_current(crate::i18n::Lang::EN);
+        let (mut app, id) = editing_text("One\nTwo");
+        select_range(&mut app, 0, 0);
+        let lists = |app: &VectorcraftApp| {
+            let node = app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id.as_u64().unwrap())).unwrap();
+            let NodeKind::Text(text) = &node.kind else { panic!("text") };
+            (text.para_at(0).list, text.para_at(1).list)
+        };
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let row = std::cell::Cell::new(egui::Rect::NOTHING);
+        let mut draw = |app: &mut VectorcraftApp, ui: &mut Ui| {
+            row.set(ui.horizontal(|ui| bullets_button(app, ui, 28.0)).response.rect);
+        };
+        super::super::tests_appearance::frame_events(&ctx, &mut app, vec![], &mut draw);
+        let min = row.get().min;
+        let (button, arrow) = (min + vec2(14.0, 14.0), min + vec2(28.0 + 7.0, 14.0));
+        super::super::tests_appearance::click(&ctx, &mut app, button, &mut draw);
+        assert_eq!(lists(&app), (Some(ParaList::bulleted(Bullet::Dot)), None), "the caret's paragraph");
+        assert_eq!(shared_para(&app, |p| p.list.map(|l| l.bullet)), Some(Some(Bullet::Dot)), "the button shows pressed");
+        let mut pick = |app: &mut VectorcraftApp, name: &str| {
+            super::super::tests_appearance::click(&ctx, app, arrow, &mut draw);
+            let texts = super::super::tests_appearance::frame_events(&ctx, app, vec![], &mut draw);
+            let at = super::super::tests_appearance::text_rect(&texts, name).center();
+            super::super::tests_appearance::click(&ctx, app, at, &mut draw);
+        };
+        pick(&mut app, "Filled Square");
+        assert_eq!(lists(&app), (Some(ParaList::bulleted(Bullet::Square)), None));
+        pick(&mut app, "None");
+        assert_eq!(lists(&app), (None, None));
+        app.session.set_tool_option("selectAll", &json!(true));
+        app.run("type.applyBullets", json!({})).unwrap();
+        assert_eq!(lists(&app), (Some(ParaList::bulleted(Bullet::Dot)), Some(ParaList::bulleted(Bullet::Dot))));
+        app.run("type.applyBullets", json!({"bullet": "dash"})).unwrap();
+        assert_eq!(lists(&app).0, Some(ParaList::bulleted(Bullet::Dash)));
+        app.session.set_tool_option("selectAll", &json!(true));
+        reset_panel(&mut app);
+        assert_eq!(lists(&app), (None, None));
     }
 
     /// Reset Panel turns Hyphenate and Roman Hanging Punctuation off and sets the Hyphenation and

@@ -932,19 +932,38 @@ pub fn dilate_plane(a: &mut Vec<f32>, w: usize, h: usize, radius: f64) {
 /// One horizontal pass of [`dilate_plane`] over the rows of `w` values of a plane: the largest
 /// value within `whole`, blended by `frac` towards the largest within `whole + 1`.
 fn max_plane(src: &[f32], dst: &mut [f32], w: usize, whole: usize, frac: f32) {
+    let (mut inner, mut ring) = (vec![0.0f32; w], vec![0.0f32; w]);
     for (row, out) in src.chunks_exact(w).zip(dst.chunks_exact_mut(w)) {
-        for (x, o) in out.iter_mut().enumerate() {
-            let lo = x.saturating_sub(whole + 1);
-            let hi = (x + whole + 1).min(w - 1);
-            let (mut inner, mut ring) = (row[x], row[x]);
-            for (j, v) in row[lo..=hi].iter().enumerate() {
-                if (lo + j).abs_diff(x) <= whole {
-                    inner = inner.max(*v);
-                }
-                ring = ring.max(*v);
-            }
-            *o = inner + (ring - inner) * frac;
+        window_max(row, whole, &mut inner);
+        window_max(row, whole + 1, &mut ring);
+        for ((o, i), r) in out.iter_mut().zip(&inner).zip(&ring) {
+            *o = i + (r - i) * frac;
         }
+    }
+}
+
+/// For each `x`, the largest of `row[x - radius..=x + radius]` (cut at the row's ends) into `out`,
+/// in time linear in the row (a sliding window, not a scan of the window for each `x`).
+fn window_max(row: &[f32], radius: usize, out: &mut [f32]) {
+    use std::collections::VecDeque;
+    // Indices of the window's values that can still be its largest, falling in value.
+    let mut keep: VecDeque<usize> = VecDeque::new();
+    let mut next = 0;
+    for (x, o) in out.iter_mut().enumerate().take(row.len()) {
+        let hi = x.saturating_add(radius).min(row.len().saturating_sub(1));
+        while next <= hi {
+            let v = row[next];
+            while keep.back().is_some_and(|&b| row[b] <= v) {
+                keep.pop_back();
+            }
+            keep.push_back(next);
+            next += 1;
+        }
+        let lo = x.saturating_sub(radius);
+        while keep.front().is_some_and(|&f| f < lo) {
+            keep.pop_front();
+        }
+        *o = keep.front().map_or(row[x], |&f| row[f]);
     }
 }
 
@@ -1061,3 +1080,22 @@ mod tests;
 mod tests_paint;
 #[cfg(test)]
 mod tests_sketch;
+
+#[cfg(test)]
+mod window_max_tests {
+    use super::window_max;
+
+    #[test]
+    fn the_sliding_maximum_matches_a_scan_of_each_window() {
+        let row: Vec<f32> = (0..40u32).map(|i| ((i * 7919) % 31) as f32).collect();
+        for radius in [0, 1, 2, 5, 39, 100] {
+            let mut out = vec![0.0; row.len()];
+            window_max(&row, radius, &mut out);
+            for (x, got) in out.iter().enumerate() {
+                let (lo, hi) = (x.saturating_sub(radius), (x + radius).min(row.len() - 1));
+                let want = row[lo..=hi].iter().copied().fold(f32::MIN, f32::max);
+                assert_eq!(*got, want, "radius {radius} at {x}");
+            }
+        }
+    }
+}

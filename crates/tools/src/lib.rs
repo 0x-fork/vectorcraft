@@ -352,6 +352,10 @@ pub struct ToolContext<'a> {
     /// two other objects in its row or column, or evenly between its two neighbours, and the
     /// equal gaps show.
     pub spacing_guides: bool,
+    /// Smart Guides → Invoke Distance Guides: with the Selection tool, Alt/Option held over another
+    /// object shows how far the selection is from it, and over an empty part of an artboard how
+    /// far it is from the artboard's edges ([`guides::distance_guides`]).
+    pub distance_guides: bool,
     /// Smart Guides → Snapping Tolerance (screen pixels): how near a smart guide target pulls the
     /// pointer, a dragged edge or a drawn point.
     pub snapping_tolerance: f64,
@@ -455,6 +459,9 @@ pub enum Overlay {
     Label { p: Point, text: String, color: [u8; 3] },
     /// Measurement pill near the cursor (grey box with white text).
     Measure { p: Point, text: String },
+    /// A Distance Guides measurement: a line from `a` to `b` with a tick across each end, and
+    /// `text` (its length) in a pill of `color` on its middle.
+    Distance { a: Point, b: Point, text: String, color: [u8; 3] },
     /// Translucent filled quad (text selection highlight), RGBA.
     Highlight { quad: [Point; 4], color: [u8; 4] },
     /// A colour chip of fixed screen size (a gradient stop), RGBA; ringed when selected.
@@ -554,8 +561,8 @@ pub enum Cursor {
     /// Over the type widget of selected type (a double-click converts point type to area type and
     /// back): the arrow with a type badge.
     TypeWidget,
-    /// The Selection tool loaded with the text of the out port of area type or type on a path (a
-    /// click threads it into a path or a new frame, a drag draws the new frame).
+    /// The Selection tool loaded with the text of area type or type on a path by a click on its out
+    /// or in port (a click threads it into a path or a new frame, a drag draws the new frame).
     LoadedText,
     /// The Shape Builder: a crosshair with a plus (merge mode)...
     ShapeBuilder,
@@ -806,6 +813,17 @@ pub trait Tool: Send {
         None
     }
     fn notify(&mut self, _cx: &ToolContext, _what: &str) {}
+    /// The pointer stopped hovering for the tool while it holds no press: it left the canvas (for a
+    /// panel or out of the window), went under a floating panel, menu, popup or dialog, or a press
+    /// started panning, zooming or turning the view. Drop what shows only for the hover (the
+    /// Selection tool's Distance Guides).
+    fn hover_ended(&mut self, _cx: &ToolContext) {}
+    /// Whether what the tool shows for the hover depends on what lies under a still pointer: then
+    /// the canvas hovers it again where the pointer is when the view, the document or the
+    /// selection changes (the Selection tool while Alt shows Distance Guides).
+    fn wants_rehover(&self) -> bool {
+        false
+    }
     /// Called when the user switches away (finish pending work).
     fn deactivate(&mut self, _cx: &ToolContext) -> Vec<Action> {
         vec![]
@@ -1047,6 +1065,7 @@ pub(crate) mod testutil {
             measurement_labels: true,
             transform_tools_guides: true,
             spacing_guides: true,
+            distance_guides: true,
             snapping_tolerance: 4.0,
             construction_angles: guides::construction_angles(guides::DEFAULT_CONSTRUCTION_ANGLES),
             screen: None,

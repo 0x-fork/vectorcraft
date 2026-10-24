@@ -179,6 +179,8 @@
 	Anti-aliased Artwork	Kenar Yumuşatılmış Sanat Çalışması
 	Anti-aliasing:	Kenar yumuşatma:
 	Any Kind	Her Türlü
+	Font Technology	Yazı Tipi Teknolojisi
+font-technology	Variable	Değişken
 	Appearance	Görünüm
 	Appearance Attribute	Görünüm Özniteliği
 	Appearance Item	Görünüm Öğesi
@@ -264,6 +266,9 @@
 	Background Color:	Arka Plan Rengi:
 	Show Center Mark	Merkez İşaretini Göster
 	Show Cross Hairs	Artı Çizgilerini Göster
+	Show Video Safe Areas	Video Güvenli Alanlarını Göster
+	Video Ruler Pixel Aspect Ratio:	Video Cetveli Piksel En Boy Oranı:
+	Hide Video Rulers	Video Cetvellerini Gizle
 	Background Contents	Arka Plan İçeriği
 	Background Contents:	Arkaplan İçeriği:
 	Background:	Arka plan:
@@ -331,6 +336,13 @@
 	Built-in presets don't change: New… starts an editable copy.	Yerleşik ön ayarlar değişmez: Yeni… düzenlenebilir bir kopya başlatır.
 	Bulge…	çıkıntı…
 	Bullet	Madde işareti
+	Bullets	Madde İşaretleri
+	Bullets and Numbering	Madde İşaretleri ve Numaralandırma
+	Apply Bullets	Madde İşaretlerini Uygula
+	Filled Dot	Dolu Nokta
+	Dash	Tire
+	Hollow Circle	Boş Daire
+	Filled Square	Dolu Kare
 	Butt Cap	Popo Kapağı
 	Byte Order:	Bayt Sırası:
 	Calligraphic	Kaligrafi
@@ -2929,6 +2941,7 @@
 	Space Before Paragraph	Paragraftan Önce Boşluk
 	Spaces	Alanlar
 	Spacing Guides	Aralık Kılavuzları
+	Invoke Distance Guides	Mesafe Kılavuzlarını Çağır
 	Spacing:	Aralık:
 	Spanish	İspanyolca
 	Specified Distance	Belirtilen Mesafe
@@ -3056,7 +3069,6 @@
 	Show all open documents	Tüm açık belgeleri göster
 	Symbol Instance	Sembol Örneği
 	Symbol Libraries	Sembol Kitaplıkları
-	Symbol Libraries (on the roadmap)	Sembol Kitaplıkları (yol haritasında)
 	Symbol Screener Tool	Sembol Perdeleyici Aracı
 	Symbol Scruncher Tool	Sembol Ezici Aracı
 	Symbol Shifter Tool	Sembol Yer Değiştirme Aracı
@@ -3182,6 +3194,13 @@
 	Transparent Background	Şeffaf Arka Plan
 	Transverse (the page a quarter turn on the paper)	Enine (kağıt üzerinde çeyrek tur dönüş yapan sayfa)
 	Trap…	Tuzak…
+	Trap	Tuzak
+	Height/Width	Yükseklik/Genişlik
+	Tint Reduction	Ton Azaltma
+	Traps with Process Color	Proses Renkli Tuzaklar
+	Reverse Traps	Tuzakları Tersine Çevir
+	Precision	Hassasiyet
+	Remove Redundant Points	Gereksiz Noktaları Kaldır
 	Trim	Kırpma
 	Trim mark weight:	Trim işareti ağırlığı:
 	Trim marks	Kırpma işaretleri
@@ -3636,6 +3655,7 @@ axis	Both	Her İkisi
 @msg	Opened {url}	{url} açıldı
 @msg	Outline Stroke: no stroked paths selected	Anahat Konturu: konturlu yol seçilmedi
 @msg	PDF settings are not an object	PDF ayarları bir nesne değildir
+@msg	PDF security settings are not an object	PDF güvenlik ayarları bir nesne değildir
 @msg	PDF writer error: {0}	PDF yazıcı hatası: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	{folder}{note} biçiminde paketlenmiş {n} dosyası/dosyaları
 @msg	Packaged {n} file(s){note}	Paketlenmiş {n} dosyası/dosyaları{note}
@@ -3731,6 +3751,7 @@ axis	Both	Her İkisi
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	eksen "{v}" değil, "dikey", "yatay" veya derece cinsinden bir açı olmalıdır
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	arka plan {other}: şeffaf, beyaz, siyah veya "#ff8800" gibi bir renk
 @msg	bad color {v}	kötü renk {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio 0,1 ile 10 arasında bir sayı olmalıdır
 @msg	the Color Picker is not open	Renk Seçici açık değil
 @msg	the screen color sampler is already open	ekran rengi örnekleyici zaten açık
 @msg	this system has no screen color sampler	bu sistemin ekran rengi örnekleyicisi yok
@@ -3803,7 +3824,7 @@ axis	Both	Her İkisi
 @msg	missing `name`	"isim" eksik
 @msg	missing `tool`	'araç' eksik
 @msg	missing index	eksik dizin
-@msg	multiple windows land with M11.5	M11.5 ile birden fazla pencere açılır
+@msg	New Window isn't available yet: a document opens in one window	Yeni Pencere henüz kullanılamıyor: bir belge tek pencerede açılır
 @msg	name the file	dosyayı adlandırın
 @msg	no CSS to copy: select objects with CSS of their own	kopyalanacak CSS yok: kendilerine ait CSS'ye sahip nesneleri seçin
 @msg	no Live Paint edge near that point	bu noktanın yakınında Canlı Boyama kenarı yok
@@ -4540,6 +4561,7 @@ lighting	Light	Işık
 	Brown	Kahverengi
 	Business Card 3.5 × 2 in	Kartvizit 3,5 × 2 inç
 	Business Card 85 × 55 mm	Kartvizit 85×55 mm
+	Business Card 91 × 55 mm	Kartvizit 91×55 mm
 	CRLF (Windows)	CRLF (Windows)
 	Cap Height	Kapak Yüksekliği
 	Chevron	Şerit
@@ -5423,3 +5445,54 @@ axis	Y Axis	Y ekseni
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	canlı efekt belge çizilirken çalışır, bu yüzden `heavy` olamaz
 @msg	an exporter always gets an export's budget: leave `budget` out	dışa aktarma eklentisi her zaman bir dışa aktarmanın bütçesini alır: `budget` anahtarını çıkarın
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	“{_1}” büyük bir hesaplama bütçesi istiyor (her çalıştırma en fazla {minutes} dakika ve olağan komutların {times} katı): kullanıcı onayladıktan sonra `allowHeavy: true` ile yükleyin
+# Actions panel: action sets (#3712).
+	New Set…	Yeni Set…
+	New Set	Yeni Set
+	Set Options…	Set Seçenekleri…
+	Set Options	Set Seçenekleri
+	Create New Set	Yeni Set Oluştur
+	Stop Global Edit	Genel Düzenlemeyi Durdur
+	Global Edit Options	Genel Düzenleme Seçenekleri
+	Match	Eşleştir
+	On Artboards	Çalışma Yüzeylerinde
+	All Artboards	Tüm Çalışma Yüzeyleri
+	Include Objects On Canvas	Tuvaldeki Nesneleri Dahil Et
+	Result(s): {count}	Sonuç(lar): {count}
+@msg	select one object	bir nesne seçin
+@msg	Global Edit works on paths, compound paths and symbol instances	Genel düzenleme yollar, bileşik yollar ve sembol örnekleri üzerinde çalışır
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	benzer nesne bulunamadı (döndürülmüş veya yansıtılmış kopyalar eşleşmez); Genel Düzenleme Seçeneklerini değiştirip yeniden deneyin
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all ya da 1, 3-5 gibi bir aralık olmalı, {v} değil
+	Add to Symbols	Sembollere Ekle
+	Basic Shapes	Temel Şekiller
+	Open Symbol Library	Sembol Kitaplığını Aç
+	Save Symbol Library	Sembol Kitaplığını Kaydet
+	Save Symbol Library…	Sembol Kitaplığını Kaydet…
+	Save Symbols…	Sembolleri Kaydet…
+	Selected Symbols Only	Yalnızca Seçilen Semboller
+	Symbol Libraries Menu	Sembol Kitaplıkları Menüsü
+	Symbol Library	Sembol Kitaplığı
+	User Symbol Library 1	Kullanıcı Sembol Kitaplığı 1
+	User Symbol Library 2	Kullanıcı Sembol Kitaplığı 2
+	User Symbol Library 3	Kullanıcı Sembol Kitaplığı 3
+	User Symbol Library 4	Kullanıcı Sembol Kitaplığı 4
+	User Symbol Library 5	Kullanıcı Sembol Kitaplığı 5
+	User Symbol Library 6	Kullanıcı Sembol Kitaplığı 6
+	User Symbol Library 7	Kullanıcı Sembol Kitaplığı 7
+	User Symbol Library 8	Kullanıcı Sembol Kitaplığı 8
+	User Symbol Library 9	Kullanıcı Sembol Kitaplığı 9
+	User Symbol Library 10	Kullanıcı Sembol Kitaplığı 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` içinde yerleştirilecek sembol yok
+@msg	missing `library` (see symbol.libraries)	`library` eksik (bkz. symbol.libraries)
+@msg	no symbol `{n}`	`{n}` sembolü yok
+@msg	no symbol `{n}` in `{_1}`	`{_1}` içinde `{n}` sembolü yok
+@msg	no symbol library `{key}` (see symbol.libraries)	`{key}` sembol kitaplığı yok (bkz. symbol.libraries)
+@msg	the document has no symbols to save	belgede kaydedilecek sembol yok
+@msg	Trap: select two or more objects filled with solid colours	Tuzak: düz renkle doldurulmuş iki veya daha fazla nesne seçin
+@msg	Trap: no edges of different colours meet among the selected objects	Tuzak: seçili nesneler arasında farklı renkli kenarlar birleşmiyor
+@msg	thickness must be from 0.01 to 5000 pt	thickness 0,01 ile 5000 pt arasında olmalıdır
+@msg	heightWidth must be from 1 to 1000 %	heightWidth 1 ile 1000 % arasında olmalıdır
+@msg	tintReduction must be from 0 to 100 %	tintReduction 0 ile 100 % arasında olmalıdır
+	Rectangular Grid Tool Options	Dikdörtgen Izgara Aracı Seçenekleri
+	Polar Grid Tool Options	Yuvarlak Izgara Aracı Seçenekleri
+	Fill Line	Çizgiyi doldur

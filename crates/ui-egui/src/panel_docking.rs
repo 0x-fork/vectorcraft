@@ -798,7 +798,9 @@ impl craft_ui::docking::DockContent<String> for PanelContent<'_> {
                 self.commands.push(("window.panel.dock", json!({"panel": active, "group": true})));
             }
         } else {
-            let response = ui.interact(grip, ui.id().with("dock-group-bar"), egui::Sense::drag());
+            // Click as well as drag, so a double-click here collapses the group
+            // (`tab_area_double_clicked`) rather than floating it on the first press.
+            let response = ui.interact(grip, ui.id().with("dock-group-bar"), egui::Sense::click_and_drag());
             if response.drag_started()
                 && let Some(pos) = response.interact_pointer_pos()
             {
@@ -888,6 +890,39 @@ fn root_groups(ctx: &egui::Context, layout: &Layout<String>, content: egui::Rect
         }
     }
     out
+}
+
+/// The panel shown by the dock group whose strip was double-clicked this frame right of its tabs
+/// and left of its panel menu, from which Illustrator also collapses the group
+/// (<https://helpx.adobe.com/illustrator/using/customizing-workspace.html>). Most of it has no
+/// widget of its own, so the press is read from the input; `layer` is the dock's, so a press on a
+/// floating group or a menu over the strip doesn't count. Accordions, and groups beside another
+/// (which don't collapse), are left out.
+fn tab_area_double_clicked(
+    ctx: &egui::Context,
+    layer: egui::LayerId,
+    layout: &Layout<String>,
+    groups: &[crate::floating::RootGroup],
+) -> Option<&'static str> {
+    let at = ctx.input(|i| if i.pointer.button_double_clicked(egui::PointerButton::Primary) { i.pointer.interact_pos() } else { None })?;
+    // No layer: the background, where the dock panel is.
+    if ctx.layer_id_at(at).is_some_and(|l| l != layer) {
+        return None;
+    }
+    let group = groups.iter().find(|g| g.strip.contains(at))?;
+    if tab_group_shortens(layout, group.shown) != Some(true) {
+        return None;
+    }
+    let area = egui::Id::new("vectorcraft-panel-docking");
+    let right = |id: egui::Id| ctx.read_response(id).map(|r| r.rect.right());
+    let tabs = group
+        .panels
+        .iter()
+        .filter_map(|p| right(area.with(("tab", &p.to_string()))))
+        .chain(right(area.with(("overflow", &group.shown.to_string()))))
+        .fold(group.strip.left(), f32::max);
+    // The panel menu is 16 wide, 12 in from the right, with 4 to spare (`group_header`).
+    (at.x >= tabs && at.x < group.strip.right() - 24.0).then_some(group.shown)
 }
 
 pub(crate) fn show(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> bool {
@@ -1067,15 +1102,20 @@ pub(crate) fn show(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> bool {
             None => dock(ui),
         };
         // A double-click on a tab of the dock's tree collapses its group to its tabs, or expands it.
+        // A group beside another doesn't collapse, so its tabs ignore it rather than report an error.
         if let Some(root) = &drawn.root {
             let tabs = Layout { root: Some(root.clone()), floating: Vec::new() };
             if let Some(panel) =
                 tabs.panels().into_iter().find(|p| ui.ctx().read_response(area.with(("tab", *p))).is_some_and(|r| r.double_clicked()))
+                && tab_group_shortens(&tabs, panel) == Some(true)
             {
                 content.commands.push(("window.panel.collapse", json!({"panel": panel})));
             }
         }
         let groups = if collapsed { Vec::new() } else { root_groups(ui.ctx(), &display, tree, style.tab_height) };
+        if let Some(panel) = tab_area_double_clicked(ui.ctx(), ui.layer_id(), &display, &groups) {
+            content.commands.push(("window.panel.collapse", json!({"panel": panel})));
+        }
         ui.ctx().data_mut(|data| data.insert_temp(crate::floating::root_groups_id(), groups));
         for (id, params) in content.commands {
             if let Err(error) = app.run(id, params) {

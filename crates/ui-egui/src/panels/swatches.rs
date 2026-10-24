@@ -609,7 +609,11 @@ pub(crate) fn drag_preview(app: &VectorcraftApp, ctx: &egui::Context) {
         },
         PanelDrag::GraphicStyle(name) => return pointer_chip(ctx, |ui, r| super::graphic_styles::paint_style(app, ui, r, name)),
         PanelDrag::Symbol(name) => match app.session.active() {
-            Some(st) => return pointer_chip(ctx, |ui, r| super::symbols::chip(ui, &st.doc, r, name)),
+            Some(st) => return pointer_chip(ctx, |ui, r| super::symbols::chip(ui, &st.doc, super::symbols::resources_key(&st.doc), r, name)),
+            None => return,
+        },
+        PanelDrag::LibrarySymbol { library, name } => match vectorcraft_engine::cmd::symbollib::library(&app.session, library) {
+            Some((_, lib)) => return pointer_chip(ctx, |ui, r| super::symbols::chip(ui, &lib.doc, super::symbols::resources_key(&lib.doc), r, name)),
             None => return,
         },
         PanelDrag::Brush { def, .. } => return pointer_chip(ctx, |ui, r| super::brushes::chip(ui, r, def)),

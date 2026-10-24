@@ -51,7 +51,10 @@ pub(crate) fn image_node(d: &mut Document, bytes: Vec<u8>, w: u32, h: u32, xf: A
     let blob = ImageBlob::new("image/png", bytes);
     let key = blob.content_key();
     d.images.insert(key.clone(), blob);
-    Node::new(NodeId(0), NodeKind::Image(Box::new(ImageObject { key, width: w, height: h, xf, link: None, placement: Default::default() })))
+    Node::new(
+        NodeId(0),
+        NodeKind::Image(Box::new(ImageObject { key, width: w, height: h, xf, link: None, placement: Default::default(), pixels: None })),
+    )
 }
 
 pub(crate) fn u32_at(b: &[u8], at: usize) -> u32 {
@@ -253,9 +256,12 @@ fn emf_clips_gradients_and_images() {
 fn type_is_written_as_outlines() {
     let t = TextObject::point(Point::new(10.0, 50.0), "Hi", CharStyle { fill: red(), ..CharStyle::default() });
     let d = doc_with(100.0, 100.0, vec![Node::new(NodeId(0), NodeKind::Text(Box::new(t)))]);
-    let k = kinds(&emf_records(&emf(&d).bytes));
+    let out = emf(&d);
+    let k = kinds(&emf_records(&out.bytes));
     assert!(k.contains(&62), "glyphs are filled paths");
     assert!(!k.contains(&84) && !k.contains(&83), "no text records");
+    // Said so (#3850).
+    assert!(out.warnings.iter().any(|w| w.contains("type is written as outlines")), "{:?}", out.warnings);
 }
 
 #[test]
@@ -365,6 +371,8 @@ fn patterns_inside_pattern_tiles_share_one_tile_budget() {
     let (ops, warnings) = crate::scene::Scene::new(&d, d.artboards[0].rect, true).run();
     assert!(ops.len() < 300_000, "{} operations", ops.len());
     assert!(warnings.iter().any(|w| w.contains("one colour")), "{warnings:?}");
+    // The tiles that were written are reported too (#3850).
+    assert!(warnings.iter().any(|w| w.contains("written as their tiles")), "{warnings:?}");
 
     // A tile filled with its own pattern multiplies at every level down to the nesting limit.
     let square = path(shapes::rectangle(Rect::new(0.0, 0.0, 4.0, 4.0)), pattern("self"), Paint::None, 0.0);

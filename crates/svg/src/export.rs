@@ -54,6 +54,8 @@ fn write(doc: &Document, opts: &ExportOptions, native: Option<&[u8]>, id_prefix:
         classes: Vec::new(),
         class_ids: HashMap::new(),
         used_ids: HashSet::new(),
+        next_suffix: HashMap::new(),
+        linked_names: HashSet::new(),
         names: HashMap::new(),
         depth: 1,
         patterns: HashMap::new(),
@@ -304,6 +306,10 @@ struct Writer<'a> {
     /// 1-based class/entity number by declaration; avoids a linear scan for each style.
     class_ids: HashMap<String, usize>,
     used_ids: HashSet<String>,
+    /// The next suffix to try for a base name, so a repeated name doesn't probe the ones taken again.
+    next_suffix: HashMap<String, usize>,
+    /// The names in `linked`.
+    linked_names: HashSet<String>,
     names: HashMap<NodeId, String>,
     depth: usize,
     /// `<pattern>` def ids by pattern name + placement.
@@ -540,7 +546,7 @@ impl Writer<'_> {
     /// missing), else its bytes. `None` when it has neither.
     fn image_href(&mut self, im: &vectorcraft_doc::ImageObject) -> Option<String> {
         let (doc, link) = (self.doc, self.opts.images == ImageMode::Link);
-        match (im.link.as_ref().filter(|_| link), doc.images.get(&im.key)) {
+        match (im.link.as_ref().filter(|_| link), doc.image_blob(im)) {
             (Some(l), _) => Some(l.path.clone()),
             (None, Some(b)) if !b.bytes.is_empty() => Some(self.blob_href(&web_image(b))),
             _ => im.link.as_ref().map(|l| l.path.clone()),
@@ -550,17 +556,16 @@ impl Writer<'_> {
     /// Images drawn more than once in `art` (the pieces of a distorted image) go into the defs
     /// once; each piece then draws them with `<use>`.
     fn share_images(&mut self, art: &Node) {
-        let mut seen: HashMap<(String, u32, u32), usize> = HashMap::new();
+        // Each image's count and its first piece, which shows what they all show.
+        let mut seen: HashMap<(String, u32, u32), (usize, vectorcraft_doc::ImageObject)> = HashMap::new();
         art.walk(&mut |c| {
             if let NodeKind::Image(im) = &c.kind {
-                *seen.entry((im.key.clone(), im.width, im.height)).or_default() += 1;
+                seen.entry((im.key.clone(), im.width, im.height)).or_insert_with(|| (0, (**im).clone())).0 += 1;
             }
         });
-        let mut repeated: Vec<_> = seen.into_iter().filter(|(k, n)| *n > 1 && !self.shared_images.contains_key(k)).map(|(k, _)| k).collect();
-        repeated.sort();
-        for (key, width, height) in repeated {
-            let link = self.linked_of(art, &key);
-            let im = vectorcraft_doc::ImageObject { key: key.clone(), width, height, xf: Affine::IDENTITY, link, placement: Default::default() };
+        let mut repeated: Vec<_> = seen.into_iter().filter(|(k, (n, _))| *n > 1 && !self.shared_images.contains_key(k)).collect();
+        repeated.sort_by(|a, b| a.0.cmp(&b.0));
+        for ((key, width, height), (_, im)) in repeated {
             let Some(href) = self.image_href(&im) else { continue };
             let id = self.fresh_id("image");
             self.def(
@@ -572,20 +577,6 @@ impl Writer<'_> {
             );
             self.shared_images.insert((key, width, height), id);
         }
-    }
-
-    /// The link of the first image with blob `key` in `art`.
-    fn linked_of(&self, art: &Node, key: &str) -> Option<vectorcraft_doc::LinkInfo> {
-        let mut link = None;
-        art.walk(&mut |c| {
-            if let NodeKind::Image(im) = &c.kind
-                && im.key == key
-                && link.is_none()
-            {
-                link = im.link.clone();
-            }
-        });
-        link
     }
 
     fn fresh_id(&mut self, prefix: &str) -> String {
@@ -601,14 +592,17 @@ impl Writer<'_> {
     /// `base` (with the unique prefix) if free, else `base-2`, `base-3`…
     fn unique_id(&mut self, base: &str) -> String {
         let base = format!("{}{base}", self.id_prefix);
-        let mut cand = base.clone();
-        for i in 2.. {
-            if self.used_ids.insert(cand.clone()) {
-                break;
-            }
-            cand = format!("{base}-{i}");
+        if self.used_ids.insert(base.clone()) {
+            return base;
         }
-        cand
+        let next = self.next_suffix.entry(base.clone()).or_insert(2);
+        loop {
+            let cand = format!("{base}-{next}");
+            *next += 1;
+            if self.used_ids.insert(cand.clone()) {
+                return cand;
+            }
+        }
     }
 
     /// Reserve ids for every named object up front so generated def ids never collide with them.
@@ -1584,7 +1578,7 @@ impl Writer<'_> {
             return format!("data:{};base64,{}", b.mime, base64_encode(&b.bytes));
         }
         let name = format!("{}.{}", b.content_key(), image_ext(&b.mime));
-        if !self.linked.iter().any(|l| l.name == name) {
+        if self.linked_names.insert(name.clone()) {
             self.linked.push(LinkedImage { name: name.clone(), bytes: b.bytes.clone() });
         }
         name
@@ -1869,8 +1863,12 @@ impl Writer<'_> {
         let resolved = doc.inline_resolved(t);
         let t = &*resolved;
         let inline = t.runs.iter().any(|r| r.inline.is_some());
-        // Ruby is written as outlines with its base text: a reader's <text> can't place it.
-        let outlined = self.opts.outline_text || t.vertical || !t.ruby.is_empty() || (inline && matches!(t.kind, TextKind::OnPath { .. }));
+        // Ruby is written as outlines with its base text: a reader's <text> can't place it. So are
+        // small capitals, superscript and subscript and tab leaders, which SVG text doesn't draw (#3869).
+        let unwritable = t.runs.iter().any(|r| r.style.small_caps.is_some() || r.style.position != vectorcraft_doc::CharPosition::Normal)
+            || std::iter::once(&t.para).chain(&t.paras).any(|p| p.tabs.iter().any(|tab| !tab.leader.is_empty()));
+        let outlined =
+            self.opts.outline_text || t.vertical || !t.ruby.is_empty() || (inline && matches!(t.kind, TextKind::OnPath { .. })) || unwritable;
         let chars = |w: &mut Self, n: &Node| if outlined { w.text_outlines(n, t) } else { w.text(n, t) };
         let painted = n.appearance.items.iter().any(|i| i.visible() && !i.paint().is_none());
         // Live type with an inside or outside character stroke writes that stroke apart from the
@@ -1920,11 +1918,11 @@ impl Writer<'_> {
     }
 
     /// Text as glyph outlines: one compound path per run, painted like the run (gradients span
-    /// the whole text, as on the canvas).
+    /// the whole text), over its colour glyphs, as on the canvas.
     fn text_outlines(&mut self, n: &Node, t: &TextObject) {
         let db = vectorcraft_text::FontDb::global();
         let lay = vectorcraft_text::layout(db, t);
-        let mut runs: Vec<(usize, kurbo::BezPath)> = vec![];
+        let mut runs = vec![kurbo::BezPath::new(); t.runs.len()];
         // Underline and strikethrough bars join their run's outlines; ruby glyphs are painted
         // with the run of the text they annotate.
         let bars = vectorcraft_text::decorations(&lay, db, t);
@@ -1935,9 +1933,8 @@ impl Writer<'_> {
             .chain(lay.ruby.iter().map(|g| (g.run, &g.outline)))
             .chain(bars.iter().map(|(r, b)| (*r, b)))
         {
-            match runs.iter_mut().find(|(r, _)| *r == run) {
-                Some((_, bp)) => bp.extend(outline.iter()),
-                None => runs.push((run, outline.clone())),
+            if let Some(bp) = runs.get_mut(run) {
+                bp.extend(outline.iter());
             }
         }
         let id = self.id_attr(n);
@@ -1947,28 +1944,32 @@ impl Writer<'_> {
         // The glyphs stay in text space; the text's transform joins the document's meanwhile.
         let saved = self.xf;
         self.xf = saved * t.xf;
-        for (r, bp) in runs {
-            let Some(run) = t.runs.get(r) else { continue };
-            let pd = PathData::from_bezpath(&bp);
+        for (i, (bp, run)) in runs.iter().zip(&t.runs).enumerate() {
+            // Colour glyphs paint themselves, under their run's paint: bitmap glyphs (emoji) as
+            // their images, COLR and SVG glyphs as their art.
+            for g in lay.glyphs.iter().filter(|g| g.run == i) {
+                if let Some((image, to_text)) = g.placed_image() {
+                    let m = self.matrix(self.xf * to_text);
+                    let href = self.blob_href(&image.blob);
+                    self.line(&format!(
+                        "<image width=\"{}\" height=\"{}\" transform=\"{m}\" preserveAspectRatio=\"none\" xlink:href=\"{}\"/>",
+                        image.width,
+                        image.height,
+                        xml_escape(&href)
+                    ));
+                }
+                if let Some(art) = g.placed_colour(Affine::IDENTITY) {
+                    self.node(&art);
+                }
+            }
+            if bp.elements().is_empty() {
+                continue;
+            }
+            let pd = PathData::from_bezpath(bp);
             // An unnamed id: the pieces carry no id attribute (the group has it).
             let glyphs = Node::path(NodeId(u64::MAX), pd.clone(), run.style.appearance());
             let d = self.path_d(&pd, self.xf);
             self.shape(&glyphs, &d, &[&pd], FillRule::NonZero, Some(lay.bounds));
-        }
-        // Colour bitmap glyphs (emoji): their images, which the runs' paint doesn't paint.
-        for (image, to_text) in lay.glyphs.iter().filter_map(|g| g.placed_image()) {
-            let m = self.matrix(self.xf * to_text);
-            let href = self.blob_href(&image.blob);
-            self.line(&format!(
-                "<image width=\"{}\" height=\"{}\" transform=\"{m}\" preserveAspectRatio=\"none\" xlink:href=\"{}\"/>",
-                image.width,
-                image.height,
-                xml_escape(&href)
-            ));
-        }
-        // COLR glyphs: their layers, as art.
-        for art in lay.glyphs.iter().filter_map(|g| g.placed_colour(Affine::IDENTITY)) {
-            self.node(&art);
         }
         self.xf = saved;
         self.depth -= 1;
@@ -2002,6 +2003,11 @@ impl Writer<'_> {
                 self.warn("type on a path with glyphs hanging outside its brackets is outlined to keep its look");
                 return self.text_outlines(n, t);
             }
+            // A `<textPath>` holds the characters of the text, not the bullets drawn before them.
+            if !lay.markers.is_empty() {
+                self.warn("type on a path with bullets is outlined to keep its look");
+                return self.text_outlines(n, t);
+            }
             return self.text_on_path(n, t, path, *start);
         }
         self.note_fonts(t, &lay);
@@ -2029,7 +2035,13 @@ impl Writer<'_> {
         let uniform = anchors.first().copied().filter(|a| a.is_some() && anchors.iter().all(|b| b == a)).flatten();
         // The <text> element's user space is text space.
         let space = (lay.bounds, Affine::IDENTITY);
-        let base = TextBase { props: self.char_props(&drawn.first_style(), space), space, anchored: uniform.is_some() };
+        let mut base_props = self.char_props(&drawn.first_style(), space);
+        // A `<tspan>` cannot undo the decoration of the `<text>` around it: with bullets, which
+        // have none, each run's `<tspan>` carries its own.
+        if !lay.markers.is_empty() {
+            base_props.retain(|(k, _)| *k != "text-decoration");
+        }
+        let base = TextBase { props: base_props, space, anchored: uniform.is_some() };
         let mut props = base.props.clone();
         if let Some((a, _)) = uniform {
             props.push(("text-anchor", a.into()));
@@ -2113,7 +2125,14 @@ impl Writer<'_> {
         // The baseline shift the current text position carries.
         let mut shift = 0.0;
         for seg in line {
-            let Some(st) = t.runs.get(seg.run).map(|r| &r.style) else { continue };
+            let Some(run_style) = t.runs.get(seg.run).map(|r| &r.style) else { continue };
+            let marker_style;
+            let st = if seg.marker {
+                marker_style = vectorcraft_doc::text::ParaList::marker_style(run_style);
+                &marker_style
+            } else {
+                run_style
+            };
             let mut attrs = String::new();
             if place {
                 let (x, y) = if first { start } else { (seg.x, seg.y) };
@@ -2161,7 +2180,7 @@ impl Writer<'_> {
         let db = FontDb::global();
         let plain = t.plain_text();
         let mut face: Option<Arc<FontFace>> = None;
-        for g in &lay.glyphs {
+        for (i, g) in lay.glyphs.iter().enumerate() {
             let Some(st) = t.runs.get(g.run).map(|r| &r.style) else { continue };
             // A colour font's subset would hold no bitmaps or COLR layers: its emoji are left to the
             // viewer.
@@ -2185,8 +2204,9 @@ impl Writer<'_> {
                 self.fonts.len() - 1
             });
             let Some(chars) = self.fonts.get_mut(at).map(|u| &mut u.chars) else { continue };
-            // As written: a hyphen where a line breaks, capitals for All Caps, the style's Digits.
-            let src = if g.len == 0 { "-" } else { plain.get(g.byte..g.byte + g.len).unwrap_or("") };
+            // As written: a list marker's characters, a hyphen where a line breaks, capitals for All
+            // Caps, the style's Digits.
+            let src = lay.marker_text(i).unwrap_or_else(|| if g.len == 0 { "-" } else { plain.get(g.byte..g.byte + g.len).unwrap_or("") });
             for c in src.chars().filter(|c| !c.is_control() && *c != '\u{ad}').map(|c| st.digits.map(c)) {
                 if st.all_caps {
                     chars.extend(c.to_uppercase());
@@ -2404,6 +2424,9 @@ struct Segment {
     /// Glyph Scaling of the segment's one glyph (Justification…), which a reader stretches it to
     /// (`textLength`); 1 for other segments.
     scale: f64,
+    /// A list marker's characters and tab, written in
+    /// [`vectorcraft_doc::text::ParaList::marker_style`] of the run's style.
+    marker: bool,
 }
 
 /// How far a reader may draw a character from where the layout draws it before the character is
@@ -2440,18 +2463,24 @@ fn text_lines(t: &TextObject, lay: &vectorcraft_text::TextLayout, fewer: bool) -
         let mut tail = None;
         let mut segs: Vec<Segment> = Vec::new();
         let mut cluster = None;
-        let source = |g: &vectorcraft_text::PositionedGlyph| if g.len == 0 { "-" } else { plain.get(g.byte..g.byte + g.len).unwrap_or("") };
+        // A list marker's glyphs write its characters and then a tab (glyph `i` of the layout).
+        let source = |i: usize, g: &vectorcraft_text::PositionedGlyph| {
+            lay.marker_text(i).unwrap_or_else(|| if g.len == 0 { "-" } else { plain.get(g.byte..g.byte + g.len).unwrap_or("") })
+        };
         let mut glyphs = lay.glyphs.get(line.glyph_start..line.glyph_end).unwrap_or_default();
         // Spaces where the line wrapped (it doesn't end its paragraph) don't belong to the line.
         if plain.get(line.end..).is_some_and(|rest| !rest.is_empty() && !rest.starts_with('\n')) {
-            while let Some((_, rest)) = glyphs.split_last().filter(|(g, _)| source(g).chars().all(|c| c.is_whitespace() && c != '\t')) {
+            while let Some((_, rest)) =
+                glyphs.split_last().filter(|(g, rest)| source(line.glyph_start + rest.len(), g).chars().all(|c| c.is_whitespace() && c != '\t'))
+            {
                 glyphs = rest;
             }
         }
         let mut after_inline = false;
-        for g in glyphs {
+        for (k, g) in glyphs.iter().enumerate() {
             let Some(run) = t.runs.get(g.run) else { continue };
-            if run.inline.is_some() {
+            // A list marker before an inline graphic is in the graphic's run, and is text.
+            if run.inline.is_some() && lay.marker_of(line.glyph_start + k).is_none() {
                 // An inline graphic (written as art): the text after it is placed anew.
                 if let Some(last) = segs.last_mut() {
                     last.brk = true;
@@ -2470,7 +2499,9 @@ fn text_lines(t: &TextObject, lay: &vectorcraft_text::TextLayout, fewer: bool) -
                 }
                 continue;
             }
-            cluster = Some(g.byte);
+            // A glyph that stands for no character (a list marker before the paragraph's first
+            // character) starts no cluster.
+            cluster = (g.len > 0).then_some(g.byte);
             let (advance, x) = match set {
                 Some(&(advance, offset)) => {
                     // A glyph the layout draws before its pen (Mojikumi) starts that much earlier.
@@ -2479,7 +2510,7 @@ fn text_lines(t: &TextObject, lay: &vectorcraft_text::TextLayout, fewer: bool) -
                 }
                 None => (g.advance, g.origin.x),
             };
-            let src: String = source(g).chars().filter(|c| *c != '\u{ad}').map(|c| run.style.digits.map(c)).collect();
+            let src: String = source(line.glyph_start + k, g).chars().filter(|c| *c != '\u{ad}').map(|c| run.style.digits.map(c)).collect();
             let piece = if run.style.all_caps { src.to_uppercase() } else { src };
             let brk = piece == "\t" || (split_words && !piece.is_empty() && piece.chars().all(char::is_whitespace));
             // A glyph Glyph Scaling widens or narrows is a segment of its own, stretched to its width.
@@ -2489,18 +2520,23 @@ fn text_lines(t: &TextObject, lay: &vectorcraft_text::TextLayout, fewer: bool) -
             let moved = reader.is_some()
                 && segs.last().is_some_and(|last| (x - pen).abs() > PLACE_TOLERANCE || (g.origin.y - last.y).abs() > PLACE_TOLERANCE);
             pen = x + advance;
+            // A list marker is a segment of its own, and so is the text after it. In horizontally
+            // scaled type a tab is a segment apart from the characters before it, so a reader
+            // stretching those characters to their width (`textLength`) stretches them alone.
+            let marker = lay.marker_of(line.glyph_start + k).is_some();
+            let tab_apart = piece == "\t" && (run.style.h_scale - run.style.v_scale).abs() > 1e-9;
             match segs.last_mut() {
-                Some(last) if last.run == g.run && !last.brk && !fresh && !moved => {
+                Some(last) if last.run == g.run && !last.brk && !fresh && !moved && last.marker == marker && !tab_apart => {
                     last.text.push_str(&piece);
                     last.advance += advance;
                     last.brk = brk;
                 }
                 last => {
                     if let Some(last) = last {
-                        last.brk |= moved;
+                        last.brk |= moved || last.marker != marker;
                         end_segment(last, tail, t, lay, &mut unkerned);
                     }
-                    segs.push(Segment { run: g.run, x, y: g.origin.y, text: piece, advance, brk, scale });
+                    segs.push(Segment { run: g.run, x, y: g.origin.y, text: piece, advance, brk, scale, marker });
                 }
             }
             tail = set.map(|_| (g.byte, advance));

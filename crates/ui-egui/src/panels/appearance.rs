@@ -1277,14 +1277,16 @@ mod tests {
     }
 
     /// Those choices read as their dialogs show them in the UI language: in French, the channel's
-    /// RGB is RVB, and in Spanish, Extrude & Bevel's Rounded is the "3d" row's Redondeado, not the
-    /// plain row's Redondeada. Rasterize names the document's color mode.
+    /// RGB as the "effect" row translates it, and in Spanish, Extrude & Bevel's Rounded as the "3d"
+    /// row does, not the plain row. Rasterize names the document's color mode.
     #[test]
     fn the_effect_editor_shows_those_choices_as_their_dialogs_do() {
-        crate::i18n::set_current(crate::i18n::Lang::from_code("fr").unwrap());
+        let fr = crate::i18n::Lang::from_code("fr").unwrap();
+        crate::i18n::set_current(fr);
         let (mut app, ctx, _) = editing("adjust.levels");
         let texts = shown_texts(&mut app, &ctx);
-        assert!(texts.iter().any(|s| s == "RVB"), "{texts:?}");
+        let rgb = crate::i18n::tr_ctx(fr, "effect", "RGB");
+        assert!(texts.iter().any(|s| s == rgb), "{rgb}: {texts:?}");
         let es = crate::i18n::Lang::from_code("es").unwrap();
         crate::i18n::set_current(es);
         let (mut app, ctx, _) = editing("threeD.extrude");

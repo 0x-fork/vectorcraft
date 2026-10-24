@@ -319,6 +319,13 @@
 	Glyphs	Merkit
 	Insert Special Character	Lisää erikoismerkki
 	Bullet	Luettelomerkki
+	Bullets	Luettelomerkit
+	Bullets and Numbering	Luettelomerkit ja numerointi
+	Apply Bullets	Käytä luettelomerkkejä
+	Filled Dot	Täytetty piste
+	Dash	Ajatusviiva
+	Hollow Circle	Ontto ympyrä
+	Filled Square	Täytetty neliö
 	Copyright Symbol	Tekijänoikeusmerkki
 	Ellipsis	Kolme pistettä
 	Paragraph Symbol	Kappalemerkki
@@ -767,7 +774,7 @@
 	Units	Yksiköt
 	Guides & Grid	Apuviivat ja ruudukko
 	Hyphenation	Tavutus
-	Plug-ins & Scratch Disks	Laajennukset & Työlevyt
+	Plug-ins & Scratch Disks	Laajennukset ja työlevyt
 	User Interface	Käyttöliittymä
 	Performance	Suorituskyky
 	File Handling	Tiedostojen käsittely
@@ -1511,7 +1518,7 @@ lighting	Light	Valo
 	Clear History	Tyhjennä historia
 	Set History Limit…	Aseta historian raja…
 	Open a document to see its history.	Avaa asiakirja, niin näet sen historian.
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Käytä tietojoukkoa
 	Cancel Pattern Editing	Peruuta kuvion muokkaus
 	Copy Appearance	Kopioi ulkoasu
@@ -1755,6 +1762,13 @@ lighting	Light	Valo
 	Repeat Pathfinder	Toista polunetsin
 	Repeat {name}	Toista {name}
 	Trap…	Ylitäyttö…
+	Trap	Ylitäyttö
+	Height/Width	Korkeus/leveys
+	Tint Reduction	Sävyn vähennys
+	Traps with Process Color	Ylitäytöt prosessiväreillä
+	Reverse Traps	Käänteiset ylitäytöt
+	Precision	Tarkkuus
+	Remove Redundant Points	Poista tarpeettomat pisteet
 	Bottom in Front	Alin edessä
 	Brick by Column	Tiili sarakkeittain
 	Brick by Row	Tiili riveittäin
@@ -1881,7 +1895,6 @@ lighting	Light	Valo
 	{kind}, {model}	{kind}, {model}
 	No symbols in this document	Tässä asiakirjassa ei ole symboleja
 	Select art and click New Symbol to make one.	Luo symboli valitsemalla kuvitus ja napsauttamalla Uusi symboli.
-	Symbol Libraries (on the roadmap)	Symbolikirjastot (suunnitteilla)
 	Align On:	Tasaa kohteeseen:
 	Bottom-Justified Tab	Alas tasattu sarkain
 	Center-Justified Tab	Keskitetty sarkain
@@ -2331,11 +2344,11 @@ lighting	Light	Valo
 	Fonts whose licence doesn't allow embedding are not copied.	Fontteja, joiden lisenssi ei salli upottamista, ei kopioida.
 	Package collects a saved document with its linked files and fonts.	Paketointi kokoaa tallennetun asiakirjan sekä sen linkitetyt tiedostot ja fontit.
 	Package created	Paketti luotu
-	Packaged {n} file(s) in {folder} {note}	Paketoitu {n} tiedosto(a) kansioon {folder}{note}
+	Packaged {n} file(s) in {folder} {note}	Paketoitiin {n} tiedosto(a) kansioon {folder} {note}
 	Packaged {n} file(s){note}	Paketoitu {n} tiedosto(a){note}
 	Relink Linked Files to the Document	Linkitä linkitetyt tiedostot uudelleen asiakirjaan
 	Save the document first?	Tallennetaanko asiakirja ensin?
-	{count} file(s) in {folder} {note}. Show the package folder?	{count} tiedosto(a) kansiossa {folder}{note}. Näytetäänkö pakettikansio?
+	{count} file(s) in {folder} {note}. Show the package folder?	{count} tiedosto(a) kansiossa {folder} {note}. Näytetäänkö pakettikansio?
 	{count} linked file(s) not found	{count} linkitettyä tiedostoa ei löytynyt
 	fonts not copied: {fonts}	fontteja ei kopioitu: {fonts}
 	Built-in presets are read-only: New… starts an editable copy.	Sisäiset esiasetukset ovat vain luku -tilassa: Uusi… luo muokattavan kopion.
@@ -2384,6 +2397,9 @@ lighting	Light	Valo
 	Background Color:	Taustaväri:
 	Show Center Mark	Näytä keskimerkki
 	Show Cross Hairs	Näytä hiusristikko
+	Show Video Safe Areas	Näytä videon turva-alueet
+	Video Ruler Pixel Aspect Ratio:	Videoviivainten kuvapisteen kuvasuhde:
+	Hide Video Rulers	Piilota videoviivaimet
 	Client-side (.html)	Asiakaspuoli (.html)
 	Color Reduction:	Värien vähennys:
 	Lossless (lossy WebP isn't available yet)	Häviötön (häviöllinen WebP ei ole vielä käytettävissä)
@@ -3437,6 +3453,7 @@ theme	Appearance	Ulkoasu
 	Size/Leading	Koko/riviväli
 	Snapping Tolerance	Tartuntatoleranssi
 	Spacing Guides	Välistysapuviivat
+	Invoke Distance Guides	Käytä etäisyysapuviivoja
 	Spanish	Espanja
 	Subdivisions	Jaot
 	Templates Folder	Mallipohjakansio
@@ -3742,6 +3759,8 @@ effect	Regular	Normaali
 	Put back in the dock	Palauta telakkaan
 	All Scripts	Kaikki kirjoitusjärjestelmät
 	Any Kind	Mikä tahansa laji
+	Font Technology	Fonttitekniikka
+font-technology	Variable	Muuttuvat
 	Decorative	Koristeelliset
 	Favorites	Suosikit
 	Latin	Latinalainen
@@ -4049,8 +4068,9 @@ imageTrace	Outline	Ääriviiva
 @msg	Opened {url}	Avattiin {url}
 @msg	Outline Stroke: no stroked paths selected	Muunna viiva ääriviivaksi: viivallisia polkuja ei ole valittu
 @msg	PDF settings are not an object	PDF-asetukset eivät ole objekti
+@msg	PDF security settings are not an object	PDF-suojausasetukset eivät ole objekti
 @msg	PDF writer error: {0}	PDF-kirjoittimen virhe: {0}
-@msg	Packaged {n} file(s) in {folder} {note}	Paketoitiin {n} tiedosto(a) kansioon {folder}{note}
+@msg	Packaged {n} file(s) in {folder} {note}	Paketoitiin {n} tiedosto(a) kansioon {folder} {note}
 @msg	Packaged {n} file(s){note}	Paketoitiin {n} tiedosto(a){note}
 @msg	Preview in Browser needs the desktop app (the web downloads files instead)	Esikatselu selaimessa vaatii työpöytäsovelluksen (verkkoversio lataa tiedostot sen sijaan)
 @msg	Release Guides: no guides	Vapauta apuviivat: ei apuviivoja
@@ -4169,6 +4189,7 @@ imageTrace	Outline	Ääriviiva
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	akselin on oltava "vertical", "horizontal" tai kulma asteina, ei `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	tausta {other}: transparent, white, black tai väri, kuten "#ff8800"
 @msg	bad color {v}	virheellinen väri {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio on oltava luku väliltä 0,1–10
 @msg	bad colour `{hex}` (#rrggbb)	virheellinen väri `{hex}` (#rrggbb)
 @msg	bad page tree	virheellinen sivupuu
 @msg	bad shortcut	virheellinen pikanäppäin
@@ -4242,7 +4263,7 @@ imageTrace	Outline	Ääriviiva
 @msg	missing index	indeksi puuttuu
 @msg	missing number `{key}`	luku `{key}` puuttuu
 @msg	missing integer `{key}`	kokonaisluku `{key}` puuttuu
-@msg	multiple windows land with M11.5	useat ikkunat tulevat versiossa M11.5
+@msg	New Window isn't available yet: a document opens in one window	Uusi ikkuna ei ole vielä käytettävissä: asiakirja avautuu yhteen ikkunaan
 @msg	name the file	anna tiedostolle nimi
 @msg	no CSS to copy: select objects with CSS of their own	ei kopioitavaa CSS:ää: valitse objekteja, joilla on oma CSS
 @msg	no Live Paint edge near that point	pisteen lähellä ei ole elävän maalauksen reunaa
@@ -4743,6 +4764,7 @@ imageTrace	Outline	Ääriviiva
 	Logo 1000×1000	Logo 1000×1000
 	Business Card 3.5 × 2 in	Käyntikortti 3.5 × 2 in
 	Business Card 85 × 55 mm	Käyntikortti 85 × 55 mm
+	Business Card 91 × 55 mm	Käyntikortti 91 × 55 mm
 	Letterhead Letter	Kirjelomake Letter
 	Letterhead A4	Kirjelomake A4
 	Envelope DL	Kirjekuori DL
@@ -4975,8 +4997,8 @@ imageTrace	Outline	Ääriviiva
 	DWG (use DXF)	DWG (käytä DXF:ää)
 	Artistic	Taiteelliset
 	Film Grain…	Filmin rakeisuus…
-	Colored Pencil…	Väriliitu…
-	Colored Pencil	Väriliitu
+	Colored Pencil…	Värikynä…
+	Colored Pencil	Värikynä
 	Cutout…	Leikkaus…
 	Cutout	Leikkaus
 	Dry Brush…	Kuiva sivellin…
@@ -4991,8 +5013,8 @@ imageTrace	Outline	Ääriviiva
 	Rough Pastels…	Karkeat pastellit…
 	Poster Edges	Julisteen reunat
 	Rough Pastels	Karkeat pastellit
-	Underpainting…	Alapinta…
-	Underpainting	Alapinta
+	Underpainting…	Pohjamaalaus…
+	Underpainting	Pohjamaalaus
 	Levels	Tasot
 	Edge Simplicity	Reunojen yksinkertaisuus
 	Edge Fidelity	Reunojen tarkkuus
@@ -5351,7 +5373,7 @@ mark-style	Japanese	Japanilainen
 	Choose a filter	Valitse suodatin
 	Effect Gallery	Tehostegalleria
 	Filters	Suodattimet
-	Select artwork to apply effects	Valitse grafiikka, johon tehosteet otetaan
+	Select artwork to apply effects	Valitse kuvitus, johon tehosteet lisätään
 @msg	the file's variables and data sets weren't read (variables: {variables}, data sets: {data_sets}): the Variables panel doesn't list them	tiedoston muuttujia ja tietojoukkoja ei luettu (muuttujia: {variables}, tietojoukkoja: {data_sets}): Muuttujat-paneeli ei näytä niitä
 # Select by Color (select.color)
 	Select by Color	Valitse värin mukaan
@@ -5456,12 +5478,12 @@ swatch	Bright Violet	Kirkas violetti
 	Effect Gallery…	Tehostegalleria…
 	Effect Gallery Dialog	Tehostegalleria-valintaikkuna
 	Arc Segment Tool Options	Kaarisegmenttityökalun asetukset
-	Base Along:	Pohja pitkin:
+	Base Along:	Kanta akselilla:
 	Closed	Suljettu
 	Convex	Kupera
 	Fill Arc	Täytä kaari
-	Length X-Axis:	Pituus X-akseli:
-	Length Y-Axis:	Pituus Y-akseli:
+	Length X-Axis:	X-akselin pituus:
+	Length Y-Axis:	Y-akselin pituus:
 	Slope:	Kaltevuus:
 axis	X Axis	X-akseli
 axis	Y Axis	Y-akseli
@@ -5491,3 +5513,54 @@ axis	Y Axis	Y-akseli
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	live-tehoste suoritetaan asiakirjaa piirrettäessä, joten se ei voi olla `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	vientilaajennus saa aina viennin budjetin: jätä `budget` pois
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	”{_1}” pyytää suurta laskentabudjettia (jokainen ajo enintään {minutes} minuuttia ja {times} kertaa tavallinen määrä käskyjä): asenna se asetuksella `allowHeavy: true`, kun käyttäjä hyväksyy
+# Actions panel: action sets (#3712).
+	New Set…	Uusi sarja…
+	New Set	Uusi sarja
+	Set Options…	Sarjan asetukset…
+	Set Options	Sarjan asetukset
+	Create New Set	Luo uusi sarja
+	Stop Global Edit	Lopeta yleismuokkaus
+	Global Edit Options	Yleismuokkauksen asetukset
+	Match	Vastaavuus
+	On Artboards	Piirtoalustoilla
+	All Artboards	Kaikki piirtoalustat
+	Include Objects On Canvas	Sisällytä kankaalla olevat objektit
+	Result(s): {count}	Tulokset: {count}
+@msg	select one object	valitse yksi objekti
+@msg	Global Edit works on paths, compound paths and symbol instances	Yleismuokkaus toimii poluille, yhdistelmäpoluille ja symbolien esiintymille
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	samankaltaisia objekteja ei löytynyt (kierrettyjä tai peilattuja kopioita ei tunnisteta); muuta yleismuokkauksen asetuksia ja yritä uudelleen
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all tai alue, kuten 1, 3-5, ei {v}
+	Add to Symbols	Lisää symboleihin
+	Basic Shapes	Perusmuodot
+	Open Symbol Library	Avaa symbolikirjasto
+	Save Symbol Library	Tallenna symbolikirjasto
+	Save Symbol Library…	Tallenna symbolikirjasto…
+	Save Symbols…	Tallenna symbolit…
+	Selected Symbols Only	Vain valitut symbolit
+	Symbol Libraries Menu	Symbolikirjastojen valikko
+	Symbol Library	Symbolikirjasto
+	User Symbol Library 1	Käyttäjän symbolikirjasto 1
+	User Symbol Library 2	Käyttäjän symbolikirjasto 2
+	User Symbol Library 3	Käyttäjän symbolikirjasto 3
+	User Symbol Library 4	Käyttäjän symbolikirjasto 4
+	User Symbol Library 5	Käyttäjän symbolikirjasto 5
+	User Symbol Library 6	Käyttäjän symbolikirjasto 6
+	User Symbol Library 7	Käyttäjän symbolikirjasto 7
+	User Symbol Library 8	Käyttäjän symbolikirjasto 8
+	User Symbol Library 9	Käyttäjän symbolikirjasto 9
+	User Symbol Library 10	Käyttäjän symbolikirjasto 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	Kohteessa `{_1}` ei ole sijoitettavia symboleja
+@msg	missing `library` (see symbol.libraries)	`library` puuttuu (katso symbol.libraries)
+@msg	no symbol `{n}`	ei symbolia `{n}`
+@msg	no symbol `{n}` in `{_1}`	ei symbolia `{n}` kohteessa `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	ei symbolikirjastoa `{key}` (katso symbol.libraries)
+@msg	the document has no symbols to save	dokumentissa ei ole tallennettavia symboleja
+@msg	Trap: select two or more objects filled with solid colours	Ylitäyttö: valitse vähintään kaksi tasaisella värillä täytettyä objektia
+@msg	Trap: no edges of different colours meet among the selected objects	Ylitäyttö: valituissa objekteissa eriväriset reunat eivät kohtaa
+@msg	thickness must be from 0.01 to 5000 pt	thickness-arvon on oltava 0,01–5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth-arvon on oltava 1–1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction-arvon on oltava 0–100 %
+	Rectangular Grid Tool Options	Suorakulmaisen ruudukon työkalun asetukset
+	Polar Grid Tool Options	Napakoordinaattiruudukon työkalun asetukset
+	Fill Line	Täytä viiva

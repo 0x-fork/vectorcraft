@@ -90,7 +90,7 @@ fn transform_objects_off_maps_nothing_and_makes_no_copies() {
 fn scale_strokes_and_effects_scales_the_stroke_and_dash_with_the_object() {
     let n = stroked(json!({"scaleH": 50, "scaleV": 50, "strokes": true}));
     assert!(has_transform_art(&n));
-    let art = reshape(&n, None).unwrap();
+    let art = reshape(None, &n, None).unwrap();
     let paths = leaves(&art);
     assert_eq!(paths.len(), 1);
     let (w, dash) = stroke_of(paths[0]);
@@ -103,7 +103,7 @@ fn scale_strokes_and_effects_scales_the_stroke_and_dash_with_the_object() {
 #[test]
 fn each_copy_scales_its_stroke_once_more() {
     let n = stroked(json!({"scaleH": 200, "scaleV": 200, "copies": 2, "strokes": true}));
-    let art = reshape(&n, None).unwrap();
+    let art = reshape(None, &n, None).unwrap();
     let widths: Vec<f64> = leaves(&art).iter().map(|p| stroke_of(p).0).collect();
     assert_eq!(widths, vec![2.0, 4.0, 8.0]);
     // Without the option the copies keep the original's weight.
@@ -114,7 +114,7 @@ fn each_copy_scales_its_stroke_once_more() {
 #[test]
 fn transform_objects_off_keeps_the_geometry_and_scales_the_stroke_once() {
     let n = stroked(json!({"scaleH": 50, "scaleV": 50, "moveH": 40, "copies": 3, "objects": false, "strokes": true}));
-    let art = reshape(&n, None).unwrap();
+    let art = reshape(None, &n, None).unwrap();
     let paths = leaves(&art);
     assert_eq!(paths.len(), 1, "no copies");
     assert_eq!(paths[0].geometric_bounds().unwrap(), Rect::new(0.0, 0.0, 100.0, 100.0));
@@ -125,7 +125,7 @@ fn transform_objects_off_keeps_the_geometry_and_scales_the_stroke_once() {
 fn transform_patterns_moves_each_copys_pattern() {
     let n = patterned(json!({"moveH": 30, "copies": 2, "patterns": true}));
     assert!(has_transform_options(&n));
-    let art = reshape(&n, None).unwrap();
+    let art = reshape(None, &n, None).unwrap();
     let xs: Vec<f64> = leaves(&art).iter().map(|p| pattern_xf(p).as_coeffs()[4]).collect();
     assert_eq!(xs, vec![0.0, 30.0, 60.0]);
     // Without it, every copy's pattern stays put (the tiles don't follow the copies).
@@ -136,7 +136,7 @@ fn transform_patterns_moves_each_copys_pattern() {
 #[test]
 fn transform_patterns_with_objects_off_moves_only_the_pattern() {
     let n = patterned(json!({"rotate": 45, "objects": false, "patterns": true}));
-    let art = reshape(&n, None).unwrap();
+    let art = reshape(None, &n, None).unwrap();
     let paths = leaves(&art);
     assert_eq!(paths.len(), 1);
     assert_eq!(paths[0].geometric_bounds().unwrap(), Rect::new(0.0, 0.0, 100.0, 100.0));
@@ -150,7 +150,7 @@ fn stroke_scaling_across_copies_stays_finite() {
     let mut n =
         Node::path(NodeId(9), shapes::line((0.0, 0.0).into(), (100.0, 0.0).into()), Appearance::basic(Paint::None, Paint::solid(Color::BLACK), 1.0));
     n.appearance.effects.push(transform(json!({"scaleH": 4000, "scaleV": 4000, "copies": 1000, "strokes": true})));
-    if let Some(art) = reshape(&n, None) {
+    if let Some(art) = reshape(None, &n, None) {
         for p in leaves(&art) {
             let w = stroke_of(p).0;
             assert!(w.is_finite() && w <= 1.0e6, "{w}");

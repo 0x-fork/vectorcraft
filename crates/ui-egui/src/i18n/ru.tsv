@@ -7,7 +7,7 @@
 # Перо, Прямое выделение). Shortcut keys keep their key-cap names (Shift, Alt, Ctrl, Esc).
 #
 # Coverage: the whole interface — every menu string and every `tl!` literal (`complete_menus`,
-# tested). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
+# `untranslated_report` lists gaps). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
 # names, OpenType, the built-in workspace names and the bracketed perspective grid preset names.
 # Photoshop-style raster effects (Effect menu, their dialogs).
 	Glowing Edges…	Светящиеся края…
@@ -192,6 +192,8 @@
 	Anti-aliased Artwork	Сглаженный рисунок
 	Anti-aliasing:	Сглаживание:
 	Any Kind	Любой тип
+	Font Technology	Технология шрифта
+font-technology	Variable	Вариативные
 	Appearance	Оформление
 	Appearance Attribute	Атрибут оформления
 	Appearance Item	Элемент оформления
@@ -277,6 +279,9 @@
 	Background Color:	Цвет фона:
 	Show Center Mark	Показать центральную метку
 	Show Cross Hairs	Показать перекрестие
+	Show Video Safe Areas	Показать безопасные зоны видео
+	Video Ruler Pixel Aspect Ratio:	Соотношение сторон пикселя видео-линеек:
+	Hide Video Rulers	Скрыть видео-линейки
 	Background Contents	Содержимое фона
 	Background Contents:	Содержимое фона:
 	Background:	Фон:
@@ -345,6 +350,13 @@
 	Built-in presets don't change: New… starts an editable copy.	Встроенные наборы не изменяются: «Создать…» создаёт редактируемую копию.
 	Bulge…	Выпуклость…
 	Bullet	Маркер
+	Bullets	Маркеры
+	Bullets and Numbering	Маркеры и нумерация
+	Apply Bullets	Применить маркеры
+	Filled Dot	Закрашенная точка
+	Dash	Тире
+	Hollow Circle	Пустой круг
+	Filled Square	Закрашенный квадрат
 	Butt Cap	Стыковое окончание
 	Byte Order:	Порядок байтов:
 	Calligraphic	Каллиграфическая
@@ -1391,7 +1403,7 @@ file-filter	Templates	Шаблоны
 	Clear History	Очистить историю
 	Set History Limit…	Задать предел истории…
 	History States	Состояния истории
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Применить набор данных
 	Area Type	Текст в области
 	Bloat	Раздувание
@@ -3121,6 +3133,7 @@ mark-style	Japanese	Японский
 	Space Before Paragraph	Интервал перед абзацем
 	Spaces	Пробелы
 	Spacing Guides	Направляющие интервалов
+	Invoke Distance Guides	Вызывать направляющие расстояний
 	Spacing:	Интервал:
 	Spanish	Испанский
 	Specified Distance	Заданное расстояние
@@ -3258,7 +3271,6 @@ mark-style	Japanese	Японский
 	Show all open documents	Показать все открытые документы
 	Symbol Instance	Экземпляр символа
 	Symbol Libraries	Библиотеки символов
-	Symbol Libraries (on the roadmap)	Библиотеки символов (в плане развития)
 	Symbol Screener Tool	Инструмент «Прозрачность символов»
 	Symbol Scruncher Tool	Инструмент «Сжатие символов»
 	Symbol Shifter Tool	Инструмент «Сдвиг символов»
@@ -3387,6 +3399,13 @@ mark-style	Japanese	Японский
 	Transparent Background	Прозрачный фон
 	Transverse (the page a quarter turn on the paper)	Поперечная (страница повёрнута на четверть оборота на листе)
 	Trap…	Треппинг…
+	Trap	Треппинг
+	Height/Width	Высота/ширина
+	Tint Reduction	Снижение оттенка
+	Traps with Process Color	Треппинг триадными цветами
+	Reverse Traps	Обратный треппинг
+	Precision	Точность
+	Remove Redundant Points	Удалить лишние точки
 	Trim	Подрезать
 	Trim mark weight:	Толщина меток подрезки:
 	Trim marks	Метки подрезки
@@ -3788,7 +3807,7 @@ axis	Both	Оба
 
 # Status and error messages (`@msg`), translated where the status bar shows them; the message itself
 # stays English for agents and tests. `{_1}`, `{_2}` … stand for the `{}` of the format string, in order
-# (`complete_languages_translate_every_message` lists any that are missing). Command ids, parameter
+# (`untranslated_report` lists any that are missing). Command ids, parameter
 # names and values in backticks or code (`colorModel rgb`, `document.export`) stay as they are.
 @msg	no library `{id}`	нет библиотеки `{id}`
 @msg	select some type first	сначала выделите текст
@@ -3863,6 +3882,7 @@ axis	Both	Оба
 @msg	Opened {url}	Открыто {url}
 @msg	Outline Stroke: no stroked paths selected	Обводка контура: не выделены контуры с обводкой
 @msg	PDF settings are not an object	параметры PDF не являются объектом
+@msg	PDF security settings are not an object	параметры безопасности PDF не являются объектом
 @msg	PDF writer error: {0}	ошибка записи PDF: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	Упаковано файлов: {n} в {folder}{note}
 @msg	Packaged {n} file(s){note}	Упаковано файлов: {n}{note}
@@ -3985,6 +4005,7 @@ axis	Both	Оба
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	axis должно быть "vertical", "horizontal" или углом в градусах, а не `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	фон {other}: transparent, white, black или цвет, например "#ff8800"
 @msg	bad color {v}	недопустимый цвет {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio должно быть числом от 0,1 до 10
 @msg	the Color Picker is not open	палитра цветов не открыта
 @msg	the Simplify slider is not open	ползунок «Упростить» не открыт
 @msg	the screen color sampler is already open	средство выбора цвета с экрана уже открыто
@@ -4062,7 +4083,7 @@ axis	Both	Оба
 @msg	missing index	отсутствует index
 @msg	missing number `{key}`	отсутствует число `{key}`
 @msg	missing integer `{key}`	отсутствует целое число `{key}`
-@msg	multiple windows land with M11.5	несколько окон появятся в M11.5
+@msg	New Window isn't available yet: a document opens in one window	Новое окно пока недоступно: документ открывается в одном окне
 @msg	name the file	дайте файлу имя
 @msg	no CSS to copy: select objects with CSS of their own	нет CSS для копирования: выделите объекты с собственным CSS
 @msg	no Live Paint edge near that point	рядом с этой точкой нет границы быстрой заливки
@@ -5073,3 +5094,54 @@ axis	Y Axis	Ось Y
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	динамический эффект выполняется во время отрисовки документа, поэтому он не может быть `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	модуль экспорта всегда получает бюджет экспорта: не указывайте `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	«{_1}» запрашивает большой вычислительный бюджет (каждый запуск до {minutes} минут и в {times} раз больше инструкций, чем обычно): установите его с `allowHeavy: true`, когда пользователь согласится
+# Actions panel: action sets (#3712).
+	New Set…	Новый набор…
+	New Set	Новый набор
+	Set Options…	Параметры набора…
+	Set Options	Параметры набора
+	Create New Set	Создать новый набор
+	Stop Global Edit	Завершить глобальное редактирование
+	Global Edit Options	Параметры глобального редактирования
+	Match	Совпадение
+	On Artboards	На монтажных областях
+	All Artboards	Все монтажные области
+	Include Objects On Canvas	Включать объекты на холсте
+	Result(s): {count}	Результаты: {count}
+@msg	select one object	выберите один объект
+@msg	Global Edit works on paths, compound paths and symbol instances	Глобальное редактирование работает с контурами, составными контурами и экземплярами символов
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	похожие объекты не найдены (повёрнутые или отражённые копии не учитываются); измените параметры глобального редактирования и повторите попытку
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all или диапазон, например 1, 3-5, а не {v}
+	Add to Symbols	Добавить в символы
+	Basic Shapes	Базовые фигуры
+	Open Symbol Library	Открыть библиотеку символов
+	Save Symbol Library	Сохранить библиотеку символов
+	Save Symbol Library…	Сохранить библиотеку символов…
+	Save Symbols…	Сохранить символы…
+	Selected Symbols Only	Только выбранные символы
+	Symbol Libraries Menu	Меню «Библиотеки символов»
+	Symbol Library	Библиотека символов
+	User Symbol Library 1	Пользовательская библиотека символов 1
+	User Symbol Library 2	Пользовательская библиотека символов 2
+	User Symbol Library 3	Пользовательская библиотека символов 3
+	User Symbol Library 4	Пользовательская библиотека символов 4
+	User Symbol Library 5	Пользовательская библиотека символов 5
+	User Symbol Library 6	Пользовательская библиотека символов 6
+	User Symbol Library 7	Пользовательская библиотека символов 7
+	User Symbol Library 8	Пользовательская библиотека символов 8
+	User Symbol Library 9	Пользовательская библиотека символов 9
+	User Symbol Library 10	Пользовательская библиотека символов 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	В `{_1}` нет символов для размещения
+@msg	missing `library` (see symbol.libraries)	не указан `library` (см. symbol.libraries)
+@msg	no symbol `{n}`	нет символа `{n}`
+@msg	no symbol `{n}` in `{_1}`	нет символа `{n}` в `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	нет библиотеки символов `{key}` (см. symbol.libraries)
+@msg	the document has no symbols to save	в документе нет символов для сохранения
+@msg	Trap: select two or more objects filled with solid colours	Треппинг: выберите два или более объекта со сплошной заливкой
+@msg	Trap: no edges of different colours meet among the selected objects	Треппинг: среди выбранных объектов нет соприкасающихся краёв разных цветов
+@msg	thickness must be from 0.01 to 5000 pt	thickness должно быть от 0,01 до 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth должно быть от 1 до 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction должно быть от 0 до 100 %
+	Rectangular Grid Tool Options	Параметры инструмента «Прямоугольная сетка»
+	Polar Grid Tool Options	Параметры инструмента «Полярная сетка»
+	Fill Line	Заливка отрезка

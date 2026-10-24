@@ -34,6 +34,9 @@ mod vector_effect;
 
 /// The XML of `svg`.
 fn parse(svg: &str) -> Result<roxmltree::Document<'_>, SvgError> {
+    if crate::entities::expansion_too_large(svg) {
+        return Err(SvgError::Parse("the entities the document declares expand to too much text".into()));
+    }
     roxmltree::Document::parse_with_options(svg, roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() })
         .map_err(|e| SvgError::Parse(e.to_string()))
 }
@@ -342,6 +345,8 @@ fn inkscape_pages(xml: &roxmltree::Document, user: Affine) -> Option<Vec<vectorc
             locked: false,
             show_center_mark: false,
             show_cross_hairs: false,
+            show_video_safe_areas: false,
+            video_ruler_pixel_aspect_ratio: 1.0,
             color: None,
         })
         .collect();
@@ -1510,6 +1515,8 @@ impl Importer {
             return None;
         }
         let (appearance, r) = self.appearance(p, acc, path.bounds());
+        // Shared, so a compound path's subpaths don't each copy a gradient's stops.
+        let appearance: vectorcraft_doc::Shared<Appearance> = appearance.into();
         let mut n = if path.subpaths.len() > 1 {
             // Multi-subpath SVG paths are compound paths (as in Illustrator).
             let children = path
@@ -1518,7 +1525,7 @@ impl Importer {
                 .map(|sp| {
                     let id = self.doc.alloc_id();
                     let mut c = Node::new(id, NodeKind::Path { path: PathData::single(sp), rule: r, live: None, clipping: false, guide: false });
-                    c.appearance = appearance.clone().into();
+                    c.appearance = appearance.clone();
                     Arc::new(c)
                 })
                 .collect();
@@ -1526,7 +1533,7 @@ impl Importer {
         } else {
             self.named(p.id(), NodeKind::Path { path, rule: r, live: None, clipping: false, guide: false })
         };
-        n.appearance = appearance.into();
+        n.appearance = appearance;
         Some(n)
     }
 
@@ -1557,7 +1564,10 @@ impl Importer {
             if link.is_some() && !missing { blob.with_proxy() } else { blob }
         });
         let xf = acc * Affine::scale_non_uniform(size.width() as f64 / pw as f64, size.height() as f64 / ph as f64);
-        Some(self.named(i.id(), NodeKind::Image(Box::new(ImageObject { key, width: pw, height: ph, xf, link, placement: Default::default() }))))
+        Some(self.named(
+            i.id(),
+            NodeKind::Image(Box::new(ImageObject { key, width: pw, height: ph, xf, link, placement: Default::default(), pixels: None })),
+        ))
     }
 
     /// An SVG shown as an image (a data URL or a linked file) → its art, `acc` mapping its size.

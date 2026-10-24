@@ -271,7 +271,12 @@ fn unsafe_data(stream: &Stream<'_>, inside: bool) -> bool {
 /// here).
 pub(crate) fn unsafe_file_streams(pdf: &[u8]) -> bool {
     let find = |from: usize, what: &[u8]| pdf.get(from..).and_then(|rest| rest.windows(what.len()).position(|w| w == what)).map(|at| from + at);
-    let mut from = 0;
+    // A walk back through a dictionary stops at `dicts_from`, the end of the last keyword walked
+    // back from, so the scan reads each byte a bounded number of times (#3586): before, every
+    // keyword walked back up to 64 KiB through all the dictionaries before it.
+    let (mut from, mut dicts_from) = (0, 0);
+    // The first `endstream` at or after the last place it was looked for (`None`: there is none).
+    let mut endstream: Option<Option<usize>> = None;
     while let Some(at) = find(from, b"stream") {
         from = at + 6;
         if at >= 3 && pdf.get(at - 3..at) == Some(b"end") {
@@ -282,8 +287,10 @@ pub(crate) fn unsafe_file_streams(pdf: &[u8]) -> bool {
         if close < 2 || pdf.get(close - 2..close) != Some(b">>") {
             continue;
         }
+        let floor = close.saturating_sub(1 << 16).max(dicts_from);
+        dicts_from = from;
         let (mut depth, mut open, mut i) = (0usize, None, close);
-        while i >= 2 && close - i < 1 << 16 {
+        while i >= floor + 2 {
             match pdf.get(i - 2..i) {
                 Some(b">>") => (depth, i) = (depth + 1, i - 2),
                 Some(b"<<") => {
@@ -308,12 +315,16 @@ pub(crate) fn unsafe_file_streams(pdf: &[u8]) -> bool {
         let start = from
             + usize::from(pdf.get(from) == Some(&b'\r'))
             + usize::from(pdf.get(from + usize::from(pdf.get(from) == Some(&b'\r'))) == Some(&b'\n'));
-        let end = dict
-            .get::<usize>(b"Length")
-            .and_then(|n| start.checked_add(n))
-            .filter(|e| *e <= pdf.len())
-            .or_else(|| find(start, b"endstream"))
-            .unwrap_or(pdf.len());
+        let length = dict.get::<usize>(b"Length").and_then(|n| start.checked_add(n)).filter(|e| *e <= pdf.len());
+        let end = match length {
+            Some(end) => end,
+            None => {
+                if endstream.is_none_or(|e| e.is_some_and(|e| e < start)) {
+                    endstream = Some(find(start, b"endstream"));
+                }
+                endstream.flatten().unwrap_or(pdf.len())
+            }
+        };
         if matches!(decode(pdf.get(start..end).unwrap_or_default(), &dict, false), Err(TooBig)) {
             return true;
         }
@@ -462,6 +473,23 @@ mod tests {
             stream("/Filter /FlateDecode /DecodeParms << /Predictor 2 /Columns 0 >>", b"x"),
         ] {
             assert!(!unsafe_file_streams(&fine));
+        }
+        // A bad stream after others is still found: a walk back stops at the previous keyword, not before its own `<<`.
+        let fine = stream("/Type /XRef /Filter /FlateDecode /DecodeParms << /Predictor 12 /Columns 5 >>", b"x");
+        let bad = stream("/Type /XRef /Filter /FlateDecode /DecodeParms 9 0 R", b"x");
+        assert!(unsafe_file_streams(&[fine.as_slice(), b"<< >>stream x endstream", &bad].concat()));
+    }
+
+    #[test]
+    fn a_file_dense_with_stream_keywords_is_scanned_in_linear_time() {
+        // #3586: each `stream` keyword walked back up to 64 KiB, through every dictionary before
+        // it, so 1 MiB of keywords took minutes. Now the whole scan takes milliseconds.
+        for unit in [&b"<</A <</B 1>> >>stream"[..], b">>stream", b"<</Type/XRef>>stream"] {
+            let pdf = unit.repeat((1 << 20) / unit.len());
+            let t = std::time::Instant::now();
+            assert!(!unsafe_file_streams(&pdf));
+            let took = t.elapsed();
+            assert!(took < std::time::Duration::from_secs(5), "{} took {took:?}", String::from_utf8_lossy(unit));
         }
     }
 }

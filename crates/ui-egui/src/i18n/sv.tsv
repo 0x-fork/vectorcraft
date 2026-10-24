@@ -182,6 +182,8 @@
 	Anti-aliased Artwork	Kantutjämnad grafik
 	Anti-aliasing:	Kantutjämning:
 	Any Kind	Alla typer
+	Font Technology	Teckensnittsteknik
+font-technology	Variable	Variabla
 	Appearance	Utseende
 	Appearance Attribute	Utseendeattribut
 	Appearance Item	Utseendeobjekt
@@ -268,6 +270,9 @@
 	Background Color:	Bakgrundsfärg:
 	Show Center Mark	Visa mittmarkering
 	Show Cross Hairs	Visa hårkors
+	Show Video Safe Areas	Visa videosäkra områden
+	Video Ruler Pixel Aspect Ratio:	Pixelproportion för videolinjaler:
+	Hide Video Rulers	Dölj videolinjaler
 	Background Contents	Bakgrundsinnehåll
 	Background Contents:	Bakgrundsinnehåll:
 	Background:	Bakgrund:
@@ -336,6 +341,13 @@
 	Built-in presets don't change: New… starts an editable copy.	Inbyggda förinställningar ändras inte: Ny… skapar en redigerbar kopia.
 	Bulge…	Utbuktning…
 	Bullet	Punkt
+	Bullets	Punkter
+	Bullets and Numbering	Punkter och numrering
+	Apply Bullets	Använd punkter
+	Filled Dot	Fylld punkt
+	Dash	Tankstreck
+	Hollow Circle	Tom cirkel
+	Filled Square	Fylld kvadrat
 	Butt Cap	Rak ände
 	Byte Order:	Byteordning:
 	Calligraphic	Kalligrafisk
@@ -1350,7 +1362,7 @@
 	Clear History	Rensa historik
 	Set History Limit…	Ange historikgräns…
 	History States	Historiktillstånd
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Använd datauppsättning
 	Cancel Pattern Editing	Avbryt mönsterredigering
 	Copy Appearance	Kopiera utseende
@@ -3023,6 +3035,7 @@
 	Space Before Paragraph	Avstånd före stycke
 	Spaces	Blanksteg
 	Spacing Guides	Avståndsstödlinjer
+	Invoke Distance Guides	Anropa mätstödlinjer för avstånd
 	Spacing:	Avstånd:
 	Spanish	Spanska
 	Specified Distance	Angivet avstånd
@@ -3160,7 +3173,6 @@
 	Show all open documents	Visa alla öppna dokument
 	Symbol Instance	Symbolinstans
 	Symbol Libraries	Symbolbibliotek
-	Symbol Libraries (on the roadmap)	Symbolbibliotek (planeras)
 	Symbol Screener Tool	Verktyg för symbolopacitet
 	Symbol Scruncher Tool	Verktyg för att dra ihop symboler
 	Symbol Shifter Tool	Verktyg för att flytta symboler
@@ -3288,6 +3300,13 @@
 	Transparent Background	Transparent bakgrund
 	Transverse (the page a quarter turn on the paper)	Tvärställd (sidan vriden ett kvarts varv på pappret)
 	Trap…	Överfyllning…
+	Trap	Överfyllning
+	Height/Width	Höjd/bredd
+	Tint Reduction	Tonreducering
+	Traps with Process Color	Överfyllningar med processfärger
+	Reverse Traps	Omvända överfyllningar
+	Precision	Precision
+	Remove Redundant Points	Ta bort överflödiga punkter
 	Trim	Trimma
 	Trim mark weight:	Tjocklek på skärmärken:
 	Trim marks	Skärmärken
@@ -3747,6 +3766,7 @@ axis	Both	Båda
 @msg	Opened {url}	Öppnade {url}
 @msg	Outline Stroke: no stroked paths selected	Kontur till bana: inga banor med kontur markerade
 @msg	PDF settings are not an object	PDF-inställningarna är inte ett objekt
+@msg	PDF security settings are not an object	PDF-säkerhetsinställningarna är inte ett objekt
 @msg	PDF writer error: {0}	fel i PDF-skrivaren: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	Paketerade {n} fil(er) i {folder}{note}
 @msg	Packaged {n} file(s){note}	Paketerade {n} fil(er){note}
@@ -3868,6 +3888,7 @@ axis	Both	Båda
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	axis måste vara "vertical", "horizontal" eller en vinkel i grader, inte `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	background {other}: transparent, white, black eller en färg som "#ff8800"
 @msg	bad color {v}	ogiltig färg {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio måste vara ett tal från 0,1 till 10
 @msg	bad colour `{hex}` (#rrggbb)	ogiltig färg `{hex}` (#rrggbb)
 @msg	bad page tree	ogiltigt sidträd
 @msg	bad shortcut	ogiltigt kortkommando
@@ -3941,7 +3962,7 @@ axis	Both	Båda
 @msg	missing index	index saknas
 @msg	missing number `{key}`	talet `{key}` saknas
 @msg	missing integer `{key}`	heltalet `{key}` saknas
-@msg	multiple windows land with M11.5	flera fönster kommer med M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nytt fönster är inte tillgängligt än: ett dokument öppnas i ett fönster
 @msg	name the file	namnge filen
 @msg	no CSS to copy: select objects with CSS of their own	ingen CSS att kopiera: markera objekt som har egen CSS
 @msg	no Live Paint edge near that point	ingen Live Paint-kant nära den punkten
@@ -4733,6 +4754,7 @@ lighting	Light	Ljus
 	Brown	Brun
 	Business Card 3.5 × 2 in	Visitkort 3,5 × 2 in
 	Business Card 85 × 55 mm	Visitkort 85 × 55 mm
+	Business Card 91 × 55 mm	Visitkort 91 × 55 mm
 	CRLF (Windows)	CRLF (Windows)
 	Cap Height	Versalhöjd
 	Chevron	Chevron
@@ -5416,3 +5438,54 @@ axis	Y Axis	Y-axel
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	en live-effekt körs medan dokumentet ritas, så den kan inte vara `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	ett exportinsticksprogram får alltid en exports budget: utelämna `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	”{_1}” begär en stor beräkningsbudget (varje körning upp till {minutes} minuter och {times} gånger de vanliga instruktionerna): installera det med `allowHeavy: true` när användaren har godkänt
+# Actions panel: action sets (#3712).
+	New Set…	Ny uppsättning…
+	New Set	Ny uppsättning
+	Set Options…	Alternativ för uppsättning…
+	Set Options	Alternativ för uppsättning
+	Create New Set	Skapa ny uppsättning
+	Stop Global Edit	Avsluta global redigering
+	Global Edit Options	Alternativ för global redigering
+	Match	Matcha
+	On Artboards	På ritytor
+	All Artboards	Alla ritytor
+	Include Objects On Canvas	Ta med objekt på arbetsytan
+	Result(s): {count}	Resultat: {count}
+@msg	select one object	markera ett objekt
+@msg	Global Edit works on paths, compound paths and symbol instances	Global redigering fungerar på banor, sammansatta banor och symbolinstanser
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	inga liknande objekt hittades (roterade eller speglade kopior matchas inte); ändra alternativen för global redigering och försök igen
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all eller ett intervall som 1, 3-5, inte {v}
+	Add to Symbols	Lägg till i symboler
+	Basic Shapes	Grundformer
+	Open Symbol Library	Öppna symbolbibliotek
+	Save Symbol Library	Spara symbolbibliotek
+	Save Symbol Library…	Spara symbolbibliotek…
+	Save Symbols…	Spara symboler…
+	Selected Symbols Only	Endast markerade symboler
+	Symbol Libraries Menu	Meny för symbolbibliotek
+	Symbol Library	Symbolbibliotek
+	User Symbol Library 1	Användarbibliotek för symboler 1
+	User Symbol Library 2	Användarbibliotek för symboler 2
+	User Symbol Library 3	Användarbibliotek för symboler 3
+	User Symbol Library 4	Användarbibliotek för symboler 4
+	User Symbol Library 5	Användarbibliotek för symboler 5
+	User Symbol Library 6	Användarbibliotek för symboler 6
+	User Symbol Library 7	Användarbibliotek för symboler 7
+	User Symbol Library 8	Användarbibliotek för symboler 8
+	User Symbol Library 9	Användarbibliotek för symboler 9
+	User Symbol Library 10	Användarbibliotek för symboler 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` har inga symboler att placera
+@msg	missing `library` (see symbol.libraries)	`library` saknas (se symbol.libraries)
+@msg	no symbol `{n}`	ingen symbol `{n}`
+@msg	no symbol `{n}` in `{_1}`	ingen symbol `{n}` i `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	inget symbolbibliotek `{key}` (se symbol.libraries)
+@msg	the document has no symbols to save	dokumentet har inga symboler att spara
+@msg	Trap: select two or more objects filled with solid colours	Överfyllning: markera två eller fler objekt fyllda med enfärgade färger
+@msg	Trap: no edges of different colours meet among the selected objects	Överfyllning: inga kanter i olika färger möts bland de markerade objekten
+@msg	thickness must be from 0.01 to 5000 pt	thickness måste vara från 0,01 till 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth måste vara från 1 till 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction måste vara från 0 till 100 %
+	Rectangular Grid Tool Options	Alternativ för verktyget för rektangulärt rutnät
+	Polar Grid Tool Options	Alternativ för verktyget för polärt rutnät
+	Fill Line	Fyll linje

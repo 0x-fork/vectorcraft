@@ -1136,7 +1136,15 @@ fn raster_node(d: &mut Document, r: Raster) -> Node {
     d.images.insert(key.clone(), r.blob);
     let image = Node::new(
         d.alloc_id(),
-        NodeKind::Image(Box::new(ImageObject { key, width: r.width, height: r.height, xf: r.xf, link: None, placement: Default::default() })),
+        NodeKind::Image(Box::new(ImageObject {
+            key,
+            width: r.width,
+            height: r.height,
+            xf: r.xf,
+            link: None,
+            placement: Default::default(),
+            pixels: None,
+        })),
     );
     let Some(path) = r.clip else { return image };
     super::rasterfx::clip_group(d, path, FillRule::NonZero, image)
@@ -1226,13 +1234,14 @@ impl Scratch {
             NodeKind::Text(_) => outlined_text(n),
             NodeKind::SymbolInstance { symbol, .. } => {
                 let art = self.doc.symbols.iter().find(|s| &s.name == symbol).map(|s| vectorcraft_render::instance_art(&s.art, n));
-                art.and_then(|a| effects::outline_art(n, Some(&a))).map(|g| carry(n, g))
+                art.and_then(|a| effects::outline_art(Some(&self.doc), n, Some(&a))).map(|g| carry(n, g))
             }
             // A placed document stays one: its art's resources aren't the document's.
             NodeKind::PlacedDocument(_) => None,
             NodeKind::Blend { .. } | NodeKind::Envelope { .. } | NodeKind::Repeat(_) => {
                 let hook: &dyn Fn(&Node) -> Option<Node> = &effects::outline_text;
-                Some(carry(n, vectorcraft_doc::live::expanded_group(n, Some(hook))))
+                let hooks = vectorcraft_doc::live::Hooks { outline: Some(hook), symbols: Some(&self.doc), ..Default::default() };
+                Some(carry(n, vectorcraft_doc::live::expanded_group_hooks(n, hooks)))
             }
             NodeKind::Path { guide: false, .. } | NodeKind::Compound { .. } => outline_strokes(&mut self.doc, &self.brushes, n),
             _ => None,

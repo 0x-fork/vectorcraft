@@ -73,7 +73,7 @@ fn escaped(s: &str) -> Option<(char, usize)> {
     let body = s.strip_prefix("_x")?;
     let end = body.find('_')?;
     let hex = body.get(..end)?;
-    if hex.is_empty() || hex.len() > 6 {
+    if hex.is_empty() || hex.len() > 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
     let c = char::from_u32(u32::from_str_radix(hex, 16).ok()?)?;
@@ -111,6 +111,12 @@ mod tests {
         assert_eq!(to_object_name("S_00000092429200007574234970000005974767392385616558_"), "S");
         assert!(is_valid("Layer_1") && is_valid("_x31_abc") && is_valid(":root"));
         assert!(!is_valid("My Rect") && !is_valid("1abc") && !is_valid(""));
+    }
+
+    #[test]
+    fn sign_is_not_a_hex_digit_in_escapes() {
+        assert_eq!(to_object_name("a_x+41_b"), "a x+41 b");
+        assert_eq!(to_object_name("a_x-41_b"), "a x-41 b");
     }
 
     #[test]

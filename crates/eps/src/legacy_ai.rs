@@ -83,7 +83,7 @@ const HEX_LINE: usize = 60;
 
 pub const SUBLAYERS: &str = "sublayers are written as groups in their top-level layer (legacy .ai files have no sublayers)";
 pub const TYPE: &str = "type a legacy .ai can't hold as text (characters outside Windows Latin-1, vertical type, inline graphics, gradient or pattern fills) is written as outlines";
-pub const TYPE_ATTRIBUTES: &str = "type attributes legacy .ai files don't have (underline, strikethrough, small caps, superscript and subscript, character rotation, OpenType features, Variable Font settings, area type options, type on a path effects, space after paragraphs, tabs) are left out";
+pub const TYPE_ATTRIBUTES: &str = "type attributes legacy .ai files don't have (underline, strikethrough, small caps, superscript and subscript, character rotation, OpenType features, Variable Font settings, area type options, type on a path effects, space after paragraphs, tabs, bulleted lists) are left out";
 pub const HIDDEN: &str = "hidden objects are left out (hidden layers are kept, hidden)";
 pub const HIDDEN_LAYER: &str = "hidden objects are moved to a hidden layer above their own (legacy .ai files can hide only layers)";
 pub const HIDDEN_SHOWN: &str = "hidden objects are written visible (legacy .ai files can hide only layers)";
@@ -678,7 +678,7 @@ impl<'a> Writer<'a> {
             }
             NodeKind::Image(im) => {
                 self.lock(locked);
-                self.image(self.doc.images.get(&im.key), im.width, im.height, im.xf);
+                self.image(self.doc.image_blob(im), im.width, im.height, im.xf);
             }
             NodeKind::SymbolInstance { symbol, xf } => {
                 self.warn(LIVE);
@@ -1396,7 +1396,7 @@ fn lost_attributes(t: &TextObject) -> bool {
             || !s.features.is_empty()
             || !s.font_axes.is_empty()
     };
-    let para_lost = |p: &ParaStyle| p.space_after != 0.0 || !p.tabs.is_empty();
+    let para_lost = |p: &ParaStyle| p.space_after != 0.0 || !p.tabs.is_empty() || p.list.is_some();
     t.runs.iter().any(|r| run_lost(&r.style))
         || t.paragraph_styles().iter().any(para_lost)
         || (matches!(t.kind, TextKind::Area { .. }) && t.area != AreaOptions::default())

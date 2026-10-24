@@ -1,12 +1,13 @@
-//! Library panels: read-only views of one library each (swatch and graphic style libraries; any
-//! kind of library implementing [`LibraryKind`]) with thumbnail and list views, a find field, the
-//! libraries menu and previous / next arrows. A plain click on an item adds it to the document and
-//! applies it; Shift and Cmd/Ctrl-clicks select items (and folders) for Add to ….
+//! Library panels: read-only views of one library each (swatch, graphic style and symbol
+//! libraries; any kind of library implementing [`LibraryKind`]) with thumbnail and list views, a
+//! find field, the libraries menu and previous / next arrows. A plain click on an item adds it to
+//! the document and applies it; Shift and Cmd/Ctrl-clicks select items (and folders) for Add to ….
+//! A kind whose items drag ([`LibraryKind::drag`]) lets them be dragged out of the panel.
 //!
 //! As in Illustrator (<https://helpx.adobe.com/illustrator/using/using-creating-swatches.html>,
 //! "Swatch libraries"), each open library is a panel of its own, `library:<kind>:<library id>`
 //! ([`panel_id`]), that floats, tabs, docks and closes as any panel of the shared docking system:
-//! `window.swatchLibrary` and `window.graphicStyleLibrary` open one, or bring it forward when it is
+//! `window.swatchLibrary`, `window.graphicStyleLibrary` and `window.symbolLibrary` open one, or bring it forward when it is
 //! open. `UiState::library_panels` keeps each one's view, Show Find Field and Persistent
 //! (`ui.libraryPanel`); a persistent panel reopens when the app starts ([`restore`]). A persistent
 //! panel whose library can't be found shows the library as missing, with its file and Locate
@@ -25,7 +26,7 @@ use super::swatches::{View, click_selection, folder_tile, list_row, list_row_nam
 use super::{pstate, set_pstate};
 use crate::VectorcraftApp;
 use crate::state::UiState;
-use crate::widgets::{self, menu_item};
+use crate::widgets::{self, PanelDrag, menu_item};
 
 /// What every library panel's id starts with.
 pub const PREFIX: &str = "library:";
@@ -115,6 +116,10 @@ pub(crate) trait LibraryKind {
     fn click(app: &mut VectorcraftApp, ui: &Ui, id: &str, name: &str);
     /// Add the items and folders `names` of library `id` to the document.
     fn add(app: &mut VectorcraftApp, id: &str, names: Vec<String>);
+    /// What dragging item `name` of library `id` out of the panel carries, if it drags.
+    fn drag(_id: &str, _name: &str) -> Option<PanelDrag> {
+        None
+    }
     /// Items heading the libraries menu.
     fn menu_head(_app: &mut VectorcraftApp, _ui: &mut Ui) {}
     /// Items closing the libraries menu.
@@ -154,7 +159,13 @@ fn kind_of<K: LibraryKind>() -> Kind {
 
 /// The kind of library `kind` names.
 fn kind(kind: &str) -> Option<Kind> {
-    [kind_of::<super::swatches::SwatchLibraries>(), kind_of::<super::graphic_styles::GraphicStyleLibraries>()].into_iter().find(|k| k.kind == kind)
+    [
+        kind_of::<super::swatches::SwatchLibraries>(),
+        kind_of::<super::graphic_styles::GraphicStyleLibraries>(),
+        kind_of::<super::symbols::SymbolLibraries>(),
+    ]
+    .into_iter()
+    .find(|k| k.kind == kind)
 }
 
 /// The id of the panel of library `id` of `kind` (`library:swatches:pastels`).
@@ -541,7 +552,8 @@ fn set(app: &mut VectorcraftApp, panel: &str, mut params: Value) {
     }
 }
 
-/// Open-dialog filters for Other Library… / Locate Library… of library panels of kind `kind`.
+/// Open-dialog filters for Other Library… / Locate Library… of library panels of kind `kind`
+/// (symbol libraries: any document).
 pub(crate) fn library_pick_filters(kind: &str) -> Vec<(&'static str, &'static [&'static str])> {
     match kind {
         super::swatches::SwatchLibraries::KIND => fileio::library_open_filters("Swatch libraries", swatchlib::LIBRARY_EXTS).collect(),
@@ -628,16 +640,18 @@ fn body<K: LibraryKind>(app: &mut VectorcraftApp, ui: &mut Ui, id: &str) {
                         None => super::swatches::draw_folder(ui, chip),
                     }
                     list_row_name(ui, r, chip, row.name);
+                    drag_out::<K>(ui, &resp, id, row);
                     let tip = || row.item.map_or_else(|| row.name.to_string(), |i| format!("{} ({})", row.name, K::describe(i)));
                     click(ui, resp, row, &tip);
                 }
             } else {
                 for (row, cell) in tile_grid(ui, &rows, view, |r| r.item.is_none()) {
-                    let resp = ui.interact(cell, tile_id(&panel, row.name), Sense::click());
+                    let resp = ui.interact(cell, tile_id(&panel, row.name), Sense::click_and_drag());
                     match row.item {
                         Some(item) => K::draw(app, ui, cell, item, is_sel(row.name), resp.hovered()),
                         None => folder_tile(ui, cell, is_sel(row.name)),
                     }
+                    drag_out::<K>(ui, &resp, id, row);
                     click(ui, resp, row, &|| row.name.to_string());
                 }
             }
@@ -654,6 +668,16 @@ fn body<K: LibraryKind>(app: &mut VectorcraftApp, ui: &mut Ui, id: &str) {
         }
     }
     bottom::<K>(app, ui, id);
+}
+
+/// An item of library `id` dragged out of its tile or row `resp` carries what `K` says it does.
+fn drag_out<K: LibraryKind>(ui: &Ui, resp: &egui::Response, id: &str, row: &Row<K::Item>) {
+    if row.item.is_some()
+        && resp.drag_started()
+        && let Some(drag) = K::drag(id, row.name)
+    {
+        egui::DragAndDrop::set_payload(ui.ctx(), drag);
+    }
 }
 
 /// The body of the panel of library `id` when the library is missing ([`missing_file`]): its file,

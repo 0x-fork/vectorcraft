@@ -664,6 +664,34 @@ fn opacity_mask_without_clip_and_inverted() {
     assert_eq!(img.pixel(80, 50), [255, 0, 0, 255], "inverted clip background → visible");
 }
 
+/// #3580: each opacity mask is rendered over its object's pixels, not over the whole frame. 300
+/// masked 4 × 4 pt squares on a 1000 × 1000 page draw offscreen in proportion to their bounds, and
+/// still draw where their masks show them.
+#[test]
+fn small_masks_render_over_their_objects_only() {
+    let mut d = Document::new(1000.0, 1000.0);
+    let l = d.layers[0].id;
+    for i in 0..300 {
+        let (x, y) = (10.0 + (i % 30) as f64 * 30.0, 10.0 + (i / 30) as f64 * 30.0);
+        let square = Rect::new(x, y, x + 4.0, y + 4.0);
+        let mut n = rect_node(&mut d, square, Paint::solid(Color::rgb(1.0, 0.0, 0.0)), Paint::None, 0.0);
+        let white = rect_node(&mut d, square, Paint::solid(Color::WHITE), Paint::None, 0.0);
+        n.extras_mut().mask = Some(Box::new(vectorcraft_doc::OpacityMask::new(white, true)));
+        d.insert(Some(l), usize::MAX, n).unwrap();
+    }
+    let mut r = Renderer::new();
+    r.threads = 0;
+    let opts = RenderOptions { background: Some([255, 255, 255, 255]), ..Default::default() };
+    OFFSCREEN_PIXELS.with(|n| n.set(0));
+    let img = r.render(&d, 1000, 1000, Affine::IDENTITY, &opts);
+    let px = OFFSCREEN_PIXELS.with(|n| n.get());
+    // Each square's region is at most 4 + 2 × 2 margin + 1 rounding pixels a side, mask and content.
+    assert!(px <= 300 * 2 * 9 * 9, "{px} offscreen pixels for 300 masked 4 × 4 squares");
+    assert_eq!(img.pixel(12, 12), [255, 0, 0, 255]);
+    assert_eq!(img.pixel(12 + 29 * 30, 12 + 9 * 30), [255, 0, 0, 255]);
+    assert_eq!(img.pixel(20, 20), [255, 255, 255, 255]);
+}
+
 #[test]
 fn disabled_or_outline_mask_draws_unmasked() {
     let mut d = masked_doc(true, false);
@@ -805,7 +833,7 @@ fn images_take_their_nearest_pixel_without_smoothing() {
     let mut d = Document::new(40.0, 20.0);
     d.images.insert("bw".into(), ImageBlob::new("image/png", png));
     let id = d.alloc_id();
-    let im = ImageObject { key: "bw".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default() };
+    let im = ImageObject { key: "bw".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default(), pixels: None };
     d.insert(Some(d.layers[0].id), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     // How many pixels across the image are neither black nor white.
     let greys = |smooth_images| {
@@ -877,7 +905,8 @@ fn a_gray_image_draws_its_gray_levels() {
     let mut d = Document::new(40.0, 20.0);
     d.images.insert("gray".into(), ImageBlob::new("image/png", png));
     let id = d.alloc_id();
-    let im = ImageObject { key: "gray".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default() };
+    let im =
+        ImageObject { key: "gray".into(), width: 2, height: 1, xf: Affine::scale(20.0), link: None, placement: Default::default(), pixels: None };
     d.insert(Some(d.layers[0].id), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     let r = Renderer::new().render(&d, 40, 20, Affine::IDENTITY, &RenderOptions { smooth_images: false, ..Default::default() });
     assert_eq!((r.pixel(5, 10), r.pixel(35, 10)), ([40, 40, 40, 255], [200, 200, 200, 255]));

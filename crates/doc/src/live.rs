@@ -1476,6 +1476,9 @@ pub struct Hooks<'a> {
     pub appearance: Outliner<'a>,
     /// Distort Pattern Fills: the tiles a pattern fill lays (see [`PatternTiles`]).
     pub pattern: Option<PatternTiles<'a>>,
+    /// The document whose symbols' art counts toward the instance budget of a Repeat of their
+    /// instances ([`crate::RepeatSpec::expand`]).
+    pub symbols: Option<&'a crate::Document>,
 }
 
 impl<'a> From<Outliner<'a>> for Hooks<'a> {
@@ -1792,7 +1795,7 @@ pub fn expand_live_hooks(n: &Node, hooks: Hooks) -> Vec<Node> {
         NodeKind::Blend { children, spec } => blend_expand(children, spec),
         NodeKind::Envelope { content, kind, fidelity, options, frame, .. } => expand_envelope(content, kind, *fidelity, *options, **frame, hooks),
         NodeKind::Mesh(m) => mesh_quad_nodes(m, 8),
-        NodeKind::Repeat(r) => r.expand(),
+        NodeKind::Repeat(r) => r.expand(hooks.symbols),
         NodeKind::PlacedDocument(p) => p.art(n),
         NodeKind::Intertwine { children } => crate::intertwine::expand(children),
         _ => vec![n.clone()],

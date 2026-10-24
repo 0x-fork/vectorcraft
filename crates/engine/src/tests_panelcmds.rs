@@ -916,19 +916,145 @@ fn artboard_display_marks_round_trip_through_the_native_format() {
     assert!(back.artboards.iter().all(|a| !a.show_center_mark && !a.show_cross_hairs));
 }
 
-/// Show Center Mark and Show Cross Hairs are screen-only: SVG and PDF exports (and print, which
-/// prints the PDF) come out the same with them on as with them off.
+/// Show Center Mark, Show Cross Hairs, Show Video Safe Areas and the Video Ruler Pixel Aspect Ratio
+/// are screen-only: SVG and PDF exports (and print, which prints the PDF) come out the same with
+/// them on as with them off.
 #[test]
 fn artboard_display_marks_stay_out_of_exports() {
     let mut s = session();
     rect(&mut s);
     let doc = |s: &Session| (*s.doc().unwrap().doc).clone();
     let off = doc(&s);
-    s.execute("artboard.setProps", &json!({"index": 0, "showCenterMark": true, "showCrossHairs": true})).unwrap();
+    s.execute(
+        "artboard.setProps",
+        &json!({"index": 0, "showCenterMark": true, "showCrossHairs": true, "showVideoSafeAreas": true, "videoRulerPixelAspectRatio": 2}),
+    )
+    .unwrap();
     let on = doc(&s);
     assert_ne!(on.artboards, off.artboards);
     assert_eq!(vectorcraft_svg::export(&on, &Default::default()), vectorcraft_svg::export(&off, &Default::default()));
     assert_eq!(crate::export_pdf(&on, &Default::default()).unwrap(), crate::export_pdf(&off, &Default::default()).unwrap());
+}
+
+/// Artboard Options' video display options: `artboard.setProps {showVideoSafeAreas,
+/// videoRulerPixelAspectRatio}` sets each on that artboard only, in one undo step, also for a
+/// locked artboard and in an `artboards` list. A change without them leaves them, a duplicate
+/// keeps them, `artboard.new` takes them, `inspect_document` reports them, and a value that isn't
+/// true or false, or a ratio outside 0.1–10, is refused and changes nothing.
+#[test]
+fn artboard_video_display_options_are_set_in_one_undo_step() {
+    let mut s = session();
+    s.execute("artboard.new", &json!({})).unwrap();
+    let video = |s: &Session, i: usize| {
+        let a = &s.doc().unwrap().doc.artboards[i];
+        (a.show_video_safe_areas, a.video_ruler_pixel_aspect_ratio)
+    };
+    let undo = |s: &Session| s.doc().unwrap().history.undo.len();
+    assert_eq!((video(&s, 0), video(&s, 1)), ((false, 1.0), (false, 1.0)), "off and square by default");
+    let u0 = undo(&s);
+    s.execute("artboard.setProps", &json!({"index": 1, "showVideoSafeAreas": true})).unwrap();
+    assert_eq!((video(&s, 0), video(&s, 1)), ((false, 1.0), (true, 1.0)), "only that artboard");
+    s.execute("artboard.setProps", &json!({"index": 1, "videoRulerPixelAspectRatio": 0.9})).unwrap();
+    assert_eq!(video(&s, 1), (true, 0.9));
+    s.execute("artboard.setProps", &json!({"index": 1, "name": "Video"})).unwrap();
+    assert_eq!(video(&s, 1), (true, 0.9), "a change without them leaves them");
+    assert_eq!(undo(&s), u0 + 3, "one undo step each");
+    for was in [(true, 0.9), (true, 1.0), (false, 1.0)] {
+        s.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(video(&s, 1), was);
+    }
+    s.execute("edit.redo", &json!({})).unwrap();
+    assert_eq!(video(&s, 1), (true, 1.0));
+    // A locked artboard keeps its rectangle, not its video display options.
+    s.execute("artboard.setProps", &json!({"index": 0, "locked": true})).unwrap();
+    s.execute("artboard.setProps", &json!({"index": 0, "videoRulerPixelAspectRatio": 2})).unwrap();
+    assert_eq!(video(&s, 0), (false, 2.0));
+    let u = undo(&s);
+    s.execute(
+        "artboard.setProps",
+        &json!({"artboards": [{"index": 0, "showVideoSafeAreas": true}, {"index": 1, "showVideoSafeAreas": false, "videoRulerPixelAspectRatio": 1.2}]}),
+    )
+    .unwrap();
+    assert_eq!((video(&s, 0), video(&s, 1)), ((true, 2.0), (false, 1.2)), "each listed artboard takes its own");
+    assert_eq!(undo(&s), u + 1, "in one undo step");
+    let doc = crate::inspect::document(&s);
+    assert_eq!(doc["artboards"][0]["showVideoSafeAreas"], json!(true));
+    assert_eq!(
+        (doc["artboards"][0]["videoRulerPixelAspectRatio"].clone(), doc["artboards"][1]["videoRulerPixelAspectRatio"].clone()),
+        (json!(2.0), json!(1.2))
+    );
+    assert!(doc["artboards"][1].get("showVideoSafeAreas").is_none(), "{doc}");
+    s.execute("artboard.setProps", &json!({"index": 1, "videoRulerPixelAspectRatio": 1})).unwrap();
+    assert!(crate::inspect::document(&s)["artboards"][1].get("videoRulerPixelAspectRatio").is_none(), "square pixels aren't reported");
+    let copy = s.execute("artboard.duplicate", &json!({"index": 0})).unwrap()["index"].as_u64().unwrap() as usize;
+    assert_eq!(video(&s, copy), (true, 2.0), "a duplicate keeps them");
+    let made = s.execute("artboard.new", &json!({"showVideoSafeAreas": true, "videoRulerPixelAspectRatio": 0.1})).unwrap()["index"].as_u64().unwrap()
+        as usize;
+    assert_eq!(video(&s, made), (true, 0.1), "a new artboard takes them too");
+    let before = s.doc().unwrap().doc.clone();
+    for bad in [json!("yes"), json!(1)] {
+        assert!(s.execute("artboard.setProps", &json!({"index": 1, "showVideoSafeAreas": bad})).is_err());
+        assert!(s.execute("artboard.new", &json!({"showVideoSafeAreas": bad})).is_err());
+    }
+    for bad in [json!(0.09), json!(10.5), json!(0), json!(-1), json!("2"), json!(null)] {
+        assert!(s.execute("artboard.setProps", &json!({"index": 1, "videoRulerPixelAspectRatio": bad})).is_err(), "{bad}");
+        assert!(s.execute("artboard.new", &json!({"videoRulerPixelAspectRatio": bad})).is_err(), "{bad}");
+    }
+    assert!(
+        s.execute(
+            "artboard.setProps",
+            &json!({"artboards": [{"index": 0, "showVideoSafeAreas": false}, {"index": 1, "videoRulerPixelAspectRatio": 11}]})
+        )
+        .is_err()
+    );
+    assert_eq!(*s.doc().unwrap().doc, *before, "a bad value changes nothing");
+    s.execute("artboard.setProps", &json!({"index": 1, "videoRulerPixelAspectRatio": 10})).unwrap();
+    assert_eq!(video(&s, 1), (false, 10.0), "10 is in range");
+}
+
+/// The native format keeps Show Video Safe Areas and the Video Ruler Pixel Aspect Ratio. A
+/// document whose artboards hide the safe areas and have square pixels is written byte for byte as
+/// before they could be set, a file written without the two keys opens with the safe areas off
+/// and square pixels, and a file's ratio outside 0.1–10 opens brought into that range.
+#[test]
+fn artboard_video_display_options_round_trip_through_the_native_format() {
+    let mut s = session();
+    s.execute("artboard.new", &json!({})).unwrap();
+    let save = |s: &Session| vectorcraft_format::save(&s.doc().unwrap().doc, false);
+    let before = save(&s);
+    s.execute(
+        "artboard.setProps",
+        &json!({"artboards": [{"index": 0, "showVideoSafeAreas": true}, {"index": 1, "videoRulerPixelAspectRatio": 0.9}]}),
+    )
+    .unwrap();
+    let bytes = save(&s);
+    let saved: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    let ab = |i: usize| saved["document"]["artboards"][i].clone();
+    assert_eq!(ab(0)["show_video_safe_areas"], json!(true));
+    assert!(ab(0).get("video_ruler_pixel_aspect_ratio").is_none(), "square pixels aren't written: {}", ab(0));
+    assert_eq!(ab(1)["video_ruler_pixel_aspect_ratio"], json!(0.9));
+    assert!(ab(1).get("show_video_safe_areas").is_none(), "hidden safe areas aren't written: {}", ab(1));
+    let back = vectorcraft_format::load(&bytes).unwrap();
+    assert_eq!(back.artboards, s.doc().unwrap().doc.artboards);
+    assert_eq!((back.artboards[0].show_video_safe_areas, back.artboards[1].video_ruler_pixel_aspect_ratio), (true, 0.9));
+    s.execute("artboard.setProps", &json!({"artboards": [{"index": 0, "showVideoSafeAreas": false}, {"index": 1, "videoRulerPixelAspectRatio": 1}]}))
+        .unwrap();
+    assert_eq!(save(&s), before, "off and square again, the file is as it was");
+    // A file whose artboards have no such keys (older writers) opens with them off and square.
+    let mut old: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    for a in old["document"]["artboards"].as_array_mut().unwrap() {
+        let a = a.as_object_mut().unwrap();
+        a.remove("show_video_safe_areas");
+        a.remove("video_ruler_pixel_aspect_ratio");
+    }
+    let back = vectorcraft_format::load(&serde_json::to_vec(&old).unwrap()).unwrap();
+    assert!(back.artboards.iter().all(|a| !a.show_video_safe_areas && a.video_ruler_pixel_aspect_ratio == 1.0));
+    for (written, opens) in [(json!(0), 0.1), (json!(-3), 0.1), (json!(1e9), 10.0), (json!(2.5), 2.5)] {
+        let mut file: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        file["document"]["artboards"][1]["video_ruler_pixel_aspect_ratio"] = written.clone();
+        let back = vectorcraft_format::load(&serde_json::to_vec(&file).unwrap()).unwrap();
+        assert_eq!(back.artboards[1].video_ruler_pixel_aspect_ratio, opens, "{written}");
+    }
 }
 
 #[test]

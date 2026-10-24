@@ -5,12 +5,13 @@
 //! gradient becomes a mesh shaped like the object. A pattern fill becomes the tiles it paints inside a clip
 //! group shaped like the object. Create Gradient Mesh shares the sampling.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use serde_json::{Value, json};
 use vectorcraft_color::cms::Model;
 use vectorcraft_color::freeform::spread_scale;
-use vectorcraft_color::{Color, Gradient, GradientKind, GradientPaint, Paint};
+use vectorcraft_color::{BlendMode, Color, Gradient, GradientKind, GradientPaint, Paint};
 use vectorcraft_doc::appearance::{AppearanceItem, FillLayer};
 use vectorcraft_doc::live::GradientMesh;
 use vectorcraft_doc::pattern::{PatternDef, place_art};
@@ -412,6 +413,45 @@ fn expand_pattern_fills(s: &mut Session) -> Result<()> {
     })
 }
 
+/// Expand the pattern fills under `root` that paint a transparent image into the tiles they paint
+/// ([`expand_patterns_where`]), so each tile image becomes an object of its own; the other
+/// pattern fills stay. A tile image counts as
+/// transparent when its key is in `see_through` (it has see-through pixels), or when it, a group
+/// in the tile art, the fill, the shape or a group the shape is in has opacity or a blending
+/// mode. Returns how many shapes changed.
+pub(crate) fn expand_transparent_image_patterns(d: &mut Document, root: NodeId, see_through: &BTreeSet<String>) -> Result<usize> {
+    let (_, n) = replace_leaves(d, root, |d, l| {
+        // Most leaves have no pattern fill: skip the ancestry walk for them.
+        if !l.appearance.items.iter().any(|i| pattern_fill(d, i).is_some()) {
+            return None;
+        }
+        let shape = d.ancestry(l.id).unwrap_or_default().iter().filter_map(|a| d.node(*a)).any(blended);
+        let transparent = |d: &Document, i: &AppearanceItem| {
+            pattern_fill(d, i).is_some_and(|(f, def, _)| {
+                let on = shape || f.opacity < 1.0 || f.blend != BlendMode::Normal;
+                def.art.iter().any(|a| transparent_image(a, see_through, on))
+            })
+        };
+        expand_patterns_where(d, l, transparent)
+    })?;
+    Ok(n)
+}
+
+/// Whether `n` has opacity or a blending mode of its own.
+fn blended(n: &Node) -> bool {
+    n.opacity < 1.0 || n.blend != BlendMode::Normal
+}
+
+/// Whether `n` is or holds a transparent image: one with see-through pixels (key in `keys`), or
+/// with opacity or a blending mode of its own or of a group in `n`, or anywhere when `on`.
+fn transparent_image(n: &Node, keys: &BTreeSet<String>, on: bool) -> bool {
+    let on = on || blended(n);
+    match &n.kind {
+        NodeKind::Image(im) => on || keys.contains(&im.key),
+        _ => n.children().is_some_and(|ch| ch.iter().any(|c| transparent_image(c, keys, on))),
+    }
+}
+
 /// Path `l` with each pattern fill turned into the tiles it paints over the box of the outline it
 /// fills, in a clip group shaped like that outline with the fill's opacity, blend mode and effects
 /// other than geometry effects, in appearance order: the other items stay on plain copies of the
@@ -420,7 +460,15 @@ fn expand_pattern_fills(s: &mut Session) -> Result<()> {
 /// ([`pattern_tiles`]). A pattern fill that lays no tile there stays. `None` when no pattern fill
 /// lays a tile.
 fn expand_patterns(d: &mut Document, l: &Node) -> Option<Node> {
-    if !matches!(l.kind, NodeKind::Path { .. } | NodeKind::Compound { .. }) || !l.appearance.items.iter().any(|i| pattern_fill(d, i).is_some()) {
+    expand_patterns_where(d, l, |_, _| true)
+}
+
+/// [`expand_patterns`] for only the pattern fills `which` picks: the others stay like the other
+/// items.
+fn expand_patterns_where(d: &mut Document, l: &Node, which: impl Fn(&Document, &AppearanceItem) -> bool) -> Option<Node> {
+    if !matches!(l.kind, NodeKind::Path { .. } | NodeKind::Compound { .. })
+        || !l.appearance.items.iter().any(|i| pattern_fill(d, i).is_some() && which(d, i))
+    {
         return None;
     }
     let reshaped = reshaped(l);
@@ -431,7 +479,7 @@ fn expand_patterns(d: &mut Document, l: &Node) -> Option<Node> {
     let mut rest = vec![];
     let mut expanded = false;
     for item in &l.appearance.items {
-        let fill = pattern_fill(d, item).map(|(f, def, xf)| (f, def.clone(), xf));
+        let fill = pattern_fill(d, item).filter(|_| which(d, item)).map(|(f, def, xf)| (f, def.clone(), xf));
         let tiles = fill.and_then(|(f, def, xf)| {
             let (fl, _, bounds) = fill_shape(l, item, &path, bounds)?;
             let t = pattern_tiles(d, &def, xf, bounds);

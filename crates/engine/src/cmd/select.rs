@@ -76,7 +76,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Select Segments",
             [],
             None,
-            "{id, segments: [[subpath, segment]…]} select path segments; their endpoints move with them, Delete removes only their connections",
+            "{id, segments: [[subpath, segment]…], mode?: \"set\"|\"add\"|\"toggle\"} select path segments; their endpoints move with them, Delete removes only their connections",
             has_doc,
             segments
         ),
@@ -436,22 +436,85 @@ pub(crate) fn checked_refs(v: Option<&Value>, cmd: &str) -> Result<Vec<(usize, u
         .collect()
 }
 
+fn segment_endpoints(doc: &Document, id: NodeId, refs: &BTreeSet<(usize, usize)>, cmd: &str) -> Result<BTreeSet<(usize, usize)>> {
+    let path = doc.node(id).and_then(|n| n.path_data()).ok_or_else(|| bad(cmd, "object is not a path"))?;
+    let mut endpoints = BTreeSet::new();
+    for &(si, seg) in refs {
+        let sp = path.subpaths.get(si).filter(|sp| seg < sp.segment_count()).ok_or_else(|| bad(cmd, "segment does not exist"))?;
+        let n = sp.anchors.len().max(1);
+        endpoints.extend([(si, seg), (si, (seg + 1) % n)]);
+    }
+    Ok(endpoints)
+}
+
 fn segments(s: &mut Session, p: &Value) -> Result<Value> {
     const C: &str = "select.segments";
     let id = checked_id(s, p.get("id").ok_or_else(|| bad(C, "missing id"))?, C)?;
     let refs: BTreeSet<_> = checked_refs(p.get("segments"), C)?.into_iter().collect();
-    let path = s.doc()?.doc.node(id).and_then(|n| n.path_data()).ok_or_else(|| bad(C, "object is not a path"))?;
-    let mut endpoints = BTreeSet::new();
-    for &(si, seg) in &refs {
-        let sp = path.subpaths.get(si).filter(|sp| seg < sp.segment_count()).ok_or_else(|| bad(C, "segment does not exist"))?;
-        endpoints.extend([(si, seg), (si, (seg + 1) % sp.anchors.len())]);
-    }
-    s.select(|_, sel| {
-        sel.clear();
-        if !refs.is_empty() {
-            sel.add(id);
-            sel.anchors.insert(id, endpoints);
-            sel.segments.insert(id, refs);
+    let mode = match str_param(p, "mode") {
+        None | Some("set") => "set",
+        Some("add") => "add",
+        Some("toggle") => "toggle",
+        Some(m) => return Err(bad(C, format!("unknown mode {m:?}"))),
+    };
+    let endpoints = segment_endpoints(&s.doc()?.doc, id, &refs, C)?;
+    s.select(|d, sel| {
+        if mode == "set" {
+            sel.clear();
+            if !refs.is_empty() {
+                sel.add(id);
+                sel.anchors.insert(id, endpoints);
+                sel.segments.insert(id, refs);
+            }
+        } else if mode == "add" {
+            if !refs.is_empty() {
+                sel.add(id);
+                sel.anchors.entry(id).or_default().extend(endpoints);
+                sel.segments.entry(id).or_default().extend(refs);
+            }
+        } else if mode == "toggle" {
+            let seg_entry = sel.segments.entry(id).or_default();
+            let mut removed_endpoints = BTreeSet::new();
+            let mut added_endpoints = BTreeSet::new();
+            let path = d.node(id).and_then(|n| n.path_data());
+            for &(si, seg) in &refs {
+                let Some(sp) = path.as_ref().and_then(|p| p.subpaths.get(si)) else { continue };
+                let n = sp.anchors.len().max(1);
+                let end1 = (si, seg);
+                let end2 = (si, (seg + 1) % n);
+                if seg_entry.contains(&(si, seg)) {
+                    seg_entry.remove(&(si, seg));
+                    removed_endpoints.insert(end1);
+                    removed_endpoints.insert(end2);
+                } else {
+                    seg_entry.insert((si, seg));
+                    added_endpoints.insert(end1);
+                    added_endpoints.insert(end2);
+                }
+            }
+            let mut surviving_seg_endpoints = BTreeSet::new();
+            for &(si, seg) in seg_entry.iter() {
+                if let Some(sp) = path.as_ref().and_then(|p| p.subpaths.get(si)) {
+                    let n = sp.anchors.len().max(1);
+                    surviving_seg_endpoints.insert((si, seg));
+                    surviving_seg_endpoints.insert((si, (seg + 1) % n));
+                }
+            }
+            let anchor_entry = sel.anchors.entry(id).or_default();
+            for pt in removed_endpoints {
+                if !surviving_seg_endpoints.contains(&pt) {
+                    anchor_entry.remove(&pt);
+                }
+            }
+            anchor_entry.extend(added_endpoints);
+            if seg_entry.is_empty() {
+                sel.segments.remove(&id);
+            }
+            if anchor_entry.is_empty() {
+                sel.remove(id);
+            } else {
+                sel.add(id);
+            }
         }
     })?;
     ok()
@@ -472,8 +535,7 @@ fn anchors(s: &mut Session, p: &Value) -> Result<Value> {
             sel.clear();
         }
         // A path selected as a whole has every anchor selected: toggle and add start from them all,
-        // but only when no partial anchor selection is active and only on a single object. With
-        // several objects selected, a click picks that anchor alone, so Join can take two picked ends.
+        // but only when no partial anchor selection is active and only on a single isolated object.
         let whole = sel.contains(id) && sel.partial(id).is_none() && sel.anchors.is_empty() && sel.objects.len() <= 1;
         sel.add(id);
         // A segment pick's endpoints aren't selected anchors: start from none of them.
@@ -490,6 +552,9 @@ fn anchors(s: &mut Session, p: &Value) -> Result<Value> {
             } else {
                 e.insert(r);
             }
+        }
+        if e.is_empty() {
+            sel.remove(id);
         }
     })?;
     ok()
@@ -561,7 +626,7 @@ fn anchors_many(s: &mut Session, p: &Value) -> Result<Value> {
 
 /// Select › Same › Fill/Stroke Color: is `a` the same colour as `b`? Tints of one global or spot
 /// swatch are, unless `tint` (General › Select Same Tint %) asks for the same tint too.
-fn same_paint(a: &Paint, b: &Paint, tint: bool) -> bool {
+pub(crate) fn same_paint(a: &Paint, b: &Paint, tint: bool) -> bool {
     match (a, b) {
         (Paint::Solid { swatch: Some(x), tint: ta, .. }, Paint::Solid { swatch: Some(y), tint: tb, .. }) if x == y => !tint || (ta - tb).abs() < 1e-4,
         _ => a == b,

@@ -75,7 +75,7 @@ The dimension hours overlap (feature rows hold some UI, format and AI work), so 
 | Colour, swatches, gradients, patterns, mesh, recolor | 92% | 4–7 |
 | Strokes, brushes, width profiles | 88% | 8–15 |
 | Appearance, transparency, graphic styles, masks | 97% | 1–2 |
-| Live vector effects | 85% | 6–10 |
+| Live vector effects | 85% | 4–8 |
 | Raster effects (Effect Gallery) — [effects-parity.md](docs/effects-parity.md) | 85% | 1–2 |
 | 3D and Materials | ~25% | 30–55 |
 | Type core — [type-parity.md](docs/type-parity.md) | 80% | 14–19 |
@@ -128,6 +128,7 @@ Ranked; detail in [docs/roadmap.md](docs/roadmap.md) and [docs/gaps.md](docs/gap
 
 ## Progress log
 
+- 2026-10-23: Pathfinder › Trap: the Pathfinder panel's Trap… and Effect › Pathfinder › Trap… add a thin overprinting strip of the lighter colour inside the darker one where two solid colours meet, so misregistered plates leave no gap ([trapping](https://helpx.adobe.com/illustrator/using/trapping.html)), with Thickness, Height/Width, Tint Reduction, Traps with Process Color and Reverse Traps. Illustrator effects 49/50 (SVG Filters remains); Live vector effects hours 6–10 → 4–8; headline numbers unchanged.
 - 2026-10-23: OpenType SVG colour fonts draw as vector art: each glyph's SVG document is read by the SVG importer, in the text's colours where it asks for them, and draws, exports and outlines as COLR glyphs do; all colour font formats are now drawn.
 - 2026-10-23: COLR colour fonts (v0 and v1, as in Noto Color Emoji's vector build, Segoe UI Emoji, Nabla) draw as vector art: their layers' colours, gradients, clips and blend modes on the canvas and in SVG, EPS, legacy `.ai` and PDF, and as editable paths with Create Outlines; glyphs using sweep gradients or compositing modes are drawn as images of the glyph.
 - 2026-10-22: The Effect Gallery shipped (#2883): Effect › Effect Gallery… browses the Artistic, Brush Strokes, Distort, Sketch, Stylize and Texture filters, edits each filter's settings, builds an ordered stack (add, reorder, hide, remove) with a live canvas preview, and OK applies it as separate appearance effects in one undo step. Filter thumbnails and a preview area inside the dialog remain ([Filter Gallery overview](https://helpx.adobe.com/photoshop/desktop/effects-filters/get-started-with-filters/filter-gallery.html)). Raster effects 82% → 85% (estimated); headline numbers unchanged.
@@ -197,6 +198,7 @@ The full pre-standard record of what landed is kept in [docs/roadmap.md](docs/ro
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | minor | Progress log row for Pathfinder › Trap; Live vector effects hours 6–10 → 4–8; headline numbers unchanged. |
 | 2026-10-23 | minor | Progress log row for OpenType SVG colour fonts; headline numbers unchanged. |
 | 2026-10-23 | minor | Progress log row for COLR colour fonts; headline numbers unchanged. |
 | 2026-10-22 | minor | G2: the Effect Gallery shipped (#2883): Effect › Effect Gallery… browses the Artistic, Brush Strokes, Distort, Sketch, Stylize and Texture filters, edits each filter's settings, builds an ordered stack (add, reorder, hide, remove) with a live canvas preview, and OK applies it as separate appearance effects in one undo step; remaining: filter thumbnails and a preview area inside the dialog; G2 estimate 4–6 → 1–2 h; Raster effects 82% → 85% (power-user view 49% → 52%), estimated, a modest move because the named missing dialog landed without thumbnails or an in-dialog preview. |

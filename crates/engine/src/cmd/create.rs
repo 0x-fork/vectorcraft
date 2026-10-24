@@ -30,7 +30,7 @@ pub fn specs() -> Vec<CommandSpec> {
             has_doc,
             flare
         ),
-        cmd!("shape.line", "Line Segment", [], None, "{x1, y1, x2, y2} → {id}", has_doc, line),
+        cmd!("shape.line", "Line Segment", [], None, "{x1, y1, x2, y2, fill?: bool (Fill Line: the current fill, else none)} → {id}", has_doc, line),
         cmd!("shape.spiral", "Spiral", [], None, "{cx, cy, radius, decay=80 (%), segments=10, clockwise?} → {id}", has_doc, spiral),
         cmd!(
             "shape.arc",
@@ -73,7 +73,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Drawing Mode",
             [],
             Some("Shift+D"),
-            "{mode?: normal|behind|inside} (inside needs one selected path, compound path or type; no param cycles normal → behind → inside → normal, going from behind back to normal when Draw Inside can't draw into the selection)",
+            "{mode?: normal|behind|inside} (inside needs one selected path, compound path or type; no param cycles normal → behind → inside → normal, going from behind back to normal when Draw Inside can't draw into the selection; when the Draw Inside target is isolated, drawing or pasting into it moves isolation to its clip group)",
             has_doc,
             draw_mode
         ),
@@ -149,16 +149,18 @@ fn insert_look_turned(
     let mode = s.draw_mode;
     let inside = s.draw_inside;
     let behind_of = s.doc()?.selection.in_paint_order(&s.doc()?.doc).first().copied();
-    let id = s.edit(label, |d, sel| {
+    let (id, into) = s.edit(label, |d, sel| {
         let id = d.alloc_id();
         let mut n = Node::new(id, kind);
         look.apply(d, &mut n);
         n.name = name;
         n.bbox_angle = bbox_angle;
+        let mut into = None;
         match (mode, inside) {
             (crate::DrawMode::Inside, Some(target)) if d.node(target).is_some() => {
                 let group = draw_inside_group(d, target)?;
                 d.insert(Some(group), usize::MAX, n)?;
+                into = Some((target, group));
             }
             (crate::DrawMode::Behind, _) => match behind_of.and_then(|b| d.position(b)) {
                 Some((par, idx, _)) => {
@@ -175,8 +177,11 @@ fn insert_look_turned(
         if select {
             sel.set([id]);
         }
-        Ok(id)
+        Ok((id, into))
     })?;
+    if let Some((target, group)) = into {
+        isolate_draw_inside_group(s, target, group)?;
+    }
     Ok(json!({ "id": id.0 }))
 }
 
@@ -202,6 +207,21 @@ pub(crate) fn draw_inside_group(d: &mut vectorcraft_doc::Document, target: NodeI
     d.insert(par, idx + 1, Node::new(gid, NodeKind::Group { children: vec![std::sync::Arc::new(mask)], clip: true }))?;
     d.move_node(target, Some(gid), usize::MAX)?;
     Ok(gid)
+}
+
+/// Draw Inside into the isolated object (#3705): isolation mode moves to the clip group the art
+/// went into ([`draw_inside_group`]), so what is drawn or pasted inside the object is in isolation
+/// mode with it, shown undimmed and picked by clicks, instead of locked beside it. Art added in
+/// isolation mode belongs with what is isolated: it takes the isolated art's place when the mode
+/// ends (<https://helpx.adobe.com/illustrator/desktop/manage-objects/select-objects/isolate-objects.html>).
+/// A drag's next preview, replayed on the drag's snapshot, makes the group again under the same
+/// id, so isolation stays on it; cancelling the drag restores the isolation it began with.
+pub(crate) fn isolate_draw_inside_group(s: &mut Session, target: NodeId, group: NodeId) -> Result<()> {
+    let st = s.doc_mut()?;
+    if st.isolation == Some(target) {
+        st.isolation = Some(group);
+    }
+    Ok(())
 }
 
 /// The object Draw Inside would draw into: the one selected object, when it is a path, a compound
@@ -466,9 +486,10 @@ fn line(s: &mut Session, p: &Value) -> Result<Value> {
     let a = Point::new(f64_req(p, "x1", "shape.line")?, f64_req(p, "y1", "shape.line")?);
     let b = Point::new(f64_req(p, "x2", "shape.line")?, f64_req(p, "y2", "shape.line")?);
     let live = LiveShape::Line { a, b };
-    // Lines are stroked, never filled (Illustrator ignores the fill for new open lines).
+    // Lines are stroked and, unless Fill Line asks for the current fill, not filled.
+    let fill = if switch_or(p, "fill", false, "shape.line")? { s.paint.fill.clone() } else { vectorcraft_color::Paint::None };
     let look = s.new_art_look(
-        vectorcraft_color::Paint::None,
+        fill,
         if s.paint.stroke.is_none() { vectorcraft_color::Paint::solid(vectorcraft_color::Color::BLACK) } else { s.paint.stroke.clone() },
         s.paint.stroke_width.max(0.1),
     );

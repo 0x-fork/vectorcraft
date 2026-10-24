@@ -1574,6 +1574,49 @@ pub fn snap_pick(cx: &ToolContext, p: Point) -> (Point, Vec<Overlay>) {
     Targets::points_near(cx.doc, &roots, near).styled(cx).snap_point(p, tol)
 }
 
+/// Distance Guides (Smart Guides → Invoke Distance Guides): how far the selection's bounds `from`
+/// lie from `to` along each axis, as measured lines ([`Overlay::Distance`]) labelled with their
+/// lengths in the General unit. Along an axis on which the two lie apart, one line spans the gap
+/// between their facing edges; along one on which they overlap, or one holds the other, one line
+/// runs between their left (top) edges and one between their right (bottom) edges. An artboard
+/// (`artboard`) is always measured edge to edge: the selection's distance from its left, right,
+/// top and bottom edges. Each line runs across the middle of where the two overlap on the other
+/// axis, else across the selection's middle, with a dashed line from `to`'s edge out to it when it
+/// passes beside `to`. Lines of no length are left out.
+pub fn distance_guides(cx: &ToolContext, from: Rect, to: Rect, artboard: bool) -> Vec<Overlay> {
+    let finite = |r: &Rect| [r.x0, r.y0, r.x1, r.y1].iter().all(|v| v.is_finite());
+    if !finite(&from) || !finite(&to) {
+        return vec![];
+    }
+    let color = cx.smart_guide_color;
+    let mut out = Vec::new();
+    for x in [true, false] {
+        let ((f0, f1), (t0, t1)) = (span(&from, x), span(&to, x));
+        let ((g0, g1), (u0, u1)) = (span(&from, !x), span(&to, !x));
+        let (lo, hi) = (g0.max(u0), g1.min(u1));
+        let across = if lo <= hi { (lo + hi) / 2.0 } else { (g0 + g1) / 2.0 };
+        let pt = |u: f64, c: f64| if x { Point::new(u, c) } else { Point::new(c, u) };
+        // Each measured line: from the selection's edge to `to`'s.
+        let lines: Vec<(f64, f64)> = match (artboard, f1 <= t0, t1 <= f0) {
+            (false, true, _) => vec![(f1, t0)],
+            (false, _, true) => vec![(f0, t1)],
+            _ => vec![(f0, t0), (f1, t1)],
+        };
+        for (fu, tu) in lines {
+            let length = (tu - fu).abs();
+            if length <= 1e-9 {
+                continue;
+            }
+            out.push(Overlay::Distance { a: pt(fu, across), b: pt(tu, across), text: cx.len(length), color });
+            let on_edge = across.clamp(u0, u1);
+            if on_edge != across {
+                out.push(Overlay::Line { a: pt(tu, on_edge), b: pt(tu, across), color, dashed: true });
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

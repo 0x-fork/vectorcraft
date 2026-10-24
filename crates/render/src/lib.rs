@@ -477,6 +477,10 @@ pub struct Renderer {
     /// [`Self::draw_outline_member`] sets it to each member of a clip group or shape of an Image
     /// Trace object that it draws.
     fx_owner: Option<Arc<Node>>,
+    /// The live object [`Self::draw_kept_node`] is drawing (kept symbol art, an opacity mask's art,
+    /// a member of a clip group in Outline view): [`Self::draw_content`] draws its evaluation from
+    /// the live cache.
+    live_root: Option<Arc<Node>>,
     /// Live-effect geometry per node ([`fx::FxGeom`]), keyed by `Arc` identity like `geom`.
     fx_geom: PtrMap<usize, fx::FxGeom>,
     stamp: u64,
@@ -528,6 +532,11 @@ pub struct Renderer {
     /// The picture [`Self::flatten`] started the current context again from, with 8-bit
     /// compositing: [`Self::finish`] renders the context over it.
     picture: Option<Arc<Pixmap>>,
+    /// Pixels of the groups being drawn offscreen (contexts and backdrop copies), and the most
+    /// they may hold (set from the frame when the first opens, see [`Self::group`]); both reset
+    /// at the start of every frame.
+    offscreen_live: u64,
+    offscreen_budget: u64,
     /// What clipping paths paint, per clipping path (see [`Self::clip_paint_of`]).
     clip_paints: FrameCache<usize, ClipPaintEntry>,
     /// Gradients along or across strokes (see [`Self::fill_path_gradient`]), keyed by
@@ -610,6 +619,8 @@ impl Frame<'_> {
     /// A render context for drawing this frame's art offscreen (on the calling thread), with its
     /// edge smoothing: hard edges must not depend on where the art is drawn.
     fn offscreen_context(&self, w: u16, h: u16) -> RenderContext {
+        #[cfg(test)]
+        OFFSCREEN_PIXELS.with(|n| n.set(n.get() + u64::from(w) * u64::from(h)));
         let mut ctx = single_threaded_context(w, h);
         ctx.set_aliasing_threshold(self.opts.anti_alias.threshold());
         ctx
@@ -630,6 +641,7 @@ impl Renderer {
             cur: None,
             made_again: false,
             fx_owner: None,
+            live_root: None,
             fx_geom: PtrMap::default(),
             stamp: 0,
             alpha: 1.0,
@@ -651,6 +663,8 @@ impl Renderer {
             blends: PtrMap::default(),
             clip_paths: vec![],
             picture: None,
+            offscreen_live: 0,
+            offscreen_budget: 0,
             clip_paints: FrameCache::new(lru::CLIP_BUDGET, 256),
             stroke_slices: PtrMap::default(),
             adjusts: HashMap::new(),
@@ -735,6 +749,8 @@ impl Renderer {
     fn begin_frame(&mut self) {
         self.stamp += 1;
         self.inline_depth = 0;
+        // Nothing is drawn offscreen yet (even if an earlier frame stopped part way).
+        (self.offscreen_live, self.offscreen_budget) = (0, 0);
     }
 
     /// End a frame: drop cache entries not used for a few frames (every render, thumbnails too,
@@ -1075,19 +1091,16 @@ impl Renderer {
             && !f.opts.outline
             && !self.is_shape(a)
         {
-            // A masked object is a non-isolated group of its own.
-            let mask = Some(self.opacity_mask(f, m, ctx.width(), ctx.height()));
+            // A masked object is a non-isolated group of its own, drawn over its own pixels: the
+            // mask is rendered over those only.
+            let bounds = self.bounds_of(f.symbols, a);
+            let Some((r, sub)) = group::area(ctx, f, bounds) else { return };
+            let mask = Some(self.mask_values(&sub, m, r.w, r.h));
             let blends = a.blend != vectorcraft_color::BlendMode::Normal || (!a.isolate && self.blends_through(a));
-            let bounds = if blends { self.bounds_of(f.symbols, a) } else { None };
             self.group(ctx, f, Composite { mask, blends, bounds, ..Default::default() }, &mut |r, c, fr| r.draw_arc_body(c, fr, a));
             return;
         }
         self.draw_arc_body(ctx, f, a);
-    }
-
-    /// Render an opacity mask's art offscreen and turn its luminance into a coverage mask.
-    fn opacity_mask(&mut self, f: &Frame, m: &vectorcraft_doc::OpacityMask, w: u16, h: u16) -> vello_cpu::Mask {
-        vello_cpu::Mask::from_parts(self.mask_values(f, m, w, h), w, h)
     }
 
     /// The coverage of opacity mask `m` per output pixel (row-major): its art rendered offscreen,
@@ -1103,7 +1116,7 @@ impl Renderer {
             std::mem::take(&mut self.clip_paths),
             self.picture.take(),
         );
-        self.draw_node(&mut mctx, &Frame { mt: false, ink: Ink::Display, ..*f }, &m.art, true);
+        self.draw_kept_node(&mut mctx, &Frame { mt: false, ink: Ink::Display, ..*f }, &m.art);
         let pm = self.finish(&mut mctx, self.raster);
         (self.knockout, self.nested, self.backdrop, self.clip_paths, self.picture) = outer;
         pm.data().iter().map(|p| mask_value(p.r, p.g, p.b, p.a, m.clip, m.invert)).collect()
@@ -1357,9 +1370,7 @@ impl Renderer {
             NodeKind::SymbolInstance { symbol, xf } => {
                 if let Some(sym) = f.doc.symbols.iter().find(|s| &s.name == symbol) {
                     let (art, kept) = self.placed_art(&sym.art, *xf, false, Some(n));
-                    let outer = std::mem::replace(&mut self.made_again, !kept);
-                    self.draw_node(ctx, f, &art, true);
-                    self.made_again = outer;
+                    self.draw_placed_art(ctx, f, &art, kept);
                 }
             }
             NodeKind::Blend { .. }
@@ -1367,8 +1378,33 @@ impl Renderer {
             | NodeKind::Mesh(_)
             | NodeKind::Repeat(_)
             | NodeKind::PlacedDocument(_)
-            | NodeKind::Intertwine { .. } => self.draw_live_node(ctx, f, n),
+            | NodeKind::Intertwine { .. } => match self.live_root.clone().filter(|a| std::ptr::eq(&**a, n)) {
+                Some(a) => self.draw_live_body(ctx, f, &a, true),
+                None => self.draw_live_node(ctx, f, n),
+            },
         }
+    }
+
+    /// Draw symbol art `art` as [`Self::placed_art`] placed it for an instance or an inline graphic
+    /// (`kept`: kept between frames, see [`Self::draw_kept_node`]).
+    fn draw_placed_art(&mut self, ctx: &mut RenderContext, f: &Frame, art: &Arc<Node>, kept: bool) {
+        let outer = std::mem::replace(&mut self.made_again, !kept);
+        if kept {
+            self.draw_kept_node(ctx, f, art);
+        } else {
+            self.draw_node(ctx, f, art, true);
+        }
+        self.made_again = outer;
+    }
+
+    /// [`Self::draw_node`] of `a` (drawn whatever its visibility and bounds), whose `Arc` stays the
+    /// same from frame to frame while the art does. When `a` is a live object,
+    /// [`Self::draw_content`] draws its evaluation from the live cache ([`Self::live_root`]).
+    fn draw_kept_node(&mut self, ctx: &mut RenderContext, f: &Frame, a: &Arc<Node>) {
+        let live = vectorcraft_doc::live::is_live(a).then(|| a.clone());
+        let outer = std::mem::replace(&mut self.live_root, live);
+        self.draw_node(ctx, f, a, true);
+        self.live_root = outer;
     }
 
     /// An Image Trace object's `children` (the hidden source image, then the traced shapes) as
@@ -1392,7 +1428,8 @@ impl Renderer {
 
     /// [`Self::draw_node`] for `c`, a member of a clip group or a shape of an Image Trace object in
     /// Outline view, culled by its cached bounds ([`Self::bounds_of`]) and drawn with `c` as
-    /// `fx_owner`, so its path and live-effect geometry come from the caches.
+    /// `fx_owner`, so its path, its live-effect geometry and, through [`Self::draw_kept_node`], a
+    /// live object's evaluation come from the caches.
     fn draw_outline_member(&mut self, ctx: &mut RenderContext, f: &Frame, c: &Arc<Node>) {
         if !c.visible || f.opts.hidden.contains(&c.id) || f.opts.hide_guides && matches!(c.kind, NodeKind::Path { guide: true, .. }) {
             return;
@@ -1409,7 +1446,7 @@ impl Renderer {
             None => {}
         }
         let outer = self.fx_owner.replace(c.clone());
-        self.draw_node(ctx, f, c, true);
+        self.draw_kept_node(ctx, f, c);
         self.fx_owner = outer;
     }
 
@@ -1738,24 +1775,23 @@ impl Renderer {
             let Some(sym) = f.doc.symbols.iter().find(|s| s.name == art.symbol) else { continue };
             // Strokes scale with the art (it is sized to the type, as in the SVG `<use>`).
             let (node, kept) = self.placed_art(&sym.art, t.xf * ig.xf * f.doc.symbol_natural_xf(&art.symbol), true, None);
-            let outer = std::mem::replace(&mut self.made_again, !kept);
-            self.draw_node(ctx, f, &node, true);
-            self.made_again = outer;
+            self.draw_placed_art(ctx, f, &node, kept);
         }
         self.inline_depth -= 1;
     }
 
     /// Symbol art `art` as an instance or an inline graphic draws it ([`place`]), and whether it is
-    /// kept. Art that is a group or a layer without an appearance of its own is kept between frames
-    /// under the art's `Arc`, `xf`, `scale_strokes` and the stain of instance `inst`: its members
-    /// keep their `Arc`s from frame to frame, and the caches keyed by a node's address (geometry,
-    /// stroke outlines, glyphs, live-effect geometry) hit for them. Other art is placed again in
-    /// every frame, and so is art that holds symbol instances, type with inline graphics, images,
-    /// placed documents, live blends, envelopes or repeats, or raster effects
+    /// kept. Art that is a group, a layer or a live object without an appearance of its own is kept
+    /// between frames under the art's `Arc`, `xf`, `scale_strokes` and the stain of instance
+    /// `inst`: it and its members keep their `Arc`s from frame to frame, and the caches keyed by a
+    /// node's address (geometry, stroke outlines, glyphs, live-effect geometry, evaluated live
+    /// objects) hit for them. Other art is placed again in every frame, and so is art that holds
+    /// symbol instances, type with inline graphics, images, placed documents or raster effects
     /// ([`depends_on_document`]), and art that the cache has no room for. Art that holds type is
     /// placed again when the fonts change.
     fn placed_art(&mut self, art: &Arc<Node>, xf: Affine, scale_strokes: bool, inst: Option<&Node>) -> (Arc<Node>, bool) {
-        if !matches!(art.kind, NodeKind::Group { .. } | NodeKind::Layer { .. }) || fx::has_object_fx(art) {
+        let kept_kind = matches!(art.kind, NodeKind::Group { .. } | NodeKind::Layer { .. }) || vectorcraft_doc::live::is_live(art);
+        if !kept_kind || fx::has_object_fx(art) {
             return (place(art, xf, scale_strokes, inst), false);
         }
         let stain = stain_bits(inst.and_then(vectorcraft_brush::stain));
@@ -1973,11 +2009,11 @@ impl Renderer {
         let unit = f.view * im.xf * Affine::scale_non_uniform(im.width as f64, im.height as f64);
         let shown = if outline && !f.doc.setup.outline_images {
             None
-        } else if let Some(pm) = mips.then(|| self.kept_mip(f, &im.key, outline, unit)).flatten() {
+        } else if let Some(pm) = mips.then(|| self.kept_mip(f, &im.key, im.pixels.as_deref(), outline, unit)).flatten() {
             Some(pm)
         } else {
-            self.image_pixmap(f.doc, &im.key, outline, !mips).map(|(key, pm)| {
-                let (key, pm) = if outline { (key, pm) } else { ink::ink_image(&key, &pm, f.ink, f.doc.images.get(&im.key), !mips) };
+            self.image_pixmap(f.doc, &im.key, im.pixels.as_deref(), outline, !mips).map(|(key, pm)| {
+                let (key, pm) = if outline { (key, pm) } else { ink::ink_image(&key, &pm, f.ink, f.doc.image_blob(im), !mips) };
                 if mips { image_mip(&key, pm, unit) } else { pm }
             })
         };
@@ -2039,15 +2075,22 @@ impl Renderer {
         self.adjusts.insert(derived, (key.to_string(), hash, map.clone()));
     }
 
-    /// The pixels of image `key` (a blob of `doc`, or a recoloured one named by
-    /// [`Self::adjusted_image`]), or a greyscale copy of them, with their key in the shared store.
-    /// `touch` marks them used there.
-    fn image_pixmap(&mut self, doc: &Document, key: &str, grey: bool, touch: bool) -> Option<(images::ImageKey, Arc<Pixmap>)> {
-        let (key, colour) = match doc.images.get(key) {
+    /// The pixels of image `key` (`own`, the pixels an image holds itself, a blob of `doc`, or a
+    /// recoloured one named by [`Self::adjusted_image`]), or a greyscale copy of them, with their
+    /// key in the shared store. `touch` marks them used there.
+    fn image_pixmap(
+        &mut self,
+        doc: &Document,
+        key: &str,
+        own: Option<&vectorcraft_doc::ImageBlob>,
+        grey: bool,
+        touch: bool,
+    ) -> Option<(images::ImageKey, Arc<Pixmap>)> {
+        let (key, colour) = match own.or_else(|| doc.images.get(key)) {
             Some(blob) => blob_pixmap(blob, touch)?,
             None => {
                 let (src, hash, map) = self.adjusts.get(key)?.clone();
-                let (src_key, src) = self.image_pixmap(doc, &src, false, touch)?;
+                let (src_key, src) = self.image_pixmap(doc, &src, None, false, touch)?;
                 let key = images::ImageKey { adjust: Some(hash), ..src_key };
                 match lookup(&key, touch) {
                     Some(pm) => (key, pm),
@@ -2086,28 +2129,28 @@ impl Renderer {
         Some((key, pm))
     }
 
-    /// The key [`Self::image_pixmap`] gives the pixels of image `key` and their size, without
+    /// The key [`Self::image_pixmap`] gives the pixels of image `key` (or `own`) and their size, without
     /// making or looking at them: `None` until the image has been decoded.
-    fn image_key(&self, doc: &Document, key: &str, grey: bool) -> Option<(images::ImageKey, (u16, u16))> {
-        let (key, size) = match doc.images.get(key) {
+    fn image_key(&self, doc: &Document, key: &str, own: Option<&vectorcraft_doc::ImageBlob>, grey: bool) -> Option<(images::ImageKey, (u16, u16))> {
+        let (key, size) = match own.or_else(|| doc.images.get(key)) {
             Some(blob) => {
                 let (key, _, size) = blob_key(blob);
                 (key, size?)
             }
             None => {
                 let (src, hash, _) = self.adjusts.get(key)?;
-                let (src_key, size) = self.image_key(doc, src, false)?;
+                let (src_key, size) = self.image_key(doc, src, None, false)?;
                 (images::ImageKey { adjust: Some(*hash), ..src_key }, size)
             }
         };
         Some((if grey { images::ImageKey { grey: true, ..key } } else { key }, size))
     }
 
-    /// The mip [`image_mip`] draws image `key` (in greyscale with `grey`, the outline view's) with
-    /// through `m` when the store holds it, marked used there; `None` when it draws the full pixels
-    /// or the mip is yet to be made.
-    fn kept_mip(&self, f: &Frame, key: &str, grey: bool, m: Affine) -> Option<Arc<Pixmap>> {
-        let (key, (w, h)) = self.image_key(f.doc, key, grey)?;
+    /// The mip [`image_mip`] draws image `key` (or `own`) with through `m`, in greyscale with
+    /// `grey` (the outline view's), when the store holds it, marked used there; `None` when it
+    /// draws the full pixels or the mip is yet to be made.
+    fn kept_mip(&self, f: &Frame, key: &str, own: Option<&vectorcraft_doc::ImageBlob>, grey: bool, m: Affine) -> Option<Arc<Pixmap>> {
+        let (key, (w, h)) = self.image_key(f.doc, key, own, grey)?;
         let key = if grey { key } else { ink::ink_key(&key, f.ink) };
         let level = mip_level(m, w, h);
         if level == 0 {
@@ -2279,19 +2322,14 @@ fn place(art: &Node, xf: Affine, scale_strokes: bool, inst: Option<&Node>) -> Ar
 }
 
 /// Does `n` hold, in it or in the opacity masks of the objects in it, a symbol instance, type
-/// with an inline graphic, an image, a placed document, a blend, an envelope, a repeat, or an
-/// object or a fill or stroke with a visible raster effect?
+/// with an inline graphic, an image, a placed document, or an object or a fill or stroke with a
+/// visible raster effect?
 fn depends_on_document(n: &Node) -> bool {
     let raster = |fx: &[vectorcraft_doc::Effect]| fx.iter().any(|e| e.visible && effects::is_raster(&e.id));
     let mut depends = false;
     n.walk(&mut |c| {
         depends |= match &c.kind {
-            NodeKind::SymbolInstance { .. }
-            | NodeKind::Image(_)
-            | NodeKind::PlacedDocument(_)
-            | NodeKind::Blend { .. }
-            | NodeKind::Envelope { .. }
-            | NodeKind::Repeat(_) => true,
+            NodeKind::SymbolInstance { .. } | NodeKind::Image(_) | NodeKind::PlacedDocument(_) => true,
             NodeKind::Text(t) => t.runs.iter().any(|r| r.inline.is_some()),
             _ => false,
         } || raster(&c.appearance.effects)
@@ -2622,6 +2660,12 @@ fn now() -> u64 {
 #[cfg(target_arch = "wasm32")]
 fn now() -> u64 {
     0
+}
+
+#[cfg(test)]
+thread_local! {
+    /// The pixels of the offscreen contexts [`Frame::offscreen_context`] has made on this thread.
+    static OFFSCREEN_PIXELS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]

@@ -18,7 +18,7 @@
 # English first word, as they are often shown after "…: ".
 #
 # Coverage: the whole interface (every menu string and `tl!` literal, `complete_menus`) and the
-# status and error messages (`COMPLETE_MESSAGES`), enforced by the tests. Left in English on
+# status and error messages (`COMPLETE_MESSAGES`), gaps listed by `untranslated_report`. Left in English on
 # purpose (`MENU_KEEP_AS_IS`): the product name, language names, OpenType, the built-in workspace
 # names and the bracketed perspective grid preset names; `hu-HU` and every other `hu-*` locale
 # resolve here.
@@ -277,6 +277,8 @@
 	Anti-aliasing:	Élsimítás:
 	Any except extracting pages	Bármi, kivéve az oldalak kinyerését
 	Any Kind	Bármilyen típus
+	Font Technology	Betűtípus-technológia
+font-technology	Variable	Változó
 	Appearance	Megjelenés
 	Appearance Attribute	Megjelenési attribútum
 	Appearance Item	Megjelenési elem
@@ -375,6 +377,9 @@
 	Background Color:	Háttérszín:
 	Show Center Mark	Középjel megjelenítése
 	Show Cross Hairs	Szálkereszt megjelenítése
+	Show Video Safe Areas	Biztonságos videoterületek megjelenítése
+	Video Ruler Pixel Aspect Ratio:	Videovonalzók képpont-méretaránya:
+	Hide Video Rulers	Videovonalzók elrejtése
 	Background Contents	Háttértartalom
 	Background Contents:	Háttértartalom:
 	Background:	Háttér:
@@ -483,10 +488,18 @@
 	Built-in presets don't change: New… starts an editable copy.	A beépített előbeállítások nem módosíthatók: az Új… szerkeszthető másolatot hoz létre.
 	Bulge…	Kidudorodás…
 	Bullet	Felsorolásjel
+	Bullets	Felsorolásjelek
+	Bullets and Numbering	Felsorolásjelek és számozás
+	Apply Bullets	Felsorolásjelek alkalmazása
+	Filled Dot	Kitöltött pont
+	Dash	Gondolatjel
+	Hollow Circle	Üres kör
+	Filled Square	Kitöltött négyzet
 	Burasagari	Burasagari
 	Burlap	Zsákvászon
 	Business Card 3.5 × 2 in	Névjegykártya 3,5 × 2 in
 	Business Card 85 × 55 mm	Névjegykártya 85 × 55 mm
+	Business Card 91 × 55 mm	Névjegykártya 91 × 55 mm
 	Butt Cap	Lapos vonalvég
 	Byte Order:	Bájtsorrend:
 	Calligraphic	Kalligrafikus
@@ -1775,7 +1788,7 @@ file-filter	Templates	Sablonok
 	Clear History	Előzmények törlése
 	Set History Limit…	Előzménykorlát beállítása…
 	History States	Előzmények lépésszáma
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Adatkészlet alkalmazása
 	Cancel Pattern Editing	Mintázatszerkesztés megszakítása
 	Copy Appearance	Megjelenés másolása
@@ -3730,6 +3743,7 @@ mark-style	Japanese	Japán
 	Spaces	Szóközök
 	Spacing	Térköz
 	Spacing Guides	Térköz-segédvonalak
+	Invoke Distance Guides	Távolság-segédvonalak előhívása
 	Spacing:	Térköz:
 	Spanish	Spanyol
 	Spatter	Fröcskölés
@@ -3868,7 +3882,6 @@ mark-style	Japanese	Japán
 	Symbol	Szimbólum
 	Symbol Instance	Szimbólumpéldány
 	Symbol Libraries	Szimbólumkönyvtárak
-	Symbol Libraries (on the roadmap)	Szimbólumkönyvtárak (tervezett funkció)
 	Symbol Screener Tool	Szimbólumhalványító
 	Symbol Scruncher Tool	Szimbólumtömörítő
 	Symbol Set Density:	Szimbólumkészlet sűrűsége:
@@ -4050,6 +4063,13 @@ mark-style	Japanese	Japán
 	Transparent Objects	Átlátszó objektumok
 	Transverse (the page a quarter turn on the paper)	Keresztirányú (az oldal negyed fordulattal elforgatva a papíron)
 	Trap…	Csapdázás…
+	Trap	Csapdázás
+	Height/Width	Magasság/szélesség
+	Tint Reduction	Tónuscsökkentés
+	Traps with Process Color	Csapdázás négyszínnyomó színekkel
+	Reverse Traps	Fordított csapdázás
+	Precision	Pontosság
+	Remove Redundant Points	Felesleges pontok eltávolítása
 	Triad	Triád
 	Triad 2	Triád 2
 	Triad 3	Triád 3
@@ -4506,6 +4526,7 @@ imageTrace	Outline	Körvonal
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	az axis értéke "vertical", "horizontal" vagy fokban megadott szög lehet, ez nem az: `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	background {other}: transparent, white, black vagy egy szín, például "#ff8800"
 @msg	bad color {v}	hibás szín: {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio: 0,1 és 10 közötti szám kell
 @msg	the Color Picker is not open	a Színválasztó nincs megnyitva
 @msg	the Simplify slider is not open	az Egyszerűsítés csúszka nincs megnyitva
 @msg	the screen color sampler is already open	a képernyős színmintavevő már nyitva van
@@ -4690,7 +4711,7 @@ imageTrace	Outline	Körvonal
 @msg	move requires a destination panel	az áthelyezéshez célpanel kell
 @msg	move requires an existing destination panel	az áthelyezéshez létező célpanel kell
 @msg	Multichannel PSD files can't be read: save it in RGB, CMYK or Grayscale mode	a többcsatornás PSD-fájlok nem olvashatók: mentsd RGB, CMYK vagy szürkeárnyalatos módban
-@msg	multiple windows land with M11.5	a több ablak az M11.5 mérföldkőben érkezik
+@msg	New Window isn't available yet: a document opens in one window	Az Új ablak még nem érhető el: egy dokumentum egy ablakban nyílik meg
 @msg	name the file	adj nevet a fájlnak
 @msg	no active document	nincs aktív dokumentum
 @msg	no active perspective plane	nincs aktív perspektivikus sík
@@ -4848,6 +4869,7 @@ imageTrace	Outline	Körvonal
 @msg	pattern missing	hiányzik a mintázat
 @msg	patterns nested too deeply are filled with mid-grey	a túl mélyen egymásba ágyazott mintázatok helyén középszürke kitöltés áll
 @msg	PDF settings are not an object	a PDF-beállítások nem objektumot alkotnak
+@msg	PDF security settings are not an object	a PDF biztonsági beállításai nem objektumot alkotnak
 @msg	PDF writer error: {0}	PDF-író hiba: {0}
 @msg	percent must be above 0 and at most 6400, not {p}	a percent értéke 0-nál nagyobb és legfeljebb 6400 lehet, ez nem az: {p}
 @msg	pick a colour, gradient or pattern to save as a swatch	válassz színt, színátmenetet vagy mintázatot a színmintaként mentéshez
@@ -5446,3 +5468,54 @@ axis	Y Axis	Y tengely
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	az élő effektus a dokumentum rajzolása közben fut, ezért nem lehet `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	az exportáló bővítmény mindig az exportálás keretét kapja: hagyd ki a `budget` kulcsot
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	a(z) „{_1}” nagy számítási keretet kér (futásonként legfeljebb {minutes} perc és a szokásos utasításszám {times}-szorosa): telepítsd az `allowHeavy: true` megadásával, miután a felhasználó beleegyezett
+# Actions panel: action sets (#3712).
+	New Set…	Új készlet…
+	New Set	Új készlet
+	Set Options…	Készlet beállításai…
+	Set Options	Készlet beállításai
+	Create New Set	Új készlet létrehozása
+	Stop Global Edit	Globális szerkesztés befejezése
+	Global Edit Options	Globális szerkesztés beállításai
+	Match	Egyezés
+	On Artboards	Rajztáblákon
+	All Artboards	Minden rajztábla
+	Include Objects On Canvas	Vásznon lévő objektumok is
+	Result(s): {count}	Eredmény(ek): {count}
+@msg	select one object	jelöljön ki egy objektumot
+@msg	Global Edit works on paths, compound paths and symbol instances	A globális szerkesztés útvonalakon, összetett útvonalakon és szimbólumpéldányokon működik
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	nem található hasonló objektum (az elforgatott vagy tükrözött másolatok nem számítanak egyezésnek); módosítsa a globális szerkesztés beállításait, és próbálja újra
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all vagy egy tartomány, például 1, 3-5, nem {v}
+	Add to Symbols	Hozzáadás a szimbólumokhoz
+	Basic Shapes	Alapalakzatok
+	Open Symbol Library	Szimbólumkönyvtár megnyitása
+	Save Symbol Library	Szimbólumkönyvtár mentése
+	Save Symbol Library…	Szimbólumkönyvtár mentése…
+	Save Symbols…	Szimbólumok mentése…
+	Selected Symbols Only	Csak a kijelölt szimbólumok
+	Symbol Libraries Menu	Szimbólumkönyvtárak menü
+	Symbol Library	Szimbólumkönyvtár
+	User Symbol Library 1	Felhasználói szimbólumkönyvtár 1
+	User Symbol Library 2	Felhasználói szimbólumkönyvtár 2
+	User Symbol Library 3	Felhasználói szimbólumkönyvtár 3
+	User Symbol Library 4	Felhasználói szimbólumkönyvtár 4
+	User Symbol Library 5	Felhasználói szimbólumkönyvtár 5
+	User Symbol Library 6	Felhasználói szimbólumkönyvtár 6
+	User Symbol Library 7	Felhasználói szimbólumkönyvtár 7
+	User Symbol Library 8	Felhasználói szimbólumkönyvtár 8
+	User Symbol Library 9	Felhasználói szimbólumkönyvtár 9
+	User Symbol Library 10	Felhasználói szimbólumkönyvtár 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	A(z) `{_1}` nem tartalmaz elhelyezhető szimbólumot
+@msg	missing `library` (see symbol.libraries)	hiányzik a `library` (lásd: symbol.libraries)
+@msg	no symbol `{n}`	nincs `{n}` szimbólum
+@msg	no symbol `{n}` in `{_1}`	nincs `{n}` szimbólum itt: `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	nincs `{key}` szimbólumkönyvtár (lásd: symbol.libraries)
+@msg	the document has no symbols to save	a dokumentumban nincs menthető szimbólum
+@msg	Trap: select two or more objects filled with solid colours	Csapdázás: jelöljön ki legalább két, egyszínű kitöltésű objektumot
+@msg	Trap: no edges of different colours meet among the selected objects	Csapdázás: a kijelölt objektumok között nem érintkeznek különböző színű élek
+@msg	thickness must be from 0.01 to 5000 pt	a thickness értéke 0,01 és 5000 pt között lehet
+@msg	heightWidth must be from 1 to 1000 %	a heightWidth értéke 1 és 1000 % között lehet
+@msg	tintReduction must be from 0 to 100 %	a tintReduction értéke 0 és 100 % között lehet
+	Rectangular Grid Tool Options	Téglalaprács beállításai
+	Polar Grid Tool Options	Polárrács beállításai
+	Fill Line	Szakasz kitöltése

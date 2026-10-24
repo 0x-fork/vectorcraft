@@ -284,6 +284,13 @@
 	Glyphs	Glif
 	Insert Special Character	Sisipkan karakter khusus
 	Bullet	Poin
+	Bullets	Poin
+	Bullets and Numbering	Poin dan penomoran
+	Apply Bullets	Terapkan poin
+	Filled Dot	Titik penuh
+	Dash	Tanda pisah
+	Hollow Circle	Lingkaran kosong
+	Filled Square	Persegi penuh
 	Copyright Symbol	Simbol hak cipta
 	Ellipsis	Elipsis
 	Paragraph Symbol	Simbol paragraf
@@ -1609,6 +1616,13 @@ lighting	Light	Cahaya
 	Repeat Pathfinder	Ulangi Pathfinder
 	Repeat {name}	Ulangi {name}
 	Trap…	Trap…
+	Trap	Trap
+	Height/Width	Tinggi/Lebar
+	Tint Reduction	Pengurangan Tint
+	Traps with Process Color	Trap dengan Warna Proses
+	Reverse Traps	Balikkan Trap
+	Precision	Presisi
+	Remove Redundant Points	Hapus Titik Berlebih
 	Bottom in Front	Bawah di depan
 	Brick by Column	Bata per kolom
 	Brick by Row	Bata per baris
@@ -1735,7 +1749,6 @@ lighting	Light	Cahaya
 	{kind}, {model}	{kind}, {model}
 	No symbols in this document	Tidak ada simbol dalam dokumen ini
 	Select art and click New Symbol to make one.	Pilih karya seni dan klik Simbol Baru untuk membuatnya.
-	Symbol Libraries (on the roadmap)	Pustaka simbol (ada di peta jalan)
 	Align On:	Ratakan pada:
 	Bottom-Justified Tab	Tab rata bawah
 	Center-Justified Tab	Tab rata tengah
@@ -2237,6 +2250,9 @@ lighting	Light	Cahaya
 	Background Color:	Warna latar belakang:
 	Show Center Mark	Tampilkan tanda tengah
 	Show Cross Hairs	Tampilkan garis silang
+	Show Video Safe Areas	Tampilkan area aman video
+	Video Ruler Pixel Aspect Ratio:	Rasio aspek piksel penggaris video:
+	Hide Video Rulers	Sembunyikan penggaris video
 	Client-side (.html)	Sisi klien (.html)
 	Color Reduction:	Reduksi warna:
 	Lossless (lossy WebP isn't available yet)	Tanpa kehilangan (WebP lossy belum tersedia)
@@ -3260,6 +3276,7 @@ theme	Appearance	Tampilan
 	Size/Leading	Ukuran/Leading
 	Snapping Tolerance	Toleransi kancing
 	Spacing Guides	Panduan jarak
+	Invoke Distance Guides	Panggil panduan pengukuran jarak
 	Spanish	Spanyol
 	Subdivisions	Subdivisi
 	Templates Folder	Folder templat
@@ -3563,6 +3580,8 @@ effect	Regular	Reguler
 	Put back in the dock	Kembalikan ke dok
 	All Scripts	Semua skrip
 	Any Kind	Jenis apa pun
+	Font Technology	Teknologi font
+font-technology	Variable	Variabel
 	Decorative	Dekoratif
 	Favorites	Favorit
 	Latin	Latin
@@ -3864,6 +3883,7 @@ imageTrace	Outline	Kontur
 @msg	Opened {url}	Berhasil membuka {url}
 @msg	Outline Stroke: no stroked paths selected	Ubah goresan menjadi kontur: tidak ada jalur dengan goresan yang dipilih
 @msg	PDF settings are not an object	Pengaturan PDF bukan objek
+@msg	PDF security settings are not an object	Pengaturan keamanan PDF bukan objek
 @msg	PDF writer error: {0}	Kesalahan penulis PDF: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	Berhasil mengemas {n} file di {folder}{note}
 @msg	Packaged {n} file(s){note}	Berhasil mengemas {n} file{note}
@@ -3979,6 +3999,7 @@ imageTrace	Outline	Kontur
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	sumbu harus "vertical", "horizontal", atau sudut dalam derajat, bukan `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	background {other}: transparan, putih, hitam, atau warna seperti "#ff8800"
 @msg	bad color {v}	warna tidak valid {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio harus berupa angka dari 0,1 sampai 10
 @msg	bad colour `{hex}` (#rrggbb)	warna tidak valid `{hex}` (#rrggbb)
 @msg	bad page tree	pohon halaman tidak valid
 @msg	bad shortcut	pintasan tidak valid
@@ -4048,7 +4069,7 @@ imageTrace	Outline	Kontur
 @msg	missing index	indeks tidak ada
 @msg	missing number `{key}`	angka `{key}` tidak ada
 @msg	missing integer `{key}`	bilangan bulat `{key}` tidak ada
-@msg	multiple windows land with M11.5	beberapa jendela hadir bersama M11.5
+@msg	New Window isn't available yet: a document opens in one window	Jendela baru belum tersedia: dokumen dibuka dalam satu jendela
 @msg	name the file	beri nama file
 @msg	no CSS to copy: select objects with CSS of their own	tidak ada CSS untuk disalin: pilih objek yang memiliki CSS sendiri
 @msg	no Live Paint edge near that point	tidak ada tepi Live Paint di dekat titik itu
@@ -4530,6 +4551,7 @@ imageTrace	Outline	Kontur
 	Logo 1000×1000	Logo 1000×1000
 	Business Card 3.5 × 2 in	Kartu nama 3.5 × 2 in
 	Business Card 85 × 55 mm	Kartu nama 85 × 55 mm
+	Business Card 91 × 55 mm	Kartu nama 91 × 55 mm
 	Letterhead Letter	Kop surat Letter
 	Letterhead A4	Kop surat A4
 	Envelope DL	Amplop DL
@@ -5425,3 +5447,44 @@ axis	Y Axis	Sumbu Y
 	The plug-in is computing…	Plug-in sedang menghitung…
 	Inspect Plug-in	Periksa plug-in
 	Cancel Plug-in Run	Batalkan jalannya plug-in
+# Actions panel: action sets (#3712).
+	New Set…	Set baru…
+	New Set	Set baru
+	Set Options…	Opsi set…
+	Set Options	Opsi set
+	Create New Set	Buat set baru
+	Stop Global Edit	Hentikan edit global
+	Global Edit Options	Opsi edit global
+	Match	Cocokkan
+	On Artboards	Di artboard
+	All Artboards	Semua artboard
+	Include Objects On Canvas	Sertakan objek di kanvas
+	Result(s): {count}	Hasil: {count}
+	Add to Symbols	Tambahkan ke simbol
+	Basic Shapes	Bentuk dasar
+	Open Symbol Library	Buka pustaka simbol
+	Save Symbol Library	Simpan pustaka simbol
+	Save Symbol Library…	Simpan pustaka simbol…
+	Save Symbols…	Simpan simbol…
+	Selected Symbols Only	Hanya simbol terpilih
+	Symbol Libraries Menu	Menu pustaka simbol
+	Symbol Library	Pustaka simbol
+	User Symbol Library 1	Pustaka simbol pengguna 1
+	User Symbol Library 2	Pustaka simbol pengguna 2
+	User Symbol Library 3	Pustaka simbol pengguna 3
+	User Symbol Library 4	Pustaka simbol pengguna 4
+	User Symbol Library 5	Pustaka simbol pengguna 5
+	User Symbol Library 6	Pustaka simbol pengguna 6
+	User Symbol Library 7	Pustaka simbol pengguna 7
+	User Symbol Library 8	Pustaka simbol pengguna 8
+	User Symbol Library 9	Pustaka simbol pengguna 9
+	User Symbol Library 10	Pustaka simbol pengguna 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	Trap: select two or more objects filled with solid colours	Trap: pilih dua objek atau lebih yang diisi warna solid
+@msg	Trap: no edges of different colours meet among the selected objects	Trap: tidak ada tepi berwarna berbeda yang bertemu di antara objek yang dipilih
+@msg	thickness must be from 0.01 to 5000 pt	thickness harus dari 0,01 sampai 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth harus dari 1 sampai 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction harus dari 0 sampai 100 %
+	Rectangular Grid Tool Options	Opsi alat kisi persegi panjang
+	Polar Grid Tool Options	Opsi alat kisi polar
+	Fill Line	Isi garis

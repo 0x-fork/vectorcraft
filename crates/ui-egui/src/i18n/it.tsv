@@ -9,7 +9,7 @@
 # user as "tu". Shortcut keys keep their key-cap names (Shift, Alt, Ctrl, Esc).
 #
 # Coverage: the whole interface — every menu string and every `tl!` literal (`complete_menus`,
-# tested). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
+# `untranslated_report` lists gaps). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
 # names, OpenType, the built-in workspace names and the bracketed perspective grid preset names.
 # Photoshop-style raster effects (Effect menu, their dialogs).
 	Glowing Edges…	Bordi luminosi…
@@ -194,6 +194,8 @@
 	Anti-aliased Artwork	Grafica con anti-aliasing
 	Anti-aliasing:	Anti-aliasing:
 	Any Kind	Qualsiasi tipo
+	Font Technology	Tecnologia font
+font-technology	Variable	Variabili
 	Appearance	Aspetto
 	Appearance Attribute	Attributo aspetto
 	Appearance Item	Elemento aspetto
@@ -279,6 +281,9 @@
 	Background Color:	Colore di sfondo:
 	Show Center Mark	Mostra segno centrale
 	Show Cross Hairs	Mostra mirino
+	Show Video Safe Areas	Mostra aree sicure video
+	Video Ruler Pixel Aspect Ratio:	Proporzioni pixel dei righelli video:
+	Hide Video Rulers	Nascondi righelli video
 	Background Contents	Contenuto sfondo
 	Background Contents:	Contenuto sfondo:
 	Background:	Sfondo:
@@ -347,6 +352,13 @@
 	Built-in presets don't change: New… starts an editable copy.	I preset integrati non cambiano: Nuovo… crea una copia modificabile.
 	Bulge…	Rigonfiamento…
 	Bullet	Punto elenco
+	Bullets	Punti elenco
+	Bullets and Numbering	Punti elenco e numerazione
+	Apply Bullets	Applica punti elenco
+	Filled Dot	Punto pieno
+	Dash	Trattino
+	Hollow Circle	Cerchio vuoto
+	Filled Square	Quadrato pieno
 	Butt Cap	Estremità tronca
 	Byte Order:	Ordine dei byte:
 	Calligraphic	Calligrafico
@@ -1393,7 +1405,7 @@ file-filter	Templates	Modelli
 	Clear History	Cancella cronologia
 	Set History Limit…	Imposta limite cronologia…
 	History States	Stati cronologia
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	Applica set di dati
 	Area Type	Testo in area
 	Bloat	Gonfia
@@ -3125,6 +3137,7 @@ mark-style	Japanese	Giapponese
 	Space Before Paragraph	Spazio prima del paragrafo
 	Spaces	Spazi
 	Spacing Guides	Guide di spaziatura
+	Invoke Distance Guides	Richiama guide di distanza
 	Spacing:	Spaziatura:
 	Spanish	Spagnolo
 	Specified Distance	Distanza specificata
@@ -3262,7 +3275,6 @@ mark-style	Japanese	Giapponese
 	Show all open documents	Mostra tutti i documenti aperti
 	Symbol Instance	Istanza di simbolo
 	Symbol Libraries	Librerie simboli
-	Symbol Libraries (on the roadmap)	Librerie simboli (in programma)
 	Symbol Screener Tool	Strumento Trasparenza simboli
 	Symbol Scruncher Tool	Strumento Addensamento simboli
 	Symbol Shifter Tool	Strumento Spostamento simboli
@@ -3391,6 +3403,13 @@ mark-style	Japanese	Giapponese
 	Transparent Background	Sfondo trasparente
 	Transverse (the page a quarter turn on the paper)	Trasversale (la pagina ruotata di un quarto di giro sul foglio)
 	Trap…	Trapping…
+	Trap	Trapping
+	Height/Width	Altezza/larghezza
+	Tint Reduction	Riduzione tinta
+	Traps with Process Color	Trapping con colori di quadricromia
+	Reverse Traps	Trapping inverso
+	Precision	Precisione
+	Remove Redundant Points	Rimuovi punti ridondanti
 	Trim	Rifila
 	Trim mark weight:	Spessore segni di taglio:
 	Trim marks	Segni di taglio
@@ -3792,7 +3811,7 @@ axis	Both	Entrambi
 
 # Status and error messages (`@msg`), translated where the status bar shows them; the message itself
 # stays English for agents and tests. `{_1}`, `{_2}` … stand for the `{}` of the format string, in order
-# (`complete_languages_translate_every_message` lists any that are missing). Command ids, parameter
+# (`untranslated_report` lists any that are missing). Command ids, parameter
 # names and values in backticks or code (`colorModel rgb`, `document.export`) stay as they are.
 @msg	no library `{id}`	nessuna libreria `{id}`
 @msg	select some type first	seleziona prima del testo
@@ -3867,6 +3886,7 @@ axis	Both	Entrambi
 @msg	Opened {url}	Aperto {url}
 @msg	Outline Stroke: no stroked paths selected	Contorna traccia: nessun tracciato con traccia selezionato
 @msg	PDF settings are not an object	Le impostazioni PDF non sono un oggetto
+@msg	PDF security settings are not an object	Le impostazioni di sicurezza PDF non sono un oggetto
 @msg	PDF writer error: {0}	Errore del generatore PDF: {0}
 @msg	Packaged {n} file(s) in {folder} {note}	Pacchetto creato con {n} file in {folder} {note}
 @msg	Packaged {n} file(s){note}	Pacchetto creato con {n} file{note}
@@ -3989,6 +4009,7 @@ axis	Both	Entrambi
 @msg	axis must be "vertical", "horizontal" or an angle in degrees, not `{v}`	axis deve essere "vertical", "horizontal" o un angolo in gradi, non `{v}`
 @msg	background {other}: transparent, white, black or a colour such as "#ff8800"	sfondo {other}: transparent, white, black o un colore come "#ff8800"
 @msg	bad color {v}	colore non valido {v}
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio deve essere un numero da 0,1 a 10
 @msg	the Color Picker is not open	il Selettore colore non è aperto
 @msg	the Simplify slider is not open	il cursore Semplifica non è aperto
 @msg	the screen color sampler is already open	il campionatore di colore dello schermo è già aperto
@@ -4066,7 +4087,7 @@ axis	Both	Entrambi
 @msg	missing index	manca index
 @msg	missing number `{key}`	manca il numero `{key}`
 @msg	missing integer `{key}`	manca il numero intero `{key}`
-@msg	multiple windows land with M11.5	le finestre multiple arriveranno con M11.5
+@msg	New Window isn't available yet: a document opens in one window	Nuova finestra non è ancora disponibile: un documento si apre in una sola finestra
 @msg	name the file	assegna un nome al file
 @msg	no CSS to copy: select objects with CSS of their own	nessun CSS da copiare: seleziona oggetti con un CSS proprio
 @msg	no Live Paint edge near that point	nessun bordo di pittura dinamica vicino a quel punto
@@ -5077,3 +5098,54 @@ axis	Y Axis	Asse Y
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	un effetto dinamico viene eseguito mentre il documento viene disegnato, quindi non può essere `heavy`
 @msg	an exporter always gets an export's budget: leave `budget` out	un plug-in di esportazione riceve sempre il budget di un’esportazione: ometti `budget`
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	“{_1}” chiede un budget di calcolo elevato (ogni esecuzione fino a {minutes} minuti e {times} volte le istruzioni consuete): installalo con `allowHeavy: true` quando l’utente acconsente
+# Actions panel: action sets (#3712).
+	New Set…	Nuovo set…
+	New Set	Nuovo set
+	Set Options…	Opzioni set…
+	Set Options	Opzioni set
+	Create New Set	Crea nuovo set
+	Stop Global Edit	Interrompi modifica globale
+	Global Edit Options	Opzioni modifica globale
+	Match	Corrispondenza
+	On Artboards	Sulle tavole da disegno
+	All Artboards	Tutte le tavole da disegno
+	Include Objects On Canvas	Includi oggetti sulla tela
+	Result(s): {count}	Risultati: {count}
+@msg	select one object	selezionate un oggetto
+@msg	Global Edit works on paths, compound paths and symbol instances	La modifica globale funziona su tracciati, tracciati composti e istanze di simboli
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	nessun oggetto simile trovato (le copie ruotate o riflesse non vengono riconosciute); cambiate le opzioni di modifica globale e riprovate
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all o un intervallo come 1, 3-5, non {v}
+	Add to Symbols	Aggiungi ai simboli
+	Basic Shapes	Forme di base
+	Open Symbol Library	Apri libreria simboli
+	Save Symbol Library	Salva libreria simboli
+	Save Symbol Library…	Salva libreria simboli…
+	Save Symbols…	Salva simboli…
+	Selected Symbols Only	Solo simboli selezionati
+	Symbol Libraries Menu	Menu Librerie simboli
+	Symbol Library	Libreria simboli
+	User Symbol Library 1	Libreria simboli utente 1
+	User Symbol Library 2	Libreria simboli utente 2
+	User Symbol Library 3	Libreria simboli utente 3
+	User Symbol Library 4	Libreria simboli utente 4
+	User Symbol Library 5	Libreria simboli utente 5
+	User Symbol Library 6	Libreria simboli utente 6
+	User Symbol Library 7	Libreria simboli utente 7
+	User Symbol Library 8	Libreria simboli utente 8
+	User Symbol Library 9	Libreria simboli utente 9
+	User Symbol Library 10	Libreria simboli utente 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` non ha simboli da inserire
+@msg	missing `library` (see symbol.libraries)	manca `library` (vedi symbol.libraries)
+@msg	no symbol `{n}`	nessun simbolo `{n}`
+@msg	no symbol `{n}` in `{_1}`	nessun simbolo `{n}` in `{_1}`
+@msg	no symbol library `{key}` (see symbol.libraries)	nessuna libreria simboli `{key}` (vedi symbol.libraries)
+@msg	the document has no symbols to save	il documento non ha simboli da salvare
+@msg	Trap: select two or more objects filled with solid colours	Trapping: selezionate due o più oggetti con riempimento in tinta unita
+@msg	Trap: no edges of different colours meet among the selected objects	Trapping: tra gli oggetti selezionati non si incontrano bordi di colori diversi
+@msg	thickness must be from 0.01 to 5000 pt	thickness deve essere compreso tra 0,01 e 5000 pt
+@msg	heightWidth must be from 1 to 1000 %	heightWidth deve essere compreso tra 1 e 1000 %
+@msg	tintReduction must be from 0 to 100 %	tintReduction deve essere compreso tra 0 e 100 %
+	Rectangular Grid Tool Options	Opzioni strumento Griglia rettangolare
+	Polar Grid Tool Options	Opzioni strumento Griglia polare
+	Fill Line	Riempi linea

@@ -125,7 +125,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "New Artboard",
             ["Window", "Artboards"],
             None,
-            "{x?, y?, width?, height?, name?, color?: color (its background color, as artboard.setProps takes it; default: none), showCenterMark?: bool, showCrossHairs?: bool (as artboard.setProps takes them; default false)} (default place: right of the last)",
+            "{x?, y?, width?, height?, name?, color?: color (its background color, as artboard.setProps takes it; default: none), showCenterMark?: bool, showCrossHairs?: bool, showVideoSafeAreas?: bool (as artboard.setProps takes them; default false), videoRulerPixelAspectRatio?: number 0.1–10 (as artboard.setProps takes it; default 1)} (default place: right of the last)",
             has_doc,
             artboard_new
         ),
@@ -143,7 +143,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Artboard Options…",
             ["Window", "Artboards"],
             None,
-            "{index | artboards: [{index, name?, color?, locked?, showCenterMark?, showCrossHairs?, x?, y?, width?, height?}…] (several artboards in one undo step, each with its own fields; the art inside each before any of them changes goes with it, and an object inside several goes with the first listed that moves or scales its art), name?, color?: color (\"#rrggbb\", {c,m,y,k}, … as the paint commands take: the background color the canvas draws the artboard's paper in, multiplied with the Simulate Colored Paper color while that is on; exports and print leave it out) | null (no background color), locked?: bool (the Artboards panel's lock column: a locked artboard keeps its rectangle (a new x, y, width or height is an error unless locked is false), can't be moved, deleted or cut, and Rearrange and Fit to Artwork Bounds leave it as it is; the art on it (each object of a layer or sublayer whose bounds with strokes overlap it, a group as one object) acts as locked art until it is unlocked: clicks, marquees, select.set, select.all and the tools pass over it (art drawn or pasted onto it stays selected and editable until a selection leaves it out or it is moved off the locked artboards), it is deselected, and when another artboard moves or scales it stays unless lockedAndHidden), showCenterMark?: bool (Artboard Options' Show Center Mark: the canvas draws a mark at the artboard's center), showCrossHairs?: bool (Show Cross Hairs: the canvas draws a line from the middle of each side through the center; both are screen-only, as the artboard's edges are: exports and print leave them out), x?, y?, width?, height?, moveArt?: bool (default false; a position-only change moves the contained art with its artboard), scaleArt?: bool (Scale Artwork with Artboard: resized, the artboard takes the art fully inside it (locked and hidden art only with lockedAndHidden?: bool, default prefs moveLockedWithArtboard) and its guides from its old rectangle onto the new one, each side by its own ratio; strokes/corners/patterns as object.scale), strokes?: bool, corners?: bool, patterns?: bool (the three as object.scale, for art that moves or scales with the artboard), lockedAndHidden?: bool (locked and hidden art moves along; default: the preference; recorded in the journal so a replay matches)} → null, or with scaleArt {scaled: the art scaled}",
+            "{index | artboards: [{index, name?, color?, locked?, showCenterMark?, showCrossHairs?, showVideoSafeAreas?, videoRulerPixelAspectRatio?, x?, y?, width?, height?}…] (several artboards in one undo step, each with its own fields; the art inside each before any of them changes goes with it, and an object inside several goes with the first listed that moves or scales its art), name?, color?: color (\"#rrggbb\", {c,m,y,k}, … as the paint commands take: the background color the canvas draws the artboard's paper in, multiplied with the Simulate Colored Paper color while that is on; exports and print leave it out) | null (no background color), locked?: bool (the Artboards panel's lock column: a locked artboard keeps its rectangle (a new x, y, width or height is an error unless locked is false), can't be moved, deleted or cut, and Rearrange and Fit to Artwork Bounds leave it as it is; the art on it (each object of a layer or sublayer whose bounds with strokes overlap it, a group as one object) acts as locked art until it is unlocked: clicks, marquees, select.set, select.all and the tools pass over it (art drawn or pasted onto it stays selected and editable until a selection leaves it out or it is moved off the locked artboards), it is deselected, and when another artboard moves or scales it stays unless lockedAndHidden), showCenterMark?: bool (Artboard Options' Show Center Mark: the canvas draws a mark at the artboard's center), showCrossHairs?: bool (Show Cross Hairs: the canvas draws a line from the middle of each side through the center), showVideoSafeAreas?: bool (Show Video Safe Areas: the canvas draws the action-safe area 3.5% and the title-safe area 5% in from each edge, as EBU R 95 sets them; the three are screen-only, as the artboard's edges are: exports and print leave them out), videoRulerPixelAspectRatio?: number 0.1–10 (Video Ruler Pixel Aspect Ratio: the width of one video pixel over its height, which View › Rulers › Show Video Rulers counts the artboard in; default 1, square pixels), x?, y?, width?, height?, moveArt?: bool (default false; a position-only change moves the contained art with its artboard), scaleArt?: bool (Scale Artwork with Artboard: resized, the artboard takes the art fully inside it (locked and hidden art only with lockedAndHidden?: bool, default prefs moveLockedWithArtboard) and its guides from its old rectangle onto the new one, each side by its own ratio; strokes/corners/patterns as object.scale), strokes?: bool, corners?: bool, patterns?: bool (the three as object.scale, for art that moves or scales with the artboard), lockedAndHidden?: bool (locked and hidden art moves along; default: the preference; recorded in the journal so a replay matches)} → null, or with scaleArt {scaled: the art scaled}",
             has_doc,
             artboard_set
         ),
@@ -813,19 +813,44 @@ fn artboard_color(p: &Value, cmd: &str) -> Result<Option<Option<vectorcraft_colo
     }
 }
 
+/// An artboard command's `videoRulerPixelAspectRatio` param: None when absent, else a number within
+/// [`vectorcraft_doc::VIDEO_PIXEL_ASPECT_RANGE`].
+fn video_pixel_aspect(p: &Value, cmd: &str) -> Result<Option<f64>> {
+    match p.get("videoRulerPixelAspectRatio") {
+        None => Ok(None),
+        Some(v) => v
+            .as_f64()
+            .filter(|r| vectorcraft_doc::VIDEO_PIXEL_ASPECT_RANGE.contains(r))
+            .map(Some)
+            .ok_or_else(|| bad(cmd, "videoRulerPixelAspectRatio must be a number from 0.1 to 10")),
+    }
+}
+
 fn artboard_new(s: &mut Session, p: &Value) -> Result<Value> {
     let d0 = &s.doc()?.doc;
     let last = d0.artboards.last().map(|a| a.rect).unwrap_or(Rect::new(0.0, 0.0, 612.0, 792.0));
     let def = Rect::new(last.x1 + 20.0, last.y0, last.x1 + 20.0 + last.width(), last.y1);
     let r = rect_from(p, def);
     let color = artboard_color(p, "artboard.new")?.flatten();
-    check_switches(p, &["showCenterMark", "showCrossHairs"], "artboard.new")?;
+    check_switches(p, &["showCenterMark", "showCrossHairs", "showVideoSafeAreas"], "artboard.new")?;
     let (show_center_mark, show_cross_hairs) = (bool_or(p, "showCenterMark", false), bool_or(p, "showCrossHairs", false));
+    let show_video_safe_areas = bool_or(p, "showVideoSafeAreas", false);
+    let video_ruler_pixel_aspect_ratio = video_pixel_aspect(p, "artboard.new")?.unwrap_or(1.0);
     let idx = s.edit("New Artboard", |d, _| {
         let id = d.next_artboard_id();
         let given = str_param(p, "name").map(str::trim).filter(|n| !n.is_empty());
         let name = given.map_or_else(|| format!("Artboard {}", d.artboards.len() + 1), str::to_string);
-        d.artboards.push(Artboard { id, name, rect: r, locked: false, show_center_mark, show_cross_hairs, color });
+        d.artboards.push(Artboard {
+            id,
+            name,
+            rect: r,
+            locked: false,
+            show_center_mark,
+            show_cross_hairs,
+            show_video_safe_areas,
+            video_ruler_pixel_aspect_ratio,
+            color,
+        });
         Ok(d.artboards.len() - 1)
     })?;
     Ok(json!({ "index": idx }))
@@ -848,9 +873,10 @@ fn artboard_delete(s: &mut Session, p: &Value) -> Result<Value> {
     ok()
 }
 
-/// One artboard's part of `artboard.setProps`: its index, new rectangle, name, color, lock and
-/// display marks (Show Center Mark, Show Cross Hairs), how far it moved, whether it was resized,
-/// the map its art and guides take when they go with it (`fit` when it scales them), and that art.
+/// One artboard's part of `artboard.setProps`: its index, new rectangle, name, color, lock,
+/// display marks (Show Center Mark, Show Cross Hairs, Show Video Safe Areas) and Video Ruler Pixel
+/// Aspect Ratio, how far it moved, whether it was resized, the map its art and guides take when
+/// they go with it (`fit` when it scales them), and that art.
 struct ArtboardEdit<'a> {
     index: usize,
     now: Rect,
@@ -859,6 +885,8 @@ struct ArtboardEdit<'a> {
     lock: Option<bool>,
     center_mark: Option<bool>,
     cross_hairs: Option<bool>,
+    safe_areas: Option<bool>,
+    pixel_aspect: Option<f64>,
     delta: vectorcraft_geom::Vec2,
     resized: bool,
     fit: Option<Affine>,
@@ -876,7 +904,7 @@ fn artboard_set(s: &mut Session, p: &Value) -> Result<Value> {
     };
     check_switches(p, &["moveArt", "scaleArt", "strokes", "corners", "patterns", "lockedAndHidden"], "artboard.setProps")?;
     for q in &entries {
-        check_switches(q, &["locked", "showCenterMark", "showCrossHairs"], "artboard.setProps")?;
+        check_switches(q, &["locked", "showCenterMark", "showCrossHairs", "showVideoSafeAreas"], "artboard.setProps")?;
         check_numbers(q, &["x", "y", "width", "height"], "artboard.setProps")?;
     }
     // Scale Artwork with Artboard: resized, an artboard takes the art fully inside it (as Move
@@ -900,6 +928,7 @@ fn artboard_set(s: &mut Session, p: &Value) -> Result<Value> {
         let now = rect_from(q, was);
         let lock = q.get("locked").and_then(Value::as_bool);
         let (center_mark, cross_hairs) = (q.get("showCenterMark").and_then(Value::as_bool), q.get("showCrossHairs").and_then(Value::as_bool));
+        let (safe_areas, pixel_aspect) = (q.get("showVideoSafeAreas").and_then(Value::as_bool), video_pixel_aspect(q, "artboard.setProps")?);
         // A locked artboard keeps its rectangle unless this unlocks it; its name can change.
         let reshaped = [now.x0 - was.x0, now.y0 - was.y0, now.x1 - was.x1, now.y1 - was.y1].iter().any(|d| d.abs() > 1e-6);
         if reshaped && lock != Some(false) {
@@ -925,6 +954,8 @@ fn artboard_set(s: &mut Session, p: &Value) -> Result<Value> {
             lock,
             center_mark,
             cross_hairs,
+            safe_areas,
+            pixel_aspect,
             delta,
             resized,
             fit,
@@ -960,6 +991,12 @@ fn artboard_set(s: &mut Session, p: &Value) -> Result<Value> {
             }
             if let Some(c) = e.cross_hairs {
                 a.show_cross_hairs = c;
+            }
+            if let Some(v) = e.safe_areas {
+                a.show_video_safe_areas = v;
+            }
+            if let Some(r) = e.pixel_aspect {
+                a.video_ruler_pixel_aspect_ratio = r;
             }
             let id = a.id;
             if let Some(xf) = e.transform {

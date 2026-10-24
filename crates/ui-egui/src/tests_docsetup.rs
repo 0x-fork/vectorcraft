@@ -1,7 +1,7 @@
 //! The canvas draws Document Setup: the red bleed outline and the transparency grid in the
 //! document's colours and cell size, also in a rotated view; a white Background Contents hides
 //! the grid and Simulate Colored Paper tints the artboard. It also draws each artboard's Show
-//! Center Mark and Show Cross Hairs (Artboard Options).
+//! Center Mark, Show Cross Hairs and Show Video Safe Areas (Artboard Options).
 
 use serde_json::json;
 use vectorcraft_engine::Session;
@@ -187,6 +187,40 @@ fn an_artboard_shows_its_center_mark_and_cross_hairs() {
         let d = s[1] - s[0];
         assert!(d.x.abs() > 1.0 && d.y.abs() > 1.0, "not along the screen's axes: {turned:?}");
     }
+}
+
+/// Show Video Safe Areas outlines the artboard's action-safe area 3.5% and its title-safe area 5%
+/// in from each edge (EBU R 95), in the theme's artboard mark colour, 1 point wide: only on the
+/// artboard that has it on, and turned with the view.
+#[test]
+fn an_artboard_shows_its_video_safe_areas() {
+    let mut app = app();
+    app.run("artboard.new", json!({})).unwrap();
+    let mark = Tokens::for_brightness(Default::default()).artboard_mark;
+    assert!(outlines(&frame(&mut app).0, mark).is_empty(), "off by default");
+    app.run("artboard.setProps", json!({"index": 0, "showVideoSafeAreas": true})).unwrap();
+    for rotation in [0.0, 30.0] {
+        app.view_mut().unwrap().rotation = rotation;
+        let (shapes, _, _) = frame(&mut app);
+        // Artboard 1's corners on screen: top-left, top-right, bottom-right, bottom-left (it is the
+        // active one, outlined in black).
+        let q = outlines(&shapes, egui::Color32::from_gray(0)).into_iter().next().unwrap();
+        let at = |u: f32, v: f32| q[0] + (q[1] - q[0]) * u + (q[3] - q[0]) * v;
+        let areas = outlines(&shapes, mark);
+        assert_eq!(areas.len(), 2, "two areas, on artboard 1 only: {areas:?}");
+        for (area, k) in areas.iter().zip([0.035, 0.05]) {
+            let want = [at(k, k), at(1.0 - k, k), at(1.0 - k, 1.0 - k), at(k, 1.0 - k)];
+            assert!(area.iter().zip(want).all(|(a, b)| (*a - b).length() < 0.01), "{rotation}°: {area:?}, want {want:?}");
+        }
+    }
+    let mut all = vec![];
+    flatten(&frame(&mut app).0, &mut all);
+    assert!(
+        all.iter().all(|s| !matches!(s, egui::Shape::Path(p) if p.stroke.color == egui::epaint::ColorMode::Solid(mark) && p.stroke.width != 1.0)),
+        "1 point wide"
+    );
+    app.run("artboard.setProps", json!({"index": 0, "showVideoSafeAreas": false})).unwrap();
+    assert!(outlines(&frame(&mut app).0, mark).is_empty(), "off again");
 }
 
 #[test]

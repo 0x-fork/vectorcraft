@@ -83,7 +83,9 @@ fn suffix(kind: &str, key: &str) -> Option<&'static str> {
 /// The fields of the form dialogs ([`grid`]) that the dialog's own body draws, by dialog kind.
 fn own_rows(kind: &str) -> &'static [&'static str] {
     match kind {
-        "artboardOptions" => &["color"],
+        "artboardOptions" => &["color", super::artboard_options::PIXEL_ASPECT],
+        // The grids' Reference Point is their 9-point locator.
+        "rectangularGrid" | "polarGrid" => &["reference"],
         _ => &[],
     }
 }
@@ -589,6 +591,8 @@ pub(crate) fn humanize(k: &str) -> String {
         "Align To Path" => "Align to Path:".into(),
         "Overlap Variation" | "Curviness Variation" | "Spacing Variation" => "Variation:".into(),
         "Create" => "Create New Fields by:".into(),
+        "Height Width" => "Height/Width:".into(),
+        "Traps With Process Color" => "Traps with Process Color:".into(),
         _ => format!("{s}:"),
     }
 }

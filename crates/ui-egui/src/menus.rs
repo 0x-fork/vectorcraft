@@ -225,6 +225,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
     ("type.justifyLeft", "Justify with last line aligned left", "Cmd+Shift+J", "{} justify the selected type's paragraphs, last line aligned left"),
     ("type.justifyAll", "Justify all lines", "Cmd+Shift+F", "{} justify every line of the selected type's paragraphs"),
     (
+        "type.applyBullets",
+        "Apply Bullets",
+        "",
+        "{bullet?: \"dot\"|\"dash\"|\"circle\"|\"square\"|\"none\"} Type › Bullets and Numbering › Apply Bullets: the selected type's paragraphs (or those the Type tool's selection touches) become a bulleted list with that bullet (text.setFormat {bullet}); without it, a list keeps its bullet and other paragraphs take the dot (text.setFormat {list: \"bullet\"}); \"none\" turns the list off",
+    ),
+    (
         "align.horizontalLeft",
         "Horizontal Align Left",
         "",
@@ -353,6 +359,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "{} template layers left off the canvas (Show Template draws them again, dimmed as before) → shown",
     ),
     ("view.rulers", "Show Rulers", "Cmd+R", "{}"),
+    (
+        "view.videoRulers",
+        "Show Video Rulers",
+        "",
+        "{} the rulers show (as Show Rulers shows them) and count the active artboard in video pixels from its top-left corner, a pixel as wide as its Video Ruler Pixel Aspect Ratio says (artboard.setProps videoRulerPixelAspectRatio) and one point tall; again (Hide Video Rulers), they count in the General unit from the ruler origin as before → whether video rulers show",
+    ),
     ("view.boundingBox", "Hide Bounding Box", "Cmd+Shift+B", "{}"),
     ("view.guides", "Hide Guides", "Cmd+;", "{}"),
     ("view.smartGuides", "Smart Guides", "Cmd+U", "{}"),
@@ -596,7 +608,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "tool.options",
         "Tool Options…",
         "",
-        "{tool: id} what double-clicking a tool button opens: hand → fits the artboard in the window (view.fitArtboard), zoom → 100% (view.actualSize), rotate|scale|reflect|shear → that Object › Transform dialog (dialog `rotate`, `scale`, `reflect` or `shear`; error `nothing selected` without a selection), selection|directSelection|groupSelection → the Move dialog (dialog `move`; the same error), gradient|magicWand → the Gradient or Magic Wand panel (window.panel), artboard → Artboard Options of the active artboard (dialog `artboardOptions`, fields index, name, x, y, width, height, showCenterMark, showCrossHairs; OK runs artboard.setProps, and with other artboards selected with the Artboard tool a new width or height goes to each of them too, in its `artboards` list, each resized about the reference point the form used for that size, or about its top-left corner when the size was set in the fields directly), flare → Flare Tool Options (dialog `flareOptions`, fields diameter and pathLength (pt), opacity, brightness, growth, fuzziness, longest, rayFuzziness, largest (%), rays, rings, direction (°), raysOn, ringsOn; OK runs tool.setOption {tool: \"flare\", values}: the next flare dragged out uses them, and a Flare click's dialog, which also has x and y, draws one there with them), columnGraph|stackedColumnGraph|barGraph|stackedBarGraph|lineGraph|areaGraph|scatterGraph|pieGraph|radarGraph → Graph Type for the selected graph (dialog `command` running graph.setType; an error without one), symbolSprayer|symbolShifter|symbolScruncher|symbolSizer|symbolSpinner|symbolStainer|symbolScreener|symbolStyler → Symbolism Tools Options (dialog `symbolismOptions`, fields tool, diameter (pt), intensity and density (1–10), shared by the eight tools; OK runs tool.setOption {tool, values}), blend → Blend Options, perspectiveGrid → Perspective Grid Options, eyedropper → Eyedropper Options (dialog `eyedropperOptions`, fields sampleSize, pickUp, apply; OK runs eyedropper.setOptions), printTiling → resets the print tiling (print.tiling.set {reset: true}), warp|twirl|pucker|bloat|scallop|crystallize|wrinkle → that tool's Tool Options (dialog `liquifyOptions`, fields tool, width, height, angle, intensity %, usePressure, detail, simplify, simplifyOn, rate, complexity, horizontal %, vertical %, affectAnchors, affectIn, affectOut, showBrush; OK runs tool.setOption {tool, values}), pencil|paintbrush|smooth|blobBrush|eraser → that tool's Tool Options (dialog `freehandOptions`, fields tool and the options the tool keeps: fidelity (pt), fill, keepSelected (on for pencil and paintbrush, off for blobBrush), mergeOnlySelection (off), closeWithin and editWithin (px, 0 is off), size (pt); OK runs tool.setOption {tool, values}), livePaintSelection → Live Paint Selection Tool Options (dialog `livePaintSelectionOptions`, fields selectFills and selectStrokes (both on), color (the highlight color, #rrggbb or a layer color's name; #ff2a2a), width (the highlight's width, 1–20 px; 4); OK runs tool.setOption {tool: \"livePaintSelection\", values}), shapeBuilder → Shape Builder Tool Options (dialog `shapeBuilderOptions`, fields gapDetection (off), gapLength (pt, 0–72; 3), openFilledAsClosed (on), clickStrokeSplitsPath (off), pickColorFrom: artwork|swatches (artwork), cursorSwatchPreview (off), selection: freeform|straightLine (freeform), highlightFill (on), highlightStroke (on), highlightColor (#rrggbb or a layer color's name; #ff4f4f); OK runs tool.setOption {tool: \"shapeBuilder\", values})",
+        "{tool: id} what double-clicking a tool button opens: hand → fits the artboard in the window (view.fitArtboard), zoom → 100% (view.actualSize), rotate|scale|reflect|shear → that Object › Transform dialog (dialog `rotate`, `scale`, `reflect` or `shear`; error `nothing selected` without a selection), selection|directSelection|groupSelection → the Move dialog (dialog `move`; the same error), gradient|magicWand → the Gradient or Magic Wand panel (window.panel), artboard → Artboard Options of the active artboard (dialog `artboardOptions`, fields index, name, x, y, width, height, showCenterMark, showCrossHairs; OK runs artboard.setProps, and with other artboards selected with the Artboard tool a new width or height goes to each of them too, in its `artboards` list, each resized about the reference point the form used for that size, or about its top-left corner when the size was set in the fields directly), flare → Flare Tool Options (dialog `flareOptions`, fields diameter and pathLength (pt), opacity, brightness, growth, fuzziness, longest, rayFuzziness, largest (%), rays, rings, direction (°), raysOn, ringsOn; OK runs tool.setOption {tool: \"flare\", values}: the next flare dragged out uses them, and a Flare click's dialog, which also has x and y, draws one there with them), lineSegment|arc|rectangularGrid|polarGrid → that tool's Tool Options, its click dialog without x and y (dialog kind = the tool id, `__toolOptions: true`; lineSegment: length (pt), angle (°), fillLine; arc: lengthX, lengthY (pt), reference (0–8), arcType: open|closed, baseAlong: x|y, slope (−100…100), fillArc; rectangularGrid: width, height (pt, the Default Size), reference (0–8), rows, columns, rowSkew, columnSkew (%), frame, fill; polarGrid: the same with concentric, radial, concentricSkew, radialSkew and compound for rows, columns, the skews and frame; OK runs tool.setOption {tool, values} and draws nothing: the next drag uses them (Fill Line, the arc's type, base, slope and fill, the grids' dividers, skews and switches) and a click's dialog opens at them), columnGraph|stackedColumnGraph|barGraph|stackedBarGraph|lineGraph|areaGraph|scatterGraph|pieGraph|radarGraph → Graph Type for the selected graph (dialog `command` running graph.setType; an error without one), symbolSprayer|symbolShifter|symbolScruncher|symbolSizer|symbolSpinner|symbolStainer|symbolScreener|symbolStyler → Symbolism Tools Options (dialog `symbolismOptions`, fields tool, diameter (pt), intensity and density (1–10), shared by the eight tools; OK runs tool.setOption {tool, values}), blend → Blend Options, perspectiveGrid → Perspective Grid Options, eyedropper → Eyedropper Options (dialog `eyedropperOptions`, fields sampleSize, pickUp, apply; OK runs eyedropper.setOptions), printTiling → resets the print tiling (print.tiling.set {reset: true}), warp|twirl|pucker|bloat|scallop|crystallize|wrinkle → that tool's Tool Options (dialog `liquifyOptions`, fields tool, width, height, angle, intensity %, usePressure, detail, simplify, simplifyOn, rate, complexity, horizontal %, vertical %, affectAnchors, affectIn, affectOut, showBrush; OK runs tool.setOption {tool, values}), pencil|paintbrush|smooth|blobBrush|eraser → that tool's Tool Options (dialog `freehandOptions`, fields tool and the options the tool keeps: fidelity (pt), fill, keepSelected (on for pencil and paintbrush, off for blobBrush), mergeOnlySelection (off), closeWithin and editWithin (px, 0 is off), size (pt); OK runs tool.setOption {tool, values}), livePaintSelection → Live Paint Selection Tool Options (dialog `livePaintSelectionOptions`, fields selectFills and selectStrokes (both on), color (the highlight color, #rrggbb or a layer color's name; #ff2a2a), width (the highlight's width, 1–20 px; 4); OK runs tool.setOption {tool: \"livePaintSelection\", values}), shapeBuilder → Shape Builder Tool Options (dialog `shapeBuilderOptions`, fields gapDetection (off), gapLength (pt, 0–72; 3), openFilledAsClosed (on), clickStrokeSplitsPath (off), pickColorFrom: artwork|swatches (artwork), cursorSwatchPreview (off), selection: freeform|straightLine (freeform), highlightFill (on), highlightStroke (on), highlightColor (#rrggbb or a layer color's name; #ff4f4f); OK runs tool.setOption {tool: \"shapeBuilder\", values})",
     ),
     (
         "ui.colorGuideOptions",
@@ -755,6 +767,34 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
     ("window.userGraphicStyleLibrary8", "User Graphic Style Library 8", "", "{} open the 8. User Defined graphic style library"),
     ("window.userGraphicStyleLibrary9", "User Graphic Style Library 9", "", "{} open the 9. User Defined graphic style library"),
     ("window.userGraphicStyleLibrary10", "User Graphic Style Library 10", "", "{} open the 10. User Defined graphic style library"),
+    (
+        "window.symbolLibrary",
+        "Symbol Library",
+        "",
+        "{library: id or name (see symbol.libraries) | null (close)} open a symbol library in a library panel of its own (UI state `library_panels`, kind symbols); clicking a symbol there runs symbol.addFromLibrary, dragging one onto the canvas runs it with place → {open, panel, name, count}",
+    ),
+    (
+        "window.symbolLibrary.other",
+        "Other Library…",
+        "",
+        "{path?} (default: pick a file) load the symbols of another document or a saved symbol library (engine: symbol.loadLibrary), and open them in a library panel",
+    ),
+    (
+        "ui.saveSymbolLibrary",
+        "Save Symbols…",
+        "",
+        "{names?: [the symbol selected in the Symbols panel]} open Save Symbol Library (dialog `saveSymbolLibrary`: name, user: save to the user library folder, selectedOnly); OK runs symbol.saveLibrary",
+    ),
+    ("window.userSymbolLibrary1", "User Symbol Library 1", "", "{} open the 1. User Defined symbol library (symbol.libraries, category user)"),
+    ("window.userSymbolLibrary2", "User Symbol Library 2", "", "{} open the 2. User Defined symbol library"),
+    ("window.userSymbolLibrary3", "User Symbol Library 3", "", "{} open the 3. User Defined symbol library"),
+    ("window.userSymbolLibrary4", "User Symbol Library 4", "", "{} open the 4. User Defined symbol library"),
+    ("window.userSymbolLibrary5", "User Symbol Library 5", "", "{} open the 5. User Defined symbol library"),
+    ("window.userSymbolLibrary6", "User Symbol Library 6", "", "{} open the 6. User Defined symbol library"),
+    ("window.userSymbolLibrary7", "User Symbol Library 7", "", "{} open the 7. User Defined symbol library"),
+    ("window.userSymbolLibrary8", "User Symbol Library 8", "", "{} open the 8. User Defined symbol library"),
+    ("window.userSymbolLibrary9", "User Symbol Library 9", "", "{} open the 9. User Defined symbol library"),
+    ("window.userSymbolLibrary10", "User Symbol Library 10", "", "{} open the 10. User Defined symbol library"),
     (
         "ui.expandDialog",
         "Expand…",
@@ -1375,6 +1415,7 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
         id if let Some((_, justify)) = crate::panels::paragraph::ALIGN_COMMANDS.iter().find(|c| c.0 == id) => {
             crate::panels::paragraph::align(app, justify)
         }
+        "type.applyBullets" => crate::panels::paragraph::apply_bullets(app, p),
         id if let Some(b) = crate::panels::align::button(id) => crate::panels::align::run_button(app, b),
         "view.gradientAnnotator" => flag(&mut app.ui.view.gradient_annotator),
         "view.livePaintGaps" => flag(&mut app.ui.view.live_paint_gaps),
@@ -1401,6 +1442,13 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
         "view.artboards" => flag(&mut app.ui.view.artboards),
         "view.template" => flag(&mut app.ui.view.templates),
         "view.rulers" => flag(&mut app.ui.view.rulers),
+        "view.videoRulers" => {
+            let v = &mut app.ui.view;
+            let show = !(v.video_rulers && v.rulers);
+            v.video_rulers = show;
+            v.rulers |= show;
+            Ok(json!(show))
+        }
         "view.boundingBox" => flag(&mut app.ui.view.bounding_box),
         "view.guides" => {
             let r = flag(&mut app.ui.view.guides);
@@ -1633,7 +1681,7 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             }
             None => Err("brightness must be dark|mediumDark|mediumLight|light".into()),
         },
-        "window.newWindow" => Err("multiple windows land with M11.5".into()),
+        "window.newWindow" => Err("New Window isn't available yet: a document opens in one window".into()),
         "tool.select" => match s("tool") {
             Some(t) if vectorcraft_tools::tool_info(&t).is_some() => {
                 app.select_tool(&t);
@@ -1759,6 +1807,16 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
         }
         id if id.starts_with(crate::panels::graphic_styles::USER_SLOT) => match crate::panels::graphic_styles::user_library(app, id) {
             Some(l) => crate::panels::graphic_styles::open_library(app, &json!({ "library": l.id })),
+            None => Err("no such user library".into()),
+        },
+        "window.symbolLibrary" => crate::panels::symbols::open_library(app, p),
+        "window.symbolLibrary.other" => crate::panels::symbols::other_library(app, s("path")),
+        "ui.saveSymbolLibrary" => {
+            let names = p.get("names").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect());
+            crate::dialogs::save_symbol_library::open(app, names.unwrap_or_default())
+        }
+        id if id.starts_with(crate::panels::symbols::USER_SLOT) => match crate::panels::symbols::user_library(app, id) {
+            Some(l) => crate::panels::symbols::open_library(app, &json!({ "library": l.id })),
             None => Err("no such user library".into()),
         },
         "ui.expandDialog" => crate::dialogs::expand::open(app),
@@ -2040,6 +2098,7 @@ pub fn dynamic_label(app: &VectorcraftApp, id: &str, label: &str) -> String {
         id if saved_selection_slot(id).is_some() => saved_selection_name(app, id).unwrap_or_else(|| "—".into()),
         "view.artboards" => if v.artboards { "Hide Artboards" } else { "Show Artboards" }.into(),
         "view.rulers" => if v.rulers { "Hide Rulers" } else { "Show Rulers" }.into(),
+        "view.videoRulers" => if v.video_rulers && v.rulers { "Hide Video Rulers" } else { "Show Video Rulers" }.into(),
         "view.globalRulers" => if app.session.active().is_some_and(|d| d.doc.rulers == vectorcraft_doc::RulerMode::Global) {
             "Change to Artboard Rulers"
         } else {
@@ -2069,6 +2128,9 @@ pub fn dynamic_label(app: &VectorcraftApp, id: &str, label: &str) -> String {
             });
             if editing { "Edit Envelope" } else { "Edit Contents" }.into()
         }
+        "select.globalEdit" => {
+            if app.session.active().is_some_and(|d| d.global_edit.is_some()) { "Stop Global Edit" } else { "Start Global Edit" }.into()
+        }
         "edit.undo" => app.session.active().and_then(|d| d.history.undo.last()).map(|h| format!("Undo {}", h.label)).unwrap_or_else(|| "Undo".into()),
         "edit.redo" => app.session.active().and_then(|d| d.history.redo.last()).map(|h| format!("Redo {}", h.label)).unwrap_or_else(|| "Redo".into()),
         id if id.starts_with(crate::panels::swatches::USER_SLOT) => {
@@ -2076,6 +2138,9 @@ pub fn dynamic_label(app: &VectorcraftApp, id: &str, label: &str) -> String {
         }
         id if id.starts_with(crate::panels::graphic_styles::USER_SLOT) => {
             crate::panels::graphic_styles::user_library(app, id).map_or_else(|| "—".into(), |l| l.name)
+        }
+        id if id.starts_with(crate::panels::symbols::USER_SLOT) => {
+            crate::panels::symbols::user_library(app, id).map_or_else(|| "—".into(), |l| l.name)
         }
         id if id.starts_with(crate::dialogs::perspective_presets::SLOT) => {
             crate::dialogs::perspective_presets::slot_preset(app, id).unwrap_or_else(|| "—".into())
@@ -2092,12 +2157,13 @@ pub fn dynamic_label(app: &VectorcraftApp, id: &str, label: &str) -> String {
 /// plug-in? Such names are shown as they are, never translated (a workspace the user calls
 /// "Layers" stays "Layers").
 fn shows_a_name(id: &str, label: &str) -> bool {
-    const SLOTS: [&str; 6] = [
+    const SLOTS: [&str; 7] = [
         "file.openRecent",
         "view.goto",
         "type.recentFont",
         crate::panels::swatches::USER_SLOT,
         crate::panels::graphic_styles::USER_SLOT,
+        crate::panels::symbols::USER_SLOT,
         crate::dialogs::perspective_presets::SLOT,
     ];
     SLOTS.iter().any(|s| id.starts_with(s))
@@ -2183,6 +2249,7 @@ fn hidden_when_disabled(id: &str) -> bool {
         || id.starts_with("file.openRecent")
         || id.starts_with(crate::panels::swatches::USER_SLOT)
         || id.starts_with(crate::panels::graphic_styles::USER_SLOT)
+        || id.starts_with(crate::panels::symbols::USER_SLOT)
         || id.starts_with(crate::dialogs::perspective_presets::SLOT)
 }
 
@@ -2437,6 +2504,7 @@ pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
         "file.save" => app.session.active().is_some_and(|d| d.path.is_none() || d.converted || d.is_dirty()),
         "type.bold" | "type.italic" => crate::panels::character::text_style(app).is_some(),
         id if crate::panels::paragraph::ALIGN_COMMANDS.iter().any(|c| c.0 == id) => crate::panels::character::text_style(app).is_some(),
+        "type.applyBullets" => crate::panels::character::text_style(app).is_some(),
         id if let Some(b) = crate::panels::align::button(id) => enabled(app, b.command()),
         "file.reveal" => app.services.reveal.is_some() && app.session.active().is_some_and(|d| d.path.is_some()),
         "file.cancelExport" | "file.exportInBackground" => app.background.jobs.iter().any(|j| j.progress.is_some() && !j.cancelled()),
@@ -2483,6 +2551,8 @@ pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
         "ui.flattenTransparencyDialog" => app.session.active().is_some_and(|d| !d.selection.is_empty()),
         "ui.saveGraphicStyleLibrary" => app.session.active().is_some(),
         id if id.starts_with(crate::panels::graphic_styles::USER_SLOT) => crate::panels::graphic_styles::user_library(app, id).is_some(),
+        "ui.saveSymbolLibrary" => app.session.active().is_some_and(|d| !d.doc.symbols.is_empty()),
+        id if id.starts_with(crate::panels::symbols::USER_SLOT) => crate::panels::symbols::user_library(app, id).is_some(),
         "ui.expandDialog" => app.session.active().is_some_and(|d| !d.selection.is_empty()),
         "ui.spotColors" => app.session.active().is_some(),
         "ui.menuDialog" => app.session.active().is_some_and(|d| !d.selection.is_empty()),
@@ -2504,6 +2574,8 @@ pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
             app.session.active().is_some() && crate::dialogs::perspective_presets::slot_preset(app, id).is_some()
         }
         "ui.perspectivePlane" => app.session.active().is_some(),
+        // Only one window per document so far: greyed out, as Window › Arrange's items are (#3724).
+        "window.newWindow" => false,
         _ => true,
     }
 }
@@ -2929,6 +3001,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                     ],
                 ),
                 cp("Smart Punctuation…", "type.smartPunctuation", json!({"quotes": true, "dashes": true, "ellipsis": true, "scope": "selection"})),
+                sub("Bullets and Numbering", vec![c("Apply Bullets", "type.applyBullets")]),
                 Sep,
                 c("Create Outlines", "type.createOutlines"),
                 c("Scale Text Attributes", "type.scaleTextAttributes"),
@@ -2994,7 +3067,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                         c("Area Text Objects", "select.object.areaText"),
                     ],
                 ),
-                todo("Start Global Edit"),
+                c("Start Global Edit", "select.globalEdit"),
                 Sep,
                 c("Save Selection…", "select.save"),
                 c("Update Selection", "select.update"),
@@ -3054,7 +3127,14 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                 c("Lock Slices", "view.slices.lock"),
                 c("Hide Template", "view.template"),
                 Sep,
-                sub("Rulers", vec![c("Show Rulers", "view.rulers"), c("Change to Global Rulers", "view.globalRulers"), todo("Show Video Rulers")]),
+                sub(
+                    "Rulers",
+                    vec![
+                        c("Show Rulers", "view.rulers"),
+                        c("Change to Global Rulers", "view.globalRulers"),
+                        c("Show Video Rulers", "view.videoRulers"),
+                    ],
+                ),
                 c("Hide Bounding Box", "view.boundingBox"),
                 c("Show Transparency Grid", "view.transparencyGrid"),
                 c("Hide Text Threads", "view.textThreads"),
@@ -3174,7 +3254,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                 sub("Brush Libraries", library_placeholders()),
                 sub("Graphic Style Libraries", crate::panels::graphic_styles::window_menu()),
                 sub("Swatch Libraries", crate::panels::swatches::window_menu()),
-                sub("Symbol Libraries", library_placeholders()),
+                sub("Symbol Libraries", crate::panels::symbols::window_menu()),
             ],
         ),
         (
@@ -3299,6 +3379,10 @@ pub fn context_items(app: &VectorcraftApp) -> Vec<Item> {
         }
         if any(|k| matches!(k, NodeKind::Compound { .. })) {
             v.push(c("Release Compound Path", "object.compoundPath.release"));
+        }
+        // The paragraphs of the selected type, or those the Type tool's selection touches.
+        if crate::panels::character::text_style(app).is_some() {
+            v.push(sub("Bullets and Numbering", vec![c("Apply Bullets", "type.applyBullets")]));
         }
         v.extend([
             c("Make Guides", "view.guides.make"),
@@ -4138,6 +4222,8 @@ pub const DYNAMIC_LABELS: &[&str] = &[
     "Show Artboards",
     "Hide Rulers",
     "Show Rulers",
+    "Hide Video Rulers",
+    "Show Video Rulers",
     "Change to Global Rulers",
     "Change to Artboard Rulers",
     "Hide Bounding Box",
@@ -4158,6 +4244,8 @@ pub const DYNAMIC_LABELS: &[&str] = &[
     "Show Print Tiling",
     "Edit Envelope",
     "Edit Contents",
+    "Start Global Edit",
+    "Stop Global Edit",
     "Undo",
     "Redo",
     "Unlock Grid",
@@ -4435,10 +4523,14 @@ mod tests {
                 _ => panic!("{id} is not a menu item"),
             }
         };
-        assert_eq!(shown(&app, "edit.undo"), "ぼかしを取り消す");
+        let step = |template: &str, name: &str| {
+            let name = crate::panels::history::step_name(ja, name).unwrap_or_else(|| name.to_string());
+            crate::i18n::fmt(crate::i18n::tr(ja, template), &[("name", &name)])
+        };
+        assert_eq!(shown(&app, "edit.undo"), step("Undo {name}", "Feather"));
         app.run("edit.undo", json!({})).unwrap();
-        assert_eq!(shown(&app, "edit.redo"), "ぼかしをやり直す");
-        assert_eq!(shown(&app, "edit.undo"), "長方形を取り消す", "a step with a plain row");
+        assert_eq!(shown(&app, "edit.redo"), step("Redo {name}", "Feather"));
+        assert_eq!(shown(&app, "edit.undo"), step("Undo {name}", "Rectangle"), "a step with a plain row");
         crate::i18n::set_current(crate::i18n::Lang::EN);
         assert_eq!(shown(&app, "edit.redo"), "Redo Feather");
     }
@@ -4543,10 +4635,15 @@ mod tests {
         let text = app.run("text.create", json!({"x": 0, "y": 40, "text": "Hello"})).unwrap()["id"].clone();
         app.run("charStyle.new", json!({"name": "Brush"})).unwrap();
         app.run("charStyle.apply", json!({"name": "Brush", "id": text})).unwrap();
-        crate::i18n::set_current(crate::i18n::Lang::from_code("ja").expect("ja registered"));
-        assert_eq!(display_label(&app, "edit.undo", "Undo"), "スタイル「Brush」を適用を取り消す");
+        let ja = crate::i18n::Lang::from_code("ja").expect("ja registered");
+        crate::i18n::set_current(ja);
+        let step = |template: &str| {
+            let applied = crate::i18n::fmt(crate::i18n::tr(ja, "Apply {name}"), &[("name", "Brush")]);
+            crate::i18n::fmt(crate::i18n::tr(ja, template), &[("name", &applied)])
+        };
+        assert_eq!(display_label(&app, "edit.undo", "Undo"), step("Undo {name}"));
         app.run("edit.undo", json!({})).unwrap();
-        assert_eq!(display_label(&app, "edit.redo", "Redo"), "スタイル「Brush」を適用をやり直す");
+        assert_eq!(display_label(&app, "edit.redo", "Redo"), step("Redo {name}"));
         crate::i18n::set_current(crate::i18n::Lang::EN);
         assert_eq!(display_label(&app, "edit.redo", "Redo"), "Redo Apply Brush");
     }
@@ -4870,5 +4967,16 @@ mod tests {
         let tall = rect(3000.0);
         assert!(tall.height() > short.height() + 100.0, "{} vs {}", tall.height(), short.height());
         assert!(tall.bottom() < 3000.0);
+    }
+
+    /// #3724: Window › New Window is greyed out until VectorCraft can open a second window on a
+    /// document, instead of being enabled and answering with an internal milestone note.
+    #[test]
+    fn new_window_is_disabled_until_it_opens_a_window() {
+        let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), crate::Services::default());
+        app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
+        assert!(!enabled(&app, "window.newWindow"), "New Window is enabled but opens no window");
+        let e = app.run("window.newWindow", json!({})).unwrap_err();
+        assert!(!e.contains("M11.5"), "a user-facing message, not a milestone: {e}");
     }
 }

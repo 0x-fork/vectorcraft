@@ -11,13 +11,15 @@
 	Smoothness	滑らかさ
 #
 # Coverage: the whole interface — every menu string and every `tl!` literal (`complete_menus`,
-# tested) — and the status and error messages (`@msg` rows at the end, `COMPLETE_MESSAGES`, tested).
+# `untranslated_report` lists gaps) — and the status and error messages (`@msg` rows at the end, `COMPLETE_MESSAGES`, `untranslated_report` lists gaps).
 # Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
 # names, OpenType, the built-in workspace names and the bracketed perspective grid preset names.
 	About VectorCraft	VectorCraft について
 	All Scripts	すべての文字
 	Anchors:	アンカー:
 	Any Kind	すべての種類
+	Font Technology	フォントテクノロジー
+font-technology	Variable	バリアブル
 	Ascender	アセンダ
 	Baseline	ベースライン
 	Bottom-to-Bottom Leading	欧文ベースライン基準の行送り
@@ -310,6 +312,13 @@
 	Glyphs	字形
 	Insert Special Character	特殊文字を挿入
 	Bullet	箇条書き記号
+	Bullets	箇条書き
+	Bullets and Numbering	箇条書きと番号付け
+	Apply Bullets	箇条書きを適用
+	Filled Dot	黒丸
+	Dash	ダッシュ
+	Hollow Circle	白丸
+	Filled Square	黒四角
 	Copyright Symbol	著作権記号
 	Ellipsis	省略記号
 	Paragraph Symbol	段落記号
@@ -938,6 +947,9 @@
 	Background Color:	背景色:
 	Show Center Mark	中心マークを表示
 	Show Cross Hairs	十字線を表示
+	Show Video Safe Areas	ビデオセーフエリアを表示
+	Video Ruler Pixel Aspect Ratio:	ビデオ定規のピクセル縦横比:
+	Hide Video Rulers	ビデオ定規を隠す
 	Background Contents	背景のカラー
 	Background Contents:	背景のカラー:
 	Background:	背景:
@@ -1637,7 +1649,7 @@
 	Clear History	ヒストリーを消去
 	Set History Limit…	ヒストリーの上限を設定…
 	History States	ヒストリー数
-# History panel: the names of undo steps (`every_undo_label_is_translated`).
+# History panel: the names of undo steps (`untranslated_report` lists any that are missing).
 	Apply Data Set	データセットを適用
 	Area Type	エリア内文字
 	Bloat	膨張
@@ -2891,6 +2903,7 @@ mark-style	Japanese	日本式
 	Space Before Paragraph	段落前のアキ
 	Spaces	スペース
 	Spacing Guides	間隔ガイド
+	Invoke Distance Guides	距離ガイドを呼び出す
 	Spacing:	間隔:
 	Spanish	スペイン語
 	Specify:	指定:
@@ -2984,7 +2997,6 @@ mark-style	Japanese	日本式
 	Use Library Item	ライブラリ項目を使用
 	Graphic	グラフィック
 	Show all open documents	開いているすべてのドキュメントを表示
-	Symbol Libraries (on the roadmap)	シンボルライブラリ (今後対応予定)
 	Symbol Screener Tool	シンボルスクリーナーツール
 	Symbol Scruncher Tool	シンボルスクランチャーツール
 	Symbol Shifter Tool	シンボルシフターツール
@@ -3069,6 +3081,13 @@ mark-style	Japanese	日本式
 	Transparent Background	背景を透明にする
 	Transverse (the page a quarter turn on the paper)	横向き回転 (用紙上でページを 90 度回転)
 	Trap…	トラップ…
+	Trap	トラップ
+	Height/Width	高さ/幅
+	Tint Reduction	色合いの軽減
+	Traps with Process Color	プロセスカラーでトラップ
+	Reverse Traps	トラップを反転
+	Precision	精度
+	Remove Redundant Points	余分なポイントを削除
 	Trim mark weight:	トリムマークの線幅:
 	True colour needs version 2004 or later: the nearest of 256 colours is written.	True Color にはバージョン 2004 以降が必要です。256 色のうち最も近い色で書き出します。
 	Turn off Data Recovery for complex documents	複雑なドキュメントではデータ復帰をオフにする
@@ -3805,7 +3824,7 @@ theme	Appearance	外観
 
 # Status and error messages (`@msg`), translated where the status bar shows them; the message itself
 # stays English for agents and tests. `{_1}`, `{_2}` … stand for the `{}` of the format string, in order
-# (`complete_languages_translate_every_message` lists any that are missing). Command ids, parameter
+# (`untranslated_report` lists any that are missing). Command ids, parameter
 # names and values in backticks or code (`colorModel rgb`, `document.export`) stay as they are.
 # Japanese: no final 。 (these are status lines, and reasons that follow a colon), unless the English ends
 # with a period; a space between Japanese text and an adjacent Latin word, number or {placeholder}.
@@ -4313,6 +4332,7 @@ swatch	Bright Violet	ビビッドバイオレット
 @msg	{label}…	{label}…
 @msg	no blend options	ブレンドオプションがありません
 @msg	bad color {v}	カラー {v} が正しくありません
+@msg	videoRulerPixelAspectRatio must be a number from 0.1 to 10	videoRulerPixelAspectRatio には 0.1 〜 10 の数値を指定してください
 @msg	the Color Picker is not open	カラーピッカーが開いていません
 @msg	the Simplify slider is not open	単純化スライダーが開いていません
 @msg	the screen color sampler is already open	画面のカラーサンプラーはすでに開いています
@@ -4376,6 +4396,7 @@ swatch	Bright Violet	ビビッドバイオレット
 @msg	name the file	ファイル名を入力してください
 @msg	unknown format	不明な形式です
 @msg	PDF settings are not an object	PDF 設定がオブジェクト形式ではありません
+@msg	PDF security settings are not an object	PDF のセキュリティ設定がオブジェクト形式ではありません
 @msg	no saved PDF preset named `{name}` (built-in presets are read-only: start a new one from them)	`{name}` という名前の保存済み PDF プリセットが見つかりません (組み込みのプリセットは読み取り専用です: それを元に新しいプリセットを作成してください)
 @msg	Saved to User Defined: {_1}	「ユーザー定義」に保存しました: {_1}
 @msg	choose a direction to divide in	分割する方向を選択してください
@@ -4426,7 +4447,7 @@ swatch	Bright Violet	ビビッドバイオレット
 @msg	missing index	index が指定されていません
 @msg	missing number `{key}`	数値 `{key}` が指定されていません
 @msg	missing integer `{key}`	整数 `{key}` が指定されていません
-@msg	multiple windows land with M11.5	複数ウィンドウは M11.5 で対応予定です
+@msg	New Window isn't available yet: a document opens in one window	新規ウィンドウはまだ使用できません: ドキュメントは 1 つのウィンドウで開きます
 @msg	no PNG encoder	PNG エンコーダーがありません
 @msg	no document open	ドキュメントが開かれていません
 @msg	no effect applied yet	まだ効果を適用していません
@@ -4651,7 +4672,7 @@ effect	Vertical	垂直
 	Define a variable first	先に変数を定義してください
 	Text	テキスト
 	Visibility	表示状態
-# tested). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
+# `untranslated_report` lists gaps). Left in English on purpose (`MENU_KEEP_AS_IS` in the tests): the product name, language
 # Shared panel docking
 	Activate Panel	パネルをアクティブにする
 	Change Panel Layout	パネルの配置を変更
@@ -5139,3 +5160,54 @@ axis	Y Axis	Y 軸
 @msg	a live effect runs while the document is drawn, so it can't be `heavy`	ライブ効果はドキュメントの描画中に実行されるため、`heavy` にはできません
 @msg	an exporter always gets an export's budget: leave `budget` out	書き出しプラグインには常に書き出しの予算が割り当てられます。`budget` は省略してください
 @msg	“{_1}” asks for a heavy budget (each run up to {minutes} minutes and {times} times the usual instructions): install it with `allowHeavy: true` once the user agrees	「{_1}」は大きな計算予算を求めています (1 回の実行につき最大 {minutes} 分、通常の {times} 倍の命令)。ユーザーが同意したら `allowHeavy: true` を指定してインストールしてください
+# Actions panel: action sets (#3712).
+	New Set…	新規セット…
+	New Set	新規セット
+	Set Options…	セットオプション…
+	Set Options	セットオプション
+	Create New Set	新規セットを作成
+	Stop Global Edit	グローバル編集を終了
+	Global Edit Options	グローバル編集オプション
+	Match	一致
+	On Artboards	アートボード上
+	All Artboards	すべてのアートボード
+	Include Objects On Canvas	カンバス上のオブジェクトを含める
+	Result(s): {count}	結果: {count}
+@msg	select one object	オブジェクトを 1 つ選択してください
+@msg	Global Edit works on paths, compound paths and symbol instances	グローバル編集はパス、複合パス、シンボルインスタンスに使用できます
+@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	類似するオブジェクトが見つかりません（回転または反転したコピーは一致しません）。グローバル編集オプションを変更してもう一度試してください
+@msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all または 1, 3-5 のような範囲を指定してください ({v} ではなく)
+	Add to Symbols	シンボルに追加
+	Basic Shapes	基本シェイプ
+	Open Symbol Library	シンボルライブラリを開く
+	Save Symbol Library	シンボルライブラリを保存
+	Save Symbol Library…	シンボルライブラリを保存…
+	Save Symbols…	シンボルを保存…
+	Selected Symbols Only	選択したシンボルのみ
+	Symbol Libraries Menu	シンボルライブラリメニュー
+	Symbol Library	シンボルライブラリ
+	User Symbol Library 1	ユーザーシンボルライブラリ 1
+	User Symbol Library 2	ユーザーシンボルライブラリ 2
+	User Symbol Library 3	ユーザーシンボルライブラリ 3
+	User Symbol Library 4	ユーザーシンボルライブラリ 4
+	User Symbol Library 5	ユーザーシンボルライブラリ 5
+	User Symbol Library 6	ユーザーシンボルライブラリ 6
+	User Symbol Library 7	ユーザーシンボルライブラリ 7
+	User Symbol Library 8	ユーザーシンボルライブラリ 8
+	User Symbol Library 9	ユーザーシンボルライブラリ 9
+	User Symbol Library 10	ユーザーシンボルライブラリ 10
+	{w} × {h} pt	{w} × {h} pt
+@msg	`{_1}` has no symbols to place	`{_1}` に配置できるシンボルがありません
+@msg	missing `library` (see symbol.libraries)	`library` がありません (symbol.libraries を参照)
+@msg	no symbol `{n}`	シンボル `{n}` がありません
+@msg	no symbol `{n}` in `{_1}`	`{_1}` にシンボル `{n}` がありません
+@msg	no symbol library `{key}` (see symbol.libraries)	シンボルライブラリ `{key}` がありません (symbol.libraries を参照)
+@msg	the document has no symbols to save	ドキュメントに保存するシンボルがありません
+@msg	Trap: select two or more objects filled with solid colours	トラップ: 単色で塗りつぶした 2 つ以上のオブジェクトを選択してください
+@msg	Trap: no edges of different colours meet among the selected objects	トラップ: 選択したオブジェクトに異なる色が接する辺がありません
+@msg	thickness must be from 0.01 to 5000 pt	thickness は 0.01～5000 pt にしてください
+@msg	heightWidth must be from 1 to 1000 %	heightWidth は 1～1000 % にしてください
+@msg	tintReduction must be from 0 to 100 %	tintReduction は 0～100 % にしてください
+	Rectangular Grid Tool Options	長方形グリッドツールオプション
+	Polar Grid Tool Options	同心円グリッドツールオプション
+	Fill Line	線を塗りつぶす

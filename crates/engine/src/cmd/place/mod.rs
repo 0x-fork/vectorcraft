@@ -385,6 +385,7 @@ fn build(d: &mut Document, l: Loaded, link: Option<LinkInfo>) -> Node {
                 xf: Affine::scale_non_uniform(sx, sy),
                 link,
                 placement: Default::default(),
+                pixels: None,
             };
             Node::new(d.alloc_id(), NodeKind::Image(Box::new(im)))
         }
