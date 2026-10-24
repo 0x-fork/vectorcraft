@@ -1303,6 +1303,40 @@ fn select_same_paint_reads_type_characters() {
     assert_eq!(same(&mut s, t1, "select.same.fillAndStroke"), vec![t1, r]);
 }
 
+/// Select > Same matches a compound path on its own paint, as a whole: never its member paths.
+/// When a member path is selected first, the other objects are compared with its compound path.
+#[test]
+fn select_same_matches_compound_paths_on_their_own_paint() {
+    let mut s = session();
+    let [a, b] = [0.0, 20.0].map(|x| rect(&mut s, x, 0.0, 10.0, 10.0));
+    let outer = rect(&mut s, 100.0, 0.0, 50.0, 50.0);
+    let inner = rect(&mut s, 110.0, 10.0, 20.0, 20.0);
+    let r = rect(&mut s, 40.0, 0.0, 10.0, 10.0);
+    for id in [a, b, outer, inner] {
+        fill(&mut s, id, "#000000");
+    }
+    fill(&mut s, r, "#ff0000");
+    sel(&mut s, &[outer, inner]);
+    let c = id_of(&s.execute("object.compoundPath.make", &json!({})).unwrap());
+    let same = |s: &mut Session, from: NodeId, cmd: &str| {
+        sel(s, &[from]);
+        s.execute(cmd, &json!({})).unwrap();
+        let mut v = selected(s);
+        v.sort();
+        v
+    };
+    for from in [a, c, outer] {
+        assert_eq!(same(&mut s, from, "select.same.fillColor"), vec![a, b, c], "from {from:?}");
+    }
+    assert_eq!(same(&mut s, inner, "select.same.shapeType"), vec![c]);
+    fill(&mut s, c, "#ff0000");
+    assert_eq!(same(&mut s, a, "select.same.fillColor"), vec![a, b]);
+    assert_eq!(same(&mut s, r, "select.same.fillColor"), vec![r, c]);
+    // Isolated in the compound path, its member paths are the objects to match.
+    s.execute("object.isolate", &json!({"id": c.0})).unwrap();
+    assert_eq!(same(&mut s, outer, "select.same.shapeType"), vec![outer, inner]);
+}
+
 /// Select by Color needs no object to start from: it matches fills and strokes as
 /// `document.inspect` reports them, `#rrggbb`.
 #[test]
