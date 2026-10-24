@@ -1760,13 +1760,25 @@ impl Session {
         // passes that its command's description doesn't name fails the test.
         #[cfg(test)]
         self.check_params(id, params)?;
+        // Objects given as `id` (where it stands for `ids` of one) or as `ids` beside it are checked
+        // before anything else: a malformed one, or one naming no object, is an error under this
+        // command's id, never the selection in its place. `effect.apply {id: "stylize.dropShadow"}`
+        // without `effect` names the effect (its older key), not an object.
+        let effect_named = id == "effect.apply"
+            && params.get("effect").is_none()
+            && params.get("ids").is_none_or(Value::is_null)
+            && params.get("id").and_then(Value::as_str).is_some_and(|e| !e.starts_with('$'));
+        if cmd::params::id_stands_for_ids(spec.params) && !effect_named && self.active().is_some() {
+            cmd::given_objects(self, params, id)?;
+        }
         // Clear's menu needs a selection; an agent supplying explicit targets only needs a
         // document. The command validates those targets before making any edit.
+        let given = given_ids(spec.params, params);
         let enabled = if id == "edit.clear" && params.get("ids").is_some() {
             cmd::has_doc(self)
-        } else if let Some(ids) = given_ids(spec.params, params) {
-            // Objects given as `ids` stand in for the selection: the command is enabled as it is
-            // with them selected (#1575).
+        } else if let Some(ids) = given.clone() {
+            // Objects given as `ids` (or `id`) stand in for the selection: the command is enabled
+            // as it is with them selected (#1575).
             self.enabled_with_selection(spec, ids)
         } else {
             (spec.enabled)(self)
@@ -1782,13 +1794,18 @@ impl Session {
             self.journal_query = false;
             self.batch_stash = None;
         }
-        // A selection-only command given `ids` selects them first, in the same undo step (#2130);
-        // when the command then fails, the selection (and the current layer selecting them made
-        // current) goes back to how it was, as when the ids are refused.
-        let select_first = SELECTS_GIVEN_IDS.contains(&id).then(|| params.get("ids")).flatten();
-        let selected_before = select_first.and(self.active()).map(|d| (d.uid, d.selection.clone(), d.active_layer));
+        // A selection-only command given `ids` (or `id`) selects them first, in the same undo step
+        // (#2130); when the command then fails, the selection (and the current layer selecting
+        // them made current) goes back to how it was, as when the ids are refused.
+        let select_first = SELECTS_GIVEN_IDS
+            .contains(&id)
+            .then(|| {
+                params.get("ids").filter(|v| !v.is_null()).cloned().or_else(|| given.map(|ids| ids.iter().map(|i| i.0).collect::<Vec<_>>().into()))
+            })
+            .flatten();
+        let selected_before = select_first.as_ref().and(self.active()).map(|d| (d.uid, d.selection.clone(), d.active_layer));
         let run = |s: &mut Session| {
-            if let Some(ids) = select_first {
+            if let Some(ids) = &select_first {
                 s.execute("select.set", &serde_json::json!({ "ids": ids }))?;
             }
             let r = (spec.run)(s, params);
@@ -2784,8 +2801,16 @@ pub(crate) const SELECTS_GIVEN_IDS: &[&str] = &[
 ];
 
 /// The non-empty `ids` given to a command whose params description names `ids` as a key (the
-/// key callers outside the app may pass it, [`cmd::params::takes_key`]).
+/// key callers outside the app may pass it, [`cmd::params::takes_key`]), or its `id` as `ids` of
+/// one when no `ids` are given and the description takes `id` so
+/// ([`cmd::params::id_stands_for_ids`]), as [`cmd::targets`] reads them.
 fn given_ids(description: &'static str, params: &Value) -> Option<Vec<NodeId>> {
-    let ids = cmd::ids_param(params, "ids").filter(|ids| !ids.is_empty())?;
-    cmd::params::takes_key(description, "ids").then_some(ids)
+    if !cmd::params::takes_key(description, "ids") {
+        return None;
+    }
+    match params.get("ids").filter(|v| !v.is_null()) {
+        Some(_) => cmd::ids_param(params, "ids"),
+        None => cmd::id_param(params, "id").filter(|_| cmd::params::id_stands_for_ids(description)).map(|id| vec![id]),
+    }
+    .filter(|ids| !ids.is_empty())
 }
