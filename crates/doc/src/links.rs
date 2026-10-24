@@ -94,6 +94,7 @@ pub fn hash_reader(r: impl std::io::Read) -> std::io::Result<String> {
 /// hash then covers only the first `max` + 1). A file that grew since its size was looked at isn't
 /// read to its new end.
 pub fn hash_reader_within(r: impl std::io::Read, max: u64) -> std::io::Result<(String, u64)> {
+    use std::io::Read;
     let mut r = r.take(max.saturating_add(1));
     let mut buf = vec![0; 1 << 16];
     let (mut h, mut read) = (FNV_BASIS, 0u64);
