@@ -1692,7 +1692,12 @@ the others turn by the same hue). `limitTo` snaps new colours to a swatch librar
 `recolor.randomize {map, order?, saturationBrightness?, seed?}` shuffles or varies new colours; a row with
 `exclude: true` keeps its colours. `swatch.editGroup {group, colors, rename?}` rewrites a colour group in one undo
 step (art linked to its global swatches follows), and `recolor.apply` with `group` recolours the art and rewrites the
-group together.
+group together. Art linked to one of the group's global swatches stays linked when the swatch is rewritten with its
+row's new color (the default without `groupColors` when the rows follow the group's order), so a later `swatch.edit` still
+reaches it; the reply's `relinked` counts the other linked paints that took the group's new colors. Art in a row that
+is linked to a swatch rewritten with another color keeps its row's new color, even an unchanged one, and is no longer
+linked to the swatch, as does art whose color the row converts into the art's own color model. Without `group`,
+the swatch keeps its color and the recolored art is no longer linked to it.
 
 ```json
 {"name":"run_command","arguments":{"command":"recolor.reduce","params":{"colors":2,"preserve":{"grays":true}}}}
