@@ -398,7 +398,11 @@ impl Tool for GestureTool {
                     }
                     self.points.truncate(1);
                 } else if self.points.last().is_some_and(|l| l.distance(p) < cx.tol(1.0)) || self.points.len() >= crate::MAX_STROKE_SAMPLES {
-                    self.near_start = self.release_closes_near_start(cx, end);
+                    // A release here keeps the last point unless it snaps (`Up`), so the ring
+                    // follows the point `finish` will test.
+                    let kept = self.points.last().copied().filter(|l| l.distance(p) < cx.tol(1.0) && !self.snaps());
+                    let release_end = kept.unwrap_or(end);
+                    self.near_start = self.release_closes_near_start(cx, release_end);
                     return vec![];
                 }
                 self.push(p, ev.pressure);
