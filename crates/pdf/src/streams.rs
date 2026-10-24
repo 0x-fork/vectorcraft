@@ -4,6 +4,7 @@
 //! that large whatever the stream holds (#1701). A file with such a stream is refused instead.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::io::Read;
 
 use craft_pdf::syntax::content::TypedIter;
@@ -279,7 +280,14 @@ fn unsafe_data(stream: &Stream<'_>, inside: bool) -> bool {
 /// of its own, within a budget for the whole file: a file that spends it is refused. Linear in
 /// the file (#3586), a run of `<` included (#3924 review).
 pub(crate) fn unsafe_file_streams(pdf: &[u8]) -> bool {
-    let mut scan = FileScan { pdf, budget: pdf.len().saturating_mul(4).saturating_add(1 << 20), endstream: None, line: None, read_from: Vec::new() };
+    let mut scan = FileScan {
+        pdf,
+        budget: pdf.len().saturating_mul(4).saturating_add(1 << 20),
+        endstream: None,
+        lines: BTreeMap::new(),
+        strings: None,
+        read_from: Vec::new(),
+    };
     scan.read().is_err()
 }
 
@@ -324,6 +332,85 @@ fn string_end(pdf: &[u8], at: usize, limit: usize) -> Result<usize, usize> {
     Err(i.min(limit))
 }
 
+/// How far past its `(` a string read in skipped text may end to be read again each time it is
+/// entered (bytes); one ending further is looked up in [`StringEnds`].
+const NEAR_STRING: usize = 64;
+
+/// Is the byte at `at` escaped, a `\` before it that isn't escaped itself? Reading a string from
+/// any `(` before it sees the same, as the run of `\` before it lies after that `(`.
+fn escaped(pdf: &[u8], at: usize) -> bool {
+    pdf.get(..at).unwrap_or_default().iter().rev().take_while(|b| **b == b'\\').count() % 2 == 1
+}
+
+/// Where the literal strings read from the file's `(` end, for those ending more than
+/// [`NEAR_STRING`] bytes on (#3924 review). As whether a byte is escaped doesn't depend on where
+/// reading started ([`escaped`]), the string from any `(` ends after the first `)` that takes the
+/// count of unescaped `(` less unescaped `)` from the file's start below the count with that `(`
+/// (counted even when escaped). So all are found in three passes over the file: forward for the
+/// count at its end, back for the `(` whose string never ends (the count never falls below theirs
+/// again), and forward pairing the others with a stack.
+struct StringEnds {
+    /// Each `(` whose string ends more than [`NEAR_STRING`] bytes on, and where, in file order.
+    far: Vec<(usize, usize)>,
+}
+
+impl StringEnds {
+    /// The ends in `pdf`; `None` when more than one in 16 bytes of it are kept or pending (only a
+    /// file built for it nests strings so deep).
+    fn of(pdf: &[u8]) -> Option<StringEnds> {
+        let most = pdf.len() / 16 + 1024;
+        // What the byte at `i` adds to the count: an escaped `(` adds nothing but is one too.
+        let step = |i: usize| match pdf.get(i) {
+            Some(b'(') => Some(i64::from(!escaped(pdf, i))),
+            Some(b')') => (!escaped(pdf, i)).then_some(-1),
+            _ => None,
+        };
+        let total: i64 = (0..pdf.len()).filter_map(step).sum();
+        // The `(` whose string never ends: none after it takes the count below its own.
+        let mut endless = vec![0u64; pdf.len() / 64 + 1];
+        let (mut count, mut lowest) = (total, i64::MAX);
+        for i in (0..pdf.len()).rev() {
+            let Some(d) = step(i) else { continue };
+            if pdf.get(i) == Some(&b'(')
+                && count <= lowest
+                && let Some(word) = endless.get_mut(i / 64)
+            {
+                *word |= 1 << (i % 64);
+            }
+            lowest = lowest.min(count);
+            count -= d;
+        }
+        let (mut far, mut open, mut count) = (vec![], Vec::<(usize, i64)>::new(), 0);
+        for i in 0..pdf.len() {
+            let Some(d) = step(i) else { continue };
+            count += d;
+            if pdf.get(i) == Some(&b'(') {
+                if endless.get(i / 64).is_some_and(|word| word >> (i % 64) & 1 == 0) {
+                    open.push((i, count));
+                }
+            } else {
+                while let Some(&(at, _)) = open.last().filter(|(_, level)| *level > count) {
+                    open.pop();
+                    if i + 1 - at > NEAR_STRING {
+                        far.push((at, i + 1));
+                    }
+                }
+            }
+            if far.len() + open.len() > most {
+                return None;
+            }
+        }
+        far.sort_unstable();
+        Some(StringEnds { far })
+    }
+
+    /// Where the string from the `(` at `at` ends, if it ends more than [`NEAR_STRING`] bytes on;
+    /// `None` for one that doesn't end.
+    fn far(&self, at: usize) -> Option<usize> {
+        self.far.binary_search_by_key(&at, |(open, _)| *open).ok().and_then(|n| self.far.get(n)).map(|(_, end)| *end)
+    }
+}
+
 /// Past the hex string opening at `at` (a `<`): hex digits and white space, then `>`. `Err` with
 /// how far it got for one the reader fails on.
 fn hex_end(pdf: &[u8], at: usize, limit: usize) -> Result<usize, usize> {
@@ -356,8 +443,11 @@ struct FileScan<'a> {
     budget: usize,
     /// Where an `endstream` was last looked for, and the first one found there (`None`: none).
     endstream: Option<(usize, Option<usize>)>,
-    /// Where a comment's end of line was last looked for, and where it is.
-    line: Option<(usize, usize)>,
+    /// The comments read in skipped text: each one's end of line, and where reading it began.
+    lines: BTreeMap<usize, usize>,
+    /// The ends of strings read in skipped text far from their `(` ([`StringEnds`]), found once
+    /// the first such string is read.
+    strings: Option<StringEnds>,
     /// The `<<` a dictionary in skipped text was read from, a bit a byte of the file (empty
     /// until one is).
     read_from: Vec<u64>,
@@ -446,7 +536,9 @@ impl FileScan<'_> {
         let mut opens = std::collections::VecDeque::new();
         let (mut depth, mut limit, mut i, mut work) = (0usize, at.saturating_add(MAX_SKIPPED_DICT), at, 0usize);
         while let Some(&b) = pdf.get(i).filter(|_| i < limit) {
-            let next = match pdf.get(i..i + 2) {
+            // Where to read on (`Err`: the dictionary ends there, read or unreadable), and the
+            // bytes read to get there.
+            let (next, read) = match pdf.get(i..i + 2) {
                 Some(b"<<") => {
                     self.mark(i);
                     limit = limit.max(i.saturating_add(MAX_SKIPPED_DICT));
@@ -455,30 +547,29 @@ impl FileScan<'_> {
                     }
                     opens.push_back(i);
                     depth += 1;
-                    Ok(i + 2)
+                    (Ok(i + 2), 2)
                 }
                 Some(b">>") => {
                     depth = depth.saturating_sub(1);
                     if let Some(open) = opens.pop_back() {
                         self.closed(open, i + 2)?;
                     }
-                    if depth == 0 { Err(i + 2) } else { Ok(i + 2) }
+                    (if depth == 0 { Err(i + 2) } else { Ok(i + 2) }, 2)
                 }
                 _ => match b {
-                    b'(' => string_end(pdf, i, limit),
-                    b'<' => hex_end(pdf, i, limit),
-                    b'%' => {
-                        i = self.line_end(i)?;
-                        continue;
+                    // Strings and comments are charged as they are first read.
+                    b'(' => (self.string_end(i)?.ok_or(pdf.len()), 0),
+                    b'%' => (Ok(self.line_end(i)?), 0),
+                    b'<' => {
+                        let end = hex_end(pdf, i, limit);
+                        let (Ok(n) | Err(n)) = end;
+                        (end, n.saturating_sub(i))
                     }
-                    _ => Ok(i + 1),
+                    _ => (Ok(i + 1), 1),
                 },
             };
-            let (Ok(n) | Err(n)) = next;
-            work += n.saturating_sub(i);
-            if next.is_err() {
-                break;
-            }
+            work += read;
+            let Ok(n) = next else { break };
             i = n;
         }
         self.charge(work)
@@ -501,19 +592,42 @@ impl FileScan<'_> {
         Ok(())
     }
 
-    /// The end of the comment at `at` ([`comment_end`]), the last one found kept: comments in
-    /// skipped text are read again from many places.
+    /// The end of the comment at `at` ([`comment_end`]). Comments in skipped text are read from
+    /// many places, so each one's end is kept: a byte is read as comment once.
     fn line_end(&mut self, at: usize) -> Result<usize, Unsafe> {
-        if let Some((from, end)) = self.line
+        // The first comment kept that ends at or after `at`.
+        let kept = self.lines.range(at..).next().map(|(end, from)| (*end, *from));
+        if let Some((end, from)) = kept
             && from <= at
-            && at <= end
         {
             return Ok(end);
         }
-        let end = comment_end(self.pdf, at);
-        self.charge(end - at)?;
-        self.line = Some((at, end));
+        // Read up to the next end of line, or to where that comment was read from.
+        let upto = kept.map_or(self.pdf.len(), |(_, from)| from);
+        let rest = self.pdf.get(at..upto).unwrap_or_default();
+        let end = match rest.iter().position(|b| matches!(b, b'\n' | b'\r')) {
+            Some(n) => at + n,
+            None => kept.map_or(self.pdf.len(), |(end, _)| end),
+        };
+        self.charge(rest.len().min(end - at))?;
+        self.lines.insert(end, at);
         Ok(end)
+    }
+
+    /// Past the literal string at `at` (a `(`), as the reader reads it; `None` for one that
+    /// doesn't end. A string ending within [`NEAR_STRING`] bytes of its `(` is read again each
+    /// time a reading enters it; one ending further is looked up in [`StringEnds`], found for the
+    /// whole file in three passes (linear, so not charged) the first time one is needed. So each
+    /// time a string is entered costs at most [`NEAR_STRING`] bytes, charged as one.
+    fn string_end(&mut self, at: usize) -> Result<Option<usize>, Unsafe> {
+        self.charge(1)?;
+        if let Ok(end) = string_end(self.pdf, at, at.saturating_add(NEAR_STRING)) {
+            return Ok(Some(end));
+        }
+        if self.strings.is_none() {
+            self.strings = Some(StringEnds::of(self.pdf).ok_or(Unsafe)?);
+        }
+        Ok(self.strings.as_ref().and_then(|s| s.far(at)))
     }
 
     fn mark(&mut self, at: usize) {
@@ -770,6 +884,13 @@ mod tests {
             // reader starting at the run's first `<<` reads it inside the others).
             image(&[&run[..], b"\n", bad].concat()),
             image(&[&run[..], b" /Type /XRef /DecodeParms 9 0 R >> stream\nx\nendstream"].concat()),
+            // Strings in it that end far from their `(` (looked up, not read again): one, one
+            // holding others, one from an escaped `(`, and the same after a flat area of
+            // ` <<(` whose strings never end.
+            image(&[&b"<< /Type /XRef /Pad ("[..], &[b'x'; 200], b") /DecodeParms 9 0 R >> stream\nx\nendstream"].concat()),
+            image(&[&b"<< /Type /XRef /Pad (a (b) "[..], &[b'x'; 200], b" (c (d)) \\) ) /DecodeParms 9 0 R >> stream\nx\nendstream"].concat()),
+            image(&[&b"<< /Type /XRef /Pad \\("[..], &[b'x'; 200], b") /DecodeParms 9 0 R >> stream\nx\nendstream"].concat()),
+            image(&[&b" <<(".repeat(1 << 14)[..], b"\n", bad].concat()),
         ];
         let unread: Vec<_> =
             cases.iter().filter(|bad| !unsafe_file_streams(bad)).map(|bad| String::from_utf8_lossy(&bad[..bad.len().min(80)])).collect();
@@ -788,6 +909,26 @@ mod tests {
             ("string", [&b"%PDF-1.7\n2 0 obj ("[..], &run[..], b") endobj\n"].concat()),
             ("comment", [&b"%PDF-1.7\n% "[..], &run[..], b"\n"].concat()),
         ] {
+            let t = std::time::Instant::now();
+            assert!(!unsafe_file_streams(&pdf), "{what}");
+            let took = t.elapsed();
+            assert!(took < std::time::Duration::from_secs(5), "{what} took {took:?}");
+        }
+    }
+
+    #[test]
+    fn a_flat_area_that_opens_a_string_after_each_dictionary_opens() {
+        // #3924 review: in a flat area of ` <<(` (CMYK or RGBA 32, 60, 60, 40) each `<<` was read
+        // as a dictionary, and each read its never-ending string to 64 KiB past it: the budget
+        // was spent and the file refused. A string ending far from its `(` is now read once.
+        let noise: Vec<u8> = (0u32..1 << 18).map(|i| (i.wrapping_mul(2_654_435_761) >> 24) as u8).collect();
+        for (what, data) in [
+            (" <<(", b" <<(".repeat(1 << 18)),
+            ("\\0<<(", b"\0<<(".repeat(1 << 18)),
+            ("( <<", b"( <<".repeat(1 << 18)),
+            (" <<( then noise", [&b" <<(".repeat(1 << 16)[..], &noise].concat()),
+        ] {
+            let pdf = [format!("1 0 obj << /Length {} >> stream\n", data.len()).as_bytes(), &data[..], b"\nendstream endobj\n"].concat();
             let t = std::time::Instant::now();
             assert!(!unsafe_file_streams(&pdf), "{what}");
             let took = t.elapsed();
