@@ -381,6 +381,9 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
             if let Some(v) = p.get("controlBar").and_then(Value::as_bool) {
                 app.ui.control_bar = v;
             }
+            if let Some(v) = p.get("imageTracePreview").and_then(Value::as_bool) {
+                app.ui.image_trace_preview = v;
+            }
             if p.get("closePanel").is_some() {
                 app.ui.open_panel = None;
             }
@@ -509,6 +512,17 @@ mod tests {
         let (req, _) = ControlRequest::new(method, params);
         let Outcome::Done(r) = handle(app, &egui::Context::default(), &req) else { panic!("expected immediate reply") };
         r
+    }
+
+    #[test]
+    fn ui_set_turns_the_image_trace_preview_off_and_on() {
+        let mut app = VectorcraftApp::new(Session::new(), Services::default());
+        assert!(app.ui.image_trace_preview);
+        for on in [false, true] {
+            let r = input_request(&mut app, "ui.set", json!({"imageTracePreview": on}));
+            assert_eq!(r["ok"], true, "{r}");
+            assert_eq!(app.ui.image_trace_preview, on);
+        }
     }
 
     #[test]

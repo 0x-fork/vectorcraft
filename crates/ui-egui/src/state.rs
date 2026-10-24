@@ -559,6 +559,10 @@ pub struct UiState {
     /// The Image Trace panel's Advanced section is open (as it was last left).
     #[serde(default = "yes")]
     pub image_trace_advanced: bool,
+    /// The Image Trace panel's Preview: a setting changed in the panel traces the selected Image
+    /// Trace object again at once. Off, the changes wait in the panel until Trace applies them.
+    #[serde(default = "yes")]
+    pub image_trace_preview: bool,
     /// Glyphs panel preview step, kept with the other panel choices. `0` is the default 30 pt
     /// cell; `1`..=`7` is a step from smallest to largest (`crates/ui-egui/src/panels/glyphs.rs`).
     #[serde(default, skip_serializing_if = "is_zero_u8")]
@@ -901,6 +905,7 @@ impl Default for UiState {
             layers_panel: Default::default(),
             layers_filter: Default::default(),
             image_trace_advanced: true,
+            image_trace_preview: true,
             glyphs_preview: 0,
             window: None,
         }
