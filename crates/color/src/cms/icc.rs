@@ -419,7 +419,9 @@ pub(crate) fn localized_text_fits(bytes: &[u8]) -> bool {
         for r in 0..records {
             // Each record's header: language, country, length, offset.
             let Some(length) = r.checked_mul(12).and_then(|h| be32(tag, h + 16 + 4)) else { break };
-            total = total.saturating_add(length);
+            // Each record counts its 12-byte header too: records of length 0 are not free, so
+            // many tags pointing at one `mluc` can't make this loop quadratic.
+            total = total.saturating_add(length).saturating_add(12);
             if total > MAX_LOCALIZED_TEXT {
                 return false;
             }
