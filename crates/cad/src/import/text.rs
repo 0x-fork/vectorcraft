@@ -63,13 +63,19 @@ fn until_semicolon(chars: &mut std::iter::Peekable<std::str::Chars<'_>>) -> Stri
 }
 
 /// `\U+XXXX` Unicode escapes (how files before DXF 2007 hold characters outside their code page)
-/// and caret escapes: `^ ` is a caret, `^I` a tab; other control characters are dropped. With
-/// `keep_stacks`, the `^` in an MTEXT stacked fraction `\Snum^den;` is left for the caller.
-fn escapes(s: &str, keep_stacks: bool) -> String {
+/// and caret escapes: `^ ` is a caret, `^I` a tab; other control characters are dropped. In
+/// multiline text (`mtext`) `\\` is an escaped backslash and is kept as is, so that a `U+` after
+/// it stays literal, and the `^` in a stacked fraction `\Snum^den;` is left for the caller.
+fn escapes(s: &str, mtext: bool) -> String {
     let mut out = String::with_capacity(s.len());
     let mut rest = s;
     while let Some(c) = rest.chars().next() {
         let after = rest.get(c.len_utf8()..).unwrap_or("");
+        if mtext && c == '\\' && after.starts_with('\\') {
+            out.push_str("\\\\");
+            rest = after.get(1..).unwrap_or("");
+            continue;
+        }
         if c == '\\'
             && let Some(hex) = after.strip_prefix("U+").or_else(|| after.strip_prefix("u+")).and_then(|h| h.get(..4))
             && hex.bytes().all(|b| b.is_ascii_hexdigit())
@@ -79,7 +85,7 @@ fn escapes(s: &str, keep_stacks: bool) -> String {
             rest = after.get(6..).unwrap_or("");
             continue;
         }
-        if keep_stacks
+        if mtext
             && c == '\\'
             && let Some(tail) = after.strip_prefix('S')
         {
@@ -175,5 +181,7 @@ mod tests {
         assert_eq!(mtext("\\S1^2;").0, "1/2");
         assert_eq!(mtext("\\S+1^-2;^I").0, "+1/-2\t");
         assert_eq!(mtext("trailing\\").0, "trailing\\");
+        assert_eq!(mtext("a\\\\U+0041b").0, "a\\U+0041b", "an escaped backslash is not a Unicode escape");
+        assert_eq!(mtext("a\\U+0041b").0, "aAb");
     }
 }
