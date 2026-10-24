@@ -3,7 +3,8 @@
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{Kind, Limits, Need, catalog};
+use crate::catalog::FeatureId;
+use crate::{Kind, Limits, Need};
 
 pub(crate) const UNTERMINATED_STRING: &str = "unterminatedString";
 pub(crate) const UNTERMINATED_COMMENT: &str = "unterminatedComment";
@@ -34,10 +35,40 @@ pub const PROBLEMS: &[&str] = &[
     TOO_DEEP,
 ];
 
-/// Every id in [`Report::outside`], in the order the report lists them: files written, moved or
-/// deleted; files opened in other apps; network connections; native code; messages to other apps;
-/// environment variables; code the checker can't read; the reference app's preferences changed.
-pub const OUTSIDE: &[&str] = &["filesWritten", "filesOpened", "network", "nativeCode", "otherApps", "environment", "unseenCode", "preferences"];
+/// Declares [`OutsideId`] and [`OUTSIDE`] from one table, in the order the report lists them.
+macro_rules! outside {
+    ($($variant:ident $id:literal,)*) => {
+        /// Something the script does outside the document ([`Outside::id`] is its [`OutsideId::id`]).
+        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+        pub(crate) enum OutsideId {
+            $($variant),*
+        }
+
+        impl OutsideId {
+            pub(crate) fn id(self) -> &'static str {
+                match self {
+                    $(OutsideId::$variant => $id),*
+                }
+            }
+        }
+
+        /// Every id in [`Report::outside`], in the order the report lists them: files written, moved or
+        /// deleted; files opened in other apps; network connections; native code; messages to other apps;
+        /// environment variables; code the checker can't read; the reference app's preferences changed.
+        pub const OUTSIDE: &[&str] = &[$($id),*];
+    };
+}
+
+outside! {
+    FilesWritten "filesWritten",
+    FilesOpened "filesOpened",
+    Network "network",
+    NativeCode "nativeCode",
+    OtherApps "otherApps",
+    Environment "environment",
+    UnseenCode "unseenCode",
+    Preferences "preferences",
+}
 
 /// What [`crate::check`] found in a script. Lists of located things (targets, directives,
 /// includes, problems) give a line and, for an included file, its path (`file`); tallies (features,
@@ -54,7 +85,7 @@ pub struct Report {
     pub targets: Vec<Target>,
     pub directives: Vec<Directive>,
     pub includes: Vec<Include>,
-    /// The platform features used, by id ([`crate::FEATURES`]).
+    /// The platform features used, by id.
     pub features: Vec<Feature>,
     /// The document-model member chains used, as written (`app.activeDocument.layers[].name`, with
     /// `[]` for an index and `()` for a call), a variable assigned from a chain replaced by that
@@ -225,8 +256,8 @@ impl Tally {
 pub(crate) struct Acc<'l> {
     pub limits: &'l Limits,
     pub steps: usize,
-    features: BTreeMap<&'static str, Tally>,
-    outside: BTreeMap<&'static str, (Tally, Vec<&'static str>)>,
+    features: BTreeMap<FeatureId, Tally>,
+    outside: BTreeMap<OutsideId, (Tally, Vec<&'static str>)>,
     menu: BTreeMap<String, Tally>,
     menu_dynamic: usize,
     members: BTreeMap<String, usize>,
@@ -279,12 +310,12 @@ impl<'l> Acc<'l> {
         room
     }
 
-    pub fn feature(&mut self, id: &'static str, line: Option<usize>) {
+    pub fn feature(&mut self, id: FeatureId, line: Option<usize>) {
         let max = self.limits.lines;
         self.features.entry(id).or_default().add(line, max);
     }
 
-    pub fn outside(&mut self, id: &'static str, line: Option<usize>, mode: Option<&'static str>) {
+    pub fn outside(&mut self, id: OutsideId, line: Option<usize>, mode: Option<&'static str>) {
         let max = self.limits.lines;
         let (tally, modes) = self.outside.entry(id).or_default();
         tally.add(line, max);
@@ -385,11 +416,10 @@ impl<'l> Acc<'l> {
         let mut menu_strings: Vec<MenuString> =
             self.menu.into_iter().map(|(value, t)| MenuString { value, count: t.count, lines: t.lines }).collect();
         menu_strings.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.value.cmp(&b.value)));
-        let features: Vec<Feature> = self.features.into_iter().map(|(id, t)| Feature { id, count: t.count, lines: t.lines }).collect();
-        let mut outside: Vec<Outside> =
-            self.outside.into_iter().map(|(id, (t, modes))| Outside { id, count: t.count, lines: t.lines, modes }).collect();
-        outside.sort_by_key(|o| OUTSIDE.iter().position(|id| *id == o.id));
-        let mut needs: BTreeSet<Need> = features.iter().filter_map(|f| catalog::need(f.id)).collect();
+        let mut needs: BTreeSet<Need> = self.features.keys().map(|id| id.need()).collect();
+        let features: Vec<Feature> = self.features.into_iter().map(|(id, t)| Feature { id: id.id(), count: t.count, lines: t.lines }).collect();
+        let outside: Vec<Outside> =
+            self.outside.into_iter().map(|(id, (t, modes))| Outside { id: id.id(), count: t.count, lines: t.lines, modes }).collect();
         if !members.is_empty() || !types.is_empty() {
             needs.insert(Need::Dom);
         }
