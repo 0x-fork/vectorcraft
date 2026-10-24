@@ -537,6 +537,10 @@ pub struct Renderer {
     /// at the start of every frame.
     offscreen_live: u64,
     offscreen_budget: u64,
+    /// Objects the symbol instances drawn in this frame held, together ([`vectorcraft_doc::MAX_SYMBOL_NODES`]).
+    symbol_nodes: u64,
+    /// Groups drawn twice (blending with their backdrop) that hold what is being drawn.
+    twice_drawn: u32,
     /// What clipping paths paint, per clipping path (see [`Self::clip_paint_of`]).
     clip_paints: FrameCache<usize, ClipPaintEntry>,
     /// Gradients along or across strokes (see [`Self::fill_path_gradient`]), keyed by
@@ -665,6 +669,8 @@ impl Renderer {
             picture: None,
             offscreen_live: 0,
             offscreen_budget: 0,
+            symbol_nodes: 0,
+            twice_drawn: 0,
             clip_paints: FrameCache::new(lru::CLIP_BUDGET, 256),
             stroke_slices: PtrMap::default(),
             adjusts: HashMap::new(),
@@ -751,6 +757,8 @@ impl Renderer {
         self.inline_depth = 0;
         // Nothing is drawn offscreen yet (even if an earlier frame stopped part way).
         (self.offscreen_live, self.offscreen_budget) = (0, 0);
+        self.symbol_nodes = 0;
+        self.twice_drawn = 0;
     }
 
     /// End a frame: drop cache entries not used for a few frames (every render, thumbnails too,
@@ -1339,9 +1347,13 @@ impl Renderer {
                 let bp = self.outline_path(f, n).unwrap_or_else(|| Arc::new(path.to_bezpath()));
                 if *guide {
                     let ([r, g, b], dots) = f.opts.guide;
-                    if dots {
-                        let mut screen = BezPath::clone(&bp);
-                        screen.apply_affine(f.view);
+                    let mut screen = BezPath::clone(&bp);
+                    screen.apply_affine(f.view);
+                    // The rasterizer makes every dash of the whole path before clipping: a guide
+                    // running far off screen (from a file) asked for millions of them. Past
+                    // [`MAX_GUIDE_DASHES`] (by its control polygon, which is at least as long) it
+                    // is drawn solid.
+                    if dots && polygon_length(&screen) / 4.0 <= MAX_GUIDE_DASHES {
                         ctx.set_transform(Affine::IDENTITY);
                         ctx.set_stroke(kurbo::Stroke::new(1.5).with_dashes(0.0, [1.5, 2.5]));
                         ctx.set_paint(f.ink.fixed([r, g, b, 255]));
@@ -1368,7 +1380,9 @@ impl Renderer {
             NodeKind::Text(t) => self.draw_text(ctx, f, n, t),
             NodeKind::Image(im) => self.draw_image(ctx, f, im),
             NodeKind::SymbolInstance { symbol, xf } => {
-                if let Some(sym) = f.doc.symbols.iter().find(|s| &s.name == symbol) {
+                if let Some(sym) = f.doc.symbols.iter().find(|s| &s.name == symbol)
+                    && self.charge_symbol(&sym.art)
+                {
                     let (art, kept) = self.placed_art(&sym.art, *xf, false, Some(n));
                     self.draw_placed_art(ctx, f, &art, kept);
                 }
@@ -1383,6 +1397,13 @@ impl Renderer {
                 None => self.draw_live_node(ctx, f, n),
             },
         }
+    }
+
+    /// Count symbol art `art`'s objects against the frame's [`vectorcraft_doc::MAX_SYMBOL_NODES`]: `false` (the
+    /// instance isn't drawn) once they would pass it.
+    fn charge_symbol(&mut self, art: &Node) -> bool {
+        let total = self.symbol_nodes.saturating_add(art.count() as u64);
+        (total <= vectorcraft_doc::MAX_SYMBOL_NODES).then(|| self.symbol_nodes = total).is_some()
     }
 
     /// Draw symbol art `art` as [`Self::placed_art`] placed it for an instance or an inline graphic
@@ -2378,6 +2399,33 @@ fn stain_bits(stain: Option<(vectorcraft_color::Color, f32)>) -> [u32; 6] {
 
 /// Preferred rasterizer thread count set by the app (Preferences → Performance); negative = automatic.
 static THREADS_OVERRIDE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+/// Most dashes a dotted guide is drawn with (1.5 on, 2.5 off on screen); a longer one is solid.
+const MAX_GUIDE_DASHES: f64 = 100_000.0;
+
+/// The length of `p`'s control polygon: at least its own length (infinite when a point is).
+fn polygon_length(p: &BezPath) -> f64 {
+    let (mut last, mut len): (Option<kurbo::Point>, f64) = (None, 0.0);
+    for el in p.elements() {
+        let points = match *el {
+            kurbo::PathEl::MoveTo(q) => {
+                last = Some(q);
+                continue;
+            }
+            kurbo::PathEl::LineTo(q) => [Some(q), None, None],
+            kurbo::PathEl::QuadTo(a, b) => [Some(a), Some(b), None],
+            kurbo::PathEl::CurveTo(a, b, c) => [Some(a), Some(b), Some(c)],
+            kurbo::PathEl::ClosePath => continue,
+        };
+        for q in points.into_iter().flatten() {
+            if let Some(l) = last {
+                len += l.distance(q);
+            }
+            last = Some(q);
+        }
+    }
+    if len.is_nan() { f64::INFINITY } else { len }
+}
 
 /// Override the worker-thread count used by renderers created from now on (`None` = automatic).
 pub fn set_default_threads(n: Option<u16>) {
