@@ -11,6 +11,7 @@
 //! stroke only, open). Everything else in the document sees a plain group of paths, so rendering,
 //! export, transforms and undo need no special cases.
 
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError};
 
@@ -135,23 +136,33 @@ pub fn live_paint_at(doc: &Document, p: Point) -> Option<NodeId> {
 }
 
 /// Paths, compound paths (as one shape) of a subtree in paint order; guides, clipping paths and
-/// hidden objects are skipped. Live Paint groups contribute their faces.
+/// hidden objects are skipped. Live Paint groups contribute their faces and edges.
 pub fn leaf_shapes<'a>(n: &'a Node, out: &mut Vec<&'a Node>) {
+    collect_leaves(n, false, out);
+}
+
+/// [`leaf_shapes`]; with `filled_faces`, a Live Paint group contributes only its filled faces and
+/// its stroked edges.
+fn collect_leaves<'a>(n: &'a Node, filled_faces: bool, out: &mut Vec<&'a Node>) {
     if !n.visible {
         return;
     }
     if n.extras().shaper.is_some() {
         for c in n.children().into_iter().flatten().skip(1) {
-            leaf_shapes(c, out);
+            collect_leaves(c, filled_faces, out);
         }
         return;
     }
     match &n.kind {
         NodeKind::Path { guide: true, .. } | NodeKind::Path { clipping: true, .. } => {}
         NodeKind::Path { .. } | NodeKind::Compound { .. } => out.push(n),
+        NodeKind::Group { .. } if filled_faces && is_live_paint(n) => {
+            out.extend(faces(n).into_iter().filter(|f| f.visible && !f.appearance.fill_paint().is_none()).map(|f| &**f));
+            out.extend(edges(n).into_iter().filter(|e| e.visible && !e.appearance.stroke_paint().is_none()).map(|e| &**e));
+        }
         NodeKind::Group { children, .. } | NodeKind::Layer { children, .. } => {
             for c in children {
-                leaf_shapes(c, out);
+                collect_leaves(c, filled_faces, out);
             }
         }
         _ => {}
@@ -197,10 +208,16 @@ pub fn drawn_outlines(doc: &Document, leaves: &[&Node]) -> Vec<PathData> {
 /// Pathfinder shapes for the given roots (back → front by the order given), keyed by leaf index,
 /// with the leaves they came from.
 pub fn shapes_for<'a>(doc: &'a Document, roots: &[NodeId]) -> (Vec<po::Shape>, Vec<&'a Node>) {
+    shapes_of(doc, roots, false)
+}
+
+/// [`shapes_for`]; with `filled_faces`, a Live Paint group contributes only its filled faces and
+/// its stroked edges.
+fn shapes_of<'a>(doc: &'a Document, roots: &[NodeId], filled_faces: bool) -> (Vec<po::Shape>, Vec<&'a Node>) {
     let mut lv = vec![];
     for id in roots {
         if let Some(n) = doc.node(*id) {
-            leaf_shapes(n, &mut lv);
+            collect_leaves(n, filled_faces, &mut lv);
         }
     }
     let mut shapes = vec![];
@@ -220,10 +237,18 @@ pub fn shapes_for<'a>(doc: &'a Document, roots: &[NodeId]) -> (Vec<po::Shape>, V
 /// Shape Builder inputs: [`shapes_for`], with the open subpaths of filled paths closed where that
 /// encloses an area (the fill bounds a region, as if an invisible edge closed it) when
 /// `open_filled_as_closed`. Unfilled open paths and straight lines stay open and cut the regions
-/// they cross, and so do filled open paths without `open_filled_as_closed`.
+/// they cross, and so do filled open paths without `open_filled_as_closed`. A Live Paint group
+/// contributes its filled faces as shapes and its stroked edges as open lines; its unfilled faces
+/// and its edges without a stroke are left out.
 fn shape_builder_shapes<'a>(doc: &'a Document, roots: &[NodeId], open_filled_as_closed: bool) -> (Vec<po::Shape>, Vec<&'a Node>) {
-    let (mut shapes, leaves) = shapes_for(doc, roots);
+    let (mut shapes, leaves) = shapes_of(doc, roots, true);
     for (s, l) in shapes.iter_mut().zip(&leaves) {
+        if named(l, EDGE_NAME) && doc.parent_of(l.id).and_then(|p| doc.node(p)).is_some_and(is_live_paint) {
+            // A closed edge opens at its first anchor and keeps its closing segment.
+            let start = BTreeSet::from([0]);
+            s.path.subpaths = s.path.subpaths.iter().flat_map(|sp| sp.cut_at(&start)).collect();
+            continue;
+        }
         if !open_filled_as_closed || l.appearance.fill_paint().is_none() {
             continue;
         }

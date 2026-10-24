@@ -2100,6 +2100,105 @@ fn a_line_across_a_live_paint_shape_splits_its_face() {
     assert_eq!(face(80.0), Paint::solid(Color::from_hex("#0000ff").unwrap()));
 }
 
+/// The total length of the stroked paths among `out` that have no fill.
+fn stroked_length(s: &Session, out: &[NodeId]) -> f64 {
+    out.iter()
+        .map(|i| node(s, *i))
+        .filter(|n| n.appearance.fill_paint().is_none() && !n.appearance.stroke_paint().is_none())
+        .map(|n| outline(&n).0.length())
+        .sum()
+}
+
+/// The Shape Builder takes a selected Live Paint group's filled faces as regions and its stroked
+/// edges as lines; its unfilled faces are not regions. The merge replaces the group as it does a
+/// path, and the edges keep their strokes, except those between the merged faces.
+#[test]
+fn shape_builder_uses_the_filled_faces_of_a_live_paint_group() {
+    let mut s = session();
+    let g = live(&mut s);
+    s.execute("livePaint.fill", &json!({"group": g.0, "point": [125, 50], "none": true})).unwrap();
+    let edges = vectorcraft_tools::builder::edges(&node(&s, g)).len();
+    let c = rect(&mut s, 160.0, 20.0, 100.0, 20.0);
+    set_fill(&mut s, c, Color::rgb(0.0, 1.0, 0.0));
+    s.execute("select.set", &json!({"ids": [g.0, c.0]})).unwrap();
+    let map = s.execute("shapeBuilder.regions", &json!({})).unwrap();
+    let r = s.execute("shapeBuilder.merge", &json!({"points": [[25, 50], [75, 50]]})).unwrap();
+    let out = ids(&r);
+    let unfilled_faces =
+        out.iter().map(|i| node(&s, *i)).filter(|n| n.appearance.fill_paint().is_none() && n.appearance.stroke_paint().is_none()).count();
+    assert_eq!(
+        (map["regions"].as_array().unwrap().len(), map["lines"].as_array().unwrap().len() >= edges, unfilled_faces),
+        (4, true, 0),
+        "the two faces, the rectangle and the area the edges enclose; the edges as lines; no unfilled face comes back"
+    );
+    let enclosed: Vec<&Value> = map["regions"].as_array().unwrap().iter().filter(|r| r["sources"].as_array().unwrap().is_empty()).collect();
+    assert_eq!(enclosed.len(), 1, "{map}");
+    let bounds: Vec<f64> = enclosed[0]["bounds"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+    assert!(bounds.iter().zip([100.0, 0.0, 150.0, 100.0]).all(|(a, b)| (a - b).abs() < 0.5), "{bounds:?}");
+    assert_eq!(r["regions"], 2);
+    let merged = NodeId(r["merged"].as_u64().unwrap());
+    assert!((area(&s, merged) - 10000.0).abs() < 1.0, "{}", area(&s, merged));
+    assert!(s.doc().unwrap().doc.node(g).is_none());
+    // The outline of 0..150 × 0..100 and the edge at x = 100 keep their strokes; the edge at x = 50
+    // between the merged faces is removed.
+    assert!((stroked_length(&s, &out) - 600.0).abs() < 1.0, "{}", stroked_length(&s, &out));
+}
+
+/// An edge that closes on itself is a line around its face, not a second shape over it.
+#[test]
+fn shape_builder_takes_a_closed_live_paint_edge_as_a_line() {
+    let mut s = session();
+    let a = rect(&mut s, 0.0, 0.0, 100.0, 100.0);
+    set_fill(&mut s, a, Color::rgb(1.0, 0.0, 0.0));
+    s.execute("select.set", &json!({"ids": [a.0]})).unwrap();
+    let g = NodeId(s.execute("livePaint.make", &json!({})).unwrap()["id"].as_u64().unwrap());
+    let group = node(&s, g);
+    let edges = vectorcraft_tools::builder::edges(&group);
+    assert_eq!(edges.len(), 1);
+    assert!(outline(edges[0]).0.subpaths.iter().any(|sp| sp.closed), "the edge closes on itself");
+    s.execute("select.set", &json!({"ids": [g.0]})).unwrap();
+    // A click on the face keeps its fill on the merged shape and the edge's stroke around it.
+    let r = s.execute("shapeBuilder.merge", &json!({"points": [[50, 50]]})).unwrap();
+    let out = ids(&r);
+    let merged = node(&s, NodeId(r["merged"].as_u64().unwrap()));
+    assert_eq!(merged.appearance.fill_paint(), Paint::solid(Color::rgb(1.0, 0.0, 0.0)));
+    assert!((stroked_length(&s, &out) - 400.0).abs() < 1.0, "{}", stroked_length(&s, &out));
+    s.execute("edit.undo", &json!({})).unwrap();
+    s.execute("select.set", &json!({"ids": [g.0]})).unwrap();
+    let map = s.execute("shapeBuilder.regions", &json!({})).unwrap();
+    let regions = map["regions"].as_array().unwrap();
+    assert_eq!((regions.len(), map["lines"].as_array().unwrap().len()), (1, 1), "{map}");
+    assert_eq!(regions[0]["sources"].as_array().unwrap().len(), 1, "{map}");
+    // Unfilled, the face is not a region, and the edge still encloses all of it, closing segment
+    // included.
+    s.execute("livePaint.fill", &json!({"group": g.0, "point": [50, 50], "none": true})).unwrap();
+    s.execute("select.set", &json!({"ids": [g.0]})).unwrap();
+    let map = s.execute("shapeBuilder.regions", &json!({})).unwrap();
+    let regions = map["regions"].as_array().unwrap();
+    assert_eq!(regions.len(), 1, "{map}");
+    assert!(regions[0]["sources"].as_array().unwrap().is_empty(), "{map}");
+    assert!((regions[0]["area"].as_f64().unwrap() - 10000.0).abs() < 1.0, "{map}");
+}
+
+/// A Live Paint group with no filled face keeps its stroked edges when another selected object is
+/// merged.
+#[test]
+fn shape_builder_keeps_the_edges_of_an_unfilled_live_paint_group() {
+    let mut s = session();
+    let g = live(&mut s);
+    for x in [25, 75, 125] {
+        s.execute("livePaint.fill", &json!({"group": g.0, "point": [x, 50], "none": true})).unwrap();
+    }
+    let c = rect(&mut s, 160.0, 20.0, 100.0, 20.0);
+    set_fill(&mut s, c, Color::rgb(0.0, 1.0, 0.0));
+    s.execute("select.set", &json!({"ids": [g.0, c.0]})).unwrap();
+    let r = s.execute("shapeBuilder.merge", &json!({"points": [[200, 30]]})).unwrap();
+    let out = ids(&r);
+    assert!(s.doc().unwrap().doc.node(g).is_none());
+    // Every edge of the group: the outline of 0..150 × 0..100 and the edges at x = 50 and 100.
+    assert!((stroked_length(&s, &out) - 700.0).abs() < 1.0, "{}", stroked_length(&s, &out));
+}
+
 // ---------- Image Trace ----------
 
 /// A 100×100 image with a black disc (r = 30 px), placed at (50, 50) scaled ×2.
