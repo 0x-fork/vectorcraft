@@ -56,6 +56,9 @@ pub struct GestureTool {
     shift_raw: Vec<Point>,
     /// Where the pointer was for the Shift-constrained point the next [`Self::push`] adds.
     shift_next: Option<Point>,
+    /// The angle of the line the dragged points were last moved onto: while it holds they are on
+    /// it, and the next drag event need not move them again.
+    shift_line: Option<f64>,
     /// "Merge only with selection": a Blob Brush stroke merges only with selected paths.
     pub merge_only_selection: bool,
     /// "Edit selected paths within N pixels".
@@ -98,6 +101,7 @@ impl GestureTool {
             straight: false,
             shift_raw: vec![],
             shift_next: None,
+            shift_line: None,
             merge_only_selection: false,
             edit_within: 12.0,
             close_within: 15.0,
@@ -143,6 +147,7 @@ impl GestureTool {
         }
         let Some(&start) = self.points.first().filter(|_| self.id == "blobBrush" && m.shift) else {
             self.shift_raw.clear();
+            self.shift_line = None;
             return p;
         };
         self.shift_next = Some(p);
@@ -154,8 +159,11 @@ impl GestureTool {
         // `line` is the line's angle, measured counterclockwise on screen as the Constrain Angle is measured.
         let line = (-d.y).atan2(d.x).to_degrees();
         let on_line = |q: Point| start + vectorcraft_geom::constrain_angle_from(q - start, 180.0, line);
-        for (q, raw) in self.points.iter_mut().skip(1).rev().zip(self.shift_raw.iter().rev()) {
-            *q = on_line(*raw);
+        if self.shift_line != Some(line) {
+            for (q, raw) in self.points.iter_mut().skip(1).rev().zip(self.shift_raw.iter().rev()) {
+                *q = on_line(*raw);
+            }
+            self.shift_line = Some(line);
         }
         on_line(p)
     }
@@ -165,6 +173,7 @@ impl GestureTool {
         self.points.clear();
         self.pressures.clear();
         self.previewed = 0;
+        self.shift_line = None;
     }
 
     /// The stroke's points, each `[x, y, pressure]` when a pen pressed less than fully anywhere

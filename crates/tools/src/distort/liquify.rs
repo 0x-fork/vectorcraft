@@ -841,6 +841,10 @@ impl Tool for LiquifyTool {
         self.held = self.held.clamp(0.0, HOLD_EVERY);
         let Some(&last) = self.points.last().filter(|_| n > 0) else { return vec![] };
         let room = crate::MAX_STROKE_SAMPLES.saturating_sub(self.points.len());
+        // A full stroke takes no sample: the preview it already has stands.
+        if room == 0 {
+            return vec![];
+        }
         self.points.extend(std::iter::repeat_n(last, (n as usize).min(room)));
         self.preview(cx)
     }

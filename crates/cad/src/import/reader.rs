@@ -439,13 +439,15 @@ fn layouts(objects: &[Record<'_>], block_records: &HashMap<String, String>, enti
             continue;
         }
         let Some(block) = block else { continue };
-        if !seen.insert(name.to_ascii_lowercase()) {
+        let key = name.to_ascii_lowercase();
+        let cost = name.len() + block.len();
+        // A layout past the allowance is skipped alone: a later short one is still offered, and a
+        // skipped one reserves neither its name nor its bytes.
+        if seen.contains(&key) || name_bytes.saturating_add(cost) > MAX_LAYOUT_NAME_BYTES {
             continue;
         }
-        name_bytes = name_bytes.saturating_add(name.len() + block.len());
-        if name_bytes > MAX_LAYOUT_NAME_BYTES {
-            break;
-        }
+        seen.insert(key);
+        name_bytes += cost;
         paper.push((own.int_or(71, i64::MAX), LayoutDef { name: name.to_string(), block: Some(block.clone()) }));
     }
     paper.sort_by_key(|(order, _)| *order);
