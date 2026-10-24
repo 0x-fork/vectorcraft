@@ -743,6 +743,64 @@ fn brush_art_of_copies_draws_symbol_brush_and_stroke_edits() {
     });
 }
 
+/// A path stroked with scatter brush `Dots`, whose art is an instance of symbol `Dot` (a blue
+/// square) and a square painted with pattern `Fill` (a green square). After a frame, the next one
+/// draws as a new renderer does when the art of `Dot` or `Fill` starts or stops drawing a brushed
+/// stroke, which decides whether the brush art shows that instance or that pattern.
+#[test]
+fn brush_art_draws_edits_of_the_symbols_and_patterns_it_shows() {
+    let _fonts = fonts_steady();
+    use vectorcraft_brush::{Brush, BrushKind, Scatter};
+    use vectorcraft_doc::pattern::{PatternDef, pattern_paint};
+    use vectorcraft_geom::shapes::{line, rectangle};
+    let square = |d: &mut Document, paint: Paint| filled(d, rectangle(Rect::new(-4.0, -4.0, 4.0, 4.0)), paint, vec![]);
+    // A square painted `paint`, with a brushed line beside it when `brushed`.
+    let art = |d: &mut Document, paint: Paint, brushed: bool| {
+        let mut members = vec![Arc::new(square(d, paint))];
+        if brushed {
+            members.push(Arc::new(brushed_line(d)));
+        }
+        Node::group(d.alloc_id(), members)
+    };
+    let doc = |dot_brushed: bool, fill_brushed: bool| {
+        let mut d = Document::new(200.0, 100.0);
+        let dot = art(&mut d, Paint::solid(Color::rgb(0.0, 0.0, 1.0)), dot_brushed);
+        d.symbols.push(vectorcraft_doc::Symbol { name: "Dot".into(), art: Arc::new(dot) });
+        let fill = art(&mut d, Paint::solid(Color::rgb(0.0, 0.6, 0.0)), fill_brushed);
+        let mut def = PatternDef::new("Fill", vec![Arc::new(fill)]);
+        def.tile = Rect::new(-6.0, -6.0, 6.0, 6.0);
+        d.patterns.push(def);
+        let id = d.alloc_id();
+        let instance = Node::new(id, NodeKind::SymbolInstance { symbol: "Dot".into(), xf: Affine::translate((0.0, -8.0)) });
+        let mut painted = square(&mut d, pattern_paint("Fill"));
+        painted.transform(Affine::translate((0.0, 8.0)), true);
+        let scatter = Node::group(d.alloc_id(), vec![Arc::new(instance), Arc::new(painted)]);
+        let mut lib = vectorcraft_brush::library(&d);
+        lib.push(Brush { name: "Dots".into(), kind: BrushKind::Scatter(Scatter { art: scatter, spacing: (150.0, 150.0), ..Default::default() }) });
+        vectorcraft_brush::store(&mut d, &lib);
+        let mut ap = vectorcraft_doc::Appearance::basic(Paint::None, Paint::solid(Color::BLACK), 1.0);
+        if let Some(s) = ap.stroke_mut() {
+            s.brush = Some("Dots".into());
+        }
+        let path = Node::path(d.alloc_id(), line((20.0, 50.0).into(), (180.0, 50.0).into()), ap);
+        let l = d.layers[0].id;
+        d.insert(Some(l), usize::MAX, path).unwrap();
+        d
+    };
+    for brushed in [false, true] {
+        edit_draws_as_new(doc(brushed, false), |d| {
+            let dot = art(d, Paint::solid(Color::rgb(0.0, 0.0, 1.0)), !brushed);
+            d.symbols[0].art = Arc::new(dot);
+        });
+        edit_draws_as_new(doc(false, brushed), |d| {
+            let fill = art(d, Paint::solid(Color::rgb(0.0, 0.6, 0.0)), !brushed);
+            if let Some(def) = d.pattern_mut("Fill") {
+                def.art = vec![Arc::new(fill)];
+            }
+        });
+    }
+}
+
 /// A path of the document and an instance of symbol `Wave` (a group holding another path) are
 /// stroked with scatter brush `Bent`, whose art is an arc envelope around a green band: the second
 /// frame evaluates none of the envelopes in their brush art again, and draws what the first drew

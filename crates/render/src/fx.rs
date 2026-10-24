@@ -977,6 +977,11 @@ impl Reads {
         self.plugins || self.symbols || self.patterns
     }
 
+    /// Does the content show symbol or pattern art?
+    pub(crate) fn shows_definitions(self) -> bool {
+        self.symbols || self.patterns
+    }
+
     fn add(&mut self, n: &Node) {
         let pattern = |p: &vectorcraft_color::Paint| matches!(p, vectorcraft_color::Paint::Pattern { .. });
         n.walk(&mut |c| {

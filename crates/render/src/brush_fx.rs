@@ -6,13 +6,16 @@
 //! any of them regenerate the art and nothing else does. The copies of an object that share its id
 //! (symbol instances, inline graphics, repeat copies) have their own paths, so each keeps its own
 //! pieces. The pieces keep their `Arc`s while they are cached, so their stroke outlines, live-effect
-//! geometry and the evaluations of live objects come from the renderer's caches too.
+//! geometry and the evaluations of live objects come from the renderer's caches too. Brush art
+//! leaves out the symbol instances and pattern paints whose art draws a brushed stroke, so when
+//! the art of a symbol or pattern changes, the pieces of brushes and strokes that can show one are
+//! made again.
 
 use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
-use vectorcraft_brush::Brush;
+use vectorcraft_brush::{Brush, BrushKind};
 use vectorcraft_doc::{AppearanceItem, Document, Node, NodeKind, StrokeLayer, SymbolBoxes};
 use vectorcraft_geom::{BezPath, PathEl, Point, Rect};
 use vello_cpu::RenderContext;
@@ -25,6 +28,27 @@ pub(crate) struct Entry {
     stroke: StrokeLayer,
     brush: Arc<Brush>,
     pieces: Arc<Vec<Arc<Node>>>,
+    /// Can the pieces show symbol or pattern art ([`shows_definitions`])?
+    definitions: bool,
+}
+
+/// Can the brush art of `brush` along a stroke `st` show symbol or pattern art: does the stroke
+/// paint with a pattern, or does the brush's own art show a symbol or a pattern?
+fn shows_definitions(brush: &Brush, st: &StrokeLayer) -> bool {
+    let art: Vec<&Node> = match &brush.kind {
+        BrushKind::Art(a) => vec![&a.art],
+        BrushKind::Scatter(s) => vec![&s.art],
+        BrushKind::Pattern(p) => {
+            [Some(&p.side), p.outer_corner.as_ref(), p.inner_corner.as_ref(), p.start.as_ref(), p.end.as_ref()].into_iter().flatten().collect()
+        }
+        BrushKind::Calligraphic(_) | BrushKind::Bristle(_) => vec![],
+    };
+    matches!(st.paint, vectorcraft_color::Paint::Pattern { .. }) || crate::fx::Reads::of_all(art.into_iter()).shows_definitions()
+}
+
+/// The art of `doc`'s patterns and symbols, in order.
+fn definitions(doc: &Document) -> impl Iterator<Item = &Arc<Node>> {
+    doc.patterns.iter().flat_map(|p| &p.art).chain(doc.symbols.iter().map(|s| &s.art))
 }
 
 /// Parsed brush library and generated brush art.
@@ -37,6 +61,9 @@ pub(crate) struct BrushCache {
     /// (frame stamp, document address) the library was last validated for.
     checked: (u64, usize),
     lib: HashMap<String, Arc<Brush>>,
+    /// The art of the document's patterns and symbols ([`definitions`]) when the library was last
+    /// validated, held weakly as the pattern tiles hold theirs.
+    definitions: Vec<Weak<Node>>,
     /// Brush art per (node id, stroke item index, [`path_key`] of the stroked path).
     pub(crate) entries: FrameCache<(u64, usize, u64), Entry>,
     /// How many times [`Renderer::draw_brush`] made brush art.
@@ -51,6 +78,7 @@ impl Default for BrushCache {
             key: 0,
             checked: (0, 0),
             lib: HashMap::new(),
+            definitions: Vec::new(),
             entries: FrameCache::new(lru::BRUSH_BUDGET, 512),
             #[cfg(test)]
             made: 0,
@@ -65,6 +93,10 @@ impl BrushCache {
             return;
         }
         self.checked = key;
+        if !self.definitions.iter().map(Weak::as_ptr).eq(definitions(doc).map(Arc::as_ptr)) {
+            self.definitions = definitions(doc).map(Arc::downgrade).collect();
+            self.entries.retain(|e| !e.definitions);
+        }
         let cur = doc.unknown.get(vectorcraft_brush::DOC_KEY);
         if self.src.as_ref().is_some_and(|s| s.as_ref() == cur) {
             return;
@@ -149,8 +181,9 @@ impl Renderer {
                 let pieces: Arc<Vec<Arc<Node>>> =
                     Arc::new(vectorcraft_brush::stroke_pieces(f.doc, &brush, bp, st).into_iter().map(Arc::new).collect());
                 let bytes = size_of::<Entry>() + lru::path_bytes(bp) + pieces.iter().map(|p| lru::node_bytes(p)).sum::<usize>();
-                let kept =
-                    self.brushes.entries.insert(key, Entry { path: bp.clone(), stroke: st.clone(), brush, pieces: pieces.clone() }, bytes, stamp);
+                let definitions = shows_definitions(&brush, st);
+                let entry = Entry { path: bp.clone(), stroke: st.clone(), brush, pieces: pieces.clone(), definitions };
+                let kept = self.brushes.entries.insert(key, entry, bytes, stamp);
                 (pieces, kept)
             }
         };
