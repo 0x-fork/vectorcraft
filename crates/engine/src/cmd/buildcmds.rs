@@ -354,7 +354,7 @@ fn sb_merge(s: &mut Session, p: &Value) -> Result<Value> {
         for (i, (sh, leaf)) in map.shapes.iter().zip(&leaves).enumerate() {
             let pieces: Vec<usize> = map.lines.iter().enumerate().filter(|(_, (l, _))| l.key == i as u64).map(|(k, _)| k).collect();
             if !pieces.is_empty() {
-                // An open path loses the pieces deleted and those between merged (or deleted) regions.
+                // An open path loses the pieces deleted and those between two merged (or deleted) regions.
                 let keep: Vec<usize> =
                     pieces.iter().copied().filter(|k| !touched.lines.contains(k) && !map.line_between(*k, &touched.regions)).collect();
                 if keep.len() == pieces.len() {
