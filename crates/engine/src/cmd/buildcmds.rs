@@ -58,7 +58,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Make",
             ["Object", "Live Paint"],
             Some("Cmd+Alt+X"),
-            "{ids?|id?} build a Live Paint group from the selected paths; with a Live Paint group among them, add the others to it as livePaint.merge does → {id, faces, edges}",
+            "{ids?|id?} build a Live Paint group from the selected paths (paths, compound paths and groups of them; type, images and other objects are refused, nothing changes); with a Live Paint group among them, add the others to it as livePaint.merge does → {id, faces, edges}",
             has_selection_or_ids,
             lp_make
         ),
@@ -67,7 +67,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Merge",
             ["Object", "Live Paint"],
             None,
-            "{ids?|id?} add the other selected paths (and Live Paint groups) to the bottom-most Live Paint group, keeping its id, its paint and its own properties (name, lock, visibility, transparency, appearance, opacity mask, graphic style link) → {id, faces, edges}",
+            "{ids?|id?} add the other selected paths (compound paths, groups of paths and Live Paint groups too; type, images and other objects are refused, nothing changes) to the bottom-most Live Paint group, keeping its id, its paint and its own properties (name, lock, visibility, transparency, appearance, opacity mask, graphic style link) → {id, faces, edges}",
             has_multi_or_ids,
             lp_merge
         ),
@@ -609,9 +609,24 @@ fn merged_gap_options(groups: &[GapOptions]) -> GapOptions {
     if !bottom.detect && groups.iter().any(|g| g.detect) { GapOptions { detect: true, size: GapSize::Small, ..bottom } } else { bottom }
 }
 
+/// Refuse `roots` when one of them is something Live Paint can't take ([`b::live_paint_takes`]):
+/// its faces and edges come from path outlines alone, so type or an image would vanish among the
+/// group's hidden sources. Checked before anything changes.
+fn check_live_paint_takes(d: &Document, roots: &[NodeId]) -> Result<()> {
+    for r in roots {
+        if !b::live_paint_takes(d.node(*r).ok_or(EngineError::NoNode(*r))?) {
+            return Err(EngineError::Other(
+                "Live Paint takes paths and compound paths: convert type, images and other objects to paths first".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Make a Live Paint group from `roots`, or add them to the first Live Paint group among them
 /// as Merge does; returns (group, faces, edges).
 fn make_live(d: &mut Document, sel: &mut Selection, roots: &[NodeId]) -> Result<(NodeId, usize, usize)> {
+    check_live_paint_takes(d, roots)?;
     if roots.iter().any(|r| d.node(*r).is_some_and(is_live_paint)) {
         return merge_live(d, sel, roots);
     }
@@ -644,6 +659,7 @@ fn merge_live(d: &mut Document, sel: &mut Selection, roots: &[NodeId]) -> Result
         .copied()
         .find(|r| d.node(*r).is_some_and(is_live_paint))
         .ok_or_else(|| EngineError::Other("Live Paint Merge: select a Live Paint group and the paths to add".into()))?;
+    check_live_paint_takes(d, roots)?;
     let old = d.node(target).cloned().ok_or(EngineError::NoNode(target))?;
     // Paint to carry over: (point inside face, fill) and (point on edge, stroke).
     let keep_faces: Vec<(Point, Paint)> = b::faces(&old)

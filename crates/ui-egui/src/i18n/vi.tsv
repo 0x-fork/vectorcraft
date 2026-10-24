@@ -4351,6 +4351,7 @@ theme	Appearance	Giao diện
 @msg	layers can't be wrap objects	lớp không thể là đối tượng bọc
 @msg	linked pictures show the low-resolution preview saved in the file until their files are found: relink them in the Links panel	ảnh liên kết hiển thị bản xem trước độ phân giải thấp đã lưu trong tệp cho đến khi tìm thấy tệp gốc: liên kết lại trong bảng Liên kết
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Hợp nhất tô trực tiếp: chọn nhóm tô trực tiếp và các đường dẫn để thêm
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	Tô trực tiếp nhận đường dẫn và đường dẫn phức: hãy chuyển văn bản, hình ảnh và các đối tượng khác thành đường dẫn trước
 @msg	Live Paint: select paths or compound paths	Tô trực tiếp: chọn đường dẫn hoặc đường dẫn phức
 @msg	Live Paint: these paths are too degenerate to paint	Tô trực tiếp: các đường dẫn này quá suy biến để tô
 @msg	Loading VectorCraft…	Đang tải VectorCraft…

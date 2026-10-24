@@ -1581,6 +1581,50 @@ fn live_paint_merge_keeps_paint_and_adds_faces() {
     assert_eq!(layer_children(&s), 1);
 }
 
+/// Live Paint builds its faces and edges from path outlines alone, so Merge, Make and the Live
+/// Paint Bucket refuse type, an image, or a group holding type: before, they went into the
+/// group's hidden sources and vanished from the canvas. Nothing changes, not even the undo
+/// history. Paths, and groups of paths, still merge.
+#[test]
+fn live_paint_refuses_type_and_images_and_changes_nothing() {
+    let mut s = session();
+    let g = live(&mut s);
+    let text = NodeId(s.execute("text.create", &json!({"x": 200, "y": 300, "text": "Hi"})).unwrap()["id"].as_u64().unwrap());
+    let image = add_image(&mut s, &vectorcraft_trace::Raster::from_fn(4, 4, |_, _| [0, 0, 0, 255]), Affine::translate((300.0, 300.0)));
+    let path = rect(&mut s, 400.0, 20.0, 40.0, 40.0);
+    s.execute("select.set", &json!({"ids": [text.0, path.0]})).unwrap();
+    let text_group = NodeId(s.execute("object.group", &json!({})).unwrap()["id"].as_u64().unwrap());
+    let state = |s: &Session| {
+        let d = s.doc().unwrap();
+        (d.doc.clone(), d.selection.clone(), d.history.undo.len())
+    };
+    let want = "Live Paint takes paths and compound paths: convert type, images and other objects to paths first";
+    for other in [text, image, text_group] {
+        let calls = [
+            ("livePaint.merge", json!({"ids": [g.0, other.0]})),
+            ("livePaint.make", json!({"ids": [g.0, other.0]})),
+            ("livePaint.make", json!({"ids": [other.0]})),
+            ("livePaint.fill", json!({"ids": [other.0], "point": [200, 300], "color": "#00ff00"})),
+        ];
+        for (c, p) in calls {
+            s.execute("select.set", &json!({"ids": [g.0, other.0]})).unwrap();
+            let before = state(&s);
+            let r = s.execute(c, &p);
+            assert!(matches!(&r, Err(EngineError::Other(m)) if m == want), "{c} {p}: {r:?}");
+            assert!(state(&s) == before, "{c} {p} changed the document");
+        }
+    }
+    // A group of paths and a path still merge.
+    let (a, b) = (rect(&mut s, 120.0, 20.0, 100.0, 20.0), rect(&mut s, 120.0, 60.0, 100.0, 20.0));
+    s.execute("select.set", &json!({"ids": [a.0, b.0]})).unwrap();
+    let paths = NodeId(s.execute("object.group", &json!({})).unwrap()["id"].as_u64().unwrap());
+    let c = rect(&mut s, 0.0, 120.0, 100.0, 20.0);
+    let r = s.execute("livePaint.merge", &json!({"ids": [g.0, paths.0, c.0]})).unwrap();
+    assert_eq!(NodeId(r["id"].as_u64().unwrap()), g);
+    assert!(vectorcraft_tools::builder::live_paint_takes(&node(&s, g)));
+    assert!(!vectorcraft_tools::builder::live_paint_takes(&node(&s, text_group)));
+}
+
 /// Give Live Paint group `g` a lock, hidden state, appearance, knockout, opacity mask and
 /// graphic style link, and return it as it then is.
 fn dress_live_group(s: &mut Session, g: NodeId) -> Node {

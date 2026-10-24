@@ -3862,6 +3862,7 @@ axis	Both	Обидві
 @msg	Installed plug-in {_1}	Встановлено модуль {_1}
 @msg	Internal error: {msg} (please report this bug)	Внутрішня помилка: {msg} (будь ласка, повідомте про цю помилку)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Об’єднання швидкої заливки: виділіть групу швидкої заливки та контури для додавання
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	Швидка заливка приймає контури та складені контури: спершу перетворіть текст, зображення й інші об'єкти на контури
 @msg	Live Paint: select paths or compound paths	Швидка заливка: виділіть контури або складені контури
 @msg	Live Paint: these paths are too degenerate to paint	Швидка заливка: ці контури занадто вироджені для заливки
 @msg	Make Guides: select paths	Створення напрямних: виділіть контури

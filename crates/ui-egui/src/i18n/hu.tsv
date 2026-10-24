@@ -4705,6 +4705,7 @@ imageTrace	Outline	Körvonal
 @msg	larger than 256 MB	nagyobb 256 MB-nál
 @msg	layers can't be wrap objects	réteg nem lehet körbefuttató objektum
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Élő festés egyesítése: jelölj ki egy élőfestés-csoportot és a hozzáadandó útvonalakat
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	Az élő festés útvonalakat és összetett útvonalakat fogad: előbb alakítsd útvonallá a szöveget, a képeket és a többi objektumot
 @msg	Live Paint: select paths or compound paths	Élő festés: jelölj ki útvonalakat vagy összetett útvonalakat
 @msg	Live Paint: these paths are too degenerate to paint	Élő festés: ezek az útvonalak túlságosan elfajultak a festéshez
 @msg	Loading VectorCraft…	A VectorCraft betöltése…

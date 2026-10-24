@@ -3838,6 +3838,7 @@ axis	Both	Ambos
 @msg	Installed plug-in {_1}	Se instaló el plugin {_1}
 @msg	Internal error: {msg} (please report this bug)	Error interno: {msg} (por favor, informa de este error)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Combinar pintura interactiva: selecciona un grupo de pintura interactiva y los trazados que quieres agregar
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	La pintura interactiva admite trazados y trazados compuestos: convierte primero el texto, las imágenes y otros objetos en trazados
 @msg	Live Paint: select paths or compound paths	Pintura interactiva: selecciona trazados o trazados compuestos
 @msg	Live Paint: these paths are too degenerate to paint	Pintura interactiva: estos trazados están demasiado degenerados para pintarlos
 @msg	Make Guides: select paths	Crear guías: selecciona trazados

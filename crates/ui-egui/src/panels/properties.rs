@@ -116,7 +116,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     // Paint group selected with more to merge into it, as the Properties panel overview lists them
     // (<https://helpx.adobe.com/illustrator/desktop/get-started/learn-the-basics/properties-panel-overview.html>).
     let blend_options = n_sel == 1 && app.session.tool_id() == "blend" && matches!(first.as_ref().map(|n| &n.kind), Some(NodeKind::Blend { .. }));
-    let merge_live_paint = n_sel > 1 && selects_live_paint(app);
+    let merge_live_paint = n_sel > 1 && can_merge_live_paint(app);
     let mut actions: Vec<(&str, &str)> = vec![];
     if n_sel > 1 {
         actions.push((tl!("Group"), "object.group"));
@@ -160,11 +160,14 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     global_edit_row(app, ui);
 }
 
-/// Whether a Live Paint group is among the selected objects.
-fn selects_live_paint(app: &VectorcraftApp) -> bool {
-    app.session
-        .active()
-        .is_some_and(|st| st.selection.objects.iter().filter_map(|id| st.doc.node(*id)).any(vectorcraft_tools::builder::is_live_paint))
+/// Whether Merge Live Paint can take the selection: a Live Paint group among the selected objects
+/// and nothing Live Paint refuses (type, images and the rest; `livePaint.merge` refuses them too).
+fn can_merge_live_paint(app: &VectorcraftApp) -> bool {
+    use vectorcraft_tools::builder::{is_live_paint, live_paint_takes};
+    app.session.active().is_some_and(|st| {
+        let nodes = || st.selection.objects.iter().filter_map(|id| st.doc.node(*id));
+        nodes().any(is_live_paint) && nodes().all(live_paint_takes)
+    })
 }
 
 /// The Corners of the one path whose corners Direct Selection has selected: their kind and radius,
@@ -2169,7 +2172,8 @@ mod tests {
     }
 
     /// A Live Paint group selected with a path has Merge Live Paint in Quick Actions, which adds
-    /// the path to the group in one undo step. Not for the group alone, nor for plain paths.
+    /// the path to the group in one undo step. Not for the group alone, nor for plain paths, nor
+    /// with type selected, which Live Paint refuses.
     #[test]
     fn merge_live_paint_is_a_quick_action_for_a_live_paint_group_and_more() {
         let mut app = new_app();
@@ -2177,8 +2181,14 @@ mod tests {
         app.run("select.set", json!({"ids": [a, b]})).unwrap();
         let group = app.run("livePaint.make", json!({})).unwrap()["id"].clone();
         let (c, d) = (rect(&mut app, 140.0, 30.0, 60.0, 60.0), rect(&mut app, 300.0, 200.0, 40.0, 40.0));
+        let text = app.run("text.create", json!({"x": 50, "y": 250, "text": "Hi"})).unwrap()["id"].clone();
         let ctx = egui::Context::default();
-        for (ids, why) in [(json!([group]), "the group alone"), (json!([c, d]), "two plain paths")] {
+        for (ids, why) in [
+            (json!([group]), "the group alone"),
+            (json!([c, d]), "two plain paths"),
+            (json!([group, text]), "the group and type"),
+            (json!([group, c, text]), "the group, a path and type"),
+        ] {
             app.run("select.set", json!({"ids": ids})).unwrap();
             assert!(!shows(&tall(&mut app, &ctx, vec![]), "Merge Live Paint"), "{why}");
         }
