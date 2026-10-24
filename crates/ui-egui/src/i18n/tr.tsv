@@ -3647,6 +3647,7 @@ axis	Both	Her İkisi
 @msg	Installed plug-in {_1}	Yüklü eklenti {_1}
 @msg	Internal error: {msg} (please report this bug)	Dahili hata: {msg} (lütfen bu hatayı bildirin)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Canlı Boyama Birleştirme: Canlı Boyama grubunu ve eklenecek yolları seçin
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	Canlı Boyama yolları ve bileşik yolları kabul eder: önce metni, görüntüleri ve diğer nesneleri yollara dönüştürün
 @msg	Live Paint: select paths or compound paths	Canlı Boyama: yolları veya bileşik yolları seçin
 @msg	Live Paint: these paths are too degenerate to paint	Canlı Boyama: Bu yollar boyanamayacak kadar yozlaşmış
 @msg	Make Guides: select paths	Kılavuzlar Oluşturun: yolları seçin
