@@ -230,3 +230,30 @@ fn svg_images_are_left_out() {
     assert!(fills.contains(&Paint::solid(Color::rgb8(0, 0, 255))), "the glyph's own art");
     assert!(!fills.contains(&Paint::solid(Color::rgb8(255, 0, 0))), "not the images' documents: {fills:?}");
 }
+
+/// Of `href` and `xlink:href`, the plain one counts, as the importer reads them (SVG 2): an image
+/// whose `href` is a PNG stays, whatever its `xlink:href`; one whose `href` is a document goes.
+#[test]
+fn an_images_plain_href_decides_whether_it_is_an_svg_image() {
+    let png = vectorcraft_svg::base64_encode(&vectorcraft_text::test_fonts::solid_png(4, [0, 0, 255, 255]));
+    let svg = vectorcraft_svg::base64_encode(
+        br##"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#f00"/></svg>"##,
+    );
+    let image = |href: &str, xlink: &str| {
+        format!(
+            r##"<image width="500" height="500" href="data:image/{href};base64,{}" xlink:href="data:image/{xlink};base64,{}"/>"##,
+            if href == "png" { &png } else { &svg },
+            if xlink == "png" { &png } else { &svg }
+        )
+    };
+    let images = |inner: String| {
+        let doc = format!(
+            r##"<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="glyph1"><path d="M0 0h1v-1z"/>{inner}</g></svg>"##
+        );
+        let mut n = 0;
+        art(&doc, 1).unwrap().walk(&mut |c| n += usize::from(matches!(c.kind, NodeKind::Image(_))));
+        n
+    };
+    assert_eq!(images(image("png", "svg+xml")), 1, "the PNG stays");
+    assert_eq!(images(image("svg+xml", "png")), 0, "the document goes");
+}
