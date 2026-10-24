@@ -41,6 +41,7 @@ mod mac_menu;
 mod mac_save_format;
 #[cfg(target_os = "macos")]
 mod mac_screen_color;
+mod mac_tablet;
 #[cfg(target_os = "macos")]
 mod mac_window;
 #[cfg(target_os = "macos")]
@@ -580,6 +581,9 @@ fn services(parent: Parent, ui: egui::Context) -> Services {
         no_cursor_theme: wayland && cursor_theme::theme_missing(),
         #[cfg(target_os = "linux")]
         stylus: if x11 { tablet::start() } else { None },
+        // macOS reads it from AppKit's events (#852).
+        #[cfg(target_os = "macos")]
+        stylus: mac_tablet::start(),
         read: Some(Box::new(|p: &str| std::fs::read(p).map_err(|e| e.to_string()))),
         write: Some(Box::new(write_file)),
         exists: Some(Box::new(|p: &str| std::path::Path::new(p).exists())),
