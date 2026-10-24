@@ -130,7 +130,8 @@ impl Pen {
 /// refuses the monitor or this isn't the main thread.
 #[cfg(target_os = "macos")]
 pub fn start() -> Option<StylusFeed> {
-    let feed = StylusFeed::default();
+    // The monitor writes on the main thread before winit hands the event on: a press never waits.
+    let feed = StylusFeed::on_ui_thread();
     match monitor::install(feed.clone()) {
         Ok(()) => Some(feed),
         Err(e) => {

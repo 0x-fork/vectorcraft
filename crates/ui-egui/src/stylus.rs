@@ -69,6 +69,8 @@ struct Shared {
     pen: Mutex<Pen>,
     /// Signaled on every [`StylusFeed::set_sample`] ([`StylusFeed::set`] included).
     set: Condvar,
+    /// Written on the UI thread itself ([`StylusFeed::on_ui_thread`]): a press never waits.
+    ui_thread: bool,
 }
 
 /// The pen pressure and pen end the host last read, written from any thread and read on the UI
@@ -77,6 +79,12 @@ struct Shared {
 pub struct StylusFeed(Arc<Shared>);
 
 impl StylusFeed {
+    /// A feed the host writes on the UI thread, before the UI handles the event it read (macOS):
+    /// a press has its touch already, and waiting for one would only stall the thread.
+    pub fn on_ui_thread() -> Self {
+        Self(Arc::new(Shared { ui_thread: true, ..Shared::default() }))
+    }
+
     fn lock(&self) -> MutexGuard<'_, Pen> {
         self.0.pen.lock().unwrap_or_else(|e| e.into_inner())
     }
@@ -160,7 +168,7 @@ impl StylusFeed {
 
     fn press_within(&self, wait: Duration) -> Option<f32> {
         let mut pen = self.lock();
-        if pen.hovering() {
+        if pen.hovering() && !self.0.ui_thread {
             pen = self.wait_for_touch(pen, wait);
         }
         let peak = pen.peak.take();
@@ -383,6 +391,17 @@ mod tests {
         assert_eq!(feed.press_within(Duration::from_secs(10)), Some(0.3));
         feed.set(None);
         assert_eq!(feed.press_within(Duration::from_secs(10)), None);
+        assert!(start.elapsed() < Duration::from_secs(5));
+    }
+
+    /// A feed written on the UI thread (macOS) has nothing to wait for: a hovering pen's press
+    /// gets its 0 at once rather than stalling the thread.
+    #[test]
+    fn a_feed_written_on_the_ui_thread_never_waits() {
+        let feed = StylusFeed::on_ui_thread();
+        feed.set(Some(0.0));
+        let start = std::time::Instant::now();
+        assert_eq!(feed.press_within(Duration::from_secs(10)), Some(0.0));
         assert!(start.elapsed() < Duration::from_secs(5));
     }
 }
