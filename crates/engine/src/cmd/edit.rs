@@ -99,8 +99,8 @@ pub fn specs() -> Vec<CommandSpec> {
             "Begin Undo Group",
             [],
             None,
-            "{label?: string} until edit.undoGroup.end, the edits made in the active document are one undo step, named `label` (else after its first edit): for automation, such as MCP command_batch with `atomic` (#1163)",
-            has_doc,
+            "{label?: string} until edit.undoGroup.end, the edits made in the document active at the begin, and in each document opened or created before then (also when no document is open; the edits of a command that opens a document and edits it stay that command's undo step), are one undo step in that document, named `label` (else after its first edit); in a document that was open before the begin and is switched to (document.activate), each edit stays its own undo step: for automation, such as MCP command_batch with `atomic` (#1163)",
+            always,
             undo_group_begin
         ),
         cmd!(
@@ -109,7 +109,7 @@ pub fn specs() -> Vec<CommandSpec> {
             [],
             None,
             "{cancel?: bool} close the undo group: its edits stay one undo step or, with `cancel`, are undone",
-            has_doc,
+            always,
             undo_group_end
         ),
         cmd!("edit.cut", "Cut", ["Edit"], Some("Cmd+X"), "{} (the Artboard tool chosen: artboard.cut)", has_selection_or_artboard_tool, cut),
@@ -427,6 +427,7 @@ fn undo_group_begin(s: &mut Session, p: &Value) -> Result<Value> {
         Some(Value::String(l)) if !l.trim().is_empty() && l.chars().count() <= 200 => Some(l.trim().to_string()),
         Some(_) => return Err(bad(C, "`label` must be a non-empty name of at most 200 characters")),
     };
+    s.explicit_undo_group = Some(label.clone());
     s.begin_named_undo_group(label);
     ok()
 }

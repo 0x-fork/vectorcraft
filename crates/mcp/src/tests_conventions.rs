@@ -149,6 +149,55 @@ fn render_preview_and_screenshot_match_a_png_export_on_white() {
     }
 }
 
+/// An atomic `command_batch` that starts with `file.new` makes the edits after it one undo step in
+/// the new document, with or without a document open before it, and also when a later step fails.
+#[test]
+fn an_atomic_batch_is_one_undo_step_in_a_document_it_creates() {
+    let mut steps = vec![
+        json!({"id":"file.new","params":{"width":200,"height":100}}),
+        json!({"id":"shape.rectangle","params":{"x":0,"y":0,"width":5,"height":5}}),
+        json!({"id":"shape.ellipse","params":{"x":9,"y":0,"width":5,"height":5}}),
+    ];
+    for fail in [false, true] {
+        if fail {
+            steps.push(json!({"id":"no.such.command"}));
+        }
+        for backend in [Headless::new(), Headless::with_document()] {
+            let mut s = Server::new(Box::new(backend));
+            let r = call(&mut s, "command_batch", json!({"steps":steps,"atomic":true,"label":"Job"}));
+            assert_eq!(r["isError"], fail, "{r}");
+            let p = payload(&r);
+            assert_eq!((p["completed"].clone(), p["failed"].clone()), (json!(3), json!(u8::from(fail))), "{r}");
+            assert_eq!(payload(&call(&mut s, "doc_inspect", json!({"depth":0})))["history"], json!(["Job"]));
+        }
+    }
+}
+
+/// In an atomic `command_batch`, the edits made in a document that was open before the batch and
+/// that a step switches to are undo steps of their own, and the edits in the document active when
+/// the batch began are one undo step, also when they come before and after the switch.
+#[test]
+fn an_atomic_batch_groups_no_edits_in_a_document_it_switches_to() {
+    let mut s = Server::new(Box::new(Headless::with_document()));
+    let r = call(&mut s, "command_run", json!({"id":"file.new","params":{"width":200,"height":100}}));
+    assert_eq!(r["isError"], false, "{r}");
+    let rect = json!({"x":0,"y":0,"width":5,"height":5});
+    let steps = json!([
+        {"id":"shape.rectangle","params":rect},
+        {"id":"document.activate","params":{"index":0}},
+        {"id":"shape.rectangle","params":rect},
+        {"id":"shape.ellipse","params":rect},
+        {"id":"document.activate","params":{"index":1}},
+        {"id":"shape.ellipse","params":rect},
+    ]);
+    let r = call(&mut s, "command_batch", json!({"steps":steps,"atomic":true,"label":"Job"}));
+    assert_eq!((r["isError"].clone(), payload(&r)["completed"].clone()), (json!(false), json!(6)), "{r}");
+    let history = |s: &mut Server| payload(&call(s, "doc_inspect", json!({"depth":0})))["history"].clone();
+    assert_eq!(history(&mut s), json!(["Job"]));
+    call(&mut s, "command_run", json!({"id":"document.activate","params":{"index":0}}));
+    assert_eq!(history(&mut s).as_array().map(Vec::len), Some(2), "{}", history(&mut s));
+}
+
 struct Panics;
 impl Backend for Panics {
     fn call(&mut self, _: &str, _: Value) -> Result<Value, String> {
