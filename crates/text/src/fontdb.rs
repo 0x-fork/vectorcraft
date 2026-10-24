@@ -639,6 +639,9 @@ fn name(font: &skrifa::FontRef<'_>, ids: &[StringId]) -> Option<String> {
     ids.iter().find_map(|id| font.localized_strings(*id).english_or_first().map(|s| s.to_string()).filter(|s| !s.is_empty()))
 }
 
+/// The most distinct legacy family (and style) names of a font used as keys.
+const MAX_LEGACY_NAMES: usize = 64;
+
 /// Every localized string of `id`, with its language.
 fn localized(font: &skrifa::FontRef<'_>, id: StringId) -> Vec<(Option<String>, String)> {
     font.localized_strings(id).map(|s| (s.language().map(str::to_owned), s.to_string())).filter(|(_, s)| !s.is_empty()).collect()
@@ -691,7 +694,14 @@ struct FaceKeys {
 impl FaceKeys {
     fn of(font: &skrifa::FontRef<'_>, family: &str, style: &str) -> Self {
         let (typo_family, typo_style) = (all_names(font, StringId::TYPOGRAPHIC_FAMILY_NAME), all_names(font, StringId::TYPOGRAPHIC_SUBFAMILY_NAME));
-        let (legacy_family, legacy_style) = (localized(font, StringId::FAMILY_NAME), localized(font, StringId::SUBFAMILY_NAME));
+        let (mut legacy_family, mut legacy_style) = (localized(font, StringId::FAMILY_NAME), localized(font, StringId::SUBFAMILY_NAME));
+        // Records repeat (platforms, encodings) and are paired below: once each, and no more than a
+        // font has any use for, or the pairs multiply.
+        for names in [&mut legacy_family, &mut legacy_style] {
+            names.sort();
+            names.dedup();
+            names.truncate(MAX_LEGACY_NAMES);
+        }
         // Without typographic names, the legacy ones are the family's.
         let family_names: Vec<&str> = if typo_family.is_empty() {
             legacy_family.iter().map(|(_, f)| f.as_str()).collect()

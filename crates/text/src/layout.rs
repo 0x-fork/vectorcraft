@@ -46,7 +46,11 @@ struct Ctx<'a> {
 
 impl Ctx<'_> {
     fn style_at(&self, b: usize) -> &CharStyle {
-        let find = |b: usize| self.runs.iter().find(|(r, _)| r.start <= b && b < r.end).map(|(_, s)| *s);
+        // The runs follow one another: the first that ends after `b` is the only one that can hold it.
+        let find = |b: usize| {
+            let i = self.runs.partition_point(|(r, _)| r.end <= b);
+            self.runs.get(i).filter(|(r, _)| r.start <= b).map(|(_, s)| *s)
+        };
         find(b).or_else(|| b.checked_sub(1).and_then(find)).or_else(|| self.runs.first().map(|(_, s)| *s)).unwrap_or(&self.default)
     }
 
@@ -1304,8 +1308,10 @@ impl Pen<'_> {
                 if baseline + est.desc > r.bottom() + 0.01 {
                     break;
                 }
-                // A rectangle's lines are all as wide: none below has more room for the word.
-                let min = if r.rect || r.polys.is_empty() { 0.0 } else { min };
+                // A rectangle's lines are all as wide: none below has more room for the word
+                // (until wrap shapes can narrow the first baseline: they stay bounded).
+                let constant = (r.rect || r.polys.is_empty()) && r.wraps.is_empty();
+                let min = if constant { 0.0 } else { min };
                 let fits = |&(a, b): &(f64, f64)| {
                     let room = b - a - ind_l - ind_r;
                     room > est.asc.max(1.0) && room + EPS >= min
@@ -1313,6 +1319,8 @@ impl Pen<'_> {
                 if r.wraps.is_empty() {
                     match r.span(baseline - est.asc, baseline + est.desc) {
                         Some(s) if fits(&s) => return Some((baseline, s.0, s.1, false)),
+                        // Too narrow here is too narrow all the way down the cell: next cell.
+                        Some(_) if constant => break,
                         _ => baseline += step,
                     }
                 } else {
@@ -1430,10 +1438,13 @@ fn leader_outline(db: &FontDb, g: &SGlyph, leader: &str, origin: f64, from: f64,
 /// left out, the hyphen of a soft hyphen in), the least room a line needs not to break inside it.
 /// A list marker at `i` (glyphs of length 0) counts whole, with the word after it.
 fn word_width(g: &[SGlyph], i: usize) -> f64 {
+    /// Glyphs measured at most: a word wrapped over many lines is measured again from each line's
+    /// start, and one this long is broken inside whatever cell it meets.
+    const MAX_GLYPHS: usize = 1024;
     let rest = g.get(i..).unwrap_or_default();
     let marker = rest.iter().take_while(|gl| gl.len == 0).count();
     let mut w: f64 = rest.iter().take(marker).map(|gl| gl.adv).sum();
-    for gl in rest.iter().skip(marker) {
+    for gl in rest.iter().skip(marker).take(MAX_GLYPHS) {
         if gl.is_space() {
             break;
         }
@@ -1879,14 +1890,15 @@ fn hyphen_breaks(text: &str, g: &[SGlyph], ws: usize, we: usize, opts: &Hyphenat
     let (s, e) = (g[a].byte, g[b - 1].byte + g[b - 1].len);
     let Some(word) = text.get(s..e) else { return vec![] };
     let offs: Vec<usize> = word.char_indices().map(|(o, _)| s + o).collect();
-    hyphen_points_with(word, opts)
-        .into_iter()
-        .filter_map(|ci| {
-            let byte = *offs.get(ci)?;
-            // Only at cluster starts (not inside a ligature).
-            (a + 1..b).find(|&k| g[k].byte == byte && g[k - 1].byte != byte)
-        })
-        .collect()
+    // The first glyph of each cluster start (not inside a ligature), by its byte: one pass, not a
+    // search for each point.
+    let mut starts = std::collections::HashMap::new();
+    for k in a + 1..b {
+        if g[k].byte != g[k - 1].byte {
+            starts.entry(g[k].byte).or_insert(k);
+        }
+    }
+    hyphen_points_with(word, opts).into_iter().filter_map(|ci| starts.get(offs.get(ci)?).copied()).collect()
 }
 
 /// Break candidates for the every-line composer: hyphenation points under `hyphenate` (the
@@ -2904,6 +2916,11 @@ fn ruby_layout(cx: &mut Ctx<'_>, t: &TextObject) {
         overhang: bool,
     }
     let mut pieces: Vec<Piece> = Vec::new();
+    // The glyphs by their byte, to find a span's without a scan of them all for each span.
+    let byte_of = |i: usize| cx.out.glyphs.get(i).map_or(0, |g| g.byte);
+    let mut by_byte: Vec<usize> = (0..cx.out.glyphs.len()).collect();
+    by_byte.sort_by_key(|&i| byte_of(i));
+    let longest = cx.out.glyphs.iter().map(|g| g.len.max(1)).max().unwrap_or(1);
     for span in &t.ruby {
         let (start, end) = (span.start.min(text_len), span.end.min(text_len));
         if start >= end || span.text.trim().is_empty() {
@@ -2912,7 +2929,13 @@ fn ruby_layout(cx: &mut Ctx<'_>, t: &TextObject) {
         // The base glyphs of the span, by line; a glyph's cluster is its byte range (`len`, or
         // one byte for generated glyphs). A list marker is not part of the base.
         let mut by_line: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
-        for (i, g) in cx.out.glyphs.iter().enumerate() {
+        let hi = by_byte.partition_point(|&i| byte_of(i) < end);
+        let lo = by_byte.partition_point(|&i| byte_of(i).saturating_add(longest) <= start).min(hi);
+        let mut hits: Vec<usize> = by_byte.get(lo..hi).unwrap_or_default().to_vec();
+        // In glyph order, as the scan found them.
+        hits.sort_unstable();
+        for i in hits {
+            let Some(g) = cx.out.glyphs.get(i) else { continue };
             let b = g.byte.saturating_add(g.len.max(1));
             if g.byte < end && b > start && cx.out.marker_of(i).is_none() {
                 by_line.entry(g.line).or_default().push(i);
