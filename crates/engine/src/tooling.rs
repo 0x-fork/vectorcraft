@@ -399,6 +399,18 @@ impl Session {
         self.tool.wants_ticks()
     }
 
+    /// Is the active tool waiting for work it runs on another thread ([`Tool::waiting`])?
+    pub fn tool_waiting(&self) -> bool {
+        self.tool.waiting()
+    }
+
+    /// Lets the active tool check on the work [`Session::tool_waiting`] reports, and with `wait`
+    /// wait for it to finish ([`Tool::poll`]).
+    pub fn tool_poll(&mut self, view: ViewInfo, wait: bool) -> Result<()> {
+        self.with_tool_cx(view, |t, cx| t.poll(cx, wait));
+        self.take_tool_panic()
+    }
+
     pub fn tool_key(&mut self, key: ToolKey, mods: Mods, view: ViewInfo) -> Result<Vec<UiRequest>> {
         // 1–4 pick the active perspective plane while the grid is shown.
         if let Some(plane) = self.plane_key(key) {
