@@ -1696,7 +1696,7 @@ group together. Art linked to one of the group's global swatches stays linked wh
 row's new color (the default without `groupColors` when the rows follow the group's order), so a later `swatch.edit` still
 reaches it; the reply's `relinked` counts the other linked paints that took the group's new colors. Art in a row that
 is linked to a swatch rewritten with another color keeps its row's new color, even an unchanged one, and is no longer
-linked to the swatch. Without `group`,
+linked to the swatch, as does art whose color the row converts into the art's own color model. Without `group`,
 the swatch keeps its color and the recolored art is no longer linked to it.
 
 ```json

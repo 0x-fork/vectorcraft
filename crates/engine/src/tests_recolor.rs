@@ -438,6 +438,15 @@ fn apply_with_a_group_keeps_art_linked_to_its_global_swatches() {
     run(&mut s, "recolor.apply", json!({"map": {"#2878f0": "#2878f0"}, "group": "Brand", "groupColors": ["#123456"]}));
     assert_eq!(link(&s, full), (blue, None, 1.0));
     assert_eq!(swatch_hex(&s), "#123456");
+    // A CMYK new color for RGB art keeps the art's model (model: "keep"), so the art takes the
+    // color in RGB, unlinked, while the swatch takes it in CMYK.
+    run(&mut s, "edit.undo", json!({}));
+    select_all(&mut s);
+    let r = run(&mut s, "recolor.apply", json!({"map": {"#2878f0": {"c": 0, "m": 60, "y": 100, "k": 0}}, "group": "Brand"}));
+    assert!(r["note"].is_string(), "{r}");
+    let (c, w, _) = link(&s, full);
+    assert!(matches!(c, Color::Rgb { .. }) && w.is_none(), "{c:?} {w:?}");
+    assert!(matches!(s.doc().unwrap().doc.swatch(&name).unwrap().paint.color(), Some(Color::Cmyk { .. })));
     // Without a group the swatch is unchanged, so the art takes the new color unlinked.
     run(&mut s, "edit.undo", json!({}));
     select_all(&mut s);
