@@ -44,6 +44,8 @@ pub use {vectorcraft_doc as doc, vectorcraft_format as format, vectorcraft_rende
 /// real directory, not a link, with no access for others and writable by this user: one pre-made in a shared temp folder is refused.
 pub fn temp_dir(tag: &str) -> std::path::PathBuf {
     let dir = std::env::temp_dir().join(format!("vectorcraft-testkit-{tag}-{}", std::process::id()));
+    // Unix sets the mode on it; elsewhere it stays as made.
+    #[cfg_attr(not(unix), allow(unused_mut))]
     let mut b = std::fs::DirBuilder::new();
     #[cfg(unix)]
     std::os::unix::fs::DirBuilderExt::mode(&mut b, 0o700);
@@ -54,7 +56,9 @@ pub fn temp_dir(tag: &str) -> std::path::PathBuf {
         assert!(std::os::unix::fs::PermissionsExt::mode(&m.permissions()) & 0o077 == 0, "{}: not private", dir.display());
         // A private directory made by another user passes the mode check but is closed to this one:
         // writing a probe file tells it apart from ours without needing the user ids.
-        let probe = dir.join(".probe");
+        // Named for this call: tests running alongside probe the same directory.
+        static PROBES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let probe = dir.join(format!(".probe-{}", PROBES.fetch_add(1, std::sync::atomic::Ordering::Relaxed)));
         assert!(std::fs::write(&probe, b"").and_then(|()| std::fs::remove_file(&probe)).is_ok(), "{}: not owned by this user", dir.display());
     }
     dir
