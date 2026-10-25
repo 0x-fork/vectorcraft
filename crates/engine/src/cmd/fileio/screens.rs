@@ -46,7 +46,14 @@ impl ScreenSize {
     /// `2x` (or `2`), `100w`, `100h` or `72ppi`, in any case; positive numbers only.
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim().to_ascii_lowercase();
-        let num = |t: &str| t.trim().parse::<f64>().ok().filter(|v| v.is_finite() && *v > 0.0);
+        // Digits and `.` only: `str::parse` would also take `+2`, `1e2`, `inf` and `nan`.
+        let num = |t: &str| {
+            let t = t.trim();
+            if !t.bytes().all(|b| b.is_ascii_digit() || b == b'.') {
+                return None;
+            }
+            t.parse::<f64>().ok().filter(|v| v.is_finite() && *v > 0.0)
+        };
         if let Some(n) = s.strip_suffix("ppi") {
             return num(n).map(Self::Ppi);
         }
@@ -994,4 +1001,20 @@ pub(crate) fn store_settings(s: &mut Session, settings: Map<String, Value>) -> R
 /// `document.exportSettings`: the Export for Screens settings the document last exported with.
 pub(super) fn export_settings(s: &mut Session, _: &Value) -> Result<Value> {
     Ok(json!({ "settings": s.doc()?.doc.export_settings }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ScreenSize;
+
+    #[test]
+    fn size_parse_refuses_signs_and_exponents() {
+        for s in ["+2x", "+2", "+100w", "+100h", "+72ppi", "-2x", "1e2", "2e0w"] {
+            assert_eq!(ScreenSize::parse(s), None, "{s}");
+        }
+        assert_eq!(ScreenSize::parse("2x"), Some(ScreenSize::Scale(2.0)));
+        assert_eq!(ScreenSize::parse("1.5"), Some(ScreenSize::Scale(1.5)));
+        assert_eq!(ScreenSize::parse("100W"), Some(ScreenSize::Width(100.0)));
+        assert_eq!(ScreenSize::parse("72ppi"), Some(ScreenSize::Ppi(72.0)));
+    }
 }
