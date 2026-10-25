@@ -1156,7 +1156,7 @@ mod tests {
         let painted = |scale: f32| {
             let ctx = egui::Context::default();
             let mut out = ctx.run_ui(egui::RawInput::default(), |ui| {
-                let layer = egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("probe"));
+                let layer = egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique("probe"));
                 assert!(paint(&ui.ctx().layer_painter(layer), Cursor::Arrow, pos2(100.0, 100.0), scale));
             });
             out.textures_delta.clear();

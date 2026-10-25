@@ -1239,8 +1239,9 @@ fn latin_script_glyphs_are_available_without_system_fonts() {
         let families: Vec<_> = fonts.definitions().families.iter().map(|(f, stack)| (f.clone(), stack.first().cloned())).collect();
         for (family, first) in families {
             let first = first.unwrap();
-            let mut font = fonts.fonts.font(&family);
-            let chars = font.characters();
+            // Public 0.37 view: the family's characters with the fonts that have each (the old
+            // `fonts.font(...).characters()` reached a now-private field).
+            let chars = fonts.characters(&family);
             for ch in "áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ„“‚‘…–ñÑüÜ¿¡”àèìòùÀÈÌÒÙ«»’âêîôûçëïÿœæÂÊÎÔÛÇËÏŒÆäöÄÖßőűŐŰąćęłńśźżĄĆĘŁŃŚŹŻåÅ\u{a0}".chars()
             {
                 assert!(chars.get(&ch).is_some_and(|fonts| fonts.contains(&first)), "{first} ({family:?}) has no {ch}");
@@ -1261,8 +1262,9 @@ fn cyrillic_glyphs_are_available_without_system_fonts() {
         let families: Vec<_> = fonts.definitions().families.iter().map(|(f, stack)| (f.clone(), stack.first().cloned())).collect();
         for (family, first) in families {
             let first = first.unwrap();
-            let mut font = fonts.fonts.font(&family);
-            let chars = font.characters();
+            // Public 0.37 view: the family's characters with the fonts that have each (the old
+            // `fonts.font(...).characters()` reached a now-private field).
+            let chars = fonts.characters(&family);
             for ch in "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯґєіїҐЄІЇ«»„“…–’".chars()
             {
                 assert!(chars.get(&ch).is_some_and(|fonts| fonts.contains(&first)), "{first} ({family:?}) has no {ch}");

@@ -374,7 +374,7 @@ pub fn bullets_button(app: &mut VectorcraftApp, ui: &mut Ui, size: f32) {
         ui.painter().rect_filled(rect, egui::CornerRadius::same(4), t.hover);
     }
     crate::icons::paint(ui, "chevron-down", egui::Rect::from_center_size(rect.center(), vec2(10.0, 10.0)), t.text_dim);
-    arrow.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Bullets")));
+    arrow.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Bullets")));
     let arrow = arrow.on_hover_text(tl!("Bullets"));
     let presets = [
         (tl!("None"), "none", None),
@@ -421,7 +421,7 @@ fn bullet_row(ui: &mut Ui, name: &str, bullet: Option<vectorcraft_doc::text::Bul
         Some(Bullet::Square) => painter.rect_filled(egui::Rect::from_center_size(c, vec2(6.0, 6.0)), 0.0, t.text_strong),
     };
     painter.text(rect.left_center() + vec2(42.0, 0.0), egui::Align2::LEFT_CENTER, name, font, t.text_strong);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, ui.is_enabled(), checked, name));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, ui.is_enabled(), checked, name));
     resp.clicked()
 }
 
@@ -441,7 +441,7 @@ pub fn numbers_button(app: &mut VectorcraftApp, ui: &mut Ui, size: f32) {
         ui.painter().rect_filled(rect, egui::CornerRadius::same(4), t.hover);
     }
     crate::icons::paint(ui, "chevron-down", egui::Rect::from_center_size(rect.center(), vec2(10.0, 10.0)), t.text_dim);
-    arrow.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Numbered List")));
+    arrow.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Numbered List")));
     let arrow = arrow.on_hover_text(tl!("Numbered List"));
     let picked = egui::Popup::menu(&arrow).show(|ui| {
         let mut picked = None;
@@ -475,7 +475,7 @@ fn number_row(ui: &mut Ui, sample: &str, checked: bool) -> bool {
         painter.text(rect.left_center() + vec2(6.0, 0.0), egui::Align2::LEFT_CENTER, "✓", font.clone(), t.text_strong);
     }
     painter.text(rect.left_center() + vec2(22.0, 0.0), egui::Align2::LEFT_CENTER, sample, font, t.text_strong);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::RadioButton, ui.is_enabled(), checked, sample));
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::RadioButton, ui.is_enabled(), checked, sample));
     resp.clicked()
 }
 
@@ -526,27 +526,61 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     };
     egui::Grid::new("para-grid").num_columns(4).spacing([4.0, 4.0]).show(ui, |ui| {
         label(ui, "→|", tl!("Left Indent"));
-        if let Some(v) = widgets::spin_field(ui, "pa-li", shared_para_field(app, |p| p.left_indent), unit, fw, 1.0, -1296.0, &[]) {
+        if let Some(v) =
+            widgets::spin_field_named(ui, "pa-li", Some(tl!("Left Indent")), shared_para_field(app, |p| p.left_indent), unit, fw, 1.0, -1296.0, &[])
+        {
             format(app, json!({"leftIndent": v}));
         }
         label(ui, "|←", tl!("Right Indent"));
-        if let Some(v) = widgets::spin_field(ui, "pa-ri", shared_para_field(app, |p| p.right_indent), unit, fw, 1.0, -1296.0, &[]) {
+        if let Some(v) =
+            widgets::spin_field_named(ui, "pa-ri", Some(tl!("Right Indent")), shared_para_field(app, |p| p.right_indent), unit, fw, 1.0, -1296.0, &[])
+        {
             format(app, json!({"rightIndent": v}));
         }
         ui.end_row();
         label(ui, "1→", tl!("First-line Left Indent"));
-        if let Some(v) = widgets::spin_field(ui, "pa-fi", shared_para_field(app, |p| p.first_line_indent), unit, fw, 1.0, -1296.0, &[]) {
+        if let Some(v) = widgets::spin_field_named(
+            ui,
+            "pa-fi",
+            Some(tl!("First-line Left Indent")),
+            shared_para_field(app, |p| p.first_line_indent),
+            unit,
+            fw,
+            1.0,
+            -1296.0,
+            &[],
+        ) {
             format(app, json!({"firstLineIndent": v}));
         }
         ui.label("");
         ui.label("");
         ui.end_row();
         label(ui, "↑¶", tl!("Space Before Paragraph"));
-        if let Some(v) = widgets::spin_field(ui, "pa-sb", shared_para_field(app, |p| p.space_before), unit, fw, 1.0, 0.0, &[]) {
+        if let Some(v) = widgets::spin_field_named(
+            ui,
+            "pa-sb",
+            Some(tl!("Space Before Paragraph")),
+            shared_para_field(app, |p| p.space_before),
+            unit,
+            fw,
+            1.0,
+            0.0,
+            &[],
+        ) {
             format(app, json!({"spaceBefore": v}));
         }
         label(ui, "↓¶", tl!("Space After Paragraph"));
-        if let Some(v) = widgets::spin_field(ui, "pa-sa", shared_para_field(app, |p| p.space_after), unit, fw, 1.0, 0.0, &[]) {
+        if let Some(v) = widgets::spin_field_named(
+            ui,
+            "pa-sa",
+            Some(tl!("Space After Paragraph")),
+            shared_para_field(app, |p| p.space_after),
+            unit,
+            fw,
+            1.0,
+            0.0,
+            &[],
+        ) {
             format(app, json!({"spaceAfter": v}));
         }
         ui.end_row();

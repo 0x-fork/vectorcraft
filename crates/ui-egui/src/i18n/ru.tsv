@@ -5162,3 +5162,6 @@ axis	Y Axis	Ось Y
 	Rectangular Grid Tool Options	Параметры инструмента «Прямоугольная сетка»
 	Polar Grid Tool Options	Параметры инструмента «Полярная сетка»
 	Fill Line	Заливка отрезка
+	Scale Presets	Наборы масштаба
+@msg	a {width}×{height} screenshot's byte count overflows	количество байтов снимка {width}×{height} переполняется
+@msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	{what} окна ({points} пунктов × {scale} DPI) не позволяет задать размер снимка

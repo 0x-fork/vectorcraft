@@ -5502,3 +5502,6 @@ axis	Y Axis	Άξονας Y
 	Rectangular Grid Tool Options	Επιλογές εργαλείου ορθογώνιου πλέγματος
 	Polar Grid Tool Options	Επιλογές εργαλείου πολικού πλέγματος
 	Fill Line	Γέμισμα γραμμής
+	Scale Presets	Προεπιλογές κλίμακας
+@msg	a {width}×{height} screenshot's byte count overflows	το πλήθος byte ενός στιγμιότυπου {width}×{height} υπερχειλίζει
+@msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	το {what} του παραθύρου ({points} σημεία × {scale} DPI) δεν μπορεί να καθορίσει μέγεθος στιγμιότυπου

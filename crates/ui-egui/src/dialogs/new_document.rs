@@ -171,7 +171,7 @@ fn set_layout(d: &mut Dialog, key: &str, v: Value) {
 
 /// The New Document dialog window `id` in the shared modal frame.
 fn window(ctx: &egui::Context, id: &str, margin: i8, add: impl FnOnce(&mut egui::Ui)) {
-    super::modal::show(ctx, id, egui::Id::new(("dialog", id)), -20.0, margin, add);
+    super::modal::show(ctx, id, egui::Id::unique(("dialog", id)), -20.0, margin, add);
 }
 
 /// What the buttons of a window asked for.

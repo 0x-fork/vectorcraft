@@ -248,7 +248,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     });
     // Art dragged off the canvas and dropped on the list opens New Brush for that art, as the New
     // Brush button opens it for the selection.
-    let zone = ui.interact(list_rect, ui.id().with("brushes-drop"), Sense::hover());
+    let zone = ui.interact(list_rect, ui.scope_id().with("brushes-drop"), Sense::hover());
     if let Some(ids) = widgets::art_drop(ui, &zone)
         && let Err(e) = app.run("ui.newBrush", json!({ "ids": ids }))
     {

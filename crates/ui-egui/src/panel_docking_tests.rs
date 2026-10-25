@@ -91,8 +91,9 @@ fn ordinary_panel_tab_drag_enters_shared_docking_and_can_redock_into_another_tab
     drag(&mut h, source, egui::pos2(160.0, 140.0));
     let layout = h.state().ui.docking.as_ref().expect("ordinary tab drag starts shared docking");
     assert!(layout.floating.iter().any(|g| g.panels.contains(&"layers".into())), "{layout:?}");
-    let source = h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &"layers".to_string()))).unwrap().rect.center();
-    let destination = h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &"properties".to_string()))).unwrap().rect.center();
+    let source = h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &"layers".to_string()))).unwrap().rect.center();
+    let destination =
+        h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &"properties".to_string()))).unwrap().rect.center();
     drag(&mut h, source, destination);
     let layout = h.state().ui.docking.as_ref().unwrap();
     assert!(!layout.floating.iter().any(|g| g.panels.contains(&"layers".into())));
@@ -289,8 +290,8 @@ fn populated_canvas_keeps_a_real_stroke_edit_after_floating_and_redocking() {
         std::fs::create_dir_all(directory).unwrap();
         h.render().unwrap().save(directory.join("vectorcraft-populated-stroke-floating.png")).unwrap();
     }
-    let from = h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &"stroke".to_string()))).unwrap().rect.center();
-    let to = h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &"properties".to_string()))).unwrap().rect.center();
+    let from = h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &"stroke".to_string()))).unwrap().rect.center();
+    let to = h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &"properties".to_string()))).unwrap().rect.center();
     drag(&mut h, from, to);
     assert!(h.state().ui.docking.as_ref().unwrap().floating.is_empty());
     assert_eq!(crate::panels::current_stroke(h.state()).unwrap().dash.unwrap(), dash);
@@ -757,7 +758,7 @@ fn a_floating_group_dropped_on_the_lower_half_of_the_dock_splits_it() {
     h.state_mut().run("window.panel.float", json!({"panel":"align","x":300,"y":300})).unwrap();
     h.run_steps(3);
     let title =
-        h.ctx.memory(|m| m.area_rect(egui::Id::new("vectorcraft-panel-docking").with(("floating", &"align".to_string())))).unwrap().left_top()
+        h.ctx.memory(|m| m.area_rect(egui::Id::unique("vectorcraft-panel-docking").with(("floating", &"align".to_string())))).unwrap().left_top()
             + vec2(6.0, 16.0);
     drag(&mut h, title, egui::pos2(lower.center().x, lower.top() + 50.0));
     assert!(h.state().ui.docking.as_ref().unwrap().floating.is_empty());
@@ -773,7 +774,7 @@ fn a_floating_group_dropped_on_the_icon_column_becomes_icons() {
     h.state_mut().run("window.panel.float", json!({"panel":"layers","x":300,"y":300})).unwrap();
     h.run_steps(3);
     let title =
-        h.ctx.memory(|m| m.area_rect(egui::Id::new("vectorcraft-panel-docking").with(("floating", &"layers".to_string())))).unwrap().left_top()
+        h.ctx.memory(|m| m.area_rect(egui::Id::unique("vectorcraft-panel-docking").with(("floating", &"layers".to_string())))).unwrap().left_top()
             + vec2(6.0, 16.0);
     let column = h.ctx.data(|d| d.get_temp::<egui::Rect>(crate::floating::icons_rect_id())).unwrap();
     drag(&mut h, title, column.center());
@@ -829,7 +830,7 @@ fn a_dock_tab_context_menu_closes_its_panel_and_the_window_menu_brings_it_back()
     assert!(!layout.contains(&"libraries".to_string()));
     assert_eq!(root_group_of(h.state(), "layers"), ["properties", "layers"]);
     // In the shared dock the tabs' context menu closes them too.
-    let tab = h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &"layers".to_string()))).unwrap().rect.center();
+    let tab = h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &"layers".to_string()))).unwrap().rect.center();
     h.event(Event::PointerMoved(tab));
     h.event(Event::PointerButton { pos: tab, button: PointerButton::Secondary, pressed: true, modifiers: Modifiers::NONE });
     h.event(Event::PointerButton { pos: tab, button: PointerButton::Secondary, pressed: false, modifiers: Modifiers::NONE });
@@ -908,9 +909,12 @@ fn a_panel_the_icon_column_has_no_place_for_still_shows_there_once_dropped_on_it
     assert!(!crate::state::ICON_PANEL_GROUPS.iter().any(|group| group.contains(&"charStyles")));
     h.state_mut().run("window.panel.float", json!({"panel":"charStyles","x":300,"y":300})).unwrap();
     h.run_steps(3);
-    let title =
-        h.ctx.memory(|m| m.area_rect(egui::Id::new("vectorcraft-panel-docking").with(("floating", &"charStyles".to_string())))).unwrap().left_top()
-            + vec2(6.0, 16.0);
+    let title = h
+        .ctx
+        .memory(|m| m.area_rect(egui::Id::unique("vectorcraft-panel-docking").with(("floating", &"charStyles".to_string()))))
+        .unwrap()
+        .left_top()
+        + vec2(6.0, 16.0);
     let column = h.ctx.data(|d| d.get_temp::<egui::Rect>(crate::floating::icons_rect_id())).unwrap();
     drag(&mut h, title, column.center());
     assert!(h.state().ui.docking_icons.contains("charStyles"));
@@ -936,7 +940,7 @@ fn double_click(h: &mut Harness<'static, VectorcraftApp>, at: Pos2) {
 
 /// The Layers panel's body is drawn (its search field).
 fn layers_drawn(h: &Harness<'static, VectorcraftApp>) -> bool {
-    h.ctx.read_response(egui::Id::new("layers-search").with("edit")).is_some()
+    h.ctx.read_response(egui::Id::unique("layers-search").with("edit")).is_some()
 }
 
 /// Clicks at `at`.
@@ -967,7 +971,7 @@ fn two_stacked_groups_both_collapsed_are_both_as_short_as_their_tabs() {
 }
 
 fn tab_center(h: &Harness<'static, VectorcraftApp>, panel: &str) -> Pos2 {
-    h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &panel.to_string()))).unwrap().rect.center()
+    h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &panel.to_string()))).unwrap().rect.center()
 }
 
 /// A double-click on a tab of the shared dock collapses its group to its tabs; another tab expands it.
@@ -1086,7 +1090,7 @@ fn a_double_click_on_the_shared_dock_strip_right_of_the_tabs_collapses_its_group
     let saved = app.ui.docking.clone();
     let mut h = harness(app, vec2(1280.0, 800.0));
     let strip = root_groups(&h)[0].strip;
-    let tab = h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &"swatches".to_string()))).unwrap().rect;
+    let tab = h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &"swatches".to_string()))).unwrap().rect;
     // Between the tab and the group's header (80 wide), and on the header's grip.
     let gap = pos2(tab.right() + 10.0, strip.center().y);
     assert!(gap.x < strip.right() - 80.0, "{tab:?} {strip:?}");
@@ -1212,11 +1216,40 @@ fn a_double_click_on_the_strip_of_a_group_beside_another_does_nothing() {
     let mut h = harness(app, vec2(1280.0, 800.0));
     let status = h.state().ui.status.clone();
     let strip = root_groups(&h).into_iter().find(|g| g.shown == "swatches").unwrap().strip;
-    let tab = h.ctx.read_response(egui::Id::new("vectorcraft-panel-docking").with(("tab", &"swatches".to_string()))).unwrap().rect;
+    let tab = h.ctx.read_response(egui::Id::unique("vectorcraft-panel-docking").with(("tab", &"swatches".to_string()))).unwrap().rect;
     let gap = pos2(tab.right() + 4.0, strip.center().y);
     assert!(gap.x < strip.right() - 24.0, "{tab:?} {strip:?}");
     double_click(&mut h, gap);
     assert_eq!(h.state().ui.status, status, "no error");
     assert!(h.state().ui.docking_collapsed.is_empty());
     assert_eq!(h.state().ui.docking, saved);
+}
+
+/// egui 0.37 keys a `Panel`'s persisted state by its parent `Ui` scope plus its own salt, not by
+/// a global `Id`. Seeding the saved width must use the same key, and the width the panel was laid
+/// out at must come back into `UiState` (`dock_width`), for a workspace switch and the next run.
+#[test]
+fn the_dock_width_seeds_and_returns_through_the_public_panel_state() {
+    let mut app = app();
+    // The shared panel layout (not the legacy single dock), so `Panel::right`'s parent-scope key
+    // is the one under test.
+    app.run("window.panel.move", json!({"panel":"swatches", "anchor":"layers", "zone":"top"})).unwrap();
+    app.ui.dock_width = Some(420.0);
+    app.ui.dock_width_pending = true;
+    let mut h = harness(app, vec2(1400.0, 900.0));
+    let width = h.state().ui.dock_width.expect("the laid-out width is remembered");
+    assert!((width - 420.0).abs() < 1.0, "the seeded width is restored, got {width}");
+    assert!(!h.state().ui.dock_width_pending, "the pending seed is consumed");
+
+    // An in-session width change (a workspace switch) resizes the already-laid-out panel.
+    h.state_mut().ui.dock_width = Some(300.0);
+    h.state_mut().ui.dock_width_pending = true;
+    h.run_steps(2);
+    let width = h.state().ui.dock_width.expect("the new width is remembered");
+    assert!((width - 300.0).abs() < 1.0, "the in-session width is applied, got {width}");
+
+    // The preference survives a serialization round trip, as the saved workspace does.
+    let saved = serde_json::to_vec(&h.state().ui).unwrap();
+    let restored: crate::state::UiState = serde_json::from_slice(&saved).unwrap();
+    assert_eq!(restored.dock_width.map(|w| w.round()), Some(300.0));
 }

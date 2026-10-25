@@ -355,8 +355,16 @@ fn text_copy(app: &mut VectorcraftApp) -> bool {
 
 fn text_key(app: &mut VectorcraftApp, k: ToolKey, m: Mods) {
     let v = app.view_info();
-    if let Err(e) = app.session.tool_key(k, m, v) {
-        app.status(e.to_string());
+    let target_before = crate::ime::target(&mut app.session, v);
+    let before = crate::ime::stamp(&mut app.session, v);
+    let r = app.session.tool_key(k, m, v);
+    match &r {
+        Err(e) => app.status(e.to_string()),
+        Ok(_) => {
+            if let Some(ctx) = app.ui_ctx.clone().or_else(|| CTX.get().cloned()) {
+                crate::ime::note_application_edit(app, &ctx, v, target_before, before);
+            }
+        }
     }
 }
 
@@ -364,8 +372,16 @@ fn text_paste(app: &mut VectorcraftApp, s: Option<String>) {
     let s = s.unwrap_or_else(|| CLIP.lock().unwrap_or_else(|e| e.into_inner()).clone());
     if !s.is_empty() {
         let v = app.view_info();
-        if let Err(e) = app.session.tool_text(&s, v) {
-            app.status(e.to_string());
+        let target_before = crate::ime::target(&mut app.session, v);
+        let before = crate::ime::stamp(&mut app.session, v);
+        let r = app.session.tool_text(&s, v);
+        match &r {
+            Err(e) => app.status(e.to_string()),
+            Ok(_) => {
+                if let Some(ctx) = app.ui_ctx.clone().or_else(|| CTX.get().cloned()) {
+                    crate::ime::note_application_edit(app, &ctx, v, target_before, before);
+                }
+            }
         }
     }
 }
@@ -490,7 +506,9 @@ fn cell(ui: &mut Ui, label: &str, tip: &str, add: impl FnOnce(&mut Ui)) {
         let l =
             ui.add_sized(vec2(22.0, 24.0), egui::Label::new(egui::RichText::new(label).size(11.5).strong().color(t.text))).on_hover_text(tl!(tip));
         crate::scrub::note_label(ui, l.rect);
-        add(ui);
+        // The visible label names the value field beside it, also in a grid cell that draws more
+        // than one widget (egui 0.37's strict accessibility check).
+        ui.label_inputs_by(l.id, add);
     });
 }
 
@@ -1104,7 +1122,7 @@ mod tests {
             let input = egui::RawInput { events, ..Default::default() };
             ctx.run_ui(input, |ui| {
                 axis_sliders(app, ui, &face);
-                slider = ctx.read_response(ui.id().with(("ch-axis", *b"wght"))).map(|r| r.rect);
+                slider = ctx.read_response(ui.scope_id().with(("ch-axis", *b"wght"))).map(|r| r.rect);
             })
             .textures_delta
             .clear();

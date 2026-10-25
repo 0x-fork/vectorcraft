@@ -433,7 +433,7 @@ pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let (mut ok, mut cancel) = (false, false);
     let mut action: Option<(&str, Value)> = None;
     let manage = d.kind == "manageWorkspaces";
-    crate::dialogs::modal::show(ctx, "Workspace", egui::Id::new("dialog-workspace"), -40.0, 22, |ui| {
+    crate::dialogs::modal::show(ctx, "Workspace", egui::Id::unique("dialog-workspace"), -40.0, 22, |ui| {
         ui.set_width(340.0);
         crate::dialogs::modal::heading(ui, if manage { tl!("Manage Workspaces") } else { tl!("New Workspace") });
         ui.add_space(12.0);

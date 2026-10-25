@@ -5,7 +5,7 @@ use vectorcraft_doc::Selection;
 use vectorcraft_geom::Point;
 use vectorcraft_tools::distort::perspective::widget::WidgetPlace;
 use vectorcraft_tools::draw2::FEEDBACK;
-use vectorcraft_tools::{Action, Cursor, Mods, Overlay, PointerEvent, PointerKind, Tool, ToolContext, ToolKey, settings};
+use vectorcraft_tools::{Action, Cursor, ImeSurrounding, Mods, Overlay, PointerEvent, PointerKind, Tool, ToolContext, ToolKey, settings};
 
 use crate::{EngineError, Prefs, Result, Session};
 
@@ -429,6 +429,20 @@ impl Session {
         self.apply_actions(acts)
     }
 
+    /// Would [`Session::tool_text`] insert `text` unchanged (no control-character filtering,
+    /// newline normalization or document formatting such as Typographer's Quotes)? An IME commit
+    /// the application rewrites is an application edit, not an accepted IME insertion.
+    pub fn tool_text_is_verbatim(&mut self, text: &str, view: ViewInfo) -> bool {
+        self.with_tool_cx(view, |t, cx| t.text_input_is_verbatim(cx, text))
+    }
+
+    /// Does the active tool's open typing session still match the document? An IME commit after
+    /// an external edit starts a fresh session (an application-side reset), so its receipt must
+    /// not be accepted as an unchanged IME insertion.
+    pub fn tool_ime_session_matches(&mut self, view: ViewInfo) -> bool {
+        self.with_tool_cx(view, |t, cx| t.ime_session_matches_document(cx))
+    }
+
     pub fn tool_wants_text(&self) -> bool {
         self.tool.wants_text()
     }
@@ -439,6 +453,37 @@ impl Session {
         let acts = self.with_tool_cx(view, |t, cx| t.ime_preedit(cx, text, active_chars));
         self.take_tool_panic()?;
         self.apply_actions(acts)
+    }
+
+    /// An IME replaces text around its composition before committing: delete `before`/`after`
+    /// units around the selection or pre-edit. The selection/pre-edit itself is preserved (the
+    /// following commit replaces it), and the commit shares the typing session, so the replacement
+    /// is one undo step.
+    pub fn tool_ime_delete_surrounding(
+        &mut self,
+        before: usize,
+        after: usize,
+        unit: vectorcraft_tools::SurroundingUnit,
+        view: ViewInfo,
+    ) -> Result<Vec<UiRequest>> {
+        let acts = self.with_tool_cx(view, |t, cx| t.ime_delete_surrounding(cx, before, after, unit));
+        self.take_tool_panic()?;
+        self.apply_actions(acts)
+    }
+
+    /// The active tool's stable IME owner `(document uid, target id, replacement epoch)`: the
+    /// document uid changes on document replacement, the epoch when the same target is started
+    /// afresh. Ordinary edits and caret moves leave both unchanged.
+    pub fn tool_ime_target(&mut self, view: ViewInfo) -> Option<(u64, u64, u64)> {
+        self.with_tool_cx(view, |t, cx| t.ime_target(cx))
+    }
+
+    /// The committed logical text around the IME cursor (UTF-8 byte offsets), with any pre-edit
+    /// removed and at most `max_bytes` bytes copied: the app's outgoing surrounding-text producer
+    /// (egui E21b) reads it. An explicit [`ImeSurrounding::Unavailable`] carries the narrow reason
+    /// (no editor, invalid offsets, or a selection wider than the limit).
+    pub fn tool_ime_surrounding(&mut self, max_bytes: usize, view: ViewInfo) -> ImeSurrounding {
+        self.with_tool_cx(view, |t, cx| t.ime_surrounding(cx, max_bytes))
     }
 
     /// Is the active tool showing uncommitted IME text?

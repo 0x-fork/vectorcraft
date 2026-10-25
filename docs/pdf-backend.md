@@ -51,9 +51,9 @@ warnings also become errors before a document is returned. Whitespace and commen
 EOF remain valid. The typed iterator does not classify every malformed operator, so this
 is known-incomplete rejection rather than a general PDF validity certificate.
 
-The three patched Hayro crates and Krilla are selected in the root `[patch.crates-io]`
+The five patched Hayro crates and Krilla are selected in the root `[patch.crates-io]`
 from the same immutable revision as `craft-pdf`. `cargo xtask pdf-deps` rejects missing,
-duplicate, local-path, registry and mismatched revisions for those five packages.
+duplicate, local-path, registry and mismatched revisions for those seven packages.
 `craft-print` and `craft-ui` keep their existing independent revisions.
 
 Dependency asset hashes and sources are in `ASSETS.md`; redistributed license texts are

@@ -337,7 +337,13 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
             // Notches, not a flood: a turn stays within what a real wheel sends.
             let delta = egui::vec2(f("dx"), f("dy")).clamp(egui::Vec2::splat(-100.0), egui::Vec2::splat(100.0));
             app.synthetic.push(egui::Event::PointerMoved(egui::pos2(f("x"), f("y"))));
-            app.synthetic.push(egui::Event::MouseWheel { unit, delta, phase: egui::TouchPhase::Move, modifiers: modifiers(p) });
+            app.synthetic.push(egui::Event::MouseWheel {
+                unit,
+                delta,
+                phase: egui::TouchPhase::Move,
+                modifiers: modifiers(p),
+                source: egui::MouseWheelSource::Unknown,
+            });
             ctx.request_repaint();
             ok(Value::Null)
         }
@@ -497,12 +503,44 @@ fn with_data(mut result: Value, png: Option<&[u8]>) -> Value {
     result
 }
 
+/// The largest image whose PNG goes back in a `ui.screenshot` reply (`data: true`): the reply
+/// makes a straight-alpha copy, the encoded PNG and, for `data`, a base64 string (~1.33× the
+/// PNG), so this bounds that working set before any of it is allocated. A path-only capture keeps
+/// the shared 128 MiB image budget.
+pub(crate) const MAX_SCREENSHOT_PNG_REPLY_BYTES: usize = 64 * 1024 * 1024;
+
+/// The checked RGBA size of `w × h`, when it fits.
+fn screenshot_rgba_bytes(w: usize, h: usize) -> Option<usize> {
+    w.checked_mul(h).and_then(|n| n.checked_mul(4))
+}
+
 /// The reply to `ui.screenshot`: the window capture `image` written to `path`, and sent back as
 /// `pngBase64` with `data`.
 pub fn save_screenshot(app: &mut VectorcraftApp, image: &egui::ColorImage, path: Option<&str>, data: bool) -> Value {
+    save_screenshot_with_limit(app, image, path, data, MAX_SCREENSHOT_PNG_REPLY_BYTES)
+}
+
+/// [`save_screenshot`] with the inline-PNG encoding limit supplied, so a small image can exercise
+/// the over-limit path without allocating a multi-megapixel frame. The public function always uses
+/// [`MAX_SCREENSHOT_PNG_REPLY_BYTES`].
+pub(crate) fn save_screenshot_with_limit(
+    app: &mut VectorcraftApp,
+    image: &egui::ColorImage,
+    path: Option<&str>,
+    data: bool,
+    max_reply_bytes: usize,
+) -> Value {
     let [w, h] = image.size;
     if path.is_none() && !data {
         return json!({"ok": true, "result": {"width": w, "height": h}});
+    }
+    // A data-only reply has no second way to deliver the image, so refuse an oversized one before
+    // allocating its working set. A request that named a path still writes that file: only the
+    // inline copy is downgraded.
+    if data && path.is_none() && !screenshot_rgba_bytes(w, h).is_some_and(|bytes| bytes <= max_reply_bytes) {
+        return json!({"ok": false, "error": format!(
+            "a PNG reply of this {w}×{h} screenshot would exceed the {max_reply_bytes}-byte reply-encoding limit; write it to a path instead"
+        )});
     }
     let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
     let img = vectorcraft_render::Rendered { width: w as u32, height: h as u32, pixels: rgba };
@@ -510,7 +548,14 @@ pub fn save_screenshot(app: &mut VectorcraftApp, image: &egui::ColorImage, path:
         Ok(png) => png,
         Err(e) => return json!({"ok": false, "error": e}),
     };
-    let data = data.then_some(png.as_slice());
+    let reply_png = data && png.len() <= max_reply_bytes;
+    if data && !reply_png && path.is_none() {
+        return json!({"ok": false, "error": format!(
+            "this screenshot's PNG is {} bytes, over the {max_reply_bytes}-byte reply-encoding limit; write it to a path instead",
+            png.len()
+        )});
+    }
+    let data = reply_png.then_some(png.as_slice());
     let Some(path) = path else {
         return json!({"ok": true, "result": with_data(json!({"width": w, "height": h}), data)});
     };

@@ -31,30 +31,32 @@ pub(crate) fn clamp_shared_dock_width(width: f32) -> f32 {
     width.clamp(SHARED_DOCK_MIN, SHARED_DOCK_MAX)
 }
 
-fn seed_dock_panel_width(ctx: &egui::Context, panel: &str, width: f32) {
-    let screen = ctx.content_rect();
+/// Seed the panel's public persisted state before it is laid out: `Panel` keys it by the parent
+/// `Ui`'s scope id and its own salt in 0.37, not by a global `Id` (the old `Id::unique(panel)` key
+/// silently stopped restoring the width). Keep this in one place so the key cannot drift.
+fn seed_dock_panel_width(ui: &egui::Ui, panel: &str, width: f32) {
+    let screen = ui.ctx().content_rect();
     let w = width.max(1.0);
     let outer_rect = egui::Rect::from_min_size(egui::pos2(screen.right() - w, screen.top()), egui::vec2(w, screen.height()));
     let state = egui::containers::panel::PanelState { outer_rect };
-    ctx.data_mut(|data| data.insert_persisted(egui::Id::new(panel), state));
+    ui.ctx().data_mut(|data| data.insert_persisted(ui.scope_id().with(panel), state));
 }
 
-pub(crate) fn apply_pending_dock_width(app: &mut VectorcraftApp, ctx: &egui::Context, panel: &str, clamp: fn(f32) -> f32) {
+pub(crate) fn apply_pending_dock_width(app: &mut VectorcraftApp, ui: &egui::Ui, panel: &str, clamp: fn(f32) -> f32) {
     if !app.ui.dock_width_pending {
         return;
     }
     if let Some(width) = app.ui.dock_width.filter(|w| w.is_finite() && *w > 0.0) {
-        seed_dock_panel_width(ctx, panel, clamp(width));
+        seed_dock_panel_width(ui, panel, clamp(width));
     }
     app.ui.dock_width_pending = false;
 }
 
-pub(crate) fn note_dock_width(app: &mut VectorcraftApp, ctx: &egui::Context, panel: &str) {
-    if let Some(state) = egui::containers::panel::PanelState::load(ctx, egui::Id::new(panel)) {
-        let width = state.size().x;
-        if width.is_finite() && width > 0.0 {
-            app.ui.dock_width = Some(width);
-        }
+/// Remember the width the panel was actually laid out at (its `response.rect`), so a workspace
+/// switch or the next session restores it without reaching into egui's private `PanelState`.
+pub(crate) fn note_dock_width(app: &mut VectorcraftApp, width: f32) {
+    if width.is_finite() && width > 0.0 {
+        app.ui.dock_width = Some(width);
     }
 }
 
@@ -70,13 +72,13 @@ const FLYOUT_TOP: f32 = 110.0;
 
 /// Where the icon column's left edge was drawn last (egui temp memory, one frame old).
 fn column_left_id() -> egui::Id {
-    egui::Id::new("dock-icon-column-left")
+    egui::Id::unique("dock-icon-column-left")
 }
 
 /// Where the dock's left edge was drawn last: the icon column's, or the leftmost dock column's
 /// (egui temp memory, one frame old). Popped-out panels open left of it.
 pub(crate) fn dock_left_id() -> egui::Id {
-    egui::Id::new("dock-left")
+    egui::Id::unique("dock-left")
 }
 
 /// Collapse the tabbed group to icons or expand it again (`window.collapseDock`). Expanding while
@@ -118,8 +120,8 @@ fn panel_icon(app: &mut VectorcraftApp, ui: &mut Ui, id: &'static str, label: &s
     let open = app.ui.open_panel.as_deref() == Some(id);
     // Its own id: the icons below it move up when it floats, and mustn't take over its drag.
     let (_, rect) = ui.allocate_space(vec2(30.0, 30.0));
-    let resp = widgets::paint_icon_button(ui, ui.interact(rect, ui.id().with(("panel-icon", id)), Sense::click_and_drag()), icon, label, open);
-    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, ui.is_enabled(), open, tl!(label)));
+    let resp = widgets::paint_icon_button(ui, ui.interact(rect, ui.scope_id().with(("panel-icon", id)), Sense::click_and_drag()), icon, label, open);
+    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), open, tl!(label)));
     if resp.clicked() {
         app.ui.open_panel = if open { None } else { Some(id.to_string()) };
     }
@@ -131,7 +133,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     if crate::panel_docking::show(app, ui) {
         return;
     }
-    apply_pending_dock_width(app, ui.ctx(), LEGACY_DOCK_PANEL, clamp_legacy_dock_width);
+    apply_pending_dock_width(app, ui, LEGACY_DOCK_PANEL, clamp_legacy_dock_width);
     let t = Tokens::get(ui.ctx());
     let shown = floating::shown_tab(&app.ui);
     ui.ctx().data_mut(|d| d.insert_temp(floating::root_groups_id(), Vec::<floating::RootGroup>::new()));
@@ -178,7 +180,9 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             .response
             .rect
     });
-    note_dock_width(app, ui.ctx(), LEGACY_DOCK_PANEL);
+    if let Some(rect) = group {
+        note_dock_width(app, rect.width());
+    }
     // Collapsed icon-panel strip, left of the expanded panel group (like Illustrator's dock). A
     // collapsed group's panels head it, under the « that expands them again. Floating panels leave
     // it.
@@ -277,7 +281,7 @@ fn tab_strip(app: &mut VectorcraftApp, ui: &mut Ui, active: DockTab) -> bool {
     }
     let rest = Rect::from_min_max(egui::pos2(out.right, strip.top()), egui::pos2(menu.left() - 4.0, strip.bottom()));
     if rest.width() > 0.0 {
-        let resp = ui.interact(rest, ui.id().with("dock-group-bar"), Sense::click_and_drag());
+        let resp = ui.interact(rest, ui.scope_id().with("dock-group-bar"), Sense::click_and_drag());
         if resp.double_clicked() {
             if let Err(error) = app.run("window.panel.collapse", json!({ "panel": active.info().0 })) {
                 app.ui.status = error;
@@ -369,7 +373,7 @@ pub(crate) fn panel_tabs(
         } else {
             galley.clone()
         };
-        let resp = craft_ui::tabs::Tab::new(ui.id().with((id, key)), label, i == selected)
+        let resp = craft_ui::tabs::Tab::new(ui.scope_id().with((id, key)), label, i == selected)
             .sense(Sense::click_and_drag())
             .focus_stroke(Stroke::new(1.0, t.accent))
             .show_at(ui, rect, |ui, _| {
@@ -384,7 +388,7 @@ pub(crate) fn panel_tabs(
     }
     if !fit.overflow.is_empty() && fit.overflow_width > 0.0 {
         let rect = Rect::from_min_size(egui::pos2(out.right, area.top()), vec2(fit.overflow_width, area.height()));
-        let resp = ui.interact(rect, ui.id().with((id, "overflow")), Sense::click());
+        let resp = ui.interact(rect, ui.scope_id().with((id, "overflow")), Sense::click());
         if resp.hovered() {
             ui.painter().rect_filled(rect, 0.0, t.hover);
         }
@@ -392,7 +396,7 @@ pub(crate) fn panel_tabs(
             ui.painter().rect_stroke(rect.shrink(2.0), 0.0, Stroke::new(1.0, t.accent), egui::StrokeKind::Inside);
         }
         icons::paint(ui, "chevrons-right", Rect::from_center_size(rect.center(), vec2(12.0, 12.0)).intersect(rect), t.text);
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Panels")));
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Panels")));
         let resp = resp.on_hover_text(tl!("Panels"));
         egui::Popup::menu(&resp).show(|ui| {
             widgets::menu_scroll(ui, |ui| {
@@ -451,7 +455,7 @@ pub fn floating_panel(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let tall = (screen.height() - FLYOUT_TOP - 26.0 - 20.0 - 40.0).clamp(160.0, 560.0);
     let mut open = true;
     let mut torn = None;
-    let area = egui::Area::new(egui::Id::new("icon-panel")).order(egui::Order::Foreground).pivot(egui::Align2::RIGHT_TOP);
+    let area = egui::Area::new(egui::Id::unique("icon-panel")).order(egui::Order::Foreground).pivot(egui::Align2::RIGHT_TOP);
     area.fixed_pos(egui::pos2(right, FLYOUT_TOP)).show(ctx, |ui| {
         egui::Frame::popup(ui.style()).fill(t.panel).corner_radius(CornerRadius::same(4)).inner_margin(egui::Margin::ZERO).show(ui, |ui| {
             ui.set_width(width);
@@ -462,14 +466,14 @@ pub fn floating_panel(app: &mut VectorcraftApp, ctx: &egui::Context) {
             ui.painter().rect_filled(title, CornerRadius { nw: 4, ne: 0, sw: 0, se: 0 }, t.panel);
             ui.painter().text(title.left_center() + vec2(12.0, 0.0), egui::Align2::LEFT_CENTER, &label, theme::semibold(12.0), t.text);
             let close = Rect::from_center_size(strip.right_center() - vec2(13.0, 0.0), vec2(14.0, 14.0));
-            let cr = ui.interact(close, ui.id().with("close-panel"), Sense::click());
+            let cr = ui.interact(close, ui.scope_id().with("close-panel"), Sense::click());
             icons::paint(ui, "chevrons-right", close, if cr.hovered() { t.text } else { t.text_dim });
             if cr.clicked() {
                 open = false;
             }
             let menu_r = Rect::from_center_size(strip.right_center() - vec2(34.0, 0.0), vec2(16.0, 16.0));
             panels::panel_menu(app, ui, id, menu_r);
-            let drag = ui.interact(title, ui.id().with("title"), Sense::drag()).on_hover_cursor(egui::CursorIcon::Grab);
+            let drag = ui.interact(title, ui.scope_id().with("title"), Sense::drag()).on_hover_cursor(egui::CursorIcon::Grab);
             if drag.dragged() && ui.input(|i| i.pointer.is_decidedly_dragging()) {
                 torn = Some(title.left());
             }
@@ -655,7 +659,7 @@ mod tests {
                 let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
                 ctx.run_ui(input, |ui| floating_panel(&mut app, ui.ctx())).textures_delta.clear();
             }
-            let rect = ctx.memory(|m| m.area_rect(egui::Id::new("icon-panel"))).unwrap();
+            let rect = ctx.memory(|m| m.area_rect(egui::Id::unique("icon-panel"))).unwrap();
             if rect.right() > column {
                 too_wide.push(format!("{panel}: {:.0} past the column", rect.right() - column));
             }
@@ -871,7 +875,7 @@ mod tests {
         h.click(layers.center());
         assert_eq!(h.app.ui.open_panel.as_deref(), Some("layers"));
         h.settle();
-        let rect = h.ctx.memory(|m| m.area_rect(egui::Id::new("icon-panel"))).unwrap();
+        let rect = h.ctx.memory(|m| m.area_rect(egui::Id::unique("icon-panel"))).unwrap();
         let column = h.column_left();
         assert!(rect.right() <= column, "the flyout {rect:?} stays left of the column at {column}");
         assert!(rect.left() >= 0.0 && rect.bottom() <= SCREEN.y, "the flyout {rect:?} is on screen");
@@ -892,7 +896,7 @@ mod tests {
         h.app.run("window.collapseDock", json!({"collapsed": true})).unwrap();
         h.app.run("window.panel", json!({"panel": "properties"})).unwrap();
         h.settle();
-        let rect = h.ctx.memory(|m| m.area_rect(egui::Id::new("icon-panel"))).unwrap();
+        let rect = h.ctx.memory(|m| m.area_rect(egui::Id::unique("icon-panel"))).unwrap();
         assert!(rect.width() >= DOCK_WIDTH && rect.right() <= h.column_left(), "Properties flyout {rect:?}");
         // Taller than the 400 points egui sizes a new area at: its sections (Align, Quick
         // Actions) aren't cut off below Appearance.
@@ -917,7 +921,7 @@ mod tests {
         assert_eq!(h.app.ui.open_panel, None, "on: a click elsewhere puts it away");
         h.click(layers.center());
         assert_eq!(h.app.ui.open_panel.as_deref(), Some("layers"), "its icon still pops it out");
-        let rect = h.ctx.memory(|m| m.area_rect(egui::Id::new("icon-panel"))).unwrap();
+        let rect = h.ctx.memory(|m| m.area_rect(egui::Id::unique("icon-panel"))).unwrap();
         h.click(egui::pos2(rect.center().x, rect.top() + 13.0 + 26.0 + 10.0));
         assert_eq!(h.app.ui.open_panel.as_deref(), Some("layers"), "a click inside keeps it");
         // The icons still swap the flyout and put it away.
@@ -929,7 +933,7 @@ mod tests {
         h.click(layers.center());
         h.app.ui.dialog = Some(crate::state::Dialog::new("move", json!({"dx": "0 pt", "dy": "0 pt"})));
         h.settle();
-        let dialog = h.ctx.memory(|m| m.area_rect(egui::Id::new(("dialog", "move")))).expect("the Move dialog");
+        let dialog = h.ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", "move")))).expect("the Move dialog");
         h.click(dialog.left_top() + vec2(20.0, 30.0));
         assert_eq!(h.app.ui.open_panel.as_deref(), Some("layers"), "a click in the dialog keeps it");
         h.click(egui::pos2(dialog.left() - 40.0, dialog.center().y));

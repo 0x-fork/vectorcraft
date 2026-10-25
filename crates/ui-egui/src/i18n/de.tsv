@@ -5132,3 +5132,6 @@ axis	Y Axis	Y-Achse
 	Rectangular Grid Tool Options	Optionen für das Rechteckiges-Raster-Werkzeug
 	Polar Grid Tool Options	Optionen für das Radiales-Raster-Werkzeug
 	Fill Line	Linie füllen
+	Scale Presets	Skalierungsvorgaben
+@msg	a {width}×{height} screenshot's byte count overflows	die Byteanzahl eines {width}×{height}-Screenshots läuft über
+@msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	die {what} des Fensters ({points} Punkte × {scale} DPI) kann keinen Screenshot bemessen

@@ -89,8 +89,9 @@ impl eframe::App for App {
     // (`VectorcraftApp::with_automation_roots`), which are in force elsewhere in the process.
     fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         file_access::unconfined(|| self.logic_frame(ctx, frame));
+        self.app.finish_ime_logic(ctx);
     }
-    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
         // winit gives the window its caption back when it changes the window's flags (maximize,
         // restore, …): take it off again before the frame is laid out (#1758).
         if let Some(window_frame) = self.window_frame.as_mut() {
@@ -103,7 +104,7 @@ impl eframe::App for App {
         // A pen contact with the barrel button held presses the secondary button (Windows Ink).
         #[cfg(all(windows, not(target_vendor = "win7")))]
         windows_stylus::raw_input_hook(raw);
-        file_access::unconfined(|| self.app.raw_input_hook(raw));
+        file_access::unconfined(|| self.app.raw_input_hook(ctx, raw));
     }
     #[cfg_attr(not(target_os = "macos"), allow(unused_variables))]
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
@@ -164,7 +165,7 @@ impl App {
             }
             open_files(&mut self.app, files);
         }
-        self.app.logic(ctx);
+        self.app.tick(ctx);
         if self.pending_maximize {
             if let Some(w) = &self.winit_window {
                 self.pending_maximize = window::apply_pending_maximize(w, true, &mut self.maximize_tries);
@@ -1014,6 +1015,7 @@ fn main() -> std::process::ExitCode {
         run(
             options,
             Box::new(move |cc| {
+                VectorcraftApp::install_ime_reset_hooks(&cc.egui_ctx);
                 let mut session = Session::new();
                 // The profiles loaded before come back before the preferences name any of them.
                 prefs_dir::attach_profile_store(&mut session);

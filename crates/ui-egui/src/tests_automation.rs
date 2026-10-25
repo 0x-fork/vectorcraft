@@ -185,12 +185,84 @@ fn frames_with_injected_input_are_confined() {
     let (mut app, tx, base) = confined("synthetic");
     let r = request(&mut app, &tx, "ui.key", json!({"key": "Escape"}));
     assert_eq!(r["ok"], true, "{r}");
+    let ctx = egui::Context::default();
     let mut raw = egui::RawInput::default();
-    app.raw_input_hook(&mut raw);
+    app.raw_input_hook(&ctx, &mut raw);
     assert!(app.synthetic_frame, "the frame carrying the key");
+    // The batch is acknowledged only after a settled UI pass took it (one step per pass).
+    let mut out = ctx.run_ui(raw, |_| {});
+    out.textures_delta.clear();
     let mut raw = egui::RawInput::default();
-    app.raw_input_hook(&mut raw);
+    app.raw_input_hook(&ctx, &mut raw);
     assert!(!app.synthetic_frame, "the frames after it are the person's");
+    let _ = std::fs::remove_dir_all(base);
+}
+
+/// Hidden logic-only ticks between the injection and its UI pass must not drain another step:
+/// one step per settled pass, not per hidden tick.
+#[test]
+fn hidden_ticks_without_a_ui_pass_do_not_drain_more_injected_steps() {
+    let (mut app, tx, base) = confined("gate");
+    let r = request(&mut app, &tx, "ui.key", json!({"key": "A", "text": "x"}));
+    assert_eq!(r["ok"], true, "{r}");
+    let ctx = egui::Context::default();
+    let mut raw = egui::RawInput::default();
+    app.raw_input_hook(&ctx, &mut raw);
+    assert!(!raw.events.is_empty(), "the first step is in the host's input");
+    let queued = app.synthetic.len();
+    for _ in 0..3 {
+        let mut raw = egui::RawInput::default();
+        app.raw_input_hook(&ctx, &mut raw);
+        assert!(raw.events.is_empty(), "no new step while the previous batch is unapplied");
+    }
+    assert_eq!(app.synthetic.len(), queued, "the hidden ticks drained nothing");
+    let _ = std::fs::remove_dir_all(base);
+}
+
+/// A UI pass that changes the document before taking an injected batch drops exactly that batch,
+/// including the synthetic modifier latch it set: a later real event keeps the host's modifiers.
+#[test]
+fn a_stale_injected_batch_is_dropped_with_its_modifier_latch() {
+    let (mut app, tx, base) = confined("discard");
+    let r = request(&mut app, &tx, "ui.key", json!({"key": "A", "text": "x", "cmd": true}));
+    assert_eq!(r["ok"], true, "{r}");
+    let ctx = egui::Context::default();
+    let mut raw = egui::RawInput::default();
+    app.raw_input_hook(&ctx, &mut raw);
+    assert!(app.synthetic_modifiers, "the batch carries Cmd");
+    assert!(!raw.events.is_empty());
+    // The document changed after injection (a control request or a click switching documents):
+    // the batch no longer belongs to what the UI pass would act on.
+    app.run("file.new", json!({"width": 100, "height": 100})).unwrap();
+    app.raw_input_hook(&ctx, &mut raw);
+    assert!(raw.events.is_empty(), "the stale events are removed from the host's input");
+    assert!(!app.synthetic_frame && !app.synthetic_injected, "the batch is not applied");
+    assert!(!app.synthetic_modifiers, "its modifier latch is cleared too");
+    assert!(app.synthetic.is_empty(), "nothing further was queued");
+    let _ = std::fs::remove_dir_all(base);
+}
+
+/// If the host's raw input no longer contains the synthetic batch exactly (another handler
+/// rewrote or interleaved events), the app cannot separate stale synthetic clicks/text from the
+/// person's input. It delivers nothing that pass and cancels the rest of the sequence.
+#[test]
+fn an_unidentifiable_stale_injected_batch_fails_closed() {
+    let (mut app, tx, base) = confined("discard-unknown");
+    let r = request(&mut app, &tx, "ui.key", json!({"key": "A", "text": "x", "cmd": true}));
+    assert_eq!(r["ok"], true, "{r}");
+    let ctx = egui::Context::default();
+    let mut raw = egui::RawInput::default();
+    app.raw_input_hook(&ctx, &mut raw);
+    assert!(raw.events.len() > 1, "the batch has a modifier companion and the key");
+    // Rewrite one event so the exact subsequence can no longer be found.
+    let last = raw.events.len() - 1;
+    raw.events[last] = egui::Event::Text("host".into());
+    app.run("file.new", json!({"width": 100, "height": 100})).unwrap();
+    app.raw_input_hook(&ctx, &mut raw);
+    assert!(raw.events.is_empty(), "unidentifiable stale input is never delivered");
+    assert!(!app.synthetic_frame && !app.synthetic_injected, "the stale batch is not applied");
+    assert!(!app.synthetic_modifiers, "its modifier latch is cleared too");
+    assert!(app.synthetic.is_empty(), "the rest of the stale synthetic sequence is cancelled");
     let _ = std::fs::remove_dir_all(base);
 }
 

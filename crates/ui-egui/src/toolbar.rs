@@ -114,7 +114,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
         Some(pos) => {
             // Floating, kept inside the window, its tools scrolling when they don't fit under it.
             let ctx = ui.ctx().clone();
-            let id = egui::Id::new("toolbar-floating");
+            let id = egui::Id::unique("toolbar-floating");
             let screen = ctx.content_rect();
             // Kept on screen by its title bar and first tools: the rest scrolls.
             let size = ctx.memory(|m| m.area_rect(id)).map_or(vec2(w, 160.0), |r| vec2(r.width(), r.height().min(160.0)));
@@ -161,7 +161,7 @@ fn body(app: &mut VectorcraftApp, ui: &mut Ui, cols: usize, floating: Option<egu
         );
     }
     crate::floating::drag_tools(app, ui.ctx(), &hresp.union(gresp.clone()), bounds, floating);
-    hresp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Toggle single/double column")));
+    hresp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Toggle single/double column")));
     if hresp.on_hover_text(tl!("Toggle single/double column")).clicked()
         // It only fails on bad params, which this never sends; show it all the same.
         && let Err(e) = app.run("window.toolbarColumns", json!({ "double": cols == 1 }))
@@ -169,13 +169,13 @@ fn body(app: &mut VectorcraftApp, ui: &mut Ui, cols: usize, floating: Option<egu
         app.ui.status = e;
     }
     let grip_tip = if floating.is_some() { tl!("Drag to the window's left edge to dock") } else { tl!("Drag to float the toolbar") };
-    gresp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), grip_tip));
+    gresp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), grip_tip));
     gresp.on_hover_cursor(egui::CursorIcon::Grab).on_hover_text(grip_tip);
     // The tools and the controls under them scroll in a window too short for them.
     widgets::strip_scroll(ui, "toolbar", |ui| {
         let active = app.session.tool_id();
         // The tool button whose long press opened its flyout, until the next press.
-        let held_id = egui::Id::new("toolbar-held");
+        let held_id = egui::Id::unique("toolbar-held");
         if ui.input(|inp| inp.pointer.any_pressed()) {
             ui.data_mut(|d| d.remove::<egui::Id>(held_id));
         }
@@ -262,7 +262,7 @@ fn body(app: &mut VectorcraftApp, ui: &mut Ui, cols: usize, floating: Option<egu
                     } else if resp.clicked() {
                         app.select_tool(shown.id);
                     }
-                    resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), is_active, tip(shown)));
+                    resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), is_active, tip(shown)));
                     resp.on_hover_text(tip(shown));
                 }
             });
@@ -277,8 +277,8 @@ fn body(app: &mut VectorcraftApp, ui: &mut Ui, cols: usize, floating: Option<egu
         if let Some((slot, rect)) = open_flyout {
             app.ui.flyout = Some(0);
             ui.data_mut(|d| {
-                d.insert_temp(egui::Id::new("flyout-anchor"), rect);
-                d.insert_temp(egui::Id::new("flyout-tools"), slot.iter().map(|s| s.to_string()).collect::<Vec<String>>());
+                d.insert_temp(egui::Id::unique("flyout-anchor"), rect);
+                d.insert_temp(egui::Id::unique("flyout-tools"), slot.iter().map(|s| s.to_string()).collect::<Vec<String>>());
             });
         }
         ui.add_space(8.0);
@@ -479,7 +479,7 @@ fn bottom_controls(app: &mut VectorcraftApp, ui: &mut Ui, t: &Tokens, cols: usiz
                     "paint.lastGradient" => widgets::gradient_chip(ui, r, &app.session.last_gradient),
                     _ => widgets::paint_chip(ui, r, &Paint::None),
                 }
-                resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!(tip)));
+                resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!(tip)));
                 if resp.on_hover_text(tl!(tip)).clicked() {
                     clicked = Some(cmd);
                 }
@@ -560,7 +560,7 @@ fn is_floating(app: &VectorcraftApp, key: &str) -> bool {
 
 /// The area of the floating flyout of the group whose first tool is `key`.
 fn floating_area(key: &str) -> egui::Id {
-    egui::Id::new(("tool-floating", key))
+    egui::Id::unique(("tool-floating", key))
 }
 
 /// Bring a floating flyout to the front and flash its border.
@@ -604,9 +604,9 @@ fn flyout_body(ui: &mut Ui, t: &Tokens, active: &str, tools: &[String], floating
         ui.painter().rect_filled(bar, 0.0, t.tab_strip);
         let grip = if floating {
             let x = egui::Rect::from_min_size(bar.min, vec2(BAR, CLOSE));
-            let xr = ui.interact(x, egui::Id::new(("tool-flyout-close", key)), Sense::click());
+            let xr = ui.interact(x, egui::Id::unique(("tool-flyout-close", key)), Sense::click());
             icons::paint(ui, "x", x.shrink2(vec2(1.0, 3.0)), if xr.hovered() { t.text_strong } else { t.text });
-            xr.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tl!("Put back in the toolbar")));
+            xr.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Put back in the toolbar")));
             out.close = xr.on_hover_text(tl!("Put back in the toolbar")).clicked();
             egui::Rect::from_min_max(bar.min + vec2(0.0, CLOSE), bar.max)
         } else {
@@ -619,7 +619,7 @@ fn flyout_body(ui: &mut Ui, t: &Tokens, active: &str, tools: &[String], floating
             ui.painter().line_segment([pos2(x, grip.center().y - half), pos2(x, grip.center().y + half)], Stroke::new(0.6, t.text_disabled));
         }
         let tip = if floating { tl!("Drag to move") } else { tl!("Drag to float as a toolbar") };
-        resp.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), tip));
+        resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tip));
         let resp = if resp.dragged() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
             resp
@@ -655,7 +655,7 @@ fn tool_rows(ui: &mut Ui, t: &Tokens, active: &str, tools: &[String]) -> Option<
         if let Some(sc) = shortcut {
             ui.painter().galley(pos2(r.right() - ROW_END - sc.size().x, r.center().y - sc.size().y / 2.0), sc, color);
         }
-        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), is_active, tip(tool)));
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), is_active, tip(tool)));
         if resp.clicked() {
             chosen = Some(tool.id);
         }
@@ -687,7 +687,7 @@ fn rows_width<'a>(rows: impl Iterator<Item = &'a RowText>) -> f32 {
 /// The grab bar of the group whose first tool is `key` (one id, flyout or floating, so a drag
 /// that tears the flyout off carries on moving it).
 fn bar_id(key: &str) -> egui::Id {
-    egui::Id::new(("tool-flyout-bar", key))
+    egui::Id::unique(("tool-flyout-bar", key))
 }
 
 /// Where the pointer holds a floating flyout's bar, from the flyout's corner, while it's dragged.
@@ -709,7 +709,7 @@ fn tool_strip(ui: &mut Ui, t: &Tokens, active: &str, tools: &[String]) -> Option
         }
         let ir = egui::Rect::from_center_size(r.center(), vec2(18.0, 18.0));
         icons::paint(ui, icons::tool_icon(tool.icon), ir, if active == tool.id { t.text_strong } else { t.icon });
-        resp.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), active == tool.id, tip(tool)));
+        resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), active == tool.id, tip(tool)));
         if resp.on_hover_text(tip(tool)).clicked() {
             chosen = Some(tool.id);
         }
@@ -731,17 +731,17 @@ fn flyout(app: &mut VectorcraftApp, ctx: &egui::Context) {
     if app.ui.flyout.is_none() {
         return;
     }
-    let tools: Vec<String> = ctx.data(|d| d.get_temp(egui::Id::new("flyout-tools"))).unwrap_or_default();
+    let tools: Vec<String> = ctx.data(|d| d.get_temp(egui::Id::unique("flyout-tools"))).unwrap_or_default();
     if tools.is_empty() {
         app.ui.flyout = None;
         return;
     }
     let anchor: egui::Rect =
-        ctx.data(|d| d.get_temp(egui::Id::new("flyout-anchor"))).unwrap_or(egui::Rect::from_min_size(pos2(40.0, 100.0), vec2(32.0, 32.0)));
+        ctx.data(|d| d.get_temp(egui::Id::unique("flyout-anchor"))).unwrap_or(egui::Rect::from_min_size(pos2(40.0, 100.0), vec2(32.0, 32.0)));
     let t = Tokens::get(ctx);
     let active = app.session.tool_id();
     let mut input = FlyoutInput::default();
-    let resp = egui::Area::new(egui::Id::new("tool-flyout")).order(egui::Order::Foreground).fixed_pos(anchor.right_top() + vec2(8.0, -1.0)).show(
+    let resp = egui::Area::new(egui::Id::unique("tool-flyout")).order(egui::Order::Foreground).fixed_pos(anchor.right_top() + vec2(8.0, -1.0)).show(
         ctx,
         |ui| {
             flyout_frame(&t, false).show(ui, |ui| input = flyout_body(ui, &t, active, &tools, false));
@@ -886,7 +886,16 @@ pub(crate) mod tests {
     /// A mouse wheel turn over `at`, scrolling the content up by `dy` points.
     pub(crate) fn wheel(at: Pos2, dy: f32) -> Vec<Event> {
         let unit = egui::MouseWheelUnit::Point;
-        vec![Event::PointerMoved(at), Event::MouseWheel { unit, delta: vec2(0.0, -dy), phase: egui::TouchPhase::Move, modifiers: Default::default() }]
+        vec![
+            Event::PointerMoved(at),
+            Event::MouseWheel {
+                unit,
+                delta: vec2(0.0, -dy),
+                phase: egui::TouchPhase::Move,
+                modifiers: Default::default(),
+                source: egui::MouseWheelSource::Unknown,
+            },
+        ]
     }
 
     #[test]
@@ -1237,7 +1246,7 @@ pub(crate) mod tests {
         frame(&mut app, &ctx, 1.05, vec![b(false)]);
         frame(&mut app, &ctx, 1.1, vec![]);
         assert!(app.ui.flyout.is_some(), "the right-click opens the flyout and the same click doesn't close it");
-        let menu = ctx.memory(|m| m.area_rect(egui::Id::new("tool-flyout"))).expect("the flyout is shown");
+        let menu = ctx.memory(|m| m.area_rect(egui::Id::unique("tool-flyout"))).expect("the flyout is shown");
         assert_eq!(app.session.tool_id(), "selection", "a right-click only opens the flyout");
         // Its second row is Rounded Rectangle (30 pt rows).
         let row = egui::pos2(menu.left() + 60.0, menu.top() + 45.0);
@@ -1352,9 +1361,9 @@ pub(crate) mod tests {
             frame_in(&mut app, &ctx, 1.4, vec![pointer(at, false)], 2000.0);
             frame_in(&mut app, &ctx, 1.45, vec![], 2000.0);
             assert_eq!(app.session.tool_id(), "selection");
-            let tools: Vec<String> = ctx.data(|d| d.get_temp(egui::Id::new("flyout-tools"))).unwrap();
+            let tools: Vec<String> = ctx.data(|d| d.get_temp(egui::Id::unique("flyout-tools"))).unwrap();
             let row_index = tools.iter().position(|id| id == "verticalType").unwrap();
-            let menu = ctx.memory(|m| m.area_rect(egui::Id::new("tool-flyout"))).unwrap();
+            let menu = ctx.memory(|m| m.area_rect(egui::Id::unique("tool-flyout"))).unwrap();
             let row = egui::pos2(menu.left() + 60.0, menu.top() + 15.0 + row_index as f32 * 30.0);
             frame_in(&mut app, &ctx, 2.0, vec![Event::PointerMoved(row), pointer(row, true)], 2000.0);
             frame_in(&mut app, &ctx, 2.05, vec![pointer(row, false)], 2000.0);
@@ -1486,7 +1495,7 @@ pub(crate) mod tests {
         let ctx = egui::Context::default();
         let at = shapes_button(&mut app, &ctx).center();
         click(&mut app, &ctx, 1.0, at, PointerButton::Secondary);
-        let menu = ctx.memory(|m| m.area_rect(egui::Id::new("tool-flyout"))).expect("the flyout is shown");
+        let menu = ctx.memory(|m| m.area_rect(egui::Id::unique("tool-flyout"))).expect("the flyout is shown");
         // Its grab bar runs down its right side: dragging it tears the flyout off.
         let bar = pos2(menu.right() - BAR / 2.0, menu.center().y);
         drag(&mut app, &ctx, 2.0, bar, &[bar + vec2(20.0, 0.0), bar + vec2(60.0, 40.0)]);
@@ -1531,7 +1540,7 @@ pub(crate) mod tests {
         let ctx = egui::Context::default();
         let at = shapes_button(&mut app, &ctx).center();
         click(&mut app, &ctx, 1.0, at, PointerButton::Secondary);
-        let menu = ctx.memory(|m| m.area_rect(egui::Id::new("tool-flyout"))).unwrap();
+        let menu = ctx.memory(|m| m.area_rect(egui::Id::unique("tool-flyout"))).unwrap();
         let bar = pos2(menu.right() - BAR / 2.0, menu.center().y);
         click(&mut app, &ctx, 2.0, bar, PointerButton::Primary);
         frame(&mut app, &ctx, 2.2, vec![]);
@@ -1551,7 +1560,7 @@ pub(crate) mod tests {
         frame(&mut app, &ctx, 1.0, vec![Event::PointerMoved(at), b(at, true)]);
         frame(&mut app, &ctx, 1.0 + LONG_PRESS + 0.01, vec![]);
         frame(&mut app, &ctx, 1.45, vec![]);
-        let menu = ctx.memory(|m| m.area_rect(egui::Id::new("tool-flyout"))).expect("the long press opens the flyout");
+        let menu = ctx.memory(|m| m.area_rect(egui::Id::unique("tool-flyout"))).expect("the long press opens the flyout");
         let bar = pos2(menu.right() - BAR / 2.0, menu.center().y);
         frame(&mut app, &ctx, 1.5, vec![Event::PointerMoved(bar)]);
         frame(&mut app, &ctx, 1.55, vec![b(bar, false)]);
@@ -1722,7 +1731,7 @@ pub(crate) mod tests {
         let group: Vec<String> = ["rectangle", "roundedRectangle", "ellipse"].map(String::from).to_vec();
         let flyout = tree(|ui| {
             app.ui.flyout = Some(0);
-            ui.data_mut(|d| d.insert_temp(egui::Id::new("flyout-tools"), group.clone()));
+            ui.data_mut(|d| d.insert_temp(egui::Id::unique("flyout-tools"), group.clone()));
             show(&mut app, ui);
         });
         assert_eq!(role_and_state(&flyout, &name("roundedRectangle")), (Role::Button, Some(Toggled::False)));
