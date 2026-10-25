@@ -103,7 +103,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     let w = if cols == 2 { 80.0 } else { WIDTH };
     // Where the panel docks: along the window's left edge, under the bars.
     let edge = ui.available_rect_before_wrap();
-    ui.ctx().data_mut(|d| d.insert_temp(crate::floating::tools_zone_id(), egui::Rect::from_min_size(edge.min, vec2(WIDTH, edge.height()))));
+    ui.ctx().data_mut(|d| d.insert_temp(crate::tools_float::tools_zone_id(), egui::Rect::from_min_size(edge.min, vec2(WIDTH, edge.height()))));
     match app.ui.toolbar_pos {
         None => {
             let margin = egui::Margin { left: 6, right: 0, top: 6, bottom: 6 };
@@ -118,7 +118,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             let screen = ctx.content_rect();
             // Kept on screen by its title bar and first tools: the rest scrolls.
             let size = ctx.memory(|m| m.area_rect(id)).map_or(vec2(w, 160.0), |r| vec2(r.width(), r.height().min(160.0)));
-            let at = crate::floating::clamp(pos, size, screen);
+            let at = crate::tools_float::clamp(pos, size, screen);
             egui::Area::new(id).order(egui::Order::Middle).fixed_pos(at).show(&ctx, |ui| {
                 flyout_frame(&t, false).inner_margin(egui::Margin { left: 0, right: 0, top: 0, bottom: 4 }).show(ui, |ui| {
                     ui.set_width(w);
@@ -160,7 +160,7 @@ fn body(app: &mut VectorcraftApp, ui: &mut Ui, cols: usize, floating: Option<egu
             Stroke::new(0.4, t.text_disabled),
         );
     }
-    crate::floating::drag_tools(app, ui.ctx(), &hresp.union(gresp.clone()), bounds, floating);
+    crate::tools_float::drag_tools(app, ui.ctx(), &hresp.union(gresp.clone()), bounds, floating);
     hresp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), tl!("Toggle single/double column")));
     if hresp.on_hover_text(tl!("Toggle single/double column")).clicked()
         // It only fails on bad params, which this never sends; show it all the same.
@@ -344,7 +344,7 @@ pub fn open_options(app: &mut VectorcraftApp, tool: &str) -> Result<serde_json::
             Ok(json!({ "dialog": dialog }))
         }
         // The Gradient and Magic Wand tools: their panels.
-        "gradient" | "magicWand" if app.ui.open_panel.as_deref() == Some(tool) => Ok(json!({ "open": tool })),
+        "gradient" | "magicWand" if crate::panel_docking::showing(&app.ui, tool) => Ok(json!({ "open": tool })),
         "gradient" | "magicWand" => app.run("window.panel", json!({ "panel": tool })),
         "artboard" => crate::dialogs::artboard_options::open(app),
         "eyedropper" => {
@@ -796,7 +796,7 @@ fn floating(app: &mut VectorcraftApp, ctx: &egui::Context) {
         }
         // Kept on screen (a smaller window, or a position saved on a bigger one).
         let size = ctx.memory(|m| m.area_rect(id)).map_or(vec2(strip_width(&f.tools), PITCH), |r| r.size());
-        let pos = crate::floating::clamp(f.pos, size, screen);
+        let pos = crate::tools_float::clamp(f.pos, size, screen);
         let mut input = FlyoutInput::default();
         egui::Area::new(id).order(egui::Order::Middle).fixed_pos(pos).show(ctx, |ui| {
             flyout_frame(&t, flash).show(ui, |ui| input = flyout_body(ui, &t, active, &f.tools, true));
@@ -993,9 +993,9 @@ pub(crate) mod tests {
         assert_eq!((d.str("__command"), d.str("type")), ("graph.setType".to_string(), "column".to_string()));
         // The Magic Wand panel opens, and stays open on a second double-click.
         open_options(&mut app, "magicWand").unwrap();
-        assert_eq!(app.ui.open_panel.as_deref(), Some("magicWand"));
-        assert_eq!(open_options(&mut app, "magicWand").unwrap()["open"], "magicWand");
-        assert_eq!(app.ui.open_panel.as_deref(), Some("magicWand"));
+        assert!(crate::panel_docking::showing(&app.ui, "magicWand"));
+        open_options(&mut app, "magicWand").unwrap();
+        assert!(crate::panel_docking::showing(&app.ui, "magicWand"));
     }
 
     /// A double-click at `at`, `time` seconds in (a second apart from the last).

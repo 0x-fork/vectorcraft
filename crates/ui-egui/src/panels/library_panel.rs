@@ -208,14 +208,14 @@ fn registered(panel: &str) -> Result<&'static str, String> {
 
 /// Is panel `panel` open (in the dock or floating)?
 pub(crate) fn is_open(ui: &UiState, panel: &str) -> bool {
-    ui.docking.as_ref().is_some_and(|l| l.panels().iter().any(|p| p.as_str() == panel)) || crate::floating::group_of(ui, panel).is_some()
+    crate::panel_docking::layout_of(ui).contains(&panel.to_string())
 }
 
 /// The open library panels.
 fn open_panels(ui: &UiState) -> Vec<String> {
     let mut out: Vec<String> = vec![];
     let docked = ui.docking.iter().flat_map(|l| l.panels());
-    for p in docked.chain(ui.floating_panels.iter().flat_map(|g| &g.panels)) {
+    for p in docked {
         if p.starts_with(PREFIX) && !out.contains(p) {
             out.push(p.clone());
         }
@@ -367,15 +367,21 @@ fn rename(ui: &mut UiState, from: &str, to: &str) -> Result<(), String> {
         serde_json::from_value(v).map_err(|e| e.to_string())
     }
     registered(to)?;
-    let docking = ui.docking.as_ref().map(|l| renamed(l, from, to)).transpose()?;
+    let mut docking = ui.docking.as_ref().map(|l| renamed(l, from, to)).transpose()?;
+    // A floating window keeps its id, and with it its OS window.
+    if let (Some(new), Some(old)) = (docking.as_mut(), ui.docking.as_ref()) {
+        for (window, was) in new.floating.iter_mut().zip(&old.floating) {
+            window.id = was.id;
+        }
+    }
     let mut hidden = std::collections::BTreeMap::new();
     for (p, at) in &ui.docking_hidden {
         hidden.insert(if p == from { to.to_string() } else { p.clone() }, renamed(at, from, to)?);
     }
     ui.docking = docking;
     ui.docking_hidden = hidden;
-    for p in ui.floating_panels.iter_mut().flat_map(|g| g.panels.iter_mut()).chain(ui.open_panel.as_mut()).filter(|p| p.as_str() == from) {
-        *p = to.into();
+    if ui.open_panel.as_deref() == Some(from) {
+        ui.open_panel = Some(to.into());
     }
     Ok(())
 }
@@ -1132,7 +1138,7 @@ mod tests {
     }
 
     fn groups(app: &VectorcraftApp) -> Vec<Vec<String>> {
-        docking(app).floating.iter().map(|g| g.panels.clone()).collect()
+        docking(app).floating.iter().map(crate::panel_docking::window_panels).collect()
     }
 
     #[test]
@@ -1154,7 +1160,7 @@ mod tests {
         assert_eq!(groups(&app).len(), 3);
         assert_eq!(last_open(&app.ui).map(LibraryPanel::panel), Some(pastels.clone()));
         // They group, dock and close as any panel, and `window.panel` shows one again.
-        app.run("window.panel.float", json!({"panel": brights, "onto": pastels})).unwrap();
+        app.run("window.panel.move", json!({"panel": brights, "anchor": pastels})).unwrap();
         assert!(groups(&app).contains(&vec![pastels.clone(), brights.clone()]), "{:?}", groups(&app));
         app.run("window.panel.dock", json!({"panel": styles})).unwrap();
         assert!(craft_ui::docking::Layout { root: docking(&app).root.clone(), floating: vec![] }.contains(&styles));
@@ -1242,7 +1248,7 @@ mod tests {
         let next = restarted(&app);
         assert!(is_open(&next.ui, &pastels) && is_open(&next.ui, &brand), "{}", next.ui.status);
         assert!(!is_open(&next.ui, &brights), "a panel that isn't persistent closed with the app");
-        let group = docking(&next).floating.iter().find(|g| g.panels.contains(&pastels)).unwrap();
+        let group = docking(&next).floating.iter().find(|g| g.contains(&pastels)).unwrap();
         assert_eq!(group.rect[..2], [40.0, 90.0], "where it was");
         let s = settings(&next.ui, "swatches", "pastels").unwrap();
         assert_eq!((s.view, s.hide_find, s.persistent), (Some(View::LargeList), true, true));
@@ -1427,8 +1433,8 @@ mod tests {
         step::<SwatchLibraries>(&mut app, "pastels", 1);
         let next = panel_id("swatches", SWATCH_IDS[5]);
         assert!(!is_open(&app.ui, &first) && is_open(&app.ui, &next), "{}", app.ui.status);
-        let group = docking(&app).floating.iter().find(|g| g.panels.contains(&next)).unwrap();
-        assert_eq!((group.panels.len(), group.rect[0], group.rect[1]), (1, 50.0, 60.0), "in its place");
+        let group = docking(&app).floating.iter().find(|g| g.contains(&next)).unwrap();
+        assert_eq!((group.panels().count(), group.rect[0], group.rect[1]), (1, 50.0, 60.0), "in its place");
         let s = settings(&app.ui, "swatches", SWATCH_IDS[5]).unwrap();
         assert_eq!((s.view, s.persistent), (Some(View::SmallList), true), "the panel keeps its settings");
         assert!(settings(&app.ui, "swatches", "pastels").is_none());

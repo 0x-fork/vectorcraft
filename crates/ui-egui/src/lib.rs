@@ -27,7 +27,6 @@ pub mod dock;
 mod edit_toolbar;
 pub mod export_progress;
 pub mod find_font;
-pub mod floating;
 pub mod font_menu;
 mod frame_rate;
 mod free_transform;
@@ -38,6 +37,7 @@ pub mod icons;
 pub(crate) mod ime;
 pub mod io;
 pub mod keymap;
+pub mod layout_migration;
 pub mod menus;
 pub mod native_menu;
 pub mod opening;
@@ -63,6 +63,7 @@ pub mod theme;
 pub mod thumb_worker;
 pub mod titlebar;
 pub mod toolbar;
+mod tools_float;
 pub mod touch;
 mod ui_fonts;
 pub mod unsaved;
@@ -334,7 +335,14 @@ pub struct Services {
     /// and the end to switch to the Eraser tool and back. Without it, pen pressure comes from
     /// touch events only ([`stylus`]).
     pub stylus: Option<stylus::StylusFeed>,
+    /// The host's rewrites of a window's raw input (pen barrel button, closing the macOS menu
+    /// bar's open menu) for floating panels in OS windows of their own: eframe runs the host's
+    /// `raw_input_hook` for the main window only.
+    pub native_input_hook: Option<NativeInputHook>,
 }
+
+/// Rewrites one window's raw input before egui reads it ([`Services::native_input_hook`]).
+pub type NativeInputHook = std::sync::Arc<dyn Fn(&mut egui::RawInput) + Send + Sync>;
 
 /// Cached canvas raster.
 pub struct CanvasCache {
@@ -456,6 +464,8 @@ pub struct VectorcraftApp {
     pub services: Services,
     pub canvas: CanvasCache,
     pub perf: Perf,
+    /// Docking state that lives for the session only.
+    pub(crate) dock_rt: panel_docking::Runtime,
     /// macOS: the room the app bar keeps at its left for the window buttons over it, in points
     /// (0 where the OS draws no buttons over the app bar).
     pub titlebar_inset: f32,
@@ -553,6 +563,15 @@ pub struct VectorcraftApp {
     pub recovery: recovery::Timer,
     /// Modifiers the keyboard holds (from the host's input), given back after synthetic input.
     host_modifiers: egui::Modifiers,
+    /// Key, text and clipboard events a floating panel's own OS window forwarded, for the main
+    /// window's next frame ([`Self::raw_input_hook`]), and the modifiers held in that window.
+    pub(crate) forwarded: Vec<egui::Event>,
+    pub(crate) forwarded_modifiers: Option<egui::Modifiers>,
+    /// The last frame held the forwarded modifiers: this one goes back to the keyboard's.
+    forwarded_modifiers_held: bool,
+    /// This host iteration's input carries forwarded keys: they are the main window's although
+    /// its OS window doesn't have the keyboard (see `shortcuts::handle`).
+    pub(crate) forwarded_frame: bool,
     /// Synthetic input set the modifiers egui holds (see [`Self::raw_input_hook`]).
     synthetic_modifiers: bool,
     /// The marked text the system IME last sent (`None` once it commits or clears). When the Type
@@ -762,6 +781,7 @@ impl VectorcraftApp {
                 hover_cursor: None,
             },
             perf: Perf::default(),
+            dock_rt: Default::default(),
             titlebar_inset: 0.0,
             last_effect: None,
             last_warp: None,
@@ -807,6 +827,10 @@ impl VectorcraftApp {
             placing: Default::default(),
             recovery: Default::default(),
             host_modifiers: Default::default(),
+            forwarded: Vec::new(),
+            forwarded_modifiers: None,
+            forwarded_modifiers_held: false,
+            forwarded_frame: false,
             synthetic_modifiers: false,
             ime_marked: None,
             ime_context: Default::default(),
@@ -1946,10 +1970,16 @@ impl VectorcraftApp {
     #[cfg(not(target_arch = "wasm32"))]
     fn take_dropped_files(&mut self, ctx: &egui::Context) {
         let (dropped, shift) = ctx.input(|i| (i.raw.dropped_files.clone(), i.modifiers.shift));
+        self.open_dropped_files(dropped, place::drag_pos(ctx), shift);
+    }
+
+    /// Files dropped on the main window or on a floating panel's own OS window, opened or placed
+    /// by kind; `pos` is the drop point in the main window, where the backend reports one.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn open_dropped_files(&mut self, dropped: Vec<egui::DroppedFileHandle>, pos: Option<egui::Pos2>, shift: bool) {
         if dropped.is_empty() {
             return;
         }
-        let pos = place::drag_pos(ctx);
         let mut files = vec![];
         for f in dropped {
             let path = Some(f.path().to_string_lossy().to_string()).filter(|s| !s.is_empty());
@@ -2126,6 +2156,19 @@ impl VectorcraftApp {
                 _ => {}
             }
         }
+        // Keys a floating panel's own OS window left over run here, as if typed in this window,
+        // under the modifiers held there for this frame only.
+        if std::mem::take(&mut self.forwarded_modifiers_held) {
+            raw.events.insert(0, egui::Event::ModifiersChanged(self.host_modifiers));
+        }
+        self.forwarded_frame = !self.forwarded.is_empty();
+        if !self.forwarded.is_empty() {
+            if let Some(m) = self.forwarded_modifiers.take() {
+                raw.events.push(egui::Event::ModifiersChanged(m));
+                self.forwarded_modifiers_held = true;
+            }
+            raw.events.append(&mut self.forwarded);
+        }
         // The previous pass settled: the batch it took is done, so the next step may go.
         if self.injected_settled.swap(false, Ordering::Relaxed) {
             self.acknowledge_injected_batch();
@@ -2185,6 +2228,23 @@ impl VectorcraftApp {
         raw.events.extend(batch);
     }
 
+    /// The canvas panel's body: the document tabs, the canvas and the isolation bar over it.
+    pub(crate) fn canvas_area(&mut self, ui: &mut egui::Ui) {
+        let t = theme::Tokens::get(ui.ctx());
+        ui.painter().rect_filled(ui.max_rect(), 0.0, t.pasteboard);
+        if self.ui.screen_mode < 3 {
+            chrome::doc_tabs(self, ui);
+        }
+        canvas::show(self, ui);
+        // Over the canvas inside the rulers, so the rulers and scroll bars stay uncovered.
+        if self.ui.screen_mode < 3
+            && !menus::home_showing(self)
+            && let Some(area) = self.canvas_rect
+        {
+            chrome::isolation_bar(self, ui, area);
+        }
+    }
+
     /// Lay out the whole window: the first UI pass of a host iteration sets the UI up (fonts,
     /// theme, image loaders) and takes the input; later passes (a `request_discard` rerun) draw
     /// only.
@@ -2222,7 +2282,7 @@ impl VectorcraftApp {
         self.ime_caret_rect = None;
         scrub::begin_frame(self, &ctx);
         font_menu::end_stale_preview(self, &ctx);
-        floating::track(self, &ctx);
+        tools_float::track(self, &ctx);
         // A selection move released over a panel ends before any panel sees the release (#2826).
         canvas::release_over_panel(self, &ctx);
         let t = theme::Tokens::get(&ctx);
@@ -2243,24 +2303,8 @@ impl VectorcraftApp {
             toolbar::show(self, ui);
         }
         panels::library_panel::tidy(self);
-        if self.ui.dock && self.ui.screen_mode < 3 {
-            dock::show(self, ui);
-        }
-        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| {
-            if self.ui.screen_mode < 3 {
-                chrome::doc_tabs(self, ui);
-            }
-            canvas::show(self, ui);
-            // Over the canvas inside the rulers, so the rulers and scroll bars stay uncovered.
-            if self.ui.screen_mode < 3
-                && !menus::home_showing(self)
-                && let Some(area) = self.canvas_rect
-            {
-                chrome::isolation_bar(self, ui, area);
-            }
-        });
-        dock::floating_panel(self, &ctx);
-        floating::show(self, &ctx);
+        // The canvas and the panels: one docking layout. Tab hides the panels but not the canvas.
+        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| panel_docking::show(self, ui));
         dialogs::show(self, &ctx);
         export_progress::show(self, &ctx);
         plugin_runs::show(self, &ctx);

@@ -3758,13 +3758,10 @@ axis	Horizontal	Horizontal
 axis	Vertical	Vertical
 axis	Both	Les deux
 	Drag to move	Faire glisser pour déplacer
-	Drag to move out of the set	Faire glisser pour sortir de l’ensemble
 	Drag to float as a toolbar	Faire glisser pour détacher en barre d’outils flottante
 	Put back in the toolbar	Remettre dans la barre d’outils
 	Float Panel	Rendre le panneau flottant
 	Dock Panel	Ancrer le panneau
-	Drag to float the panel group	Faire glisser pour rendre le groupe de panneaux flottant
-	Put back in the dock	Remettre dans la zone d’ancrage
 	Drag to float the toolbar	Faire glisser pour rendre la barre d’outils flottante
 	Drag to the window's left edge to dock	Faire glisser vers le bord gauche de la fenêtre pour ancrer
 	Float Tool Group	Rendre le groupe d’outils flottant
@@ -4634,7 +4631,6 @@ effect	Soft	Doux
 @msg	before must name a panel	before doit désigner un panneau
 @msg	docking action contains an unknown panel or an excessive split path	L’action d’ancrage contient un panneau inconnu ou un chemin de divisions trop long
 @msg	group must be true or false	group doit être true ou false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	le panneau est flottant ; réduisez son groupe avec window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	le panneau n’est dans aucun groupe du dock
 @msg	only a dock group above or below others collapses, not one beside another	seul un groupe du dock situé au-dessus ou au-dessous d’autres se réduit, pas un groupe à côté
 @msg	icon must be true or false	icon doit être true ou false

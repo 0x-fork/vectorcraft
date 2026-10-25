@@ -3898,11 +3898,8 @@ theme	Appearance	Εμφάνιση
 	Joins	Συνδέσεις
 	Axis	Άξονας
 	Drag to move	Σύρετε για μετακίνηση
-	Drag to move out of the set	Σύρετε για αφαίρεση από το σύνολο
 	Drag to float as a toolbar	Σύρετε για αποδέσμευση ως γραμμή εργαλείων
 	Put back in the toolbar	Επαναφορά στη γραμμή εργαλείων
-	Drag to float the panel group	Σύρετε για αποδέσμευση της ομάδας πινάκων
-	Put back in the dock	Επαναφορά στην περιοχή σύνδεσης
 	Drag to float the toolbar	Σύρετε για αποδέσμευση της γραμμής εργαλείων
 	Drag to the window's left edge to dock	Σύρετε στο αριστερό άκρο του παραθύρου για σύνδεση
 	Float Tool Group	Αποδέσμευση ομάδας εργαλείων
@@ -4522,7 +4519,6 @@ theme	Appearance	Εμφάνιση
 @msg	before must name a panel	το before πρέπει να ορίζει πίνακα
 @msg	docking action contains an unknown panel or an excessive split path	η ενέργεια σύνδεσης περιέχει άγνωστο πίνακα ή υπερβολικά βαθιά διαδρομή διαίρεσης
 @msg	group must be true or false	το group πρέπει να είναι true ή false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	Το πάνελ αιωρείται· συμπτύξτε την ομάδα του με window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	Το πάνελ δεν βρίσκεται σε ομάδα αγκύρωσης
 @msg	only a dock group above or below others collapses, not one beside another	συμπτύσσεται μόνο ομάδα αγκύρωσης πάνω ή κάτω από άλλες, όχι δίπλα σε άλλη
 @msg	icon must be true or false	το icon πρέπει να είναι true ή false

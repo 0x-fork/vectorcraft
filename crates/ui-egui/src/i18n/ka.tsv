@@ -649,7 +649,6 @@
 	% of all commits	ყველა კომიტის %
 	Lines +/−	სტრიქონები +/−
 	Drag to move	გადაათრიეთ გადასაადგილებლად
-	Drag to move out of the set	გადაათრიეთ ნაკრებიდან გამოსატანად
 	Drag to float as a toolbar	გადაათრიეთ მცურავ ხელსაწყოთა ზოლად გადასაქცევად
 	Put back in the toolbar	ხელსაწყოთა ზოლში დაბრუნება
 	Float Panel	მცურავი პანელი
@@ -3361,8 +3360,6 @@ effect	Regular	ჩვეულებრივი
 	Replace With Font	ჩანაცვლება შრიფტით
 	  — substituted by {style}	  — ჩანაცვლებულია: {style}
 	  — {n} characters from another font	  — სხვა შრიფტის სიმბოლოები: {n}
-	Drag to float the panel group	გადაათრიეთ პანელების ჯგუფის მცურავად გადასაქცევად
-	Put back in the dock	დოკში დაბრუნება
 	All Scripts	ყველა დამწერლობა
 	Any Kind	ნებისმიერი ტიპი
 	Font Technology	შრიფტის ტექნოლოგია
@@ -4255,7 +4252,6 @@ font-technology	Variable	ცვლადი
 @msg	before must name a panel	before უნდა ასახელებდეს პანელს
 @msg	docking action contains an unknown panel or an excessive split path	მიმაგრების მოქმედება შეიცავს უცნობ პანელს ან ზედმეტად გრძელ გაყოფის გზას
 @msg	group must be true or false	group უნდა იყოს true ან false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	პანელი მცურავია; მისი ჯგუფი აკეცეთ window.panel.float {panel, collapsed}-ით
 @msg	panel is not in a dock group	პანელი არ არის დოკის ჯგუფში
 @msg	only a dock group above or below others collapses, not one beside another	იკეცება მხოლოდ სხვების ზემოთ ან ქვემოთ მდებარე დოკის ჯგუფი, არა სხვის გვერდით მდებარე
 @msg	icon must be true or false	icon უნდა იყოს true ან false

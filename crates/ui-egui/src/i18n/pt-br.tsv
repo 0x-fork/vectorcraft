@@ -3026,7 +3026,6 @@ imageTrace	Outline	Contorno
 	% of all commits	% de todos os commits
 	Lines +/−	Linhas +/−
 	Drag to move	Arraste para mover
-	Drag to move out of the set	Arraste para tirar do conjunto
 	Drag to float as a toolbar	Arraste para flutuar como barra de ferramentas
 	Put back in the toolbar	Devolver à barra de ferramentas
 	Float Panel	Flutuar Painel
@@ -3356,8 +3355,6 @@ font-technology	Variable	Variáveis
 axis	Horizontal	Horizontal
 axis	Vertical	Vertical
 axis	Both	Ambos
-	Drag to float the panel group	Arraste para flutuar o grupo de painéis
-	Put back in the dock	Devolver ao dock
 	Drag to float the toolbar	Arraste para flutuar a barra de ferramentas
 	Drag to the window's left edge to dock	Arraste até a borda esquerda da janela para encaixar
 @msg	no library `{id}`	nenhuma biblioteca `{id}`
@@ -4076,7 +4073,6 @@ axis	Both	Ambos
 @msg	before must name a panel	before deve nomear um painel
 @msg	docking action contains an unknown panel or an excessive split path	a ação de encaixe contém um painel desconhecido ou um caminho de divisão excessivo
 @msg	group must be true or false	group deve ser true ou false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	o painel está flutuando; recolha o grupo com window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	o painel não está em um grupo do encaixe
 @msg	only a dock group above or below others collapses, not one beside another	só um grupo do encaixe acima ou abaixo de outros é recolhido, não um ao lado
 @msg	icon must be true or false	icon deve ser true ou false

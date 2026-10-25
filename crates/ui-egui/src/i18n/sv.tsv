@@ -3688,13 +3688,10 @@ axis	Horizontal	Horisontell
 axis	Vertical	Vertikal
 axis	Both	Båda
 	Drag to move	Dra för att flytta
-	Drag to move out of the set	Dra för att flytta ut ur uppsättningen
 	Drag to float as a toolbar	Dra för att göra flytande som verktygsfält
 	Put back in the toolbar	Lägg tillbaka i verktygsfältet
 	Float Panel	Gör panelen flytande
 	Dock Panel	Docka panel
-	Drag to float the panel group	Dra för att göra panelgruppen flytande
-	Put back in the dock	Lägg tillbaka i dockan
 	Drag to float the toolbar	Dra för att göra verktygsfältet flytande
 	Drag to the window's left edge to dock	Dra till fönstrets vänsterkant för att docka
 	Float Tool Group	Gör verktygsgruppen flytande
@@ -4543,7 +4540,6 @@ effect	Soft	Mjuk
 @msg	before must name a panel	before måste ange en panel
 @msg	docking action contains an unknown panel or an excessive split path	dockningsåtgärden innehåller en okänd panel eller en alltför djup delningssökväg
 @msg	group must be true or false	group måste vara true eller false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	panelen flyter; komprimera dess grupp med window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	panelen ligger inte i en dockningsgrupp
 @msg	only a dock group above or below others collapses, not one beside another	bara en dockningsgrupp ovanför eller under andra komprimeras, inte en bredvid en annan
 @msg	icon must be true or false	icon måste vara true eller false

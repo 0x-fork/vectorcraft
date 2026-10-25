@@ -3790,13 +3790,10 @@ axis	Horizontal	Горизонтальна
 axis	Vertical	Вертикальна
 axis	Both	Обидві
 	Drag to move	Перетягніть для переміщення
-	Drag to move out of the set	Перетягніть, щоб винести з набору
 	Drag to float as a toolbar	Перетягніть, щоб від’єднати панель інструментів
 	Put back in the toolbar	Повернути на панель інструментів
 	Float Panel	Від’єднати панель
 	Dock Panel	Прикріпити панель
-	Drag to float the panel group	Перетягніть, щоб від’єднати групу панелей
-	Put back in the dock	Повернути у док
 	Drag to float the toolbar	Перетягніть, щоб від’єднати панель інструментів
 	Drag to the window's left edge to dock	Перетягніть до лівого краю вікна для прикріплення
 	Float Tool Group	Від’єднати групу інструментів
@@ -4646,7 +4643,6 @@ axis	Both	Обидві
 @msg	before must name a panel	before має вказувати панель
 @msg	docking action contains an unknown panel or an excessive split path	Дія прикріплення містить невідому панель або надто довгий шлях поділів
 @msg	group must be true or false	group має мати значення true або false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	панель від’єднана; згорніть її групу через window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	панель не входить до групи дока
 @msg	only a dock group above or below others collapses, not one beside another	згорнути можна лише групу дока над або під іншими, а не поруч з ними
 @msg	icon must be true or false	icon має бути true або false

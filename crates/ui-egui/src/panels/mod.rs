@@ -249,7 +249,7 @@ pub fn panel_menu(app: &mut VectorcraftApp, ui: &mut Ui, id: &str, rect: Rect) {
                 ui.separator();
             }
             // The panel floats out of the dock or goes back in, as dragging its tab does.
-            let (label, cmd) = if crate::floating::group_of(&app.ui, id).is_some() {
+            let (label, cmd) = if crate::panel_docking::floats(&app.ui, id) {
                 (tl!("Dock Panel"), "window.panel.dock")
             } else {
                 (tl!("Float Panel"), "window.panel.float")

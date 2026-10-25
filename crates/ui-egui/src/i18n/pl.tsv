@@ -716,7 +716,6 @@
 	% of all commits	% wszystkich commitów
 	Lines +/−	Wiersze +/−
 	Drag to move	Przeciągnij, aby przesunąć
-	Drag to move out of the set	Przeciągnij, aby wyjąć z zestawu
 	Drag to float as a toolbar	Przeciągnij, aby oderwać jako pasek narzędzi
 	Put back in the toolbar	Odłóż z powrotem na pasek narzędzi
 	Float Panel	Odepnij panel
@@ -3672,8 +3671,6 @@ effect	Regular	Normalny
 	Replace With Font	Zastąp czcionką
 	  — substituted by {style}	  — zastąpiona przez {style}
 	  — {n} characters from another font	  — znaki z innej czcionki: {n}
-	Drag to float the panel group	Przeciągnij, aby odpiąć grupę paneli
-	Put back in the dock	Odłóż z powrotem do doku
 	All Scripts	Wszystkie skrypty
 	Any Kind	Dowolny rodzaj
 	Font Technology	Technologia czcionek
@@ -4635,7 +4632,6 @@ imageTrace	Outline	Kontur
 @msg	icon must be true or false	icon musi mieć wartość true lub false
 @msg	icon only docks a panel in the icon column, with no anchor	icon tylko dokuje panel w kolumnie ikon, bez anchor
 @msg	column docks a set as a dock column, with no anchor or icon	column dokuje zestaw jako kolumnę doku, bez anchor ani icon
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	panel jest pływający; zwiń jego grupę za pomocą window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	panel nie należy do żadnej grupy doku
 @msg	only a dock group above or below others collapses, not one beside another	zwinąć można tylko grupę doku nad lub pod innymi, a nie obok innej
 @msg	move requires a destination panel	przeniesienie wymaga panelu docelowego

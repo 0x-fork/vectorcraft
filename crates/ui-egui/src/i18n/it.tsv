@@ -3801,13 +3801,10 @@ axis	Horizontal	Orizzontale
 axis	Vertical	Verticale
 axis	Both	Entrambi
 	Drag to move	Trascina per spostare
-	Drag to move out of the set	Trascina per spostare fuori dall’insieme
 	Drag to float as a toolbar	Trascina per rendere mobile come barra degli strumenti
 	Put back in the toolbar	Riporta nella barra degli strumenti
 	Float Panel	Rendi mobile pannello
 	Dock Panel	Ancora pannello
-	Drag to float the panel group	Trascina per rendere mobile il gruppo di pannelli
-	Put back in the dock	Riporta nell'area dei pannelli
 	Drag to float the toolbar	Trascina per rendere mobile la barra degli strumenti
 	Drag to the window's left edge to dock	Trascina sul bordo sinistro della finestra per ancorare
 	Float Tool Group	Rendi mobile gruppo strumenti
@@ -4664,7 +4661,6 @@ effect	Regular	Normale
 @msg	before must name a panel	before deve indicare un pannello
 @msg	docking action contains an unknown panel or an excessive split path	L’azione di ancoraggio contiene un pannello sconosciuto o un percorso di divisioni troppo lungo
 @msg	group must be true or false	group deve essere true o false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	il pannello è mobile; comprimi il suo gruppo con window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	il pannello non è in un gruppo del dock
 @msg	only a dock group above or below others collapses, not one beside another	si comprime solo un gruppo del dock sopra o sotto altri, non uno accanto
 @msg	icon must be true or false	icon deve essere true o false

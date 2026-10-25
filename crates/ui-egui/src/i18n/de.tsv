@@ -3685,13 +3685,10 @@ axis	Vertical	Vertikal
 axis	Both	Beide
 theme	Appearance	Erscheinungsbild
 	Drag to move	Zum Verschieben ziehen
-	Drag to move out of the set	Ziehen, um aus dem Satz zu lösen
 	Drag to float as a toolbar	Ziehen, um als eigene Werkzeugleiste abzulösen
 	Put back in the toolbar	Zurück in die Werkzeugleiste setzen
 	Float Panel	Bedienfeld ablösen
 	Dock Panel	Bedienfeld andocken
-	Drag to float the panel group	Ziehen, um die Bedienfeldgruppe abzulösen
-	Put back in the dock	Zurück ins Dock setzen
 	Drag to float the toolbar	Ziehen, um die Werkzeugleiste abzulösen
 	Drag to the window's left edge to dock	Zum Andocken an den linken Fensterrand ziehen
 	Float Tool Group	Werkzeuggruppe ablösen
@@ -4619,7 +4616,6 @@ theme	Appearance	Erscheinungsbild
 @msg	before must name a panel	before muss ein Bedienfeld benennen
 @msg	docking action contains an unknown panel or an excessive split path	Die Docking-Aktion enthält ein unbekanntes Bedienfeld oder einen zu langen Teilungspfad
 @msg	group must be true or false	group muss true oder false sein
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	Bedienfeld ist abgelöst; seine Gruppe mit window.panel.float {panel, collapsed} minimieren
 @msg	panel is not in a dock group	Bedienfeld ist in keiner Dock-Gruppe
 @msg	only a dock group above or below others collapses, not one beside another	nur eine Dock-Gruppe über oder unter anderen lässt sich minimieren, nicht eine daneben
 @msg	icon must be true or false	icon muss true oder false sein

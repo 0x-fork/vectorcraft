@@ -707,7 +707,6 @@
 	% of all commits	% af alle commits
 	Lines +/−	Linjer +/−
 	Drag to move	Træk for at flytte
-	Drag to move out of the set	Træk for at flytte ud af sættet
 	Drag to float as a toolbar	Træk for at gøre den flydende som en værktøjslinje
 	Put back in the toolbar	Sæt tilbage på værktøjslinjen
 	Float Panel	Flydende panel
@@ -3578,8 +3577,6 @@ effect	Regular	Regular
 	Replace With Font	Erstat med skrifttype
 	  — substituted by {style}	  — erstattet af {style}
 	  — {n} characters from another font	  — {n} tegn fra en anden skrifttype
-	Drag to float the panel group	Træk for at gøre panelgruppen flydende
-	Put back in the dock	Sæt tilbage i dokken
 	All Scripts	Alle scripts
 	Any Kind	Enhver type
 	Font Technology	Skrifttypeteknologi
@@ -4492,7 +4489,6 @@ imageTrace	Outline	Kontur
 @msg	before must name a panel	before skal angive et panel
 @msg	docking action contains an unknown panel or an excessive split path	dokningshandlingen indeholder et ukendt panel eller en overdreven opdelingssti
 @msg	group must be true or false	group skal være true eller false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	panelet flyder; skjul dets gruppe med window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	panelet er ikke i en dockgruppe
 @msg	only a dock group above or below others collapses, not one beside another	kun en dockgruppe over eller under andre kan skjules, ikke en ved siden af en anden
 @msg	icon must be true or false	icon skal være true eller false

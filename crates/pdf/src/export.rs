@@ -320,6 +320,7 @@ impl Writer {
             description: given(&info.description),
             keywords: info.keywords.clone(),
             created: created.map(date_time),
+            modified: None,
         };
         let pdf = write::Writer::new(settings, metadata);
         Ok(Self {

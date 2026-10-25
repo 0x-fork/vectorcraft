@@ -770,7 +770,6 @@
 	% of all commits	% všech commitů
 	Lines +/−	Řádky +/−
 	Drag to move	Přetažením přesunete
-	Drag to move out of the set	Přetažením přesunete mimo sadu
 	Drag to float as a toolbar	Přetažením vytvoříte plovoucí panel nástrojů
 	Put back in the toolbar	Vrátit do panelu nástrojů
 	Float Panel	Plovoucí panel
@@ -3833,8 +3832,6 @@ effect	Regular	Pravidelný
 	Replace With Font	Nahradit písmem
 	  — substituted by {style}	  — nahrazeno řezem {style}
 	  — {n} characters from another font	  — znaky z jiného písma: {n}
-	Drag to float the panel group	Přetažením vytvoříte plovoucí skupinu panelů
-	Put back in the dock	Vrátit do doku
 	All Scripts	Všechny systémy písma
 	Any Kind	Libovolný druh
 	Font Technology	Technologie písma
@@ -4807,7 +4804,6 @@ imageTrace	Outline	Obrys
 @msg	before must name a panel	before musí určovat panel
 @msg	docking action contains an unknown panel or an excessive split path	akce ukotvení obsahuje neznámý panel nebo příliš dlouhou cestu rozdělení
 @msg	group must be true or false	group musí být true nebo false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	panel je plovoucí; jeho skupinu sbalíte pomocí window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	panel není ve skupině doku
 @msg	only a dock group above or below others collapses, not one beside another	sbalit lze jen skupinu doku nad nebo pod jinými, ne vedle jiné
 @msg	icon must be true or false	icon musí být true nebo false

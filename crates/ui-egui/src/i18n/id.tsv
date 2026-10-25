@@ -707,7 +707,6 @@
 	% of all commits	% dari semua komit
 	Lines +/−	Baris +/−
 	Drag to move	Seret untuk memindahkan
-	Drag to move out of the set	Seret untuk memindahkan keluar dari set
 	Drag to float as a toolbar	Seret untuk mengambang sebagai bilah alat
 	Put back in the toolbar	Kembalikan ke bilah alat
 	Float Panel	Mengambangkan panel
@@ -3578,8 +3577,6 @@ effect	Regular	Reguler
 	Replace With Font	Ganti dengan font
 	  — substituted by {style}	  — digantikan oleh {style}
 	  — {n} characters from another font	  — {n} karakter dari font lain
-	Drag to float the panel group	Seret untuk mengapungkan grup panel
-	Put back in the dock	Kembalikan ke dok
 	All Scripts	Semua skrip
 	Any Kind	Jenis apa pun
 	Font Technology	Teknologi font
@@ -4492,7 +4489,6 @@ imageTrace	Outline	Kontur
 @msg	before must name a panel	before harus menyebutkan panel
 @msg	docking action contains an unknown panel or an excessive split path	tindakan docking berisi panel tidak dikenal atau jalur pemisahan berlebihan
 @msg	group must be true or false	group harus true atau false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	panel mengambang; ciutkan grupnya dengan window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	panel tidak berada dalam grup dok
 @msg	only a dock group above or below others collapses, not one beside another	hanya grup dok di atas atau di bawah grup lain yang bisa diciutkan, bukan yang berada di sampingnya
 @msg	icon must be true or false	icon harus true atau false

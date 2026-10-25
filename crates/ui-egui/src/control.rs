@@ -4,6 +4,8 @@
 //! - `engine.execute {command, params}` / `ui.menu.invoke {command|id, params}`: run any command
 //! - `engine.commands`: engine + UI commands with enablement
 //! - `document.inspect`: document summary; `ui.inspect`: UI state
+//! - `ui.docking`: the panel layout in use, the open flyout, the focused panel and the docking
+//!   controls' rects
 //! - `ui.menu.list`: flattened menu tree
 //! - `ui.contextMenu.list`: the canvas context menu for the current selection, flattened
 //! - `ui.tool.select {tool}`, `ui.tool.list`
@@ -140,10 +142,16 @@ pub fn all_commands(app: &VectorcraftApp) -> Value {
 
 pub fn inspect(app: &VectorcraftApp, ctx: &egui::Context) -> Value {
     let r = ctx.content_rect();
+    let mut ui = serde_json::to_value(&app.ui).unwrap_or_default();
+    // The old floating panels' record, kept only to read older preferences: `ui.docking` has
+    // the layout.
+    if let Some(fields) = ui.as_object_mut() {
+        fields.remove("floating_panels");
+    }
     json!({
         "tool": app.session.tool_id(),
         "toolOptions": app.session.tool_options(),
-        "ui": serde_json::to_value(&app.ui).unwrap_or_default(),
+        "ui": ui,
         // Not saved with the UI state, so not in `ui`: 0 normal … 3 Presentation Mode.
         "screenMode": app.ui.screen_mode,
         // The Contextual Task Bar: pinned (not saved either) and where it shows.
@@ -218,6 +226,7 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
         "engine.commands" => ok(all_commands(app)),
         "document.inspect" => wrap(app.run("document.inspect", p.clone())),
         "ui.inspect" => ok(inspect(app, ctx)),
+        "ui.docking" => ok(crate::panel_docking::inspect(app, ctx)),
         "ui.menu.list" => ok(serde_json::to_value(crate::menus::menu_entries(app)).unwrap_or_default()),
         "ui.contextMenu.list" => ok(serde_json::to_value(crate::menus::context_entries(app)).unwrap_or_default()),
         "ui.tool.select" => wrap(app.run("tool.select", json!({"tool": s("tool").unwrap_or("")}))),

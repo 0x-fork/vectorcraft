@@ -2866,7 +2866,7 @@ mod tests {
         let mut frame = |app: &mut VectorcraftApp, events: Vec<egui::Event>| {
             time += 0.05;
             let input = egui::RawInput { time: Some(time), events, screen_rect: Some(screen), ..Default::default() };
-            let mut out = ctx.run_ui(input, |ui| crate::dock::floating_panel(app, ui.ctx()));
+            let mut out = ctx.run_ui(input, |ui| crate::panel_docking::show(app, ui));
             out.textures_delta.clear();
             let mut c: Vec<egui::Pos2> = out
                 .shapes

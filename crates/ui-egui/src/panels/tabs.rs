@@ -80,15 +80,10 @@ fn above_text(app: &mut VectorcraftApp, ctx: &egui::Context, n: &Node, span: f64
         return None;
     }
     let width = span as f32 * per + RULER_LEFT * 2.0;
-    let height = ctx.memory(|m| m.area_rect(crate::floating::area_id("tabs"))).map_or(240.0, |r| r.height());
+    let height = crate::panel_docking::layout_of(&app.ui).floating.iter().find(|w| w.contains(&"tabs".to_string())).map_or(240.0, |w| w.rect[3]);
     let pos = egui::pos2(on_screen.left() - RULER_LEFT, on_screen.top() - height - 6.0);
-    if crate::floating::group_of(&app.ui, "tabs").is_none() {
-        crate::floating::float(&mut app.ui, &["tabs"], "tabs", pos);
-    }
-    let gi = crate::floating::group_of(&app.ui, "tabs")?;
-    let g = app.ui.floating_panels.get_mut(gi)?;
-    g.pos = [pos.x, pos.y];
-    g.width = Some(width);
+    let _ = ctx;
+    crate::panel_docking::place_floating(app, "tabs", pos, width).ok()?;
     Some(())
 }
 
@@ -952,16 +947,17 @@ mod tests {
             let (node, _, span) = current(&app).unwrap();
             let ctx = egui::Context::default();
             above_text(&mut app, &ctx, &node, span).unwrap();
-            let g = &app.ui.floating_panels[crate::floating::group_of(&app.ui, "tabs").unwrap()];
+            let layout = app.ui.docking.clone().unwrap();
+            let g = layout.floating.iter().find(|w| w.contains(&"tabs".to_string())).unwrap();
             let xf = crate::canvas::Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
             let frame = xf.rect_to_screen(node.geometric_bounds().unwrap());
-            assert!((g.pos[0] + RULER_LEFT - frame.left()).abs() < 0.01, "0 on the frame's left edge");
-            assert!(g.pos[1] < frame.top(), "above the text");
+            assert!((g.rect[0] + RULER_LEFT - frame.left()).abs() < 0.01, "0 on the frame's left edge");
+            assert!(g.rect[1] < frame.top(), "above the text");
             // The ruler (the panel less its margins) spans the frame at this zoom.
-            let ruler = g.width.unwrap() - RULER_LEFT * 2.0;
+            let ruler = g.rect[2] - RULER_LEFT * 2.0;
             assert!((ruler - frame.width()).abs() < 0.01, "{ruler} {}", frame.width());
             assert!((ruler - 300.0 * zoom as f32).abs() < 0.01);
         }
-        assert_eq!(app.ui.floating_panels.len(), 1, "placed again, not floated twice");
+        assert_eq!(app.ui.docking.unwrap().floating.len(), 1, "placed again, not floated twice");
     }
 }

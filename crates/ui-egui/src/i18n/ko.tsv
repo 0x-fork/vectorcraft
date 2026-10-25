@@ -3727,13 +3727,10 @@ axis	Horizontal	가로
 axis	Vertical	세로
 axis	Both	양쪽
 	Drag to move	드래그하여 이동
-	Drag to move out of the set	드래그하여 세트에서 꺼내기
 	Drag to float as a toolbar	드래그하여 도구 모음으로 분리
 	Put back in the toolbar	도구 모음으로 되돌리기
 	Float Panel	패널 분리
 	Dock Panel	패널 고정
-	Drag to float the panel group	드래그하여 패널 그룹 분리
-	Put back in the dock	독으로 되돌리기
 	Drag to float the toolbar	드래그하여 도구 모음 분리
 	Drag to the window's left edge to dock	창 왼쪽 가장자리로 드래그하여 고정
 	Float Tool Group	도구 그룹 분리
@@ -4634,7 +4631,6 @@ effect	Vertical	세로
 @msg	before must name a panel	before는 패널을 지정해야 합니다
 @msg	docking action contains an unknown panel or an excessive split path	도킹 동작에 알 수 없는 패널이나 지나치게 많은 분할 경로가 있습니다
 @msg	group must be true or false	group은 true 또는 false여야 합니다
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	패널이 분리되어 있습니다. 그룹은 window.panel.float {panel, collapsed}로 접으세요
 @msg	panel is not in a dock group	패널이 도크 그룹에 없습니다
 @msg	only a dock group above or below others collapses, not one beside another	다른 그룹의 위나 아래에 있는 도크 그룹만 접을 수 있으며, 옆에 있는 그룹은 접을 수 없습니다
 @msg	icon must be true or false	icon은 true 또는 false여야 합니다

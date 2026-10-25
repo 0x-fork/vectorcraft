@@ -758,7 +758,6 @@
 	% of all commits	% kaikista commiteista
 	Lines +/−	Rivit +/−
 	Drag to move	Siirrä vetämällä
-	Drag to move out of the set	Siirrä joukosta vetämällä
 	Drag to float as a toolbar	Kelluta työkalurivinä vetämällä
 	Put back in the toolbar	Palauta työkaluriviin
 	Float Panel	Kelluta paneeli
@@ -3757,8 +3756,6 @@ effect	Regular	Normaali
 	Replace With Font	Korvaa fontilla
 	  — substituted by {style}	  — korvattu tyylillä {style}
 	  — {n} characters from another font	  — {n} merkkiä toisesta fontista
-	Drag to float the panel group	Irrota paneeliryhmä vetämällä
-	Put back in the dock	Palauta telakkaan
 	All Scripts	Kaikki kirjoitusjärjestelmät
 	Any Kind	Mikä tahansa laji
 	Font Technology	Fonttitekniikka
@@ -4714,7 +4711,6 @@ imageTrace	Outline	Ääriviiva
 @msg	before must name a panel	before-arvon on nimettävä paneeli
 @msg	docking action contains an unknown panel or an excessive split path	telakointitoiminto sisältää tuntemattoman paneelin tai liian pitkän jakopolun
 @msg	group must be true or false	group-arvon on oltava true tai false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	paneeli kelluu; kutista sen ryhmä komennolla window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	paneeli ei ole telakkaryhmässä
 @msg	only a dock group above or below others collapses, not one beside another	vain muiden ylä- tai alapuolella oleva telakkaryhmä kutistuu, ei toisen vieressä oleva
 @msg	icon must be true or false	icon-arvon on oltava true tai false

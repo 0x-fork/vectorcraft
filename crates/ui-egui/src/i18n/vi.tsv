@@ -984,10 +984,8 @@ font-technology	Variable	Biến thiên
 	Drag the art to move it on the paper	Kéo tác phẩm để di chuyển trên trang
 	Drag the light, or its rings. Shift snaps to 15°.	Kéo đèn hoặc vòng của nó. Shift khớp ở 15°.
 	Drag to float as a toolbar	Kéo để thả nổi thanh công cụ
-	Drag to float the panel group	Kéo để thả nổi nhóm bảng
 	Drag to float the toolbar	Kéo để thả nổi thanh công cụ
 	Drag to move	Kéo để di chuyển
-	Drag to move out of the set	Kéo để tách khỏi bộ
 	Drag to the window's left edge to dock	Kéo đến cạnh trái cửa sổ để neo
 	Step up or down	Tăng hoặc giảm một bước
 	Drag values or labels. Double-click a value to type.	Kéo giá trị hoặc nhãn. Bấm đúp vào giá trị để nhập.
@@ -2750,7 +2748,6 @@ mark-style	Japanese	Kiểu Nhật
 	Puppet Warp	Biến dạng con rối
 	Puppet Warp Pins	Ghim biến dạng con rối
 	Puppet Warp Tool	Công cụ Biến dạng con rối
-	Put back in the dock	Đặt trở lại vào vùng neo
 	Put back in the toolbar	Đặt trở lại vào thanh công cụ
 	Quality	Chất lượng
 	Quality {quality}	Chất lượng {quality}
@@ -4289,7 +4286,6 @@ theme	Appearance	Giao diện
 @msg	icon must be true or false	icon phải là true hoặc false
 @msg	icon only docks a panel in the icon column, with no anchor	icon chỉ neo bảng vào cột biểu tượng, không có anchor
 @msg	column docks a set as a dock column, with no anchor or icon	column neo một bộ thành cột neo, không có anchor hay icon
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	bảng đang nổi; hãy thu gọn nhóm của nó bằng window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	bảng không thuộc nhóm nào của dock
 @msg	only a dock group above or below others collapses, not one beside another	chỉ thu gọn được nhóm dock nằm trên hoặc dưới các nhóm khác, không phải nhóm nằm cạnh
 @msg	guides are locked	đường căn bị khóa

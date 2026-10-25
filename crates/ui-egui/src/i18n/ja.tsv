@@ -3738,13 +3738,10 @@ axis	Horizontal	水平方向
 axis	Vertical	垂直方向
 axis	Both	両方
 	Drag to move	移動するにはドラッグ
-	Drag to move out of the set	ドラッグしてセットから出す
 	Drag to float as a toolbar	ドラッグしてツールバーとして浮かせる
 	Put back in the toolbar	ツールバーに戻す
 	Float Panel	パネルをフローティング
 	Dock Panel	パネルをドッキング
-	Drag to float the panel group	ドラッグしてパネルグループをフローティング
-	Put back in the dock	ドックに戻す
 	Drag to float the toolbar	ドラッグしてツールバーをフローティング
 	Drag to the window's left edge to dock	ウィンドウの左端までドラッグしてドッキング
 	Float Tool Group	ツールグループをフローティング
@@ -4704,7 +4701,6 @@ effect	Vertical	垂直
 @msg	before must name a panel	before にパネルを指定してください
 @msg	docking action contains an unknown panel or an excessive split path	ドッキング操作に不明なパネルまたは長すぎる分割パスが含まれています
 @msg	group must be true or false	group は true または false にしてください
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	パネルはフローティング中です。グループは window.panel.float {panel, collapsed} で折りたたんでください
 @msg	panel is not in a dock group	パネルはドックのグループにありません
 @msg	only a dock group above or below others collapses, not one beside another	折りたためるのは他のグループの上下にあるドックのグループだけで、横に並んだグループは折りたためません
 @msg	icon must be true or false	icon は true または false である必要があります

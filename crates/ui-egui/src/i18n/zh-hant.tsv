@@ -2301,7 +2301,6 @@ file-filter	Templates	範本
 @msg	before must name a panel	before 必須指定面板
 @msg	docking action contains an unknown panel or an excessive split path	停駐動作包含未知的面板或過長的分割路徑
 @msg	group must be true or false	group 必須是 true 或 false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	面板處於浮動狀態；請使用 window.panel.float {panel, collapsed} 摺疊其面板群組
 @msg	panel is not in a dock group	面板不在停駐群組中
 @msg	only a dock group above or below others collapses, not one beside another	只有位於其他群組上方或下方的停駐群組可以摺疊，並排的不行
 @msg	icon must be true or false	icon 必須為 true 或 false
@@ -4575,13 +4574,10 @@ axis	Horizontal	水平
 axis	Vertical	垂直
 axis	Both	兩者
 	Drag to move	拖曳以移動
-	Drag to move out of the set	拖曳以移出該組合
 	Drag to float as a toolbar	拖曳使其浮動為工具列
 	Put back in the toolbar	放回工具列
 	Float Panel	浮動面板
 	Dock Panel	停駐面板
-	Drag to float the panel group	拖曳以浮動面板群組
-	Put back in the dock	放回停駐區
 	Drag to float the toolbar	拖曳以浮動工具列
 	Drag to the window's left edge to dock	拖曳到視窗左側邊緣以停駐
 	Float Tool Group	浮動工具組

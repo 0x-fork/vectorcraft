@@ -3797,13 +3797,10 @@ axis	Horizontal	Горизонтально
 axis	Vertical	Вертикально
 axis	Both	Оба
 	Drag to move	Перетащите для перемещения
-	Drag to move out of the set	Перетащите, чтобы вынести из набора
 	Drag to float as a toolbar	Перетащите, чтобы сделать плавающей панелью инструментов
 	Put back in the toolbar	Вернуть на панель инструментов
 	Float Panel	Сделать панель плавающей
 	Dock Panel	Прикрепить панель
-	Drag to float the panel group	Перетащите, чтобы сделать группу панелей плавающей
-	Put back in the dock	Вернуть в док
 	Drag to float the toolbar	Перетащите, чтобы сделать панель инструментов плавающей
 	Drag to the window's left edge to dock	Перетащите к левому краю окна для прикрепления
 	Float Tool Group	Сделать группу инструментов плавающей
@@ -4660,7 +4657,6 @@ axis	Both	Оба
 @msg	before must name a panel	before должен указывать панель
 @msg	docking action contains an unknown panel or an excessive split path	Действие прикрепления содержит неизвестную панель или слишком длинный путь разделений
 @msg	group must be true or false	group должен иметь значение true или false
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	панель плавающая; сверните её группу через window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	панель не находится в группе дока
 @msg	only a dock group above or below others collapses, not one beside another	свернуть можно только группу дока над или под другими, а не рядом с ними
 @msg	icon must be true or false	icon должен быть true или false

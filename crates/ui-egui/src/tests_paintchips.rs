@@ -221,9 +221,9 @@ fn the_window_menu_panel_keys() {
         (egui::Key::T, cmd | alt | shift, "openType"),
     ] {
         press(&mut app, key, m);
-        assert_eq!(app.ui.open_panel.as_deref(), Some(panel), "{m:?}+{key:?}");
+        assert!(crate::panel_docking::showing(&app.ui, panel), "{m:?}+{key:?}");
         press(&mut app, key, m);
-        assert_eq!(app.ui.open_panel, None, "{m:?}+{key:?} again hides it");
+        assert!(!crate::panel_docking::showing(&app.ui, panel), "{m:?}+{key:?} again hides it");
     }
     press(&mut app, egui::Key::F7, Modifiers::NONE);
     assert_eq!(app.ui.dock_tab, crate::state::DockTab::Layers);

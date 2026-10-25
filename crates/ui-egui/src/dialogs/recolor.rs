@@ -381,7 +381,7 @@ fn assign_tab(app: &mut VectorcraftApp, ui: &mut Ui, d: &mut Dialog, rows: &mut 
                         changed = true;
                     }
                     let (nr, _) = ui.allocate_exact_size(vec2(46.0, 20.0), Sense::hover());
-                    let nresp = ui.interact(nr, egui::Id::new((NEW_CHIP, i)), Sense::click());
+                    let nresp = ui.interact(nr, egui::Id::unique((NEW_CHIP, i)), Sense::click());
                     let to = to_color(row).unwrap_or_default();
                     chip(ui, nr, to, off);
                     if nresp.clicked() {
@@ -722,7 +722,7 @@ mod tests {
         let input = egui::RawInput { time: Some(time), events, ..Default::default() };
         let mut out = ctx.run_ui(input, |ui| super::super::show(app, ui.ctx()));
         out.textures_delta.clear();
-        ctx.read_response(egui::Id::new((NEW_CHIP, i))).map(|r| r.rect)
+        ctx.read_response(egui::Id::unique((NEW_CHIP, i))).map(|r| r.rect)
     }
 
     /// Runs frames from `time` until the dialog stops moving (it centres itself as it measures its
