@@ -281,10 +281,11 @@ impl Tidy {
 impl Arrangement {
     pub(crate) fn new(mut paths: Vec<(BezPath, FillRule)>) -> Result<Self, PathOpsError> {
         let eps = eps_for(paths.iter().map(|p| &p.0))?;
+        snap_horizontals(&mut paths.iter_mut().map(|p| &mut p.0).collect::<Vec<_>>(), eps);
+        // Counted on the snapped geometry, which is what the sweep sees: snapping can bring boxes into contact.
         if !crate::budget::sweep_fits(paths.iter().map(|p| &p.0)) {
             return Err(PathOpsError::TooComplex);
         }
-        snap_horizontals(&mut paths.iter_mut().map(|p| &mut p.0).collect::<Vec<_>>(), eps);
         // The sweep can panic on rare near-degenerate input; that must never take the app down,
         // so it becomes an error (callers fall back to leaving the art unchanged).
         let sweep = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -641,11 +642,12 @@ pub fn try_normalize(path: &PathData, rule: FillRule) -> Result<PathData, PathOp
 
 pub(crate) fn normalize_bez(bp: &BezPath, rule: FillRule) -> Result<Contours, PathOpsError> {
     let eps = eps_for([bp])?;
-    if !crate::budget::sweep_fits([bp]) {
-        return Err(PathOpsError::TooComplex);
-    }
     let mut bp = bp.clone();
     snap_horizontals(&mut [&mut bp], eps);
+    // Counted on the snapped geometry, which is what the sweep sees: snapping can bring boxes into contact.
+    if !crate::budget::sweep_fits([&bp]) {
+        return Err(PathOpsError::TooComplex);
+    }
     let top = Topology::<i32>::from_path(&bp, eps).map_err(|_| PathOpsError::OpenPath)?;
     Ok(top.contours(|w| inside(rule, *w)))
 }

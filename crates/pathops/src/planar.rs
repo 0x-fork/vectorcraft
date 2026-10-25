@@ -1063,10 +1063,11 @@ pub(crate) fn map(shapes: &[Shape]) -> Option<Map> {
         return None;
     }
     let eps = eps_for(inputs.iter().map(|p| &p.0)).ok()?;
+    snap_horizontals(&mut inputs.iter_mut().map(|p| &mut p.0).collect::<Vec<_>>(), eps);
+    // Counted on the snapped geometry, which is what the sweep sees: snapping can bring boxes into contact.
     if !crate::budget::sweep_fits(inputs.iter().map(|p| &p.0)) {
         return None;
     }
-    snap_horizontals(&mut inputs.iter_mut().map(|p| &mut p.0).collect::<Vec<_>>(), eps);
     // The sweep can panic on rare near-degenerate input; that must never take the app down.
     let sweep =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| Topology::<Crossings>::from_paths(inputs.iter().map(|(p, i)| (p, *i)), eps)));
