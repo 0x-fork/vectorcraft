@@ -24,8 +24,8 @@
 //! frame (`text.thread.add`), which comes after the clicked one in its thread. A click on the in
 //! port does the same with the new frame put before it: the story then starts there and flows on
 //! into the clicked one. Escape drops the loaded text. A double-click on a port where the frame is
-//! threaded breaks the thread there (`text.thread.break`): "To break the thread between two
-//! objects, double-click the port on either end of the thread"
+//! threaded splits the thread at that port (`text.thread.break`), as the archived help section on
+//! threading describes
 //! (<https://web.archive.org/web/20220127090642/https://helpx.adobe.com/illustrator/using/creating-text.html>).
 //! With Smart Guides and Invoke Distance Guides on, Alt/Option held over another object shows how
 //! far the selection is from it, and over an empty part of an artboard how far it is from the

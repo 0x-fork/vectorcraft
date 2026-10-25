@@ -658,8 +658,8 @@ fn remove(s: &mut Session, _: &Value) -> Result<Value> {
 }
 
 /// `text.thread.break`: a double-click on a threaded port. The thread is split there; the whole
-/// story goes into the first part, "the text flows into the first object", and the frames of the
-/// second part are emptied, staying threaded with each other when two or more remain.
+/// story moves into the frames before the split, and the frames after it are emptied, staying
+/// threaded with each other when two or more remain.
 fn break_thread(s: &mut Session, p: &Value) -> Result<Value> {
     const C: &str = "text.thread.break";
     let id = checked_id(s, p.get("id").unwrap_or(&Value::Null), C)?;
