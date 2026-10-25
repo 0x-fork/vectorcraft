@@ -1419,7 +1419,8 @@ mod tests {
 
     /// A command bound to Cmd+Escape runs without the active tool's Escape: the Pen tool's path
     /// stays open, isolation mode stays on, and the Type tool goes on editing its text. With nothing
-    /// bound to it, Cmd+Escape goes to the tool as Escape does.
+    /// bound to it, Cmd+Escape goes to the tool as Escape does. Windows keeps Cmd+Escape (Ctrl+Esc)
+    /// for the Start menu, so no command can be bound to it there and it goes to the tool.
     #[test]
     fn a_command_on_cmd_escape_runs_without_the_tools_escape() {
         let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
@@ -1427,12 +1428,17 @@ mod tests {
         let id = app.session.execute("shape.rectangle", &json!({"x": 10, "y": 10, "width": 50, "height": 30})).unwrap()["id"].clone();
         let grid = app.ui.view.grid;
         let cmd_escape = || press(Key::Escape, Modifiers::COMMAND);
+        let bindable = crate::keymap::platform() != craft_keymap::Platform::Windows;
         bind_grid(&mut app, Some("Cmd+Escape"));
         app.select_tool("pen");
         click_at(&mut app, 100.0);
         let objects = click_at(&mut app, 150.0);
         frame(&mut app, cmd_escape());
-        assert_eq!((click_at(&mut app, 200.0), app.ui.view.grid), (objects, !grid), "Cmd+Escape runs Show Grid and the path stays open");
+        if bindable {
+            assert_eq!((click_at(&mut app, 200.0), app.ui.view.grid), (objects, !grid), "Cmd+Escape runs Show Grid and the path stays open");
+        } else {
+            assert_eq!((click_at(&mut app, 200.0), app.ui.view.grid), (objects + 1, grid), "Windows: Cmd+Escape stays unbound and ends the path");
+        }
         let text = app.session.execute("text.create", &json!({"x": 20, "y": 250, "text": "Hi"})).unwrap()["id"].clone();
         let edit = |app: &mut VectorcraftApp| {
             app.session.execute("select.set", &json!({"ids": [text]})).unwrap();
@@ -1440,14 +1446,22 @@ mod tests {
             app.session.apply_actions(vec![vectorcraft_tools::Action::Notify("text.editNew".into())]).unwrap();
             assert!(app.session.tool_wants_text());
         };
-        edit(&mut app);
-        frame(&mut app, cmd_escape());
-        assert_eq!((app.session.tool_wants_text(), app.ui.view.grid), (true, grid), "Cmd+Escape runs Show Grid and the Type tool goes on editing");
+        if bindable {
+            edit(&mut app);
+            frame(&mut app, cmd_escape());
+            assert_eq!(
+                (app.session.tool_wants_text(), app.ui.view.grid),
+                (true, grid),
+                "Cmd+Escape runs Show Grid and the Type tool goes on editing"
+            );
+        }
         app.select_tool("selection");
         app.session.execute("object.isolate", &json!({"id": id})).unwrap();
         let isolated = |app: &VectorcraftApp| app.session.active().unwrap().isolation.is_some();
-        frame(&mut app, cmd_escape());
-        assert_eq!((isolated(&app), app.ui.view.grid), (true, !grid), "Cmd+Escape runs Show Grid and isolation mode stays on");
+        if bindable {
+            frame(&mut app, cmd_escape());
+            assert_eq!((isolated(&app), app.ui.view.grid), (true, !grid), "Cmd+Escape runs Show Grid and isolation mode stays on");
+        }
         bind_grid(&mut app, None);
         frame(&mut app, cmd_escape());
         assert!(!isolated(&app), "nothing bound: Cmd+Escape leaves isolation mode as Escape does");
