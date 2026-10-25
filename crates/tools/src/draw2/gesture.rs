@@ -1282,6 +1282,31 @@ mod tests {
         }
     }
 
+    /// A Paintbrush sample under a pixel from the last point is dropped, and a release there keeps
+    /// the last point: the closing cursor follows that point, not the pointer.
+    #[test]
+    fn the_paintbrush_closing_cursor_follows_the_point_a_release_keeps() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let none = Mods::default();
+        let mut t = GestureTool::new("paintbrush");
+        t.set_option("closeWithin", &json!(15.0));
+        for (k, x, y) in [(PointerKind::Down, 310.0, 330.0), (PointerKind::Drag, 360.0, 350.0), (PointerKind::Drag, 330.0, 390.0)] {
+            t.pointer(&cx, &PointerEvent::new(k, x, y));
+        }
+        // The last point kept is 15.5 from the start, outside Close Paths When Ends Are Within.
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 325.5, 330.0));
+        assert_eq!(t.cursor(&cx, Point::new(325.5, 330.0), none), Cursor::Paintbrush, "outside the closing distance");
+        // The pointer moves 0.7 to 14.8 from the start; the sample is dropped.
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 324.8, 330.0));
+        assert_eq!(t.cursor(&cx, Point::new(324.8, 330.0), none), Cursor::Paintbrush, "the dropped sample shows no ring");
+        let acts = t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 324.8, 330.0));
+        let Some(Action::Preview(_, v)) = acts.first() else { panic!("{acts:?}") };
+        assert_eq!(v["closed"], json!(false), "the release keeps the last point and leaves the path open");
+    }
+
     #[test]
     fn eraser_and_knife_exec_on_release() {
         let (d, _) = doc_with_rect();
