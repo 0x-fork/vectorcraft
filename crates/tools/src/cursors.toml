@@ -534,6 +534,13 @@ shown_when = ["The Pencil tool: draws a freeform path; starting near the end of 
 hotspot = "The lead tip."
 
 [[cursor]]
+id = "PencilNew"
+group = "Drawing and editing tools"
+shown_when = ["The Pencil tool before a press that draws a new freehand path: the pointer is not within Edit Selected Paths of a selected path that the press would continue from an end or redraw. Over such a path, and while a stroke is drawn, the Pencil cursor has no star."]
+hotspot = "The lead tip."
+look = "The Pencil cursor with a small star badge, where PencilClose has its ring."
+
+[[cursor]]
 id = "PencilClose"
 group = "Drawing and editing tools"
 shown_when = [

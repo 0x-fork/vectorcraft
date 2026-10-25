@@ -574,6 +574,9 @@ impl Tool for GestureTool {
             "smooth" => Cursor::Smooth,
             "pathEraser" => Cursor::PathEraser,
             "join" => Cursor::Join,
+            // Before a press that draws a new path the Pencil shows its star; over a selected path
+            // that the press continues from an end or redraws (`PointerKind::Down`), it does not.
+            _ if !self.active && self.find_extend(cx, p).is_none() && self.find_redraw(cx, p).is_none() => Cursor::PencilNew,
             _ => Cursor::Pencil,
         }
     }
@@ -784,7 +787,7 @@ mod tests {
             [("pencil", Cursor::Pencil, Cursor::PencilClose, "pencil"), ("paintbrush", Cursor::Paintbrush, Cursor::PaintbrushClose, "brush")]
         {
             let mut t = GestureTool::new(id);
-            assert_eq!(t.cursor(&cx, at, Mods::default()), own, "{id}");
+            assert_eq!(t.cursor(&cx, at, Mods::default()), if id == "pencil" { Cursor::PencilNew } else { own }, "{id}");
             assert_eq!(t.cursor(&cx, at, alt), if id == "pencil" { Cursor::PencilStraight } else { closing }, "{id}");
             for alt_at_release in [true, false] {
                 t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0));
@@ -982,7 +985,7 @@ mod tests {
             }
         }
         let mut t = GestureTool::new("pencil");
-        assert_eq!(t.cursor(&cx, at, Mods::default()), Cursor::Pencil);
+        assert_eq!(t.cursor(&cx, at, Mods::default()), Cursor::PencilNew);
         assert_eq!(t.cursor(&cx, at, shift), Cursor::PencilStraight);
         assert_eq!(t.cursor(&cx, at, alt), Cursor::PencilStraight, "Alt alone draws a line at any angle");
         assert_eq!(t.cursor(&cx, at, shift_alt), Cursor::PencilStraight, "Alt at the release leaves a straight line open");
@@ -998,6 +1001,59 @@ mod tests {
         assert_eq!(t.cursor(&cx, at, shift), Cursor::Pencil, "a freehand stroke");
         assert_eq!(GestureTool::new("paintbrush").cursor(&cx, at, shift), Cursor::Paintbrush);
         assert_eq!(Cursor::PencilStraight.precise(), Cursor::Crosshair, "Use Precise Cursors");
+    }
+
+    /// Before a press, the Pencil shows its new-path cursor (the star) exactly when the press draws
+    /// a new path: over an end of a selected open path, which the stroke continues, and over a
+    /// selected path, which it redraws, it does not. With nothing selected, with Edit Selected Paths
+    /// off and away from the paths, it does; while a stroke is drawn, it does not.
+    #[test]
+    fn pencil_shows_the_star_before_a_press_that_draws_a_new_path() {
+        let (mut d, _) = doc_with_rect();
+        let l = d.layers[0].id;
+        let id = d.alloc_id();
+        let line = vectorcraft_geom::PathData::from_bezpath(&vectorcraft_geom::BezPath::from_vec(vec![
+            vectorcraft_geom::PathEl::MoveTo(Point::new(300.0, 300.0)),
+            vectorcraft_geom::PathEl::LineTo(Point::new(400.0, 300.0)),
+        ]));
+        d.insert(Some(l), 1, vectorcraft_doc::Node::path(id, line, vectorcraft_doc::Appearance::default_art())).unwrap();
+        let mut s = Selection::default();
+        s.set([id]);
+        let p = paint();
+        let mut cx = cx(&d, &s, &p);
+        cx.smart_guides = false;
+        // The stroke edits the selected path when its previews continue or redraw it.
+        let edits = |acts: &[Vec<Action>]| {
+            acts.iter().flatten().any(|a| matches!(a, Action::Preview(_, v) if v.get("extend").is_some() || v.get("redraw").is_some()))
+        };
+        let (end, middle, away) = (Point::new(405.0, 303.0), Point::new(350.0, 304.0), Point::new(350.0, 360.0));
+        for edit_within in [12.0, 0.0] {
+            for at in [end, Point::new(296.0, 302.0), middle, away, Point::new(200.0, 200.0)] {
+                let mut t = GestureTool::new("pencil");
+                t.set_option("editWithin", &json!(edit_within));
+                let shown = t.cursor(&cx, at, Mods::default()) == Cursor::PencilNew;
+                let acts = drag(&mut t, &cx, &[(at.x, at.y), (360.0, 330.0), (420.0, 350.0)], Mods::default());
+                assert_eq!(shown, !edits(&acts), "editWithin {edit_within} at {at:?}");
+            }
+        }
+        let mut t = GestureTool::new("pencil");
+        assert_eq!(t.cursor(&cx, end, Mods::default()), Cursor::Pencil, "over an end the stroke continues");
+        assert_eq!(t.cursor(&cx, middle, Mods::default()), Cursor::Pencil, "over the path the stroke redraws");
+        assert_eq!(t.cursor(&cx, away, Mods::default()), Cursor::PencilNew, "away from the path");
+        // While a stroke is drawn, the Pencil's own cursor.
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, away.x, away.y));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 380.0, 380.0));
+        assert_eq!(t.cursor(&cx, Point::new(380.0, 380.0), Mods::default()), Cursor::Pencil, "while a stroke is drawn");
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 380.0, 380.0));
+        assert_eq!(t.cursor(&cx, away, Mods::default()), Cursor::PencilNew, "after the release");
+        // With nothing selected, every press draws a new path.
+        let none = Selection::default();
+        let cx_none = crate::testutil::cx(&d, &none, &p);
+        assert_eq!(GestureTool::new("pencil").cursor(&cx_none, middle, Mods::default()), Cursor::PencilNew, "nothing selected");
+        // Shift held: a straight line, with its own cursor; the Paintbrush keeps its cursor.
+        let shift = Mods { shift: true, ..Default::default() };
+        assert_eq!(GestureTool::new("pencil").cursor(&cx, away, shift), Cursor::PencilStraight);
+        assert_eq!(GestureTool::new("paintbrush").cursor(&cx, away, Mods::default()), Cursor::Paintbrush);
     }
 
     /// #3799: a Shift line started on an end of a selected open path continues the path from that
@@ -1337,7 +1393,7 @@ mod tests {
                 let (acts, after) = at(PointerKind::Up, 318.0, 335.0);
                 let Some(Action::Preview(_, v)) = acts.first() else { panic!("{tool}: {acts:?}") };
                 assert_eq!(v["closed"], json!(within > 0.0), "{tool}: the release does what the cursor showed");
-                assert_eq!(after, own, "{tool} after the release");
+                assert_eq!(after, if tool == "pencil" { Cursor::PencilNew } else { own }, "{tool} after the release");
             }
         }
         // A straight Pencil line (Shift or Alt held at the press) stays open, so it shows no ring
@@ -1468,7 +1524,7 @@ mod tests {
         // When alt is pressed, cursor shows smooth tool.
         let alt_mod = Mods { alt: true, ..Default::default() };
         assert_eq!(t.cursor(&cx, Point::new(50.0, 50.0), alt_mod), Cursor::Smooth);
-        assert_eq!(t.cursor(&cx, Point::new(50.0, 50.0), Mods::default()), Cursor::Pencil);
+        assert_eq!(t.cursor(&cx, Point::new(50.0, 50.0), Mods::default()), Cursor::PencilNew);
 
         // Alt-drag over selected path smooths it.
         let acts = drag_held(&mut t, &cx, &[(50.0, 150.0), (150.0, 150.0), (250.0, 150.0)], alt_mod);
