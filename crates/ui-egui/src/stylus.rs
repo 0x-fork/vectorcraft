@@ -16,6 +16,11 @@
 //! ([`sync_eraser_tool`]), as the reference app's help describes under "Erase parts of a path
 //! using a stylus pen":
 //! <https://helpx.adobe.com/illustrator/desktop/draw-shapes-and-paths/modify-paths/erase-parts-of-a-path.html>
+//!
+//! The web build writes the pen's end into a feed as well. Pointer Events report the eraser end
+//! only as a press of the pen's eraser button (`button` 5), so in a browser the end changes when
+//! the pen presses: a press of the eraser end selects the Eraser before that press, and a press of
+//! the tip selects the tool used before.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
@@ -192,7 +197,7 @@ impl StylusFeed {
         }
     }
 
-    /// The browser's main thread can't wait, and the web build sets no feed.
+    /// The browser's main thread can't wait, and the web build writes its feed on that thread.
     #[cfg(target_arch = "wasm32")]
     fn wait_for_touch<'a>(&'a self, pen: MutexGuard<'a, Pen>, _wait: Duration) -> MutexGuard<'a, Pen> {
         pen

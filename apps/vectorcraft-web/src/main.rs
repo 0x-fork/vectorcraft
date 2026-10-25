@@ -11,7 +11,8 @@
 //! - Save / Export trigger a browser download;
 //! - dropped files are read asynchronously by `web::WebShell` and delivered through the inbox;
 //! - pen and finger input is read from Pointer Events by `pencil` (Apple Pencil pressure and
-//!   hover, palm rejection, fingers navigate once a pen has been seen).
+//!   hover, palm rejection, fingers navigate once a pen has been seen, the pen's eraser end
+//!   selects the Eraser tool).
 //!
 //! URL query flags: `?webgl` forces the WebGL2 backend instead of WebGPU; `?lang=es` (any
 //! language code) stands in for the browser's languages when the interface language is Automatic.

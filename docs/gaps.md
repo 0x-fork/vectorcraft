@@ -443,9 +443,12 @@ from G14 and the budget run of G15: **~170–270 h** one agent, ~50–80 h wall 
 
 - **Done:** pen pressure on macOS (#852), read from AppKit's tablet events before the window gets them, each
   move of a stroke with its own pressure, and the pen's eraser end there selecting the Eraser tool, as on Linux
+  under X11 and XWayland; not yet tried on a Mac with a tablet. On the web, a press of the pen's eraser end
+  selects the Eraser tool and a press of the tip brings back the tool before; not yet tried with a pen.
   under X11 and XWayland; not yet tried on a Mac with a tablet. The pen's eraser end on Windows with Windows Ink,
   read from the pen's pointer messages; not yet tried with a pen.
 - **Missing:** pen pressure on native Wayland (#491, #764) — winit 0.30 reports none there; tilt, bearing and
+  barrel rotation for brushes (6D Art Pen, #372); the eraser end on Windows and native Wayland.
   barrel rotation for brushes (6D Art Pen, #372); the eraser end on native Wayland and the web.
 - **Estimate:** 4–10 h, partly waiting on winit 0.31; needs pen hardware to verify.
 
