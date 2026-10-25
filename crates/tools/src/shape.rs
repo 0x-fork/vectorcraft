@@ -311,9 +311,10 @@ impl Tool for ShapeTool {
                 match self.id {
                     "star" => {
                         let outer = (self.last - s).hypot().max(0.01);
+                        // The same ratio `command_at` draws with, so the label matches the preview
+                        // (Ctrl/Cmd's held radius is already in `star_ratio`, clamped; Alt overrides it).
                         let ratio = if self.mods.alt { straight_ratio(self.points).unwrap_or(self.star_ratio) } else { self.star_ratio };
-                        let inner = self.inner.unwrap_or(outer * ratio);
-                        cx.star_radii_label(outer, inner)
+                        cx.star_radii_label(outer, outer * ratio)
                     }
                     _ => {
                         let (w, h) = match self.id {
@@ -425,6 +426,49 @@ mod tests {
             })
             .unwrap_or_default();
         assert_eq!(label, want, "{label}");
+    }
+
+    /// The star label shows the radii the preview draws, also with Ctrl/Cmd + Alt and when a
+    /// Ctrl/Cmd drag shrinks the outer radius below the held inner one (the ratio is clamped).
+    #[test]
+    fn star_measure_label_matches_the_preview_with_modifiers_and_shrink() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = ToolContext { measurement_labels: true, smart_guides: false, ..cx(&d, &s, &p) };
+        let label = |t: &ShapeTool| {
+            t.overlays(&cx)
+                .into_iter()
+                .find_map(|o| match o {
+                    Overlay::Measure { text, .. } => Some(text),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        };
+        let radii = |a: &[Action]| match a.last() {
+            Some(Action::Preview(_, v)) => (v["radius1"].as_f64().unwrap(), v["radius2"].as_f64().unwrap()),
+            other => panic!("{other:?}"),
+        };
+        let cmd = Mods { cmd: true, ..Default::default() };
+        let cmd_alt = Mods { cmd: true, alt: true, ..Default::default() };
+        let mut t = ShapeTool::new("star");
+        t.star_ratio = 0.5;
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 10.0, 10.0));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 50.0, 10.0));
+        // Ctrl/Cmd holds the 20 inner radius while the outer one grows.
+        let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 70.0, 10.0).with_mods(cmd));
+        let (r1, r2) = radii(&a);
+        assert_eq!(label(&t), cx.star_radii_label(r1, r2));
+        // Ctrl/Cmd + Alt: the preview straightens the shoulders, and so does the label.
+        let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 70.0, 10.0).with_mods(cmd_alt));
+        let (r1, r2) = radii(&a);
+        assert!((r2 - 20.0).abs() > 1e-6, "Alt should override the held radius: {r2}");
+        assert_eq!(label(&t), cx.star_radii_label(r1, r2));
+        // Shrinking below the held inner radius clamps the ratio; the label follows the preview.
+        let a = t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 20.0, 10.0).with_mods(cmd));
+        let (r1, r2) = radii(&a);
+        assert!(r2 <= r1 + 1e-9, "{r1} {r2}");
+        assert_eq!(label(&t), cx.star_radii_label(r1, r2));
     }
 
     /// During a star drag, Ctrl/Cmd keeps the inner radius while the outer one follows the pointer
