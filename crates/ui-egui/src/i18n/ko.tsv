@@ -359,6 +359,7 @@ font-technology	Variable	가변
 	Create	만들기
 	Release Selection	선택 해제
 	Remove Threading	연결 제거
+	Break Thread	연결 끊기
 	Fit Headline	제목에 맞추기
 	Decrease Font Size	글꼴 크기 줄이기
 	Decrease Font Size by Five Steps	글꼴 크기 5단계 줄이기

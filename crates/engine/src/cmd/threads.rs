@@ -50,6 +50,15 @@ pub fn specs() -> Vec<CommandSpec> {
             has_thread_selection,
             remove
         ),
+        cmd!(
+            "text.thread.break",
+            "Break Thread",
+            [],
+            None,
+            "{id, port: \"in\"|\"out\"} break the thread of area type or type on a path `id` before it (its in port) or after it (its out port), as a double-click on that port does: the story flows into the frames before the break, and the frames after it are left empty (still threaded with each other when two or more)",
+            has_doc,
+            break_thread
+        ),
         cmd!(query "text.thread.info", "Threads", [], None, "{} → [[id…]] every thread in order", has_doc, |s, _| {
             Ok(json!(s.doc()?.doc.text_threads.iter().map(|t| t.iter().map(|i| i.0).collect::<Vec<_>>()).collect::<Vec<_>>()))
         }),
@@ -648,6 +657,56 @@ fn remove(s: &mut Session, _: &Value) -> Result<Value> {
     ok()
 }
 
+/// `text.thread.break`: a double-click on a threaded port. The thread is split there; the whole
+/// story goes into the first part, "the text flows into the first object", and the frames of the
+/// second part are emptied, staying threaded with each other when two or more remain.
+fn break_thread(s: &mut Session, p: &Value) -> Result<Value> {
+    const C: &str = "text.thread.break";
+    let id = checked_id(s, p.get("id").unwrap_or(&Value::Null), C)?;
+    let before = match p.get("port").and_then(Value::as_str) {
+        Some("in") => true,
+        Some("out") => false,
+        _ => return Err(bad(C, "`port` must be \"in\" or \"out\"")),
+    };
+    let d = &s.doc()?.doc;
+    let thread = d.text_threads.iter().find(|t| t.contains(&id)).cloned().unwrap_or_default();
+    let at = thread.iter().position(|x| *x == id).map(|i| if before { i } else { i + 1 });
+    let Some(at) = at.filter(|at| *at > 0 && *at < thread.len()) else {
+        return Err(bad(C, if before { "no frame comes before `id` in a thread" } else { "no frame comes after `id` in a thread" }));
+    };
+    let (head, tail) = (thread[..at].to_vec(), thread[at..].to_vec());
+    s.edit("Break Thread", |d, _| {
+        let sources: Vec<TextObject> = thread.iter().filter_map(|id| text_of(d, *id).cloned()).collect();
+        let mut story: Vec<TextRun> = sources.iter().flat_map(|t| t.runs.iter().cloned()).collect();
+        let paras = vectorcraft_text::thread::story_paras(&sources.iter().collect::<Vec<_>>(), &[]);
+        let end_style = story.last().map(|r| r.style.clone()).unwrap_or_default();
+        let last_para = paras.last().cloned().unwrap_or_default();
+        // Every frame but the first holds nothing, for the re-flow to share the story out among
+        // the first part's frames once.
+        for id in head.iter().skip(1).chain(&tail) {
+            if let Some(NodeKind::Text(t)) = d.node_mut(*id).map(|n| &mut n.kind) {
+                t.runs = vec![TextRun { text: String::new(), style: end_style.clone(), inline: None }];
+                t.set_all_paras(last_para.clone());
+                t.first_para_continues = false;
+                refresh_bounds(t);
+            }
+        }
+        if let Some(NodeKind::Text(t)) = head.first().and_then(|id| d.node_mut(*id)).map(|n| &mut n.kind) {
+            vectorcraft_text::edit::normalize(&mut story);
+            t.runs = story;
+            t.set_paragraph_styles(paras);
+            t.first_para_continues = false;
+            refresh_bounds(t);
+        }
+        if let Some(i) = d.text_threads.iter().position(|t| *t == thread) {
+            d.text_threads.splice(i..=i, [head, tail]);
+        }
+        d.text_threads.retain(|t| t.len() >= 2);
+        Ok(())
+    })?;
+    ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1054,6 +1113,68 @@ mod tests {
         assert_eq!(threads(&s), [[a, b, c]]);
         assert!([a, b, c].iter().all(|id| !text(&s, *id).is_empty()), "each frame shows part of the story");
         (s, [a, b, c])
+    }
+
+    fn continues(s: &Session, id: u64) -> bool {
+        text_of(&s.doc().unwrap().doc, NodeId(id)).is_some_and(|t| t.first_para_continues)
+    }
+
+    /// A double-click on a threaded port breaks the thread there: the story flows into the frames
+    /// before the break and the frames after it are left empty, still threaded with each other
+    /// when two or more. One undo step restores the thread and its text.
+    #[test]
+    fn break_splits_the_thread_and_the_story_flows_into_the_first_part() {
+        let story = TEXT.repeat(12);
+        let (mut s, [a, b, c]) = three_frames(&story, 40.0);
+        let d = new_id(s.execute("text.create", &json!({"x": 200, "y": 100, "text": "", "area": {"width": 150, "height": 100}})).unwrap());
+        s.execute("text.thread.add", &json!({"from": c, "to": d})).unwrap();
+        let all = [a, b, c, d];
+        let shown: Vec<String> = all.iter().map(|id| text(&s, *id)).collect();
+        assert!(shown.iter().all(|t| !t.is_empty()), "each frame shows part of the story");
+        let joined = |s: &Session, ids: &[u64]| ids.iter().map(|id| text(s, *id)).collect::<String>();
+        // (frame, port, threads after, the frames that hold the story, the frames left empty)
+        let cases = [
+            (a, "out", vec![vec![b, c, d]], vec![a], vec![b, c, d]),
+            (b, "in", vec![vec![b, c, d]], vec![a], vec![b, c, d]),
+            (b, "out", vec![vec![a, b], vec![c, d]], vec![a, b], vec![c, d]),
+            (d, "in", vec![vec![a, b, c]], vec![a, b, c], vec![d]),
+            (c, "out", vec![vec![a, b, c]], vec![a, b, c], vec![d]),
+        ];
+        for (id, port, after, full, empty) in cases {
+            let case = format!("{port} port of {id}");
+            s.execute("text.thread.break", &json!({"id": id, "port": port})).unwrap();
+            assert_eq!(threads(&s), after, "{case}");
+            assert_eq!(joined(&s, &full), story, "{case}: the story flows into the first part");
+            assert!(empty.iter().all(|id| text(&s, *id).is_empty()), "{case}: the frames after the break are empty");
+            assert!(!continues(&s, empty[0]), "{case}: the first frame after the break starts a paragraph");
+            assert!(!continues(&s, a), "{case}: the first frame starts the story");
+            s.execute("edit.undo", &json!({})).unwrap();
+            assert_eq!(threads(&s), [all.to_vec()], "{case}: undo");
+            assert_eq!(all.iter().map(|id| text(&s, *id)).collect::<Vec<_>>(), shown, "{case}: undo");
+        }
+    }
+
+    #[test]
+    fn break_refuses_a_port_with_no_thread_and_bad_params() {
+        let (mut s, [a, b, c]) = three_frames(&TEXT.repeat(4), 200.0);
+        let lone = new_id(s.execute("text.create", &json!({"x": 400, "y": 10, "text": "Alone.", "area": {"width": 100, "height": 100}})).unwrap());
+        let ids = [a, b, c, lone];
+        let shown: Vec<String> = ids.iter().map(|id| text(&s, *id)).collect();
+        let before = threads(&s);
+        for params in [
+            json!({"id": a, "port": "in"}),
+            json!({"id": c, "port": "out"}),
+            json!({"id": lone, "port": "out"}),
+            json!({"id": lone, "port": "in"}),
+            json!({"id": a, "port": "up"}),
+            json!({"id": a}),
+            json!({"port": "out"}),
+            json!({"id": 9999, "port": "out"}),
+        ] {
+            assert!(s.execute("text.thread.break", &params).is_err(), "{params}");
+        }
+        assert_eq!(threads(&s), before);
+        assert_eq!(ids.iter().map(|id| text(&s, *id)).collect::<Vec<_>>(), shown);
     }
 
     /// Whether the document holds area type or type on a path `id`.

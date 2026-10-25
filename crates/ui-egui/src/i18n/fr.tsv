@@ -2597,6 +2597,7 @@ font-technology	Variable	Variables
 	Remove Plug-in	Supprimer le module externe
 	Remove Selected Assets	Supprimer les ressources sélectionnées
 	Remove Threading	Supprimer le chaînage
+	Break Thread	Rompre le chaînage
 	Remove “{keyword}”	Supprimer « {keyword} »
 	Rename	Renommer
 	Rename Asset	Renommer la ressource

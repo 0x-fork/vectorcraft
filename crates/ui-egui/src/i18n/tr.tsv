@@ -2419,6 +2419,7 @@ font-technology	Variable	Değişken
 	Remove Plug-in	Eklentiyi Kaldır
 	Remove Selected Assets	Seçilen Varlıkları Kaldır
 	Remove Threading	Diş Açmayı Kaldır
+	Break Thread	Metin Bağını Kopar
 	Remove “{keyword}”	“{keyword}”yi kaldırın
 	Rename	Yeniden adlandır
 	Rename Asset	Varlığı Yeniden Adlandır

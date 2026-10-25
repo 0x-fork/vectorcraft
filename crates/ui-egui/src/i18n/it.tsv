@@ -2631,6 +2631,7 @@ mark-style	Japanese	Giapponese
 	Remove Plug-in	Rimuovi plug-in
 	Remove Selected Assets	Rimuovi risorse selezionate
 	Remove Threading	Rimuovi concatenamento
+	Break Thread	Interrompi concatenamento
 	Remove “{keyword}”	Rimuovi “{keyword}”
 	Rename	Rinomina
 	Rename Asset	Rinomina risorsa

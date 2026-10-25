@@ -363,6 +363,7 @@ font-technology	Variable	バリアブル
 	Create	作成
 	Release Selection	選択部分をリリース
 	Remove Threading	スレッドを解除
+	Break Thread	スレッドを切断
 	Fit Headline	ヘッドラインを合わせる
 	Decrease Font Size	フォントサイズを小さく
 	Decrease Font Size by Five Steps	フォントサイズを5段階小さく

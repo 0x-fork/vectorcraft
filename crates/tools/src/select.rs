@@ -23,7 +23,10 @@
 //! kind, shape and size at the click on empty canvas, and a drag draws a rectangle for the new
 //! frame (`text.thread.add`), which comes after the clicked one in its thread. A click on the in
 //! port does the same with the new frame put before it: the story then starts there and flows on
-//! into the clicked one. Escape drops the loaded text.
+//! into the clicked one. Escape drops the loaded text. A double-click on a port where the frame is
+//! threaded breaks the thread there (`text.thread.break`): "To break the thread between two
+//! objects, double-click the port on either end of the thread"
+//! (<https://web.archive.org/web/20220127090642/https://helpx.adobe.com/illustrator/using/creating-text.html>).
 //! With Smart Guides and Invoke Distance Guides on, Alt/Option held over another object shows how
 //! far the selection is from it, and over an empty part of an artboard how far it is from the
 //! artboard's edges ([`crate::guides::distance_guides`]).
@@ -498,6 +501,14 @@ impl SelectionTool {
     fn loaded(&mut self, cx: &ToolContext, ev: &PointerEvent, from: NodeId, before: bool, press: Option<(Point, Point)>) -> Option<Vec<Action>> {
         let p = ev.pos;
         match (ev.kind, press) {
+            // The second press of a double-click on the port that loaded the text: the text is
+            // put down, and the double-click breaks the thread there.
+            (PointerKind::Down, _)
+                if crate::text::port_at(cx, p) == Some((from, if before { crate::text::Port::In } else { crate::text::Port::Out })) =>
+            {
+                self.state = State::Idle;
+                return Some(vec![]);
+            }
             (PointerKind::Down, _) if !cx.doc.node(from).is_some_and(is_threadable) => {
                 self.state = State::Idle;
                 return None;
@@ -678,6 +689,16 @@ impl Tool for SelectionTool {
         match (ev.kind, self.state.clone()) {
             (PointerKind::DoubleClick, _) => {
                 self.state = State::Idle;
+                // A threaded port: the thread breaks there. Any other port takes the double-click
+                // too, so it neither edits the type nor isolates.
+                if let Some((id, port)) = crate::text::port_at(cx, p) {
+                    let (input, output) = crate::text::port_states(cx.doc, id, false);
+                    let (state, name) = if port == crate::text::Port::In { (input, "in") } else { (output, "out") };
+                    if state == crate::text::PortState::Threaded {
+                        return vec![Action::Exec("text.thread.break".into(), json!({ "id": id.0, "port": name }))];
+                    }
+                    return vec![];
+                }
                 if let Some(a) = corners::double_click(cx, p, false).or_else(|| pie::double_click(cx, p)).or_else(|| typewidget::double_click(cx, p))
                 {
                     return vec![a];
@@ -2718,6 +2739,35 @@ mod tests {
         assert_eq!(t.pointer(&cx, &ev(PointerKind::Up, 80.0, 90.0)), thread(json!({"from": id.0, "rect": [20.0, 20.0, 60.0, 70.0], "before": true})));
         let corner = Point::new(input.x, input.y - crate::text::PORT_RISE_PX);
         assert_eq!(t.pointer(&cx, &ev(PointerKind::Down, corner.x, corner.y)), vec![Action::Begin("Resize Type Area".into())]);
+    }
+
+    /// A double-click on a threaded port breaks the thread there, its in port before the frame
+    /// and its out port after it; it doesn't thread the loaded text into a new frame. A
+    /// double-click on a port with no thread does nothing (it doesn't switch to the Type tool).
+    #[test]
+    fn a_double_click_on_a_threaded_port_breaks_the_thread() {
+        let (mut d, id, input, output) = fitting_area_type();
+        let rect = d.children(Some(d.layers[0].id)).unwrap()[0].id;
+        let mut s = Selection::default();
+        s.set([id]);
+        let p = paint();
+        let double_click = |d: &vectorcraft_doc::Document, at: Point| {
+            let cx = cx(d, &s, &p);
+            let mut t = SelectionTool::default();
+            let kinds = [PointerKind::Down, PointerKind::Up, PointerKind::Down, PointerKind::Up, PointerKind::DoubleClick];
+            let out: Vec<Action> = kinds.into_iter().flat_map(|k| t.pointer(&cx, &ev(k, at.x, at.y))).collect();
+            assert_ne!(t.cursor(&cx, Point::new(30.0, 420.0), Mods::default()), Cursor::LoadedText, "no text stays loaded");
+            out
+        };
+        let breaks = |port: &str| vec![Action::Exec("text.thread.break".into(), json!({"id": id.0, "port": port}))];
+        d.text_threads = vec![vec![id, rect]];
+        assert_eq!(double_click(&d, output), breaks("out"));
+        assert_eq!(double_click(&d, input), vec![], "no frame before it");
+        d.text_threads = vec![vec![rect, id]];
+        assert_eq!(double_click(&d, input), breaks("in"));
+        assert_eq!(double_click(&d, output), vec![], "no frame after it");
+        d.text_threads.clear();
+        assert_eq!(double_click(&d, output), vec![]);
     }
 
     /// The memo answers for the revision, the selected objects and Use Preview Bounds it measured

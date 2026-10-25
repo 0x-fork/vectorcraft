@@ -2600,6 +2600,7 @@ font-technology	Variable	Variables
 	Remove Plug-in	Quitar plugin
 	Remove Selected Assets	Quitar recursos seleccionados
 	Remove Threading	Quitar enlace
+	Break Thread	Romper enlace
 	Remove “{keyword}”	Quitar “{keyword}”
 	Rename	Cambiar nombre
 	Rename Asset	Cambiar nombre del recurso
