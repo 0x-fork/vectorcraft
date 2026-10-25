@@ -460,7 +460,7 @@ impl BuilderMap {
     /// Is region `r` no more than `2 * tol` across at `p`, measured from a point of its outline
     /// within `tol` of `p`, through `p`, to its outline on the other side? Every point on that line
     /// is then within `tol` of the outline. The points tried are the point of the outline nearest
-    /// `p` and each point inside a segment where the segment is square to the line to `p`, so a
+    /// `p` and each point of a segment where the segment is square to the line to `p`, so a
     /// point near the end of a thin bar measures across the bar from its sides as well as along it
     /// from the end, and splitting a segment in two does not change the answer. False when `p` is
     /// on the outline or more than `tol` from it.
@@ -482,8 +482,20 @@ impl BuilderMap {
         // A line from `p` no longer than `2 * tol` only meets segments that close to `p`.
         let reach: Vec<kurbo::PathSeg> = near.iter().filter(|&&(.., d)| d <= 2.0 * tol).map(|&(seg, ..)| seg).collect();
         // A segment's end is its nearest point when the segment turns away from `p` or stops
-        // short of the point square to it; only the nearest point of all the outline counts there.
-        let from = |&&(_, t, _, d): &&(kurbo::PathSeg, f64, Point, f64)| d <= tol && (d == closest || (t > 1e-9 && t < 1.0 - 1e-9));
+        // short of the point square to it; there, only the nearest point of all the outline and
+        // an end where the segment is square to the line to `p` count.
+        let square = |seg: kurbo::PathSeg, t: f64, n: Point| {
+            use kurbo::ParamCurveDeriv as _;
+            let dir = match seg {
+                kurbo::PathSeg::Line(l) => l.p1 - l.p0,
+                kurbo::PathSeg::Quad(q) => q.deriv().eval(t).to_vec2(),
+                kurbo::PathSeg::Cubic(c) => c.deriv().eval(t).to_vec2(),
+            };
+            let v = p - n;
+            dir.hypot() > 1e-12 && dir.dot(v).abs() <= 1e-6 * dir.hypot() * v.hypot()
+        };
+        let from =
+            |&&(seg, t, n, d): &&(kurbo::PathSeg, f64, Point, f64)| d <= tol && (d == closest || (t > 1e-9 && t < 1.0 - 1e-9) || square(seg, t, n));
         near.iter().filter(from).any(|&(_, _, n, d)| {
             let line = kurbo::Line::new(p, p + (p - n) * ((2.0 * tol - d) / d));
             reach.iter().any(|seg| seg.intersect_line(line).iter().any(|x| x.line_t > 1e-9 && x.line_t <= 1.0))
@@ -2041,6 +2053,22 @@ mod tests {
         let square = map.region_at(Point::new(50.0, 50.0)).unwrap();
         assert_eq!(map.regions[square].1.segments().count(), 5, "the point on the top edge stays");
         assert!(matches!(map.builder_hit(Point::new(1.0, 1.0), Some(4.0)), Some(Hit::Edge(_))));
+        // A bar whose sides each have a point level with a click 0.1 pt from its end: the click
+        // and a drag across the bar there still touch the bar.
+        let mut d = Document::new(500.0, 500.0);
+        let l = d.layers[0].id;
+        let id = d.alloc_id();
+        let pts = [(49.0, 10.0), (50.5, 10.0), (50.5, 10.1), (50.5, 90.0), (49.0, 90.0), (49.0, 10.1)].map(|(x, y)| Point::new(x, y));
+        let path = PathData::new(vec![SubPath::polyline(&pts, true)]);
+        d.insert(Some(l), 0, Node::path(id, path, Appearance::default_art())).unwrap();
+        let mut s = Selection::default();
+        s.add(id);
+        let map = map_of(&d, &s);
+        let split = map.region_at(Point::new(49.75, 50.0)).unwrap();
+        assert_eq!(map.regions[split].1.segments().count(), 6, "the points on the sides stay");
+        assert_eq!(map.builder_hit(Point::new(49.75, 10.1), Some(4.0)), Some(Hit::Region(split)));
+        let t = map.builder_hits_along(&[Point::new(20.0, 10.1), Point::new(80.0, 10.1)], Some(4.0));
+        assert!(t.regions.contains(&split), "{t:?}");
     }
 
     #[test]
