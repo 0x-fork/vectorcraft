@@ -92,10 +92,10 @@ text-frame fixture.
 
 ## Validation
 
-* `engine/tests/affinity_features.rs` covers pages, several artboards per canvas and per spread,
+* `engine/tests/it/affinity_features.rs` covers pages, several artboards per canvas and per spread,
   master pages, tables, paragraph formats, text scale, layer effects, overlays and embedded
   documents (whose artboards don't become artboards) on synthetic documents, and mutates them.
-  `engine/tests/affinity_local.rs` compares every artboard of local documents with their thumbnail
+  `engine/tests/it/affinity_local.rs` compares every artboard of local documents with their thumbnail
   when `AFFINITY_SAMPLES` points at a folder (never in CI; nothing is committed).
 * Unit tests on synthetic containers built by the `synth` feature (stored, zlib and zstd entries,
   checksums, budgets, cycles, hostile streams, every truncation) and property tests of random
@@ -106,7 +106,7 @@ text-frame fixture.
   feature probes plus one separately identified derived regression input from
   [SethRobinson/Patchy](https://github.com/SethRobinson/Patchy). Only document data and provenance
   notices were inspected, never that project's importer or authoring scripts.
-* `tests/real_files.rs` parses every file and freezes the modeled features of all 33 current
+* `tests/it/real_files.rs` parses every file and freezes the modeled features of all 33 current
   `.af` files. Native raster tests compare decoded pixels with independent embedded images;
   text tests assert Unicode run boundaries, fallback fonts and feature retention.
 * `engine/tests/affinity_corpus.rs` requires editable native import, exact `.vectorcraft`
@@ -123,7 +123,7 @@ text-frame fixture.
   documents with layer effects, colour overlays (also over tables), line styles, paragraph and
   character formats, tables, master pages, CMYK pixel layers and embedded documents (the embedding
   and the embedded stream), and checks that whatever opens also renders and exports.
-  `tests/import_limits.rs` builds hostile documents against the limits below: grids of 16 million
+  `tests/it/import_limits.rs` builds hostile documents against the limits below: grids of 16 million
   cells, grids and stories shared by many layers, 200 000 paragraphs, a document embedded hundreds
   of times. `fuzz/` has `cargo-fuzz` targets for the whole reader (`container`) and the object
   stream (`stream`):

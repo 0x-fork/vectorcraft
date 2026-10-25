@@ -194,6 +194,50 @@ fn rescanning_retries_characters_no_font_covered() {
     assert_eq!(db.face_covering(C).unwrap().family, "Retry Sans");
 }
 
+/// A lookup on another thread while an installed family loads finds the whole family or none of
+/// it: never only the face of its first file, which falling back takes for text in the others' style
+/// (Arial Bold Italic for upright Regular Arabic, the same text laid out again moments later in
+/// Arial Regular).
+#[test]
+fn a_family_loading_on_another_thread_is_not_found_in_part() {
+    // A private-use character none of the bundled fonts has.
+    const C: char = '\u{F0000}';
+    let dir = std::env::temp_dir().join(format!("vc-sysfonts-{}-whole-family", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    // [`FAMILY`] Bold and Regular, their character maps replaced by one holding only `C`. The Bold's
+    // file sorts first, so it is read first.
+    for (file, source) in [("Sysfont-Bold.ttf", "SourceSans3-Bold.ttf"), ("Sysfont-Regular.ttf", "SourceSans3-Regular.ttf")] {
+        let base = renamed(source);
+        let font = skrifa::FontRef::new(&base).unwrap();
+        let mut builder = write_fonts::FontBuilder::new();
+        builder.add_raw(write_fonts::types::Tag::new(b"cmap"), crate::embed::cmap(&[(C as u32, 1)]).unwrap());
+        for r in font.table_directory.table_records() {
+            let tag = write_fonts::types::Tag::new(&r.tag().to_be_bytes());
+            if !builder.contains(tag) {
+                builder.add_raw(tag, font.table_data(r.tag()).unwrap().as_bytes());
+            }
+        }
+        std::fs::write(dir.join(file), builder.build()).unwrap();
+    }
+    let db = std::sync::Arc::new(FontDb::with_font_dirs(vec![dir.clone()]));
+    // Each time this thread publishes faces, another thread falls back for `C` right then.
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let (hook_db, hook_seen) = (db.clone(), seen.clone());
+    crate::fontdb::on_faces_published(Some(Box::new(move || {
+        let db = hook_db.clone();
+        let style = std::thread::spawn(move || db.fallback_for(C, 0).map(|f| f.style.clone())).join().unwrap();
+        hook_seen.lock().unwrap().push(style);
+    })));
+    let face = db.face(FAMILY, "Regular").map(|f| f.style.clone());
+    crate::fontdb::on_faces_published(None);
+    assert_eq!(face.as_deref(), Some("Regular"));
+    let seen = seen.lock().unwrap().clone();
+    assert!(!seen.is_empty());
+    assert!(seen.iter().all(|s| s.as_deref() == Some("Regular")), "the lookups took the family's {seen:?} faces");
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
 #[test]
 fn rescanning_finds_fonts_installed_since() {
     let dir = font_dir("rescan");

@@ -337,7 +337,7 @@ fn import(app: &mut VectorcraftApp, d: &mut Dialog) -> Result<(), String> {
 }
 
 fn body(app: &mut VectorcraftApp, ui: &mut egui::Ui, d: &mut Dialog) -> bool {
-    let entry_id = egui::Id::new("graph-data-entry");
+    let entry_id = egui::Id::unique("graph-data-entry");
     if ui.memory(|m| m.has_focus(entry_id)) {
         // Tab, Enter (Shift: the other way) and the arrow keys move the picked cell while the entry box
         // has the keys; the entry keeps them (egui would move the focus on with Tab).

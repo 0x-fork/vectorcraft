@@ -106,6 +106,7 @@ async fn run(host: Host, canvas: web_sys::HtmlCanvasElement, moving: Option<Movi
             canvas,
             web_options(),
             Box::new(move |cc| {
+                VectorcraftApp::install_ime_reset_hooks(&cc.egui_ctx);
                 let ctx = &cc.egui_ctx;
                 crate::fonts::spawn_background_fonts(ctx.clone());
                 let loss = GraphicsLoss::default();
@@ -365,48 +366,52 @@ impl eframe::App for WebShell {
             self.restart(&why);
         }
         let Some(app) = &mut self.app else { return };
-        let pasted = self.host.pasted.borrow_mut().flavour.take();
-        if let Some((f, held)) = pasted {
-            app.paste_from_host(ctx, f, held);
-        }
-        let dropped = ctx.input_mut(|i| std::mem::take(&mut i.raw.dropped_files));
-        if !dropped.is_empty() {
-            let at = self.host.drag.take();
-            let z = ctx.zoom_factor();
-            let (pos, shift) = (at.map(|(x, y, _)| egui::pos2(x / z, y / z)), at.is_some_and(|a| a.2));
-            for f in dropped {
-                let name = f.path().file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "dropped".into());
-                let target = app.drop_target(&name, pos, shift);
-                let (inbox, place_inbox, ctx) = (self.host.inbox.clone(), self.host.place_inbox.clone(), ctx.clone());
-                wasm_bindgen_futures::spawn_local(async move {
-                    match f.bytes_async().await {
-                        Ok(bytes) => {
-                            match target {
-                                DropTarget::Place(d) => {
-                                    place_inbox.lock().unwrap_or_else(|e| e.into_inner()).push(PlaceArrival { name, bytes, drop: Some(d) })
-                                }
-                                DropTarget::Open => inbox.lock().unwrap_or_else(|e| e.into_inner()).push((name, bytes)),
-                            }
-                            ctx.request_repaint();
-                        }
-                        Err(e) => log::error!("couldn't read dropped file {name}: {e}"),
-                    }
-                });
-            }
-        }
-        app.logic(ctx);
+        app.tick(ctx);
         crate::api::poll_replies();
+        app.finish_ime_logic(ctx);
     }
 
-    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
         raw.events.extend(self.host.pointers.borrow_mut().take());
         if let Some(app) = &mut self.app {
-            app.raw_input_hook(raw);
+            app.raw_input_hook(ctx, raw);
         }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         if let Some(app) = &mut self.app {
+            // DOM paste and drop are host input: read them in the UI phase, once per pass, not in
+            // `logic` where a hidden tab replays the last shown frame's input.
+            let pasted = self.host.pasted.borrow_mut().flavour.take();
+            if let Some((f, held)) = pasted {
+                app.paste_from_host(&ctx, f, held);
+            }
+            let dropped = ctx.input_mut(|i| std::mem::take(&mut i.raw.dropped_files));
+            if !dropped.is_empty() {
+                let at = self.host.drag.take();
+                let z = ctx.zoom_factor();
+                let (pos, shift) = (at.map(|(x, y, _)| egui::pos2(x / z, y / z)), at.is_some_and(|a| a.2));
+                for f in dropped {
+                    let name = f.path().file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "dropped".into());
+                    let target = app.drop_target(&name, pos, shift);
+                    let (inbox, place_inbox, repaint) = (self.host.inbox.clone(), self.host.place_inbox.clone(), ctx.clone());
+                    wasm_bindgen_futures::spawn_local(async move {
+                        match f.bytes_async().await {
+                            Ok(bytes) => {
+                                match target {
+                                    DropTarget::Place(d) => {
+                                        place_inbox.lock().unwrap_or_else(|e| e.into_inner()).push(PlaceArrival { name, bytes, drop: Some(d) })
+                                    }
+                                    DropTarget::Open => inbox.lock().unwrap_or_else(|e| e.into_inner()).push((name, bytes)),
+                                }
+                                repaint.request_repaint();
+                            }
+                            Err(e) => log::error!("couldn't read dropped file {name}: {e}"),
+                        }
+                    });
+                }
+            }
             app.ui(ui);
         }
         crate::api::poll_replies();

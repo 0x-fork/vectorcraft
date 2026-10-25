@@ -246,6 +246,8 @@
 	Bullets	ბურთულები
 	Bullets and Numbering	ბურთულები და დანომრვა
 	Apply Bullets	ბურთულების გამოყენება
+	Numbered List	დანომრილი სია
+	Apply Numbers	დანომრვის გამოყენება
 	Filled Dot	სავსე წერტილი
 	Dash	ტირე
 	Hollow Circle	ცარიელი წრე
@@ -3456,6 +3458,7 @@ font-technology	Variable	ცვლადი
 	View:	ხედი:
 	Tracing Result	ვექტორიზაციის შედეგი
 	Outlines with Source Image	კონტურები საწყისი გამოსახულებით
+	Press and hold to view the source image	ხანგრძლივად დააჭირეთ საწყისი გამოსახულების სანახავად
 	SVG Options	SVG-ის პარამეტრები
 	Maximize	გაშლა
 	Restore	აღდგენა
@@ -3634,6 +3637,7 @@ font-technology	Variable	ცვლადი
 @msg	Installed plug-in {_1}	დაინსტალირდა პლაგინი {_1}
 @msg	Internal error: {msg} (please report this bug)	შიდა შეცდომა: {msg} (გთხოვთ, შეგვატყობინოთ ამ ხარვეზის შესახებ)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	ცოცხალი შეღებვის შერწყმა: მონიშნეთ ცოცხალი შეღებვის ჯგუფი და დასამატებელი ტრაექტორიები
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	ცოცხალი შეღებვა იღებს ტრაექტორიებს და შედგენილ ტრაექტორიებს: ჯერ გადააქციეთ ტექსტი, გამოსახულებები და სხვა ობიექტები ტრაექტორიებად
 @msg	Live Paint: select paths or compound paths	ცოცხალი შეღებვა: მონიშნეთ ტრაექტორიები ან შედგენილი ტრაექტორიები
 @msg	Live Paint: these paths are too degenerate to paint	ცოცხალი შეღებვა: ეს ტრაექტორიები ზედმეტად გადაგვარებულია შესაღებად
 @msg	Make Guides: select paths	დამხმარე ხაზების შექმნა: მონიშნეთ ტრაექტორიები
@@ -3695,6 +3699,12 @@ font-technology	Variable	ცვლადი
 @msg	`{key}` must be between {min} and {max} (got {x})	`{key}` უნდა იყოს {min}-სა და {max}-ს შორის (მიღებულია {x})
 @msg	`{key}` must be one of {_1}	`{key}` უნდა იყოს ერთ-ერთი: {_1}
 @msg	`{key}` must be true or false	`{key}` უნდა იყოს true ან false
+@msg	`select` must be true or false	`select` უნდა იყოს true ან false
+@msg	`minAnchors` and `maxAnchors` must be whole numbers	`minAnchors` და `maxAnchors` უნდა იყოს მთელი რიცხვები
+@msg	`{key}` must be a number not below 0	`{key}` უნდა იყოს რიცხვი, არანაკლებ 0
+@msg	`{key}` must be [x, y, width, height]: four finite numbers, width and height not negative	`{key}` უნდა იყოს [x, y, width, height]: ოთხი სასრული რიცხვი, სიგანე და სიმაღლე არ უნდა იყოს უარყოფითი
+@msg	`{min_key}` is greater than `{max_key}`	`{min_key}` მეტია, ვიდრე `{max_key}`
+@msg	give at least one of `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`	მიუთითეთ ერთი მაინც: `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`
 @msg	`{k}` must be [x, y]	`{k}` უნდა იყოს [x, y]
 @msg	`{name}` has no options	`{name}`-ს პარამეტრები არ აქვს
 @msg	`{name}` is a built-in workspace; choose another name	`{name}` ჩაშენებული სამუშაო სივრცეა; აირჩიეთ სხვა სახელი
@@ -4099,6 +4109,7 @@ font-technology	Variable	ცვლადი
 @msg	unknown tool or command `{key}`	უცნობი ხელსაწყო ან ბრძანება `{key}`
 @msg	unknown workspace (one of {_1})	უცნობი სამუშაო სივრცე (ერთ-ერთი: {_1})
 @msg	unsupported: {0}	მხარდაუჭერელია: {0}
+@msg	`{key}: {top}` and `options.{key}: {inner}` disagree: give the option once	`{key}: {top}` და `options.{key}: {inner}` ერთმანეთს ეწინააღმდეგება: პარამეტრი მხოლოდ ერთხელ მიუთითეთ
 @msg	version {0} files can't be compressed: only version {COMPRESSED_SINCE} and later open compressed files	{0} ვერსიის ფაილების შეკუმშვა შეუძლებელია: შეკუმშული ფაილები მხოლოდ {COMPRESSED_SINCE} და უფრო ახალი ვერსიებით იხსნება
 @msg	width and height are at least 1 pixel	სიგანე და სიმაღლე არანაკლებ 1 პიქსელია
 @msg	workspace name can't be empty	სამუშაო სივრცის სახელი ცარიელი ვერ იქნება
@@ -4110,6 +4121,7 @@ font-technology	Variable	ცვლადი
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} ექსპორტის პლაგინია (ფაილი › ექსპორტირება › ექსპორტირება ფორმატში…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` {size} ბაიტია (ლიმიტი {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} უკვე გამოიყენება აქ: {_2}
+@msg	{_1} is reserved by the system	{_1} დაჯავშნილია სისტემის მიერ
 @msg	{_1} linked file(s) can't be read here: their previews show	მიბმული ფაილების წაკითხვა აქ ვერ ხერხდება ({_1}): ჩანს მათი გადახედვა
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	მიბმული გამოსახულებები შეიცვალა დისკზე ({_1}): ბმულების განახლება აჩვენებს ახალ ვერსიებს
 @msg	{_1}: not saved, so not closed	{_1}: არ შენახულა, ამიტომ არ დაიხურა
@@ -4212,6 +4224,8 @@ font-technology	Variable	ცვლადი
 @msg	{key} must be an array of non-negative integer object ids	{key} უნდა იყოს ობიექტების id-ების მასივი, სადაც ყოველი id არაუარყოფითი მთელი რიცხვია
 @msg	invalid object id {value}: expected a non-negative integer	ობიექტის არასწორი id {value}: მოსალოდნელია არაუარყოფითი მთელი რიცხვი
 @msg	no such object id {value}	ობიექტი id-ით {value} არ არსებობს
+@msg	id {value} is a layer, not an object	id {value} შრეა და არა ობიექტი
+@msg	id {value} is a layer, not an object; move layers with layer.move	id {value} შრეა და არა ობიექტი; შრეების გადასატანად გამოიყენეთ layer.move
 @msg	automation filesystem access is not granted: read authority is absent: {path}	ავტომატიზაციას ფაილურ სისტემაზე წვდომა არ აქვს: წაკითხვის უფლება არ არის: {path}
 @msg	automation filesystem access is not granted: write authority is absent: {path}	ავტომატიზაციას ფაილურ სისტემაზე წვდომა არ აქვს: ჩაწერის უფლება არ არის: {path}
 @msg	automation path rejected: outside the read root {root}: {path}	ავტომატიზაციის გზა უარყოფილია: წაკითხვის ძირის {root} გარეთაა: {path}
@@ -4297,6 +4311,7 @@ font-technology	Variable	ცვლადი
 	Logo 1000×1000	ლოგო 1000×1000
 	Business Card 3.5 × 2 in	სავიზიტო ბარათი 3.5 × 2 in
 	Business Card 85 × 55 mm	სავიზიტო ბარათი 85 × 55 mm
+	Business Card 91 × 55 mm	სავიზიტო ბარათი 91 × 55 mm
 	Letterhead Letter	ბლანკი Letter
 	Letterhead A4	ბლანკი A4
 	Envelope DL	კონვერტი DL
@@ -5224,6 +5239,7 @@ imageTrace	Outline	კონტური
 @msg	Save writes {_1}, not {_2}: use file.saveAsTemplate to write it	„შენახვა“ წერს ფორმატს {_1} და არა {_2}: ამისთვის გამოიყენეთ file.saveAsTemplate
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	გამოსახულება არის {_1} × {_2} პიქსელი, ანუ ერთ მხარეზე {LARGE_TRACE_SIDE}-ზე მეტი: ის ვექტორიზდება, მაგრამ უფრო ნელა. ნაკლები სიზუსტის პრესეტი ან გამოსახულების უფრო პატარა ასლი უფრო სწრაფად ვექტორიზდება.
 @msg	The image was traced at {_1} × {_2} pixels, scaled down from {_3} × {_4} ({_5} megapixels at most).	გამოსახულება ვექტორიზდა {_1} × {_2} პიქსელზე, შემცირდა {_3} × {_4}-დან (მაქსიმუმ {_5} მეგაპიქსელი).
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	ბრტყელი ლოგოს რეჟიმში გამოსახულება ვექტორიზდა {_1} × {_2} პიქსელზე, საშუალოს გამოთვლით შემცირდა {_3} × {_4}-დან.
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` ბიბლიოთეკის პანელი არ არის (იხ. window.swatchLibrary)
 @msg	`{key}` must be a #rrggbb color	`{key}` უნდა იყოს #rrggbb ფერი
 @msg	a key object sits on that point	ამ წერტილზე საკვანძო ობიექტი მდებარეობს
@@ -5248,6 +5264,7 @@ imageTrace	Outline	კონტური
 @msg	the image has no usable size or position	გამოსახულებას არ აქვს გამოსადეგი ზომა ან პოზიცია
 @msg	the image's pixels can't be read	გამოსახულების პიქსელების წაკითხვა ვერ ხერხდება
 @msg	the spine has no segments	ხერხემალს სეგმენტები არ აქვს
+@msg	too many changed shortcuts	ზედმეტად ბევრი შეცვლილი მალსახმობი
 @msg	too many library panels were opened in this session	ამ სესიაში ზედმეტად ბევრი ბიბლიოთეკის პანელი გაიხსნა
 @msg	variables are locked	ცვლადები ჩაკეტილია
 @msg	variables that aren't text were left out: {kinds}	ცვლადები, რომლებიც ტექსტი არ არის, გამოტოვებულია: {kinds}
@@ -5448,3 +5465,6 @@ axis	Y Axis	Y ღერძი
 	Rectangular Grid Tool Options	მართკუთხა ბადის ხელსაწყოს პარამეტრები
 	Polar Grid Tool Options	პოლარული ბადის ხელსაწყოს პარამეტრები
 	Fill Line	ხაზის შევსება
+	Scale Presets	მასშტაბის წინასწარ დაყენებული მნიშვნელობები
+@msg	a {width}×{height} screenshot's byte count overflows	{width}×{height} ეკრანის სურათის ბაიტების რაოდენობა გადაივსო
+@msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	ფანჯრის {what} ({points} პუნქტი × {scale} DPI) ეკრანის სურათის ზომას ვერ განსაზღვრავს

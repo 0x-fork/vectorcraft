@@ -639,6 +639,9 @@ fn name(font: &skrifa::FontRef<'_>, ids: &[StringId]) -> Option<String> {
     ids.iter().find_map(|id| font.localized_strings(*id).english_or_first().map(|s| s.to_string()).filter(|s| !s.is_empty()))
 }
 
+/// The most distinct legacy family (and style) names of a font used as keys.
+const MAX_LEGACY_NAMES: usize = 64;
+
 /// Every localized string of `id`, with its language.
 fn localized(font: &skrifa::FontRef<'_>, id: StringId) -> Vec<(Option<String>, String)> {
     font.localized_strings(id).map(|s| (s.language().map(str::to_owned), s.to_string())).filter(|(_, s)| !s.is_empty()).collect()
@@ -691,7 +694,14 @@ struct FaceKeys {
 impl FaceKeys {
     fn of(font: &skrifa::FontRef<'_>, family: &str, style: &str) -> Self {
         let (typo_family, typo_style) = (all_names(font, StringId::TYPOGRAPHIC_FAMILY_NAME), all_names(font, StringId::TYPOGRAPHIC_SUBFAMILY_NAME));
-        let (legacy_family, legacy_style) = (localized(font, StringId::FAMILY_NAME), localized(font, StringId::SUBFAMILY_NAME));
+        let (mut legacy_family, mut legacy_style) = (localized(font, StringId::FAMILY_NAME), localized(font, StringId::SUBFAMILY_NAME));
+        // Records repeat (platforms, encodings) and are paired below: once each, and no more than a
+        // font has any use for, or the pairs multiply.
+        for names in [&mut legacy_family, &mut legacy_style] {
+            names.sort();
+            names.dedup();
+            names.truncate(MAX_LEGACY_NAMES);
+        }
         // Without typographic names, the legacy ones are the family's.
         let family_names: Vec<&str> = if typo_family.is_empty() {
             legacy_family.iter().map(|(_, f)| f.as_str()).collect()
@@ -927,6 +937,30 @@ thread_local! {
 #[cfg(test)]
 pub(crate) fn alias_lists() -> u64 {
     ALIAS_LISTS.with(std::cell::Cell::get)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Tests: run on this thread each time it publishes faces to a database, to look the database
+    /// up at exactly that point (as another thread could).
+    static ON_FACES_PUBLISHED: std::cell::RefCell<Option<Box<dyn FnMut()>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Tests: run `hook` each time this thread publishes faces to a database.
+#[cfg(test)]
+pub(crate) fn on_faces_published(hook: Option<Box<dyn FnMut()>>) {
+    ON_FACES_PUBLISHED.with(|h| *h.borrow_mut() = hook);
+}
+
+#[cfg(test)]
+fn faces_published() {
+    // Taken out while it runs, so a hook that adds faces itself doesn't run again.
+    if let Some(mut hook) = ON_FACES_PUBLISHED.with(|h| h.borrow_mut().take()) {
+        hook();
+        ON_FACES_PUBLISHED.with(|h| {
+            h.borrow_mut().get_or_insert(hook);
+        });
+    }
 }
 
 /// How a requested family and style resolved ([`FontDb::resolve`]).
@@ -1423,12 +1457,34 @@ static USER_FONT_DIRS: std::sync::RwLock<Vec<PathBuf>> = std::sync::RwLock::new(
 /// if installed. The next check for installed fonts ([`FontDb::installed_fonts_changed`]) then
 /// reports the change, and a scan catalogs them.
 pub fn set_user_font_dirs(dirs: Vec<PathBuf>) {
+    set_user_font_dirs_confined(dirs, false);
+}
+
+/// [`set_user_font_dirs`]; `confined` when a caller confined to some folders (automation) chose
+/// them: the scan then reads only what is inside them, not files or folders that links in them
+/// lead to elsewhere, since the caller could plant such a link.
+pub fn set_user_font_dirs_confined(dirs: Vec<PathBuf>, confined: bool) {
     #[cfg(not(target_arch = "wasm32"))]
     {
         *USER_FONT_DIRS.write().unwrap_or_else(std::sync::PoisonError::into_inner) = dirs;
+        USER_FONT_DIRS_CONFINED.store(confined, std::sync::atomic::Ordering::Relaxed);
     }
     #[cfg(target_arch = "wasm32")]
-    let _ = dirs;
+    let _ = (dirs, confined);
+}
+
+/// Whether [`USER_FONT_DIRS`] were chosen by a confined caller ([`set_user_font_dirs_confined`]).
+#[cfg(not(target_arch = "wasm32"))]
+static USER_FONT_DIRS_CONFINED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The folders, as found on disk, that the scan reads only the inside of
+/// ([`set_user_font_dirs_confined`]).
+#[cfg(not(target_arch = "wasm32"))]
+fn confined_font_dirs() -> Vec<PathBuf> {
+    if !USER_FONT_DIRS_CONFINED.load(std::sync::atomic::Ordering::Relaxed) {
+        return vec![];
+    }
+    user_font_dirs().iter().filter_map(|d| std::fs::canonicalize(d).ok()).collect()
 }
 
 /// The folders [`set_user_font_dirs`] added (none on wasm).
@@ -1890,24 +1946,45 @@ impl FontDb {
 
     /// [`FontDb::add_font`] for the bytes of the file at `path` (when known).
     fn add_font_from(&self, bytes: Vec<u8>, path: Option<&Path>) -> usize {
-        let data = Arc::new(bytes);
-        let mut added = 0;
-        for (i, spec) in enumerate_faces(&data) {
-            // Another version of a family and style is kept: a document may name it (the first one
-            // loaded stays the one the family and style alone resolve to).
-            let version = skrifa::FontRef::from_index(&data, i).ok().and_then(|f| name(&f, &[StringId::VERSION_STRING])).unwrap_or_default();
-            if self
-                .read_faces()
-                .iter()
-                .any(|f| f.family.eq_ignore_ascii_case(&spec.family) && f.style.eq_ignore_ascii_case(&spec.style) && f.version == version)
-            {
-                continue;
-            }
-            if let Some(f) = make_face(FontBytes::Owned(data.clone()), i, spec, path.map(Path::to_path_buf)) {
-                self.faces.write().unwrap_or_else(|e| e.into_inner()).push(Arc::new(f));
-                added += 1;
+        self.add_fonts([(bytes, path.map(Path::to_path_buf))])
+    }
+
+    /// Add the faces of `files` (each file's bytes, and the file when known) all at once: a lookup
+    /// on another thread finds all of them or none, never a family with only some of its styles
+    /// loaded, whose nearest style it would take instead (Arial Bold Italic, the first of Arial's
+    /// files, for upright Regular text). Returns the number of faces added.
+    fn add_fonts(&self, files: impl IntoIterator<Item = (Vec<u8>, Option<PathBuf>)>) -> usize {
+        // Another version of a family and style is kept: a document may name it (the first one
+        // loaded stays the one the family and style alone resolve to).
+        let same = |f: &FontFace, family: &str, style: &str, version: &str| {
+            f.family.eq_ignore_ascii_case(family) && f.style.eq_ignore_ascii_case(style) && f.version == version
+        };
+        let mut made: Vec<FontFace> = Vec::new();
+        for (bytes, path) in files {
+            let data = Arc::new(bytes);
+            for (i, spec) in enumerate_faces(&data) {
+                let version = skrifa::FontRef::from_index(&data, i).ok().and_then(|f| name(&f, &[StringId::VERSION_STRING])).unwrap_or_default();
+                let present = |f: &FontFace| same(f, &spec.family, &spec.style, &version);
+                if self.read_faces().iter().any(|f| present(f)) || made.iter().any(present) {
+                    continue;
+                }
+                if let Some(f) = make_face(FontBytes::Owned(data.clone()), i, spec, path.clone()) {
+                    made.push(f);
+                }
             }
         }
+        let mut faces = self.faces.write().unwrap_or_else(|e| e.into_inner());
+        let before = faces.len();
+        for f in made {
+            // Another thread may have added the same face meanwhile.
+            if !faces.iter().any(|g| same(g, &f.family, &f.style, &f.version)) {
+                faces.push(Arc::new(f));
+            }
+        }
+        let added = faces.len() - before;
+        drop(faces);
+        #[cfg(test)]
+        faces_published();
         if added > 0 {
             self.changed();
         }
@@ -1976,10 +2053,14 @@ impl FontDb {
         let mut stack = paths.clone();
         // Each folder once, however links lead back to it.
         let mut visited = std::collections::HashSet::new();
+        let confined = confined_font_dirs();
+        let inside_confined = |p: &Path| std::fs::canonicalize(p).is_ok_and(|r| confined.iter().any(|root| r.starts_with(root)));
         while let Some(d) = stack.pop() {
             if !visited.insert(std::fs::canonicalize(&d).unwrap_or_else(|_| d.clone())) {
                 continue;
             }
+            // In a confined folder, a link is followed only to somewhere inside one.
+            let in_confined = !confined.is_empty() && inside_confined(&d);
             // Before listing it: a font installed meanwhile changes it after this.
             modified_at.push((d.clone(), modified(&d)));
             // Not a folder: a font file named by itself (or nothing, yet).
@@ -1989,6 +2070,9 @@ impl FontDb {
             };
             for e in rd.flatten() {
                 let p = e.path();
+                if in_confined && e.file_type().is_ok_and(|t| t.is_symlink()) && !inside_confined(&p) {
+                    continue;
+                }
                 if p.is_dir() {
                     stack.push(p);
                 } else {
@@ -2183,20 +2267,17 @@ impl FontDb {
         self.postscript.read().unwrap_or_else(|e| e.into_inner()).get(&norm(name)).cloned()
     }
 
-    /// Load the files of the installed `family`. Returns whether any face was added.
+    /// Load the files of the installed `family`, adding all their faces at once
+    /// ([`Self::add_fonts`]). Returns whether the family is loaded now: by this call, or by another
+    /// thread meanwhile.
     #[cfg(not(target_arch = "wasm32"))]
     fn load_cataloged(&self, family: &str) -> bool {
         let mut paths: Vec<PathBuf> =
             self.read_catalog().get(&family.to_ascii_lowercase()).map(|c| c.faces.iter().map(|cf| cf.path.clone()).collect()).unwrap_or_default();
         paths.sort();
         paths.dedup();
-        let mut any = false;
-        for p in paths {
-            for data in font_files(&p) {
-                any |= self.add_font_from(data, Some(&p)) > 0;
-            }
-        }
-        any
+        let files = paths.into_iter().flat_map(|p| font_files(&p).into_iter().map(move |data| (data, Some(p.clone()))));
+        self.add_fonts(files) > 0 || self.is_loaded(family)
     }
 
     /// Resolve a family + style to a face, falling back to the closest style of the family, then to

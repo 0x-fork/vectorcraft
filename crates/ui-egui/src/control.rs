@@ -17,18 +17,22 @@
 //! - `ui.resize {width, height}`, `ui.focus`, `ui.screenshot {path?, data?}` (`data: true`: the PNG
 //!   comes back as `pngBase64` as well)
 //! - `ui.render {path?, scale?, artboard?, data?}`: render an artboard headlessly (`artboard`: its
-//!   0-based index, default the first; PNG; without a path, or with `data: true`, as `pngBase64`)
+//!   0-based index, default the first; PNG with the pixels of a PNG export on white; without a
+//!   path, or with `data: true`, as `pngBase64`)
 //! - `app.open {path}` (any readable format) / `app.save {path?, svg?: {…SVG options}}` / `app.quit`
 //!   (`file.close`, `file.closeAll` and `app.quit` first open a `saveChanges` dialog for each
 //!   modified document: `ui.dialog.confirm` saves, set `discard: true` then confirm to discard)
 //! - `app.export {path?, format?, …document.export options}`: encoded by the engine, written through
 //!   the host; the document keeps its path. No path → `{dataBase64, format, bytes}` (as headless)
+//! - `wait: true` on `app.save` and `app.export`: the file is written before the reply, even with
+//!   Background Save or Background Export on. A `wait` other than true, false or null is refused
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::mpsc::Sender;
 
 use serde_json::{Value, json};
+use vectorcraft_render::encode::{RasterExportOptions, RasterFormat};
 use vectorcraft_tools::{Mods, PointerEvent, PointerKind};
 
 use crate::VectorcraftApp;
@@ -333,7 +337,13 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
             // Notches, not a flood: a turn stays within what a real wheel sends.
             let delta = egui::vec2(f("dx"), f("dy")).clamp(egui::Vec2::splat(-100.0), egui::Vec2::splat(100.0));
             app.synthetic.push(egui::Event::PointerMoved(egui::pos2(f("x"), f("y"))));
-            app.synthetic.push(egui::Event::MouseWheel { unit, delta, phase: egui::TouchPhase::Move, modifiers: modifiers(p) });
+            app.synthetic.push(egui::Event::MouseWheel {
+                unit,
+                delta,
+                phase: egui::TouchPhase::Move,
+                modifiers: modifiers(p),
+                source: egui::MouseWheelSource::Unknown,
+            });
             ctx.request_repaint();
             ok(Value::Null)
         }
@@ -378,6 +388,9 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
             }
             if let Some(v) = p.get("controlBar").and_then(Value::as_bool) {
                 app.ui.control_bar = v;
+            }
+            if let Some(v) = p.get("imageTracePreview").and_then(Value::as_bool) {
+                app.ui.image_trace_preview = v;
             }
             if p.get("closePanel").is_some() {
                 app.ui.open_panel = None;
@@ -428,7 +441,9 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
             if let Err(e) = vectorcraft_render::raster_size(r, scale) {
                 return err(e);
             }
-            let img = app.canvas.renderer.render_region(&doc, r, scale, true);
+            // Rendered with the options of a PNG export on white, so its pixels are the exported file's.
+            let opts = RasterExportOptions { background: Some([255; 3]), ..Default::default() }.render_options(RasterFormat::Png);
+            let img = app.canvas.renderer.render_region_with(&doc, r, scale, &opts);
             let png = match img.to_png() {
                 Ok(png) => png,
                 Err(e) => return err(e),
@@ -446,16 +461,37 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
             }
         }
         "app.open" => wrap(app.run("file.open", json!({"path": s("path")}))),
-        "app.save" => wrap(app.run("file.save", if p.is_object() { p.clone() } else { json!({}) })),
-        "app.export" => match s("path") {
-            Some(path) => wrap(crate::io::export(app, s("format"), Some(path.to_string()), p)),
-            // No save dialog for an agent: the bytes come back, as in headless mode.
-            None => wrap(app.run("document.export", p.clone())),
-        },
+        "app.save" | "app.export" => {
+            let mut p = if p.is_object() { p.clone() } else { json!({}) };
+            // `wait: true`: the file is written before the reply, whatever Background Save and
+            // Background Export are set to, so the reply is the written file or the error.
+            let wait = match crate::menus::opt_bool(&p, "wait") {
+                Ok(w) => w == Some(true),
+                Err(e) => return err(e),
+            };
+            if let Some(o) = p.as_object_mut() {
+                o.remove("wait");
+            }
+            let method = req.method.as_str();
+            wrap(if wait { crate::background::in_foreground(app, |app| save_or_export(app, method, &p)) } else { save_or_export(app, method, &p) })
+        }
         // As the menu's Quit: `{"pending": "saveChanges"}` while a modified document is asked
         // about; otherwise null, and the host closes the window (#830).
         "app.quit" => wrap(app.run("app.quit", json!({}))),
         other => err(format!("unknown method `{other}`")),
+    }
+}
+
+/// `app.save` (`method`) or `app.export` with params `p`.
+fn save_or_export(app: &mut VectorcraftApp, method: &str, p: &Value) -> Result<Value, String> {
+    if method == "app.save" {
+        return app.run("file.save", p.clone());
+    }
+    let s = |k: &str| p.get(k).and_then(Value::as_str);
+    match s("path") {
+        Some(path) => crate::io::export(app, s("format"), Some(path.to_string()), p),
+        // No save dialog for an agent: the bytes come back, as in headless mode.
+        None => app.run("document.export", p.clone()),
     }
 }
 
@@ -467,12 +503,44 @@ fn with_data(mut result: Value, png: Option<&[u8]>) -> Value {
     result
 }
 
+/// The largest image whose PNG goes back in a `ui.screenshot` reply (`data: true`): the reply
+/// makes a straight-alpha copy, the encoded PNG and, for `data`, a base64 string (~1.33× the
+/// PNG), so this bounds that working set before any of it is allocated. A path-only capture keeps
+/// the shared 128 MiB image budget.
+pub(crate) const MAX_SCREENSHOT_PNG_REPLY_BYTES: usize = 64 * 1024 * 1024;
+
+/// The checked RGBA size of `w × h`, when it fits.
+fn screenshot_rgba_bytes(w: usize, h: usize) -> Option<usize> {
+    w.checked_mul(h).and_then(|n| n.checked_mul(4))
+}
+
 /// The reply to `ui.screenshot`: the window capture `image` written to `path`, and sent back as
 /// `pngBase64` with `data`.
 pub fn save_screenshot(app: &mut VectorcraftApp, image: &egui::ColorImage, path: Option<&str>, data: bool) -> Value {
+    save_screenshot_with_limit(app, image, path, data, MAX_SCREENSHOT_PNG_REPLY_BYTES)
+}
+
+/// [`save_screenshot`] with the inline-PNG encoding limit supplied, so a small image can exercise
+/// the over-limit path without allocating a multi-megapixel frame. The public function always uses
+/// [`MAX_SCREENSHOT_PNG_REPLY_BYTES`].
+pub(crate) fn save_screenshot_with_limit(
+    app: &mut VectorcraftApp,
+    image: &egui::ColorImage,
+    path: Option<&str>,
+    data: bool,
+    max_reply_bytes: usize,
+) -> Value {
     let [w, h] = image.size;
     if path.is_none() && !data {
         return json!({"ok": true, "result": {"width": w, "height": h}});
+    }
+    // A data-only reply has no second way to deliver the image, so refuse an oversized one before
+    // allocating its working set. A request that named a path still writes that file: only the
+    // inline copy is downgraded.
+    if data && path.is_none() && !screenshot_rgba_bytes(w, h).is_some_and(|bytes| bytes <= max_reply_bytes) {
+        return json!({"ok": false, "error": format!(
+            "a PNG reply of this {w}×{h} screenshot would exceed the {max_reply_bytes}-byte reply-encoding limit; write it to a path instead"
+        )});
     }
     let rgba: Vec<u8> = image.pixels.iter().flat_map(|c| c.to_array()).collect();
     let img = vectorcraft_render::Rendered { width: w as u32, height: h as u32, pixels: rgba };
@@ -480,7 +548,14 @@ pub fn save_screenshot(app: &mut VectorcraftApp, image: &egui::ColorImage, path:
         Ok(png) => png,
         Err(e) => return json!({"ok": false, "error": e}),
     };
-    let data = data.then_some(png.as_slice());
+    let reply_png = data && png.len() <= max_reply_bytes;
+    if data && !reply_png && path.is_none() {
+        return json!({"ok": false, "error": format!(
+            "this screenshot's PNG is {} bytes, over the {max_reply_bytes}-byte reply-encoding limit; write it to a path instead",
+            png.len()
+        )});
+    }
+    let data = reply_png.then_some(png.as_slice());
     let Some(path) = path else {
         return json!({"ok": true, "result": with_data(json!({"width": w, "height": h}), data)});
     };
@@ -505,6 +580,17 @@ mod tests {
         let (req, _) = ControlRequest::new(method, params);
         let Outcome::Done(r) = handle(app, &egui::Context::default(), &req) else { panic!("expected immediate reply") };
         r
+    }
+
+    #[test]
+    fn ui_set_turns_the_image_trace_preview_off_and_on() {
+        let mut app = VectorcraftApp::new(Session::new(), Services::default());
+        assert!(app.ui.image_trace_preview);
+        for on in [false, true] {
+            let r = input_request(&mut app, "ui.set", json!({"imageTracePreview": on}));
+            assert_eq!(r["ok"], true, "{r}");
+            assert_eq!(app.ui.image_trace_preview, on);
+        }
     }
 
     #[test]

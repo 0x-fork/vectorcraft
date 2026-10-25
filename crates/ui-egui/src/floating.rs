@@ -122,11 +122,11 @@ pub(crate) struct RootGroup {
 
 /// The dock's groups as last drawn, top to bottom.
 pub(crate) fn root_groups_id() -> Id {
-    Id::new("floating-root-groups")
+    Id::unique("floating-root-groups")
 }
 
 fn move_id() -> Id {
-    Id::new("floating-move")
+    Id::unique("floating-move")
 }
 
 fn suppressed_id() -> Id {
@@ -140,29 +140,29 @@ fn gesture_allowed(ctx: &egui::Context) -> bool {
 
 /// The dock (tabbed group and icon column) as last drawn: a group dropped there docks.
 pub(crate) fn dock_rect_id() -> Id {
-    Id::new("floating-dock-rect")
+    Id::unique("floating-dock-rect")
 }
 
 /// The strip along the window's left edge where the Tools panel docks, as last laid out.
 /// The icon column's bounds (egui temp memory, one frame old), where panels without a tab in the
 /// tabbed group go back to when docked.
 pub(crate) fn icons_rect_id() -> Id {
-    Id::new("floating-icons-rect")
+    Id::unique("floating-icons-rect")
 }
 
 pub(crate) fn tools_zone_id() -> Id {
-    Id::new("floating-tools-zone")
+    Id::unique("floating-tools-zone")
 }
 
 /// The area of the floating group whose first panel is `first` (of the set it heads).
 pub fn area_id(first: &str) -> Id {
-    Id::new(("floating-panels", first))
+    Id::unique(("floating-panels", first))
 }
 
 /// The floating group whose first panel is `first`, as last drawn (egui temp memory): in a set,
 /// from the bar above its tabs to its panel's bottom.
 pub(crate) fn group_rect_id(first: &str) -> Id {
-    Id::new(("floating-group-rect", first))
+    Id::unique(("floating-group-rect", first))
 }
 
 /// Panel `id` (`window.panel`) as a static string and its English label, if it is a panel (a
@@ -441,7 +441,7 @@ pub(crate) fn drop_target(app: &VectorcraftApp, ctx: &egui::Context, what: Movin
         let Some((first, _)) = g.panels.first().and_then(|p| panel(p)).filter(|_| !moving.contains(&i)) else { continue };
         let Some(mut r) = ctx
             .data(|d| d.get_temp::<Rect>(group_rect_id(first)))
-            .or_else(|| ctx.memory(|m| m.area_rect(Id::new("vectorcraft-panel-docking").with(("floating", &first.to_string())))))
+            .or_else(|| ctx.memory(|m| m.area_rect(Id::unique("vectorcraft-panel-docking").with(("floating", &first.to_string())))))
         else {
             continue;
         };
@@ -450,7 +450,7 @@ pub(crate) fn drop_target(app: &VectorcraftApp, ctx: &egui::Context, what: Movin
         // available just outside the window. Dock columns reserve their own panel space.
         if g.docked.is_none() && r.contains(at) {
             let area = if app.ui.docking.is_some() && !crate::panel_docking::decorated(g) {
-                Id::new("vectorcraft-panel-docking").with(("floating", &first.to_string()))
+                Id::unique("vectorcraft-panel-docking").with(("floating", &first.to_string()))
             } else {
                 let lead = set_of(&app.ui, i).first().and_then(|&index| app.ui.floating_panels.get(index)).and_then(|group| group.panels.first());
                 area_id(lead.map_or(first, String::as_str))
@@ -458,7 +458,7 @@ pub(crate) fn drop_target(app: &VectorcraftApp, ctx: &egui::Context, what: Movin
             let moving_areas: Vec<Id> = moving
                 .iter()
                 .filter_map(|&index| app.ui.floating_panels.get(index).and_then(|group| group.panels.first()))
-                .flat_map(|panel| [area_id(panel), Id::new("vectorcraft-panel-docking").with(("floating", panel))])
+                .flat_map(|panel| [area_id(panel), Id::unique("vectorcraft-panel-docking").with(("floating", panel))])
                 .collect();
             let owner = ctx.memory(|memory| {
                 let layers: Vec<_> = memory.layer_ids().collect();
@@ -538,21 +538,21 @@ pub(crate) fn drop_target(app: &VectorcraftApp, ctx: &egui::Context, what: Movin
 /// Light up a drop zone: over the docked panels, under the floating ones (the moved one too).
 pub(crate) fn highlight(ctx: &egui::Context, zone: Rect) {
     let t = Tokens::get(ctx);
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, Id::new("floating-drop-zone")));
+    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Background, Id::unique("floating-drop-zone")));
     painter.rect(zone.shrink(1.0), CornerRadius::same(2), t.accent.gamma_multiply(0.2), Stroke::new(2.0, t.accent), egui::StrokeKind::Inside);
 }
 
 /// Light up the tabs a drop stacks the moved panels with, over the floating and docked groups.
 fn tab_zone(ctx: &egui::Context, tabs: Rect) {
     let t = Tokens::get(ctx);
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::new("floating-drop-tabs")));
+    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::unique("floating-drop-tabs")));
     painter.rect(tabs.shrink(1.0), CornerRadius::same(2), t.accent.gamma_multiply(0.25), Stroke::new(2.0, t.accent), egui::StrokeKind::Inside);
 }
 
 /// Show where a drop puts the moved groups in a set: a line over the floating groups.
 fn insertion_line(ctx: &egui::Context, line: Rect) {
     let t = Tokens::get(ctx);
-    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::new("floating-drop-line")));
+    let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::unique("floating-drop-line")));
     painter.rect_filled(line, CornerRadius::same(2), t.accent);
 }
 
@@ -855,7 +855,7 @@ pub fn dock_column(ui: &mut UiState, set: &[usize], slot: u32) {
 /// The dock columns, as last drawn (egui temp memory), from the one next to the icon column
 /// leftwards.
 pub(crate) fn columns_id() -> Id {
-    Id::new("dock-columns")
+    Id::unique("dock-columns")
 }
 
 /// The sets docked as columns, by their column number (next to the icon column first).
@@ -880,7 +880,7 @@ pub(crate) fn docked_columns(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> Vec
         let groups = shown_groups(&app.ui, &set);
         let Some(first) = groups.first().and_then(|g| g.ids.first().copied()) else { continue };
         let natural = groups.iter().flat_map(|g| g.ids.iter()).map(|id| dock::panel_width(id)).fold(200.0, f32::max);
-        let panel = egui::Panel::right(Id::new(("dock-column", first)))
+        let panel = egui::Panel::right(("dock-column", first))
             .resizable(true)
             .default_size(natural)
             .size_range(200.0..=520.0)
@@ -891,7 +891,8 @@ pub(crate) fn docked_columns(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> Vec
                 let (bar, _) = ui.allocate_exact_size(vec2(width, TITLE), Sense::hover());
                 ui.painter().rect_filled(bar, 0.0, t.tab_strip);
                 let close = Rect::from_center_size(bar.right_center() - vec2(10.0, 0.0), vec2(TITLE, TITLE));
-                let grip = ui.interact(Rect::from_min_max(bar.min, pos2(close.left(), bar.bottom())), ui.id().with("column-bar"), Sense::drag());
+                let grip =
+                    ui.interact(Rect::from_min_max(bar.min, pos2(close.left(), bar.bottom())), ui.scope_id().with("column-bar"), Sense::drag());
                 for k in 0..2 {
                     let y = bar.center().y - 1.5 + k as f32 * 3.0;
                     ui.painter().line_segment([pos2(bar.center().x - 9.0, y), pos2(bar.center().x + 9.0, y)], Stroke::new(0.6, t.text_disabled));
@@ -902,7 +903,7 @@ pub(crate) fn docked_columns(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> Vec
                     action = Some(Action::Undock(gi, at - bar.min));
                 }
                 grip.on_hover_cursor(egui::CursorIcon::Grab).on_hover_text(tl!("Drag to float the panel group"));
-                let x = ui.interact(close, ui.id().with("column-close"), Sense::click());
+                let x = ui.interact(close, ui.scope_id().with("column-close"), Sense::click());
                 icons::paint(ui, "x", close.shrink(3.0), if x.hovered() { t.text_strong } else { t.text_dim });
                 if x.on_hover_text(tl!("Put back in the dock")).clicked() {
                     action = Some(Action::Close(set.clone()));
@@ -971,7 +972,7 @@ fn show_set(app: &mut VectorcraftApp, ctx: &egui::Context, set: &[usize], action
             let (bar, _) = ui.allocate_exact_size(vec2(width, TITLE), Sense::hover());
             ui.painter().rect_filled(bar, CornerRadius { nw: 4, ne: 4, sw: 0, se: 0 }, t.tab_strip);
             let close = Rect::from_center_size(bar.right_center() - vec2(10.0, 0.0), vec2(TITLE, TITLE));
-            let grip = ui.interact(Rect::from_min_max(bar.min, pos2(close.left(), bar.bottom())), ui.id().with("title"), Sense::drag());
+            let grip = ui.interact(Rect::from_min_max(bar.min, pos2(close.left(), bar.bottom())), ui.scope_id().with("title"), Sense::drag());
             for k in 0..2 {
                 let y = bar.center().y - 1.5 + k as f32 * 3.0;
                 ui.painter().line_segment([pos2(bar.center().x - 9.0, y), pos2(bar.center().x + 9.0, y)], Stroke::new(0.6, t.text_disabled));
@@ -980,7 +981,7 @@ fn show_set(app: &mut VectorcraftApp, ctx: &egui::Context, set: &[usize], action
                 *action = Some(Action::Move(lead_active, pos));
             }
             grip.on_hover_cursor(egui::CursorIcon::Grab).on_hover_text(tl!("Drag to move"));
-            let x = ui.interact(close, ui.id().with("close"), Sense::click());
+            let x = ui.interact(close, ui.scope_id().with("close"), Sense::click());
             icons::paint(ui, "x", close.shrink(3.0), if x.hovered() { t.text_strong } else { t.text_dim });
             if x.on_hover_text(tl!("Put back in the dock")).clicked() {
                 *action = Some(Action::Close(set.to_vec()));
@@ -1052,7 +1053,7 @@ fn draw_groups(
         if rest.width() > 0.0 {
             // Click as well as drag, so a press there no longer starts the move at once and a
             // double-click can collapse the group.
-            let resp = ui.interact(rest, ui.id().with(("strip", g.gi)), Sense::click_and_drag());
+            let resp = ui.interact(rest, ui.scope_id().with(("strip", g.gi)), Sense::click_and_drag());
             if resp.double_clicked() {
                 *action = Some(Action::Collapse(g.gi));
             } else if resp.drag_started() {
@@ -1327,7 +1328,7 @@ mod tests {
         fn group(&self, first: &str) -> Rect {
             let native = group_of(&self.app.ui, first).and_then(|i| self.app.ui.floating_panels.get(i)).is_some_and(crate::panel_docking::decorated);
             let id = if self.app.ui.docking.is_some() && !native {
-                Id::new("vectorcraft-panel-docking").with(("floating", &first.to_string()))
+                Id::unique("vectorcraft-panel-docking").with(("floating", &first.to_string()))
             } else {
                 area_id(first)
             };
@@ -1355,7 +1356,7 @@ mod tests {
         }
 
         fn shared_tab(&self, panel: &str) -> Rect {
-            self.ctx.read_response(Id::new("vectorcraft-panel-docking").with(("tab", &panel.to_string()))).unwrap().rect
+            self.ctx.read_response(Id::unique("vectorcraft-panel-docking").with(("tab", &panel.to_string()))).unwrap().rect
         }
 
         /// The dock's tabs, left to right.
@@ -1366,7 +1367,7 @@ mod tests {
                     .panels()
                     .into_iter()
                     .filter_map(|panel| {
-                        self.ctx.read_response(Id::new("vectorcraft-panel-docking").with(("tab", panel))).map(|response| response.rect)
+                        self.ctx.read_response(Id::unique("vectorcraft-panel-docking").with(("tab", panel))).map(|response| response.rect)
                     })
                     .collect();
             }
@@ -1534,7 +1535,7 @@ mod tests {
         let mut h = Harness::new();
         h.app.run("window.panel", json!({"panel": "swatches"})).unwrap();
         h.settle();
-        let flyout = h.ctx.memory(|m| m.area_rect(Id::new("icon-panel"))).unwrap();
+        let flyout = h.ctx.memory(|m| m.area_rect(Id::unique("icon-panel"))).unwrap();
         let to = pos2(500.0, 400.0);
         h.drag(flyout.left_top() + vec2(20.0, 13.0), to);
         assert_eq!((h.groups(), h.app.ui.open_panel.as_deref()), (vec![vec!["swatches"]], None));
@@ -1551,7 +1552,7 @@ mod tests {
             h.app.run("window.panel", json!({"panel":"swatches"})).unwrap();
             h.settle();
             let original = h.app.ui.clone();
-            let flyout = h.ctx.memory(|m| m.area_rect(Id::new("icon-panel"))).unwrap();
+            let flyout = h.ctx.memory(|m| m.area_rect(Id::unique("icon-panel"))).unwrap();
             let to = pos2(500.0, 400.0);
             h.hold(flyout.left_top() + vec2(20.0, 13.0), to);
             assert!(h.app.ui.floating_panels.iter().any(|g| g.panels.contains(&"swatches".into())));
@@ -1614,7 +1615,7 @@ mod tests {
         let to = pos2(400.0, 300.0);
         h.drag(title, to);
         let pos = h.app.ui.toolbar_pos.expect("the Tools panel floats");
-        let float = h.ctx.memory(|m| m.area_rect(Id::new("toolbar-floating"))).unwrap();
+        let float = h.ctx.memory(|m| m.area_rect(Id::unique("toolbar-floating"))).unwrap();
         assert!(float.contains(to) && (pos2(pos[0], pos[1]) - float.min).length() < 1.0, "under the pointer: {float:?}");
         // Back on the window's left edge.
         let edge = pos2(10.0, 400.0);

@@ -133,7 +133,8 @@ fn transparency(app: &mut VectorcraftApp, ui: &mut egui::Ui, d: &mut Dialog) {
                 ui.painter().rect_filled(chip, 2.0, crate::panels::c32(&c));
             }
             ui.painter().rect_stroke(chip, 2.0, egui::Stroke::new(1.0, t.input_border), egui::StrokeKind::Inside);
-            if let Some(c) = widgets::hex_field(ui, ("grid-color", i), hex).and_then(|h| vectorcraft_color::Color::from_hex(&h)) {
+            let name = format!("{} {}", tl!("Grid Colors:"), i + 1);
+            if let Some(c) = widgets::hex_field_named(ui, ("grid-color", i), Some(&name), hex).and_then(|h| vectorcraft_color::Color::from_hex(&h)) {
                 let mut v = colors.clone();
                 v.resize(2, "#ffffff".into());
                 v[i] = c.to_hex();

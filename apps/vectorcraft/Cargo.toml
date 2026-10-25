@@ -23,7 +23,7 @@ vectorcraft-text = { workspace = true }
 # Shared across the Craft suite: decides who draws the window frame per desktop (compositor vs app)
 # so VectorCraft matches the rest on Linux. `egui` adds `craft_window::decorate`. See #217.
 craft-window = { workspace = true }
-eframe = { workspace = true, features = ["default_fonts", "wayland", "x11"] }
+eframe = { workspace = true, features = ["clipboard", "default_fonts", "wayland", "x11"] }
 egui = { workspace = true }
 serde_json = { workspace = true }
 log = { workspace = true }
@@ -62,8 +62,8 @@ windows = { version = "0.62", features = ["Win32_Graphics_DirectWrite", "Win32_U
 muda = { version = "=0.21.1", default-features = false }
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "block2", "objc2-core-foundation", "NSApplication", "NSButton", "NSColor", "NSColorSampler", "NSColorSpace", "NSControl", "NSMenu", "NSEvent", "NSPasteboard", "NSPopUpButton", "NSResponder", "NSSavePanel", "NSTextField", "NSTextInputContext", "NSView", "NSWindow"] }
-# Files opened from Finder and the Dock (src/open_documents.rs) and pasted bitmaps (src/clipboard.rs); both already come with winit, muda and rfd.
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "block2", "NSArray", "NSData", "NSGeometry", "NSNotification", "NSOperation", "NSString", "NSURL"] }
+# Files opened from Finder and the Dock (src/open_documents.rs), pasted bitmaps (src/clipboard.rs) and the control channel's App Nap activity (src/control_server.rs); both already come with winit, muda and rfd.
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "block2", "NSArray", "NSData", "NSGeometry", "NSNotification", "NSOperation", "NSProcessInfo", "NSString", "NSURL"] }
 block2 = "0.6"
 # The window's AppKit view, to centre its buttons on the app bar (src/mac_window.rs). MIT OR
 # Apache-2.0 OR Zlib, already in the build through eframe and winit.

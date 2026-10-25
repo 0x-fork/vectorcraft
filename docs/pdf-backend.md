@@ -1,7 +1,7 @@
 # PDF backend
 
 PDF writing uses `craft-pdf` from `storytold/craft-libs`, pinned to
-`ca50d63b773c99f96e75c77ce5a1d21e7c9cda0d`. Its `write` feature supplies Krilla configuration,
+`2eca9b3a53a98ac52efed2a27353c6a6927ead10`. Its `write` feature supplies Krilla configuration,
 metadata construction, fallible font preparation and serialization, and native unwind guards.
 The dependency disables default features and enables `write` and `interpret`.
 The production writer retains Krilla’s raster-image support without its optional text shaper.
@@ -51,9 +51,9 @@ warnings also become errors before a document is returned. Whitespace and commen
 EOF remain valid. The typed iterator does not classify every malformed operator, so this
 is known-incomplete rejection rather than a general PDF validity certificate.
 
-The three patched Hayro crates and Krilla are selected in the root `[patch.crates-io]`
+The five patched Hayro crates and Krilla are selected in the root `[patch.crates-io]`
 from the same immutable revision as `craft-pdf`. `cargo xtask pdf-deps` rejects missing,
-duplicate, local-path, registry and mismatched revisions for those five packages.
+duplicate, local-path, registry and mismatched revisions for those seven packages.
 `craft-print` and `craft-ui` keep their existing independent revisions.
 
 Dependency asset hashes and sources are in `ASSETS.md`; redistributed license texts are

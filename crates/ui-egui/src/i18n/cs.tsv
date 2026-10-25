@@ -325,6 +325,8 @@
 	Bullets	Odrážky
 	Bullets and Numbering	Odrážky a číslování
 	Apply Bullets	Použít odrážky
+	Numbered List	Číslovaný seznam
+	Apply Numbers	Použít číslování
 	Filled Dot	Plná tečka
 	Dash	Pomlčka
 	Hollow Circle	Prázdný kruh
@@ -3932,6 +3934,7 @@ font-technology	Variable	Variabilní
 	View:	Zobrazení:
 	Tracing Result	Výsledek vektorizace
 	Outlines with Source Image	Obrysy se zdrojovým obrazem
+	Press and hold to view the source image	Podržením zobrazíte zdrojový obraz
 	SVG Options	Možnosti SVG
 	Maximize	Maximalizovat
 	Restore	Obnovit
@@ -4139,6 +4142,7 @@ imageTrace	Outline	Obrys
 @msg	Installed plug-in {_1}	Nainstalován zásuvný modul {_1}
 @msg	Internal error: {msg} (please report this bug)	Vnitřní chyba: {msg} (nahlaste prosím tuto chybu)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Sloučit živou malbu: vyberte skupinu živé malby a cesty, které chcete přidat
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	Živá malba přijímá cesty a složené cesty: text, obrazy a jiné objekty nejprve převeďte na cesty
 @msg	Live Paint: select paths or compound paths	Živá malba: vyberte cesty nebo složené cesty
 @msg	Live Paint: these paths are too degenerate to paint	Živá malba: tyto cesty jsou příliš degenerované, aby je bylo možné malovat
 @msg	Make Guides: select paths	Vytvořit vodítka: vyberte cesty
@@ -4204,6 +4208,12 @@ imageTrace	Outline	Obrys
 @msg	`{key}` must be between {min} and {max} (got {x})	`{key}` musí být mezi {min} a {max} (zadáno {x})
 @msg	`{key}` must be one of {_1}	`{key}` musí být jedno z {_1}
 @msg	`{key}` must be true or false	`{key}` musí být true nebo false
+@msg	`select` must be true or false	`select` musí být true nebo false
+@msg	`minAnchors` and `maxAnchors` must be whole numbers	`minAnchors` a `maxAnchors` musí být celá čísla
+@msg	`{key}` must be a number not below 0	`{key}` musí být číslo nejméně 0
+@msg	`{key}` must be [x, y, width, height]: four finite numbers, width and height not negative	`{key}` musí být [x, y, width, height]: čtyři konečná čísla, šířka a výška nesmí být záporné
+@msg	`{min_key}` is greater than `{max_key}`	`{min_key}` je větší než `{max_key}`
+@msg	give at least one of `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`	zadejte alespoň jeden z parametrů `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`
 @msg	`mode` must be grayscale, rgb, hsb, cmyk or websafe	`mode` musí být grayscale, rgb, hsb, cmyk nebo websafe
 @msg	`{k}` must be [x, y]	`{k}` musí být [x, y]
 @msg	`{name}` has no options	`{name}` nemá žádné možnosti
@@ -4641,6 +4651,7 @@ imageTrace	Outline	Obrys
 @msg	unsupported: {0}	nepodporováno: {0}
 @msg	variables are locked	proměnné jsou zamčené
 @msg	variables that aren't text were left out: {kinds}	proměnné, které nejsou textové, byly vynechány: {kinds}
+@msg	`{key}: {top}` and `options.{key}: {inner}` disagree: give the option once	`{key}: {top}` a `options.{key}: {inner}` si odporují: zadejte volbu jen jednou
 @msg	version {0} files can't be compressed: only version {COMPRESSED_SINCE} and later open compressed files	soubory verze {0} nelze komprimovat: komprimované soubory otevírá až verze {COMPRESSED_SINCE} a novější
 @msg	width and height are at least 1 pixel	šířka i výška jsou alespoň 1 obrazový bod
 @msg	workspace name can't be empty	název pracovního prostoru nesmí být prázdný
@@ -4654,6 +4665,7 @@ imageTrace	Outline	Obrys
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} je exportní zásuvný modul (Soubor › Export › Exportovat jako…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` má {size} bajtů (limit {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} už používá {_2}
+@msg	{_1} is reserved by the system	Zkratku {_1} si vyhrazuje systém
 @msg	{_1} linked file(s) can't be read here: their previews show	propojené soubory ({_1}) zde nelze přečíst: zobrazují se jejich náhledy
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	propojené obrázky ({_1}) se na disku změnily: nové verze zobrazí Aktualizovat propojení
 @msg	{_1}: not saved, so not closed	{_1}: neuloženo, proto nezavřeno
@@ -4764,6 +4776,8 @@ imageTrace	Outline	Obrys
 @msg	{key} must be an array of non-negative integer object ids	{key} musí být pole ID objektů, která jsou nezáporná celá čísla
 @msg	invalid object id {value}: expected a non-negative integer	neplatné ID objektu {value}: očekává se nezáporné celé číslo
 @msg	no such object id {value}	objekt s ID {value} neexistuje
+@msg	id {value} is a layer, not an object	ID {value} je vrstva, nikoli objekt
+@msg	id {value} is a layer, not an object; move layers with layer.move	ID {value} je vrstva, nikoli objekt; vrstvy přesunete pomocí layer.move
 @msg	automation filesystem access is not granted: read authority is absent: {path}	přístup automatizace k systému souborů není udělen: chybí oprávnění ke čtení: {path}
 @msg	automation filesystem access is not granted: write authority is absent: {path}	přístup automatizace k systému souborů není udělen: chybí oprávnění k zápisu: {path}
 @msg	automation path rejected: outside the read root {root}: {path}	cesta automatizace odmítnuta: mimo kořen pro čtení {root}: {path}
@@ -4857,6 +4871,7 @@ imageTrace	Outline	Obrys
 	Logo 1000×1000	Logo 1000×1000
 	Business Card 3.5 × 2 in	Vizitka 3,5 × 2 in
 	Business Card 85 × 55 mm	Vizitka 85 × 55 mm
+	Business Card 91 × 55 mm	Vizitka 91 × 55 mm
 	Letterhead Letter	Hlavičkový papír Letter
 	Letterhead A4	Hlavičkový papír A4
 	Envelope DL	Obálka DL
@@ -5375,6 +5390,7 @@ mark-style	Japanese	Japonské
 @msg	Persistent libraries not found: {files}	Trvalé knihovny nebyly nalezeny: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` není panel knihovny (viz window.swatchLibrary)
 @msg	library panel `{given}` isn't open	panel knihovny `{given}` není otevřený
+@msg	too many changed shortcuts	příliš mnoho změněných klávesových zkratek
 @msg	library panel `{given}` isn't missing its library	knihovna panelu knihovny `{given}` nechybí
 @msg	too many library panels were opened in this session	v této relaci bylo otevřeno příliš mnoho panelů knihoven
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	Obraz má {_1} × {_2} pixelů, na jedné straně více než {LARGE_TRACE_SIDE}: vektorizuje se, ale pomaleji. Rychleji se vektorizuje s předvolbou nižší věrnosti nebo menší kopie obrazu.
@@ -5384,6 +5400,7 @@ mark-style	Japanese	Japonské
 	Snap to Perpendicular	Přichytávat ke kolmici
 @msg	unknown snap option `{key}` (use {options})	neznámá možnost přichytávání `{key}` (použijte {options})
 	Gap Length:	Délka mezery:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Režim Ploché logo vektorizoval obraz v rozlišení {_1} × {_2} pixelů, zmenšený průměrováním z {_3} × {_4}.
 	Artboard {n} of {total}	Pracovní plocha {n} z {total}
 	File {n} of {total}	Soubor {n} z {total}
 	Encoding and writing the file…	Kódování a zápis souboru…
@@ -5532,3 +5549,6 @@ axis	Y Axis	osa Y
 	Rectangular Grid Tool Options	Možnosti nástroje Obdélníková mřížka
 	Polar Grid Tool Options	Možnosti nástroje Polární mřížka
 	Fill Line	Výplň úsečky
+	Scale Presets	Přednastavení měřítka
+@msg	a {width}×{height} screenshot's byte count overflows	počet bajtů snímku {width}×{height} přeteče
+@msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	okno {what} ({points} bodů × {scale} DPI) nemůže určit velikost snímku

@@ -31,7 +31,7 @@ pub(crate) fn hint(d: &Dialog) -> &'static str {
 }
 
 fn drag_id() -> Id {
-    Id::new("revolve-gizmo-drag")
+    Id::unique("revolve-gizmo-drag")
 }
 
 pub(crate) fn dragging(ctx: &egui::Context) -> bool {
@@ -201,7 +201,7 @@ pub(super) fn show(app: &VectorcraftApp, ctx: &egui::Context, d: &mut Dialog) {
             rect = rect.union(label.expand(2.0));
         }
     }
-    egui::Area::new(Id::new("revolve-gizmo-area")).order(egui::Order::Foreground).fixed_pos(rect.min).movable(false).show(ctx, |ui| {
+    egui::Area::new(Id::unique("revolve-gizmo-area")).order(egui::Order::Foreground).fixed_pos(rect.min).movable(false).show(ctx, |ui| {
         ui.set_clip_rect(geometry.xf.rect);
         let response = ui.allocate_rect(rect.intersect(geometry.xf.rect), Sense::drag());
         let options = super::revolve::light_options(d);

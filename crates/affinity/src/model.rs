@@ -517,6 +517,9 @@ struct ReadAt {
 
 /// Read a document whose spreads are placed by `base` (for embedded documents, nested `depth`
 /// deep). What it uses is taken from `budget`, also when it fails part of the way.
+/// The most characters of a layer's name kept.
+const MAX_NAME_CHARS: usize = 1024;
+
 fn read_at(bytes: &[u8], limits: Limits, budget: &mut Budget, base: Affine, depth: usize) -> ReadAt {
     let mut archive = match Archive::open(bytes, limits) {
         Ok(a) => a,
@@ -692,7 +695,8 @@ impl<'s, 'a, 'b> Reader<'s, 'a, 'b> {
         let local = s.floats::<6>(id, b"Xfrm").map(Affine::from_xfrm).unwrap_or(Affine::IDENTITY);
         let world = local.then(parent);
         let class = s.class(id).unwrap_or(Tag(0));
-        let name = s.str(id, b"Desc").unwrap_or_default().to_string();
+        // A layer name is short; a long one is cut, as every visit of a shared object keeps a copy.
+        let name: String = s.str(id, b"Desc").unwrap_or_default().chars().take(MAX_NAME_CHARS).collect();
         let visible = s.bool(id, b"Visi").unwrap_or(true);
         let locked = s.bool(id, b"Edtb").is_some_and(|e| !e);
         let opacity = s.f64(id, b"Opac").map_or(1.0, |o| o.clamp(0.0, 1.0));

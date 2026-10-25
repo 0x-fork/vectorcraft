@@ -76,7 +76,7 @@ pub(crate) fn control_bar(app: &mut VectorcraftApp, ui: &mut Ui) -> bool {
     // The field shows the name as it is (names are never translated). A new name is applied on Enter
     // or a click elsewhere, and an empty field or Escape keeps the old one, as in the Properties panel.
     ui.label(egui::RichText::new(tl!("Name:")).size(12.0).color(t.text));
-    if let Some(name) = widgets::text_field(ui, ("cb-ab", "name"), Some(&ab.name), 120.0, 1).filter(|n| !n.is_empty()) {
+    if let Some(name) = widgets::text_field_named(ui, ("cb-ab", "name"), Some(tl!("Name:")), Some(&ab.name), 120.0, 1).filter(|n| !n.is_empty()) {
         app.run("artboard.setProps", json!({"index": i, "name": name})).ok();
     }
     if widgets::icon_button(ui, "dc-artboard-options", tl!("Artboard Options"), false, 24.0).clicked() {
@@ -317,7 +317,7 @@ fn toggle(app: &mut VectorcraftApp, i: usize, n: usize) {
 /// Whether the panel has the keyboard: one of its rows was clicked, and in every frame since then
 /// the panel was drawn and the pointer was not pressed outside its list.
 fn has_keyboard(app: &VectorcraftApp, ctx: &egui::Context) -> bool {
-    pstate::<Option<u64>>(ctx, "ab-keys").is_some_and(|f| f + 1 >= app.frame)
+    pstate::<Option<u64>>(ctx, "ab-keys").is_some_and(|f| f + 1 >= app.frame_iteration())
 }
 
 /// Whether Select All's shortcut selects every artboard ([`select_all`]) instead of the art: the
@@ -422,7 +422,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                     let opened_on: Vec<usize> = pstate(ui.ctx(), "ab-edit-all");
                     let targets = if opened_on.len() > 1 && opened_on.contains(&i) { opened_on } else { vec![i] };
                     let shown = if targets.len() > 1 { "" } else { name.as_str() };
-                    let id = ui.id().with(("ab-name", i));
+                    let id = ui.scope_id().with(("ab-name", i));
                     let mut buf: String = ui.data_mut(|d| d.get_temp::<String>(id)).unwrap_or_else(|| shown.to_string());
                     let kept = widgets::own_field_shift_enter(ui, id, &mut buf, shown);
                     let te = ui.put(name_rect, egui::TextEdit::singleline(&mut buf).id(id).font(egui::FontId::proportional(12.0)));
@@ -449,7 +449,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                 // (dimmed under the pointer while it isn't), and a click locks or unlocks it.
                 let is_locked = locked.get(i).copied().unwrap_or(false);
                 let lock = egui::Rect::from_center_size(r.right_center() - vec2(36.0, 0.0), vec2(14.0, 14.0));
-                let lresp = ui.interact(lock, ui.id().with(("ab-lock", i)), Sense::click());
+                let lresp = ui.interact(lock, ui.scope_id().with(("ab-lock", i)), Sense::click());
                 if is_locked {
                     icons::paint(ui, "lock", egui::Rect::from_center_size(lock.center(), vec2(12.0, 12.0)), t.icon);
                 } else if lresp.hovered() {
@@ -459,7 +459,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                     app.run("artboard.setProps", json!({"index": i, "locked": !is_locked})).ok();
                 }
                 let opt = egui::Rect::from_center_size(r.right_center() - vec2(14.0, 0.0), vec2(14.0, 14.0));
-                let oresp = ui.interact(opt, ui.id().with(("ab-opt", i)), Sense::click());
+                let oresp = ui.interact(opt, ui.scope_id().with(("ab-opt", i)), Sense::click());
                 icons::paint(ui, "dc-artboard-options", opt, if oresp.hovered() { t.text_strong } else { t.icon });
                 let oresp = oresp.on_hover_text(tl!("Artboard Options"));
                 // A click on the active artboard's icon opens its Artboard Options. A click on
@@ -505,7 +505,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     // pressed outside the list or the panel is not drawn (`ab-keys`: the frame it last had it in).
     let pressed_outside = ui.input(|i| i.pointer.any_pressed() && i.pointer.interact_pos().is_some_and(|p| !list_rect.contains(p)));
     let keys = row_clicked || (has_keyboard(app, ui.ctx()) && !pressed_outside);
-    set_pstate(ui.ctx(), "ab-keys", keys.then_some(app.frame));
+    set_pstate(ui.ctx(), "ab-keys", keys.then_some(app.frame_iteration()));
     let n = abs.len();
     widgets::bottom_bar(ui, |ui| {
         if widgets::icon_button_enabled(ui, "dc-rearrange", tl!("Rearrange All Artboards"), false, n > 1, 24.0).clicked() {
@@ -1435,7 +1435,7 @@ mod tests {
             .collect();
         let top_left = points.iter().min_by(|a, b| (a.top(), a.left()).partial_cmp(&(b.top(), b.left())).unwrap()).unwrap();
         bar_click(&mut app, &ctx, top_left.center());
-        assert_eq!(ctx.data(|d| d.get_temp::<usize>(egui::Id::new("refpt"))), Some(0), "the shared reference point is the top-left one");
+        assert_eq!(ctx.data(|d| d.get_temp::<usize>(egui::Id::unique("refpt"))), Some(0), "the shared reference point is the top-left one");
         let w = text_rect(&bar_texts(&mut app, &ctx), "W:");
         bar_type(&mut app, &ctx, egui::pos2(w.right() + 40.0, w.center().y), "300");
         want[1] = vectorcraft_geom::Rect::new(b.x0, b.y0, b.x0 + 300.0, b.y1);

@@ -59,7 +59,7 @@ fn a_hex_field_passed_through_with_tab_commits_nothing() {
     let draw = |ui: &mut egui::Ui| {
         let [r, g, b] = rgb.get();
         let red = widgets::plain_field(ui, "red", r, "", 0, 80.0);
-        hex_id.set(ui.id().with("hex"));
+        hex_id.set(ui.scope_id().with("hex"));
         hex.set(widgets::hex_field(ui, "hex", &format!("{:02X}{:02X}{:02X}", r as u8, g as u8, b as u8)));
         blue.set(widgets::plain_field(ui, "blue", b, "", 0, 80.0));
         red
@@ -247,7 +247,7 @@ impl Field {
         let input = egui::RawInput { events, time: Some(self.time), screen_rect, focused: self.focused, ..Default::default() };
         let mut got = None;
         let mut out = self.ctx.run_ui(input, |ui| {
-            self.id.set(ui.id().with("f"));
+            self.id.set(ui.scope_id().with("f"));
             got = draw(ui);
             self.rect.set(ui.min_rect());
         });
@@ -406,7 +406,7 @@ fn shift_enter_applies_the_value_and_keeps_the_field_active() {
     let color = RefCell::new(String::from("FF8000"));
     let draw = |ui: &mut egui::Ui| {
         text.set(widgets::text_field(ui, "f", Some("Name"), 120.0, 1).or(text.take()));
-        hex_id.set(ui.id().with("hex"));
+        hex_id.set(ui.scope_id().with("hex"));
         let shown = color.borrow().clone();
         let applied = widgets::hex_field(ui, "hex", &shown);
         if let Some(h) = &applied {
@@ -608,7 +608,10 @@ fn arrow_keys_step_plain_fields() {
 
 /// A wheel turn of `dy` (`unit`s, up positive) with `modifiers`, the pointer at `at`.
 fn wheel(at: Pos2, unit: egui::MouseWheelUnit, dy: f32, modifiers: Modifiers) -> Vec<Event> {
-    vec![Event::PointerMoved(at), Event::MouseWheel { unit, delta: vec2(0.0, dy), phase: egui::TouchPhase::Move, modifiers }]
+    vec![
+        Event::PointerMoved(at),
+        Event::MouseWheel { unit, delta: vec2(0.0, dy), phase: egui::TouchPhase::Move, modifiers, source: egui::MouseWheelSource::Unknown },
+    ]
 }
 
 /// The mouse wheel over a focused numeric field steps it as ↑/↓ do (#485): a notch a step, Shift
@@ -661,7 +664,7 @@ fn the_wheel_scrolls_the_panel_unless_over_the_focused_field() {
                 ui.add_space(600.0);
                 v
             });
-            offset.set(out.state.offset.y);
+            offset.set(out.state.clamped_offset().y);
             out.inner
         };
         f.frame(vec![], &draw);

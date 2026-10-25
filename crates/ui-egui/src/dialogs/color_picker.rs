@@ -450,8 +450,8 @@ fn new_original_chips(ui: &mut Ui, new: &Color, original: &Color) -> bool {
     widgets::paint_chip(ui, top, &Paint::solid(*new));
     widgets::paint_chip(ui, bottom, &Paint::solid(*original));
     ui.painter().rect_stroke(r, 0.0, egui::Stroke::new(1.0, t.border), egui::StrokeKind::Outside);
-    ui.interact(top, ui.id().with("cp-new"), Sense::hover()).on_hover_text(tl!("New"));
-    ui.interact(bottom, ui.id().with("cp-original"), Sense::click()).on_hover_text(tl!("Original: click to restore")).clicked()
+    ui.interact(top, ui.scope_id().with("cp-new"), Sense::hover()).on_hover_text(tl!("New"));
+    ui.interact(bottom, ui.scope_id().with("cp-original"), Sense::click()).on_hover_text(tl!("Original: click to restore")).clicked()
 }
 
 /// The HSB and RGB fields with the channel radios, hex, Lab and CMYK. Returns the edited colour
@@ -488,7 +488,7 @@ fn value_fields(ui: &mut Ui, p: &Picked, channel: Channel) -> (Option<Picked>, O
                         1 | 2 => (p.hsb[i] * 100.0, "%"),
                         _ => (rgb[i - 3] * 255.0, ""),
                     };
-                    if let Some(nv) = widgets::plain_field(ui, ("cp-left", i), v as f64, suffix, 0, VALUE_W) {
+                    if let Some(nv) = widgets::plain_field_named(ui, ("cp-left", i), Some(ch.label()), v as f64, suffix, 0, VALUE_W) {
                         let nv = nv as f32;
                         edit = Some(match i {
                             0..3 => {
@@ -503,7 +503,9 @@ fn value_fields(ui: &mut Ui, p: &Picked, channel: Channel) -> (Option<Picked>, O
                             }
                         });
                     }
-                } else if let Some(c) = widgets::hex_field(ui, "cp-hex", &hex_digits(&p.color)).as_deref().and_then(parse_hex) {
+                } else if let Some(c) =
+                    widgets::hex_field_named(ui, "cp-hex", Some(tl!("Color")), &hex_digits(&p.color)).as_deref().and_then(parse_hex)
+                {
                     edit = Some(Picked::of(c));
                 }
                 ui.end_row();
@@ -531,7 +533,7 @@ fn value_fields(ui: &mut Ui, p: &Picked, channel: Channel) -> (Option<Picked>, O
                     ui.add_space(12.0);
                     ui.label(egui::RichText::new(label).size(12.5).color(t.text));
                 });
-                if let Some(nv) = widgets::plain_field(ui, ("cp-right", i), v as f64, suffix, 0, VALUE_W) {
+                if let Some(nv) = widgets::plain_field_named(ui, ("cp-right", i), Some(label), v as f64, suffix, 0, VALUE_W) {
                     let nv = nv as f32;
                     edit = Some(Picked::of(if i < 3 {
                         let mut l = [lab.l, lab.a, lab.b];
@@ -908,7 +910,8 @@ mod tests {
         assert_eq!(names[names.len() - 2..], [Some("Y"), Some("K")], "one Tab takes Y to K");
         let found: Vec<&(String, Rect)> = stops.iter().flatten().collect();
         for (left, right) in found[..7].iter().zip(&found[7..]) {
-            assert_eq!(left.1.center().y, right.1.center().y, "{} and {} are level", left.0, right.0);
+            // Two grids: their rows land on the same subpixel-rounded line, not necessarily bit-equal.
+            assert!((left.1.center().y - right.1.center().y).abs() <= 0.5, "{} and {} are level", left.0, right.0);
         }
     }
 
@@ -1092,7 +1095,7 @@ mod tests {
             assert!((last_input.bottom() - field.bottom()).abs() < 2.0, "{last_input:?} vs {field:?}");
             // Fonts and translated actions may leave one normal gutter, but never an unused column.
             assert!((last_input.right() - ok.right()).abs() < COLUMN_GAP, "no unused column beside the inputs: {last_input:?} vs {ok:?}");
-            let id = egui::Id::new(("dialog", KIND));
+            let id = egui::Id::unique(("dialog", KIND));
             let before = ctx.memory(|m| m.area_rect(id)).unwrap();
             assert!(drawn.boxes.iter().all(|r| r.left() >= before.left() - 1.0 && r.right() <= before.right() + 1.0), "controls fit horizontally");
             let title = drawn.text(tl!("Color Picker"));
@@ -1149,7 +1152,7 @@ mod tests {
         let (ctx, mut app) = (context(), app());
         app.run("ui.colorPicker", json!({"color":"#ffffff"})).unwrap();
         settled(&ctx, &mut app, screen());
-        let id = egui::Id::new(("dialog", KIND));
+        let id = egui::Id::unique(("dialog", KIND));
         let before = ctx.memory(|m| m.area_rect(id)).unwrap();
         app.ui.dialog.as_mut().unwrap().fields.insert("hex".into(), json!("0000FE"));
         let drawn = settled(&ctx, &mut app, screen());
@@ -1181,7 +1184,7 @@ mod tests {
         app.run("ui.colorPicker", json!({})).unwrap();
         let drawn = settled(&ctx, &mut app, screen());
         let title = drawn.text(tl!("Color Picker")).center();
-        let id = egui::Id::new(("dialog", KIND));
+        let id = egui::Id::unique(("dialog", KIND));
         let before = ctx.memory(|m| m.area_rect(id)).unwrap();
         let pointer = |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         draw(&ctx, &mut app, screen(), vec![egui::Event::PointerMoved(title), pointer(title, true)]);
@@ -1237,7 +1240,7 @@ mod tests {
             let (ctx, mut app) = (context(), app());
             app.run("ui.colorPicker", json!({"color": "#0000ff"})).unwrap();
             let drawn = settled(&ctx, &mut app, size);
-            let outer = ctx.memory(|m| m.area_rect(egui::Id::new(("dialog", KIND)))).unwrap();
+            let outer = ctx.memory(|m| m.area_rect(egui::Id::unique(("dialog", KIND)))).unwrap();
             assert!(outer.width() <= size.x && outer.height() <= size.y, "{outer:?} in {size:?}");
             let field = drawn.fields.iter().max_by(|a, b| a.area().total_cmp(&b.area())).unwrap();
             assert!((MIN_FIELD..=FIELD).contains(&field.width()));
@@ -1259,6 +1262,7 @@ mod tests {
                                 delta: vec2(0.0, -20.0),
                                 phase: egui::TouchPhase::Move,
                                 modifiers: Default::default(),
+                                source: egui::MouseWheelSource::Unknown,
                             },
                         ],
                     );

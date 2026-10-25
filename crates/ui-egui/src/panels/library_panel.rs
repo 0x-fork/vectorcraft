@@ -382,7 +382,7 @@ fn rename(ui: &mut UiState, from: &str, to: &str) -> Result<(), String> {
 
 /// The interaction id of the tile or row of `name` in panel `panel`.
 pub(crate) fn tile_id(panel: &str, name: &str) -> egui::Id {
-    egui::Id::new(("library-tile", panel, name))
+    egui::Id::unique(("library-tile", panel, name))
 }
 
 /// The state key `key` of panel `panel`.
@@ -594,7 +594,7 @@ pub(crate) fn user_slot(id: &str, prefix: &str, libraries: Vec<LibraryInfo>) -> 
 #[cfg(test)]
 pub(crate) fn show_window(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let Some(panel) = last_open(&app.ui).map(LibraryPanel::panel) else { return };
-    let area = egui::Area::new(egui::Id::new("test-library-panel")).fixed_pos(egui::pos2(20.0, 20.0));
+    let area = egui::Area::new(egui::Id::unique("test-library-panel")).fixed_pos(egui::pos2(20.0, 20.0));
     area.show(ctx, |ui| crate::dock::panel_body(app, ui, &panel, 256.0, 400.0));
 }
 
@@ -612,7 +612,7 @@ fn body<K: LibraryKind>(app: &mut VectorcraftApp, ui: &mut Ui, id: &str) {
     };
     let panel = panel_id(K::KIND, id);
     let (view, hide_find) = settings(&app.ui, K::KIND, id).map_or((K::VIEW, false), |s| (s.view.unwrap_or(K::VIEW), s.hide_find));
-    let query = if hide_find { String::new() } else { widgets::search_field(ui, egui::Id::new(key(&panel, "find")), tl!("Find")) };
+    let query = if hide_find { String::new() } else { widgets::search_field(ui, egui::Id::unique(key(&panel, "find")), tl!("Find")) };
     ui.add_space(4.0);
     let rows = K::rows(&lib, &query.trim().to_lowercase());
     let selected = selection(ui.ctx(), &panel);
@@ -939,7 +939,7 @@ mod tests {
         app.run("window.swatchLibrary", json!({"library": "web-safe-216"})).unwrap();
         let panel = "library:swatches:web-safe-216";
         app.run("ui.libraryPanel", json!({"panel": panel, "view": "smallList"})).unwrap();
-        ctx.data_mut(|d| d.insert_temp(egui::Id::new(key(panel, "find")), "#FF00".to_string()));
+        ctx.data_mut(|d| d.insert_temp(egui::Id::unique(key(panel, "find")), "#FF00".to_string()));
         frame(&mut app, &ctx, vec![], Modifiers::NONE, 0.0);
         frame(&mut app, &ctx, vec![], Modifiers::NONE, 0.5);
         assert!(ctx.read_response(tile_id(panel, "#FF0033")).is_some());

@@ -325,6 +325,8 @@
 	Bullets	Marcadores
 	Bullets and Numbering	Marcadores e Numeração
 	Apply Bullets	Aplicar Marcadores
+	Numbered List	Lista Numerada
+	Apply Numbers	Aplicar Numeração
 	Filled Dot	Ponto Preenchido
 	Dash	Travessão
 	Hollow Circle	Círculo Vazado
@@ -3294,6 +3296,7 @@ font-technology	Variable	Variáveis
 	Outlines	Contornos
 	Outlines with Source Image	Contornos com imagem de origem
 	Source Image	Imagem de origem
+	Press and hold to view the source image	Mantenha pressionado para ver a imagem de origem
 	Image Trace View	Exibição de vetorização de imagem
 	Stroke (X), double-click for the Color Picker	Traço (X), clique duas vezes para o seletor de cores
 	Swap Fill and Stroke (Shift+X)	Trocar preenchimento e traço (Shift+X)
@@ -3418,6 +3421,7 @@ axis	Both	Ambos
 @msg	Installed plug-in {_1}	Plug-in {_1} instalado
 @msg	Internal error: {msg} (please report this bug)	Erro interno: {msg} (relate este bug)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Mesclar Pintura dinâmica: selecione um grupo de Pintura dinâmica e os traçados a adicionar
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	A pintura dinâmica aceita traçados e traçados compostos: converta primeiro texto, imagens e outros objetos em traçados
 @msg	Live Paint: select paths or compound paths	Pintura dinâmica: selecione traçados ou traçados compostos
 @msg	Live Paint: these paths are too degenerate to paint	Pintura dinâmica: estes traçados são degenerados demais para pintar
 @msg	Make Guides: select paths	Criar guias: selecione traçados
@@ -3483,6 +3487,12 @@ axis	Both	Ambos
 @msg	`{key}` must be between {min} and {max} (got {x})	`{key}` deve estar entre {min} e {max} (recebido {x})
 @msg	`{key}` must be one of {_1}	`{key}` deve ser um de {_1}
 @msg	`{key}` must be true or false	`{key}` deve ser true ou false
+@msg	`select` must be true or false	`select` deve ser true ou false
+@msg	`minAnchors` and `maxAnchors` must be whole numbers	`minAnchors` e `maxAnchors` devem ser números inteiros
+@msg	`{key}` must be a number not below 0	`{key}` deve ser um número não inferior a 0
+@msg	`{key}` must be [x, y, width, height]: four finite numbers, width and height not negative	`{key}` deve ser [x, y, width, height]: quatro números finitos, com largura e altura não negativas
+@msg	`{min_key}` is greater than `{max_key}`	`{min_key}` é maior que `{max_key}`
+@msg	give at least one of `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`	informe pelo menos um de `name`, `kind`, `text`, `within`, `intersects`, `minWidth`, `maxWidth`, `minHeight`, `maxHeight`, `minThickness`, `maxThickness`, `minArea`, `maxArea`, `minAnchors`, `maxAnchors`
 @msg	`{k}` must be [x, y]	`{k}` deve ser [x, y]
 @msg	`{name}` has no options	`{name}` não tem opções
 @msg	`{name}` is a built-in workspace; choose another name	`{name}` é um espaço de trabalho integrado; escolha outro nome
@@ -3912,6 +3922,7 @@ axis	Both	Ambos
 @msg	unsupported: {0}	não suportado: {0}
 @msg	variables are locked	as variáveis estão bloqueadas
 @msg	variables that aren't text were left out: {kinds}	as variáveis que não são de texto foram omitidas: {kinds}
+@msg	`{key}: {top}` and `options.{key}: {inner}` disagree: give the option once	`{key}: {top}` e `options.{key}: {inner}` não coincidem: informe a opção uma só vez
 @msg	version {0} files can't be compressed: only version {COMPRESSED_SINCE} and later open compressed files	arquivos da versão {0} não podem ser compactados: somente a versão {COMPRESSED_SINCE} e posteriores abrem arquivos compactados
 @msg	width and height are at least 1 pixel	largura e altura têm pelo menos 1 pixel
 @msg	workspace name can't be empty	o nome do espaço de trabalho não pode estar vazio
@@ -3925,6 +3936,7 @@ axis	Both	Ambos
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} é um plug-in de exportação (Arquivo › Exportar › Exportar Como…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` tem {size} bytes (limite {MAX_DOCUMENT_DATA})
 @msg	{_1} is already used by {_2}	{_1} já é usado por {_2}
+@msg	{_1} is reserved by the system	{_1} é reservado pelo sistema
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} arquivo(s) vinculado(s) não podem ser lidos aqui: suas visualizações são exibidas
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} imagem(ns) vinculada(s) mudou(aram) no disco: Atualizar links mostra as novas versões
 @msg	{_1}: not saved, so not closed	{_1}: não salvo, portanto não fechado
@@ -4030,6 +4042,8 @@ axis	Both	Ambos
 @msg	{key} must be an array of non-negative integer object ids	{key} deve ser uma matriz de ids de objeto que sejam inteiros não negativos
 @msg	invalid object id {value}: expected a non-negative integer	id de objeto inválido {value}: era esperado um inteiro não negativo
 @msg	no such object id {value}	não existe objeto com o id {value}
+@msg	id {value} is a layer, not an object	o id {value} é uma camada, não um objeto
+@msg	id {value} is a layer, not an object; move layers with layer.move	o id {value} é uma camada, não um objeto; mova camadas com layer.move
 @msg	automation filesystem access is not granted: read authority is absent: {path}	o acesso da automação ao sistema de arquivos não foi concedido: falta autorização de leitura: {path}
 @msg	automation filesystem access is not granted: write authority is absent: {path}	o acesso da automação ao sistema de arquivos não foi concedido: falta autorização de gravação: {path}
 @msg	automation path rejected: outside the read root {root}: {path}	caminho da automação rejeitado: fora da raiz de leitura {root}: {path}
@@ -4785,6 +4799,7 @@ effect	Regular	Regular
 	Logo 1000×1000	Logotipo 1000×1000
 	Business Card 3.5 × 2 in	Cartão de Visita 3.5 × 2 pol
 	Business Card 85 × 55 mm	Cartão de Visita 85 × 55 mm
+	Business Card 91 × 55 mm	Cartão de Visita 91 × 55 mm
 	Letterhead Letter	Papel Timbrado Carta
 	Letterhead A4	Papel Timbrado A4
 	Envelope DL	Envelope DL
@@ -5292,6 +5307,7 @@ mark-style	Japanese	Japonesas
 @msg	Persistent libraries not found: {files}	Bibliotecas persistentes não encontradas: {files}
 @msg	`{given}` isn't a library panel (see window.swatchLibrary)	`{given}` não é um painel de biblioteca (consulte window.swatchLibrary)
 @msg	library panel `{given}` isn't open	o painel de biblioteca `{given}` não está aberto
+@msg	too many changed shortcuts	atalhos alterados demais
 @msg	library panel `{given}` isn't missing its library	a biblioteca do painel de biblioteca `{given}` não está faltando
 @msg	too many library panels were opened in this session	foram abertos painéis de biblioteca demais nesta sessão
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	A imagem tem {_1} × {_2} pixels, mais de {LARGE_TRACE_SIDE} em um lado: ela é traçada, mas mais devagar. Uma predefinição de menor fidelidade ou uma cópia menor da imagem traça mais rápido.
@@ -5301,6 +5317,7 @@ mark-style	Japanese	Japonesas
 	Snap to Perpendicular	Ajustar à Perpendicular
 @msg	unknown snap option `{key}` (use {options})	opção de ajuste desconhecida `{key}` (use {options})
 	Gap Length:	Comprimento da Lacuna:
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	O modo Logotipo Plano traçou a imagem em {_1} × {_2} pixels, reduzida por média de {_3} × {_4}.
 	Artboard {n} of {total}	Mesa de Trabalho {n} de {total}
 	File {n} of {total}	Arquivo {n} de {total}
 	Encoding and writing the file…	Codificando e gravando o arquivo…
@@ -5449,3 +5466,6 @@ axis	Y Axis	Eixo Y
 	Rectangular Grid Tool Options	Opções da Ferramenta Grade Retangular
 	Polar Grid Tool Options	Opções da Ferramenta Grade Polar
 	Fill Line	Preencher linha
+	Scale Presets	Predefinições de escala
+@msg	a {width}×{height} screenshot's byte count overflows	a contagem de bytes de uma captura {width}×{height} transborda
+@msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	o {what} da janela ({points} pontos × {scale} DPI) não pode dimensionar uma captura

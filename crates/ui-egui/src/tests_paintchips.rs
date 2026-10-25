@@ -105,7 +105,7 @@ fn a_popover_tile_click_sets_the_fill() {
     let (fill, stroke) = chips(&ctx);
     click(&mut app, &ctx, fill.center(), Modifiers::NONE, control_bar);
     assert!(app.session.fill_active, "the Fill chip brings its proxy forward");
-    let tile = ctx.read_response(egui::Id::new(("swatch-pop-tile", "Red"))).expect("the popover shows the swatches").rect;
+    let tile = ctx.read_response(egui::Id::unique(("swatch-pop-tile", "Red"))).expect("the popover shows the swatches").rect;
     click(&mut app, &ctx, tile.center(), Modifiers::NONE, control_bar);
     assert_eq!(fill_hex(&app), "#ed1c24");
     assert_eq!(app.session.doc().unwrap().history.undo.last().unwrap().label, "Fill Color", "through paint.setFill");
@@ -113,7 +113,7 @@ fn a_popover_tile_click_sets_the_fill() {
     click(&mut app, &ctx, Pos2::new(1300.0, 900.0), Modifiers::NONE, control_bar);
     click(&mut app, &ctx, stroke.center(), Modifiers::SHIFT, control_bar);
     assert!(!app.session.fill_active);
-    assert!(ctx.read_response(egui::Id::new(("swatch-pop-tile", "Red"))).is_none(), "no swatches in the mixer");
+    assert!(ctx.read_response(egui::Id::unique(("swatch-pop-tile", "Red"))).is_none(), "no swatches in the mixer");
     let text = {
         let mut t = String::new();
         for s in frame(&mut app, &ctx, vec![], Modifiers::NONE, control_bar) {
@@ -142,7 +142,7 @@ fn the_properties_panel_has_the_control_bars_fill_and_stroke() {
     let (fill, stroke) = chips(&ctx);
     assert!(stroke.top() > fill.bottom(), "Fill above Stroke");
     click(&mut app, &ctx, fill.center(), Modifiers::NONE, props);
-    let tile = ctx.read_response(egui::Id::new(("swatch-pop-tile", "Red"))).expect("the popover shows the swatches").rect;
+    let tile = ctx.read_response(egui::Id::unique(("swatch-pop-tile", "Red"))).expect("the popover shows the swatches").rect;
     click(&mut app, &ctx, tile.center(), Modifiers::NONE, props);
     assert_eq!(fill_hex(&app), "#ed1c24", "the next object's fill");
     app.run("shape.rectangle", json!({"x": 10, "y": 10, "width": 50, "height": 50})).unwrap();
@@ -152,7 +152,7 @@ fn the_properties_panel_has_the_control_bars_fill_and_stroke() {
     frame(&mut app, &ctx, vec![], Modifiers::NONE, props);
     let (fill, _) = chips(&ctx);
     click(&mut app, &ctx, fill.center(), Modifiers::NONE, props);
-    let tile = ctx.read_response(egui::Id::new(("swatch-pop-tile", "Black"))).expect("the popover shows the swatches").rect;
+    let tile = ctx.read_response(egui::Id::unique(("swatch-pop-tile", "Black"))).expect("the popover shows the swatches").rect;
     click(&mut app, &ctx, tile.center(), Modifiers::NONE, props);
     assert_eq!(fill_hex(&app), "#000000");
     assert_eq!(app.session.doc().unwrap().history.undo.last().unwrap().label, "Fill Color");
@@ -233,7 +233,7 @@ fn the_window_menu_panel_keys() {
     assert_eq!((shortcut("Align"), shortcut("Layers"), shortcut("Paragraph")), ("Shift+F7".into(), "F7".into(), "Cmd+Alt+T".into()));
     assert!(shortcut_editor::entry("panel:layers").is_some(), "the dock's tabs can be given keys too");
     // Changed in the editor, the old key is free.
-    app.ui.shortcut_overrides.insert("panel:align".into(), "Cmd+Alt+Shift+F7".into());
+    crate::keymap::set_override(&mut app.ui.shortcut_overrides, "panel:align", "Cmd+Alt+Shift+F7");
     shortcut_editor::sync(&app.ui);
     press(&mut app, egui::Key::F7, shift);
     assert_eq!(app.ui.open_panel, None);

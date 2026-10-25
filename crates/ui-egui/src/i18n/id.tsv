@@ -287,6 +287,8 @@
 	Bullets	Poin
 	Bullets and Numbering	Poin dan penomoran
 	Apply Bullets	Terapkan poin
+	Numbered List	Daftar bernomor
+	Apply Numbers	Terapkan penomoran
 	Filled Dot	Titik penuh
 	Dash	Tanda pisah
 	Hollow Circle	Lingkaran kosong
@@ -3675,6 +3677,7 @@ font-technology	Variable	Variabel
 	View:	Tampilan:
 	Tracing Result	Hasil penelusuran
 	Outlines with Source Image	Kontur dengan gambar sumber
+	Press and hold to view the source image	Tekan dan tahan untuk melihat gambar sumber
 	SVG Options	Opsi SVG
 	Maximize	Maksimalkan
 	Restore	Pulihkan
@@ -3872,6 +3875,7 @@ imageTrace	Outline	Kontur
 @msg	Installed plug-in {_1}	Berhasil memasang plug-in {_1}
 @msg	Internal error: {msg} (please report this bug)	Kesalahan internal: {msg} (harap laporkan bug ini)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Gabungkan Live Paint: pilih grup Live Paint dan jalur yang akan ditambahkan
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	Live Paint menerima jalur dan jalur majemuk: konversikan dulu teks, gambar, dan objek lain menjadi jalur
 @msg	Live Paint: select paths or compound paths	Live Paint: pilih jalur atau jalur majemuk
 @msg	Live Paint: these paths are too degenerate to paint	Live Paint: jalur ini terlalu terdegenerasi untuk dicat
 @msg	Make Guides: select paths	Buat panduan: pilih jalur
@@ -4350,6 +4354,7 @@ imageTrace	Outline	Kontur
 @msg	{_1} font families available	{_1} keluarga font tersedia
 @msg	{_1} is a live effect (Effect › Plug-ins)	{_1} adalah efek langsung (Efek › Plug-in)
 @msg	{_1} is already used by {_2}	{_1} sudah digunakan oleh {_2}
+@msg	{_1} is reserved by the system	{_1} dicadangkan oleh sistem
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} berkas tertaut tidak dapat dibaca di sini: yang ditampilkan adalah pratinjaunya
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} gambar tertaut di disk telah berubah: Perbarui Tautan menampilkan versi barunya
 @msg	{_1}: not saved, so not closed	{_1}: tidak disimpan, sehingga tidak ditutup
@@ -4551,6 +4556,7 @@ imageTrace	Outline	Kontur
 	Logo 1000×1000	Logo 1000×1000
 	Business Card 3.5 × 2 in	Kartu nama 3.5 × 2 in
 	Business Card 85 × 55 mm	Kartu nama 85 × 55 mm
+	Business Card 91 × 55 mm	Kartu nama 91 × 55 mm
 	Letterhead Letter	Kop surat Letter
 	Letterhead A4	Kop surat A4
 	Envelope DL	Amplop DL
@@ -5487,3 +5493,4 @@ axis	Y Axis	Sumbu Y
 	Rectangular Grid Tool Options	Opsi alat kisi persegi panjang
 	Polar Grid Tool Options	Opsi alat kisi polar
 	Fill Line	Isi garis
+	Scale Presets	Preset skala

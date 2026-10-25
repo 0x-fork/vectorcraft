@@ -139,6 +139,14 @@ fn floats(v: &Value) -> Option<Vec<f64>> {
 
 /// A colour object (`RGBA`, `HSLA`, `CMYK`, `GRAY`, `LABA`, `Pant`).
 pub(crate) fn color(r: &mut Reader, id: ObjId) -> Option<Color> {
+    color_within(r, id, 0)
+}
+
+/// The most spot colours that stand for one another followed.
+const MAX_SPOT_CHAIN: u32 = 8;
+
+/// [`color`], `depth` spot colours deep: one that stands for itself (or a ring of them) ends here.
+fn color_within(r: &mut Reader, id: ObjId, depth: u32) -> Option<Color> {
     let s = r.s;
     let class = s.class(id)?;
     let col = || -> Option<Vec<f64>> {
@@ -170,7 +178,13 @@ pub(crate) fn color(r: &mut Reader, id: ObjId) -> Option<Color> {
         }
         b"Pant" => {
             r.warn("spot colours (imported as their RGB equivalent)");
-            return s.obj(id, b"srgb").and_then(|c| color(r, c)).or_else(|| s.obj(id, b"base").and_then(|c| color(r, c)));
+            if depth >= MAX_SPOT_CHAIN {
+                return None;
+            }
+            return s
+                .obj(id, b"srgb")
+                .and_then(|c| color_within(r, c, depth + 1))
+                .or_else(|| s.obj(id, b"base").and_then(|c| color_within(r, c, depth + 1)));
         }
         b"RegC" => Color::Cmyk { c: 1.0, m: 1.0, y: 1.0, k: 1.0, a: 1.0 },
         _ => {

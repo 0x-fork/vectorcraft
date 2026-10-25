@@ -301,6 +301,8 @@
 	Bullets	Opsommingstekens
 	Bullets and Numbering	Opsommingstekens en nummering
 	Apply Bullets	Opsommingstekens toepassen
+	Numbered List	Genummerde lijst
+	Apply Numbers	Nummering toepassen
 	Filled Dot	Gevulde stip
 	Dash	Streepje
 	Hollow Circle	Holle cirkel
@@ -3689,6 +3691,7 @@ font-technology	Variable	Variabel
 	View:	Weergave:
 	Tracing Result	Traceringresultaat
 	Outlines with Source Image	Contouren met bronafbeelding
+	Press and hold to view the source image	Ingedrukt houden om de bronafbeelding te bekijken
 	SVG Options	SVG-opties
 	Maximize	Maximaliseren
 	Restore	Herstellen
@@ -3886,6 +3889,7 @@ imageTrace	Outline	Contour
 @msg	Installed plug-in {_1}	Plug-in {_1} geïnstalleerd
 @msg	Internal error: {msg} (please report this bug)	Interne fout: {msg} (meld deze bug alsjeblieft)
 @msg	Live Paint Merge: select a Live Paint group and the paths to add	Live Paint samenvoegen: selecteer een Live Paint-groep en de paden om toe te voegen
+@msg	Live Paint takes paths and compound paths: convert type, images and other objects to paths first	Live Paint neemt paden en samengestelde paden: zet tekst, afbeeldingen en andere objecten eerst om in paden
 @msg	Live Paint: select paths or compound paths	Live Paint: selecteer paden of samengestelde paden
 @msg	Live Paint: these paths are too degenerate to paint	Live Paint: deze paden zijn te gedegenereerd om te verven
 @msg	Make Guides: select paths	Hulplijnen maken: selecteer paden
@@ -4362,6 +4366,7 @@ imageTrace	Outline	Contour
 @msg	{_1} font families available	{_1} lettertypefamilies beschikbaar
 @msg	{_1} is a live effect (Effect › Plug-ins)	{_1} is een live-effect (Effect › Plug-ins)
 @msg	{_1} is already used by {_2}	{_1} wordt al gebruikt door {_2}
+@msg	{_1} is reserved by the system	{_1} is gereserveerd door het systeem
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} gekoppelde bestand(en) kunnen hier niet worden gelezen: hun voorbeelden worden weergegeven
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} gekoppelde afbeelding(en) zijn gewijzigd op de schijf: Koppelingen bijwerken toont de nieuwe versies
 @msg	{_1}: not saved, so not closed	{_1}: niet opgeslagen, dus niet gesloten
@@ -4563,6 +4568,7 @@ imageTrace	Outline	Contour
 	Logo 1000×1000	Logo 1000×1000
 	Business Card 3.5 × 2 in	Visitekaartje 3.5 × 2 in
 	Business Card 85 × 55 mm	Visitekaartje 85 × 55 mm
+	Business Card 91 × 55 mm	Visitekaartje 91 × 55 mm
 	Letterhead Letter	Briefhoofd Letter
 	Letterhead A4	Briefhoofd A4
 	Envelope DL	Envelop DL
@@ -5377,6 +5383,7 @@ swatch	Bright Violet	Felviolet
 @msg	too many library panels were opened in this session	er zijn in deze sessie te veel bibliotheekpanelen geopend
 @msg	The image is {_1} × {_2} pixels, more than {LARGE_TRACE_SIDE} on a side: it is traced, but more slowly. A lower-fidelity preset or a smaller copy of the image traces faster.	De afbeelding is {_1} × {_2} pixels, meer dan {LARGE_TRACE_SIDE} aan één zijde: ze wordt getraceerd, maar langzamer. Een voorinstelling met minder detail of een kleinere kopie van de afbeelding traceert sneller.
 @msg	The image was traced at {_1} × {_2} pixels, scaled down from {_3} × {_4} ({_5} megapixels at most).	De afbeelding is getraceerd op {_1} × {_2} pixels, verkleind van {_3} × {_4} (maximaal {_5} megapixels).
+@msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	De modus Plat logo heeft de afbeelding getraceerd op {_1} × {_2} pixels, door middeling verkleind van {_3} × {_4}.
 	Artboard {n} of {total}	Tekengebied {n} van {total}
 	File {n} of {total}	Bestand {n} van {total}
 	Encoding and writing the file…	Bestand coderen en schrijven…
@@ -5530,3 +5537,4 @@ axis	Y Axis	Y-as
 	Rectangular Grid Tool Options	Opties rechthoekig-rastergereedschap
 	Polar Grid Tool Options	Opties polair-rastergereedschap
 	Fill Line	Lijn vullen
+	Scale Presets	Schaalvoorinstellingen

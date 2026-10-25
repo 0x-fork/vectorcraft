@@ -96,58 +96,128 @@ fn mid(segs: &[Seg]) -> Option<Point> {
 
 /// Rectangles looked up by a point inside them, when there are too many to test one by one for
 /// every point (the map asks once per edge and once per hole, so a scan of them all made it
-/// quadratic in the input, #937). Rectangles narrow in x are sorted by their left edge, so the
-/// ones that can hold a point are one short run of them; those wide in x but narrow in y (a hatch
-/// of long horizontal lines) are sorted by their top edge the same way; the few wide both ways (a
-/// long diagonal across the art) are scanned. "Narrow" is up to twice the side of a cell holding
-/// one rectangle on average, so a run holds about the rectangles of one row or column of cells.
+/// quadratic in the input, #937). A grid of cells over their bounds, each cell listing the
+/// rectangles touching it; a lookup reads the cells around the point. The grid has about one cell
+/// per rectangle, so a lookup reads about the rectangles of the point's neighbourhood. A rectangle
+/// covering too many cells (a long diagonal's bounds take in most of the art, so an index of the
+/// bounds alone scanned a diagonal hatch whole for every point) is filed under the cells of a
+/// smaller footprint instead ([`Self::with_footprint`]), or, failing that, scanned for every point.
 struct RectIndex<T> {
-    by_x: Vec<(kurbo::Rect, T)>,
-    max_width: f64,
-    by_y: Vec<(kurbo::Rect, T)>,
-    max_height: f64,
-    wide: Vec<(kurbo::Rect, T)>,
+    items: Vec<(kurbo::Rect, T)>,
+    /// The grid's top-left corner, cell size and column count; `cells` lists the items touching
+    /// each cell, row by row.
+    origin: Point,
+    cell: (f64, f64),
+    cols: usize,
+    cells: Vec<Vec<u32>>,
+    /// Items the grid doesn't hold (bounds covering most of it, or not finite), scanned for
+    /// every point.
+    rest: Vec<usize>,
+}
+
+/// The fewest cells one footprint rectangle may always be filed under. The cap is this or two
+/// rows or columns of the grid, whichever is more: a thin stripe across the art (one of the faces
+/// a hatch cuts a shape into) is filed under the cells along it, while a rectangle covering most
+/// of the grid costs more to file and to read than to scan for every point.
+const CELLS_PER_FOOTPRINT: usize = 64;
+
+/// The cells (columns or rows) an interval `lo..=hi` touches on one axis of a grid: clamped to the
+/// grid, so an interval past its edge gets the nearest cell (whose items `contains` then rejects),
+/// and `None` for an interval that isn't a number.
+fn cell_span(lo: f64, hi: f64, origin: f64, size: f64, count: usize) -> Option<std::ops::RangeInclusive<usize>> {
+    let last = count.saturating_sub(1) as f64;
+    let a = ((lo - origin) / size).floor().clamp(0.0, last);
+    let b = ((hi - origin) / size).floor().clamp(0.0, last);
+    (a.is_finite() && b.is_finite()).then(|| (a as usize)..=(b.max(a) as usize))
 }
 
 impl<T> RectIndex<T> {
     fn new(items: Vec<(kurbo::Rect, T)>) -> Self {
-        let n = items.len().max(1) as f64;
-        let all = items.iter().map(|(r, _)| *r).reduce(|a, b| a.union(b));
-        let cell = all
-            .map(|a| {
-                let side = (a.area() / n).sqrt();
-                if side > 0.0 { 2.0 * side } else { 2.0 * a.width().max(a.height()) / n }
-            })
-            .filter(|c| c.is_finite())
-            .unwrap_or(0.0)
-            .max(1e-9);
-        let (mut by_x, mut by_y, mut wide) = (Vec::new(), Vec::new(), Vec::new());
-        for it in items {
-            if it.0.width() <= cell {
-                by_x.push(it);
-            } else if it.0.height() <= cell {
-                by_y.push(it);
-            } else {
-                // A NaN extent fails both tests above, so a non-finite rectangle is never in a sorted
-                // run along that axis; `contains` rejects it wherever it lands.
-                wide.push(it);
-            }
-        }
-        by_x.sort_by(|a, b| a.0.x0.total_cmp(&b.0.x0));
-        by_y.sort_by(|a, b| a.0.y0.total_cmp(&b.0.y0));
-        let max_width = by_x.iter().map(|(r, _)| r.width()).fold(0.0, f64::max);
-        let max_height = by_y.iter().map(|(r, _)| r.height()).fold(0.0, f64::max);
-        Self { by_x, max_width, by_y, max_height, wide }
+        Self::with_footprint(items, |r, _, _| vec![*r])
     }
 
-    /// The items whose rectangle, grown by `tol`, holds `p`.
-    fn at(&self, p: Point, tol: f64) -> impl Iterator<Item = &T> {
-        let lo = self.by_x.partition_point(|(r, _)| r.x0 < p.x - tol - self.max_width);
-        let run_x = self.by_x.get(lo..).unwrap_or_default().iter().take_while(move |(r, _)| r.x0 <= p.x + tol);
-        let lo = self.by_y.partition_point(|(r, _)| r.y0 < p.y - tol - self.max_height);
-        let run_y = self.by_y.get(lo..).unwrap_or_default().iter().take_while(move |(r, _)| r.y0 <= p.y + tol);
-        run_x.chain(run_y).chain(&self.wide).filter(move |(r, _)| r.inflate(tol, tol).contains(p)).map(|(_, t)| t)
+    /// `footprint(bounds, item, cell side)` gives the rectangles an item is filed under: a lookup
+    /// finds the item when its bounds hold the point and one footprint rectangle is within the
+    /// lookup's tolerance of it. The bounds themselves (`new`) suit items as compact as their
+    /// bounds; a long diagonal segment is better filed under the bounds of its pieces, about a
+    /// cell long each, which take in the cells along it rather than every cell its bounds cover.
+    fn with_footprint(items: Vec<(kurbo::Rect, T)>, footprint: impl Fn(&kurbo::Rect, &T, f64) -> Vec<kurbo::Rect>) -> Self {
+        let n = items.len().max(1);
+        let all = items.iter().map(|(r, _)| *r).filter(kurbo::Rect::is_finite).reduce(|a, b| a.union(b)).unwrap_or(kurbo::Rect::ZERO);
+        // A cell's side holds one rectangle on average; a grid of collinear rectangles (zero area)
+        // is divided along its length.
+        let side = (all.area() / n as f64).sqrt();
+        let side = if side > 0.0 { side } else { all.width().max(all.height()) / n as f64 }.max(1e-9);
+        // Saturating casts: an extent of a billion cells is clamped to the item count, then the
+        // grid is kept to a few cells per item however lopsided its bounds.
+        let mut cols = ((all.width() / side).ceil() as usize).clamp(1, 2 * n);
+        let mut rows = ((all.height() / side).ceil() as usize).clamp(1, 2 * n);
+        while cols * rows > 4 * n + 4 {
+            if cols > rows { cols = cols.div_ceil(2) } else { rows = rows.div_ceil(2) }
+        }
+        let cell = ((all.width() / cols as f64).max(1e-9), (all.height() / rows as f64).max(1e-9));
+        let cap = CELLS_PER_FOOTPRINT.max(2 * cols.max(rows));
+        let mut cells: Vec<Vec<u32>> = vec![Vec::new(); cols * rows];
+        let mut rest = Vec::new();
+        for (i, (r, t)) in items.iter().enumerate() {
+            // Cells hold `u32` indices to halve the memory of a long stripe filed under a row of them.
+            let Ok(index) = u32::try_from(i) else {
+                rest.push(i);
+                continue;
+            };
+            let mut scan = !r.is_finite();
+            for f in if scan { Vec::new() } else { footprint(r, t, cell.0.min(cell.1)) } {
+                match (cell_span(f.x0, f.x1, all.x0, cell.0, cols), cell_span(f.y0, f.y1, all.y0, cell.1, rows)) {
+                    (Some(xs), Some(ys)) if (xs.end() - xs.start() + 1) * (ys.end() - ys.start() + 1) <= cap => {
+                        for y in ys {
+                            for x in xs.clone() {
+                                if let Some(c) = cells.get_mut(y * cols + x) {
+                                    c.push(index);
+                                }
+                            }
+                        }
+                    }
+                    _ => scan = true,
+                }
+            }
+            if scan {
+                rest.push(i);
+            }
+        }
+        Self { items, origin: all.origin(), cell, cols, cells, rest }
     }
+
+    /// The items whose rectangle, grown by `tol`, holds `p` (and, with a footprint, one of whose
+    /// footprint rectangles is within `tol` of it).
+    fn at(&self, p: Point, tol: f64) -> impl Iterator<Item = &T> {
+        let mut found = self.rest.clone();
+        let rows = self.cells.len() / self.cols.max(1);
+        if let (Some(xs), Some(ys)) = (
+            cell_span(p.x - tol, p.x + tol, self.origin.x, self.cell.0, self.cols),
+            cell_span(p.y - tol, p.y + tol, self.origin.y, self.cell.1, rows),
+        ) {
+            for y in ys {
+                for x in xs.clone() {
+                    found.extend(self.cells.get(y * self.cols + x).into_iter().flatten().map(|&i| i as usize));
+                }
+            }
+        }
+        found.sort_unstable();
+        found.dedup();
+        found.into_iter().filter_map(move |i| self.items.get(i)).filter(move |(r, _)| r.inflate(tol, tol).contains(p)).map(|(_, t)| t)
+    }
+}
+
+/// A segment's footprint in a [`RectIndex`]: the bounds of its pieces about a cell long, so a long
+/// diagonal is filed under the cells along it, not under every cell its bounds cover.
+fn segment_footprint(bounds: &kurbo::Rect, seg: &PathSeg, cell: f64) -> Vec<kurbo::Rect> {
+    let pieces = (bounds.width().max(bounds.height()) / cell).ceil();
+    // A count past the cap gives longer pieces, each filed under more cells.
+    if pieces.is_nan() || pieces <= 1.0 {
+        return vec![*bounds];
+    }
+    let pieces = pieces.min(4096.0) as usize;
+    (0..pieces).map(|k| seg.subsegment(k as f64 / pieces as f64..(k + 1) as f64 / pieces as f64).bounding_box()).collect()
 }
 
 /// The inputs' segments (in the sweep's frame), to tell which inputs an edge lies on.
@@ -165,7 +235,7 @@ impl Outlines {
             .filter(|(r, ..)| r.width() > 0.0 || r.height() > 0.0)
             .collect();
         // The sweep moves points by a few `eps` at most.
-        Self { segs: RectIndex::new(segs), tol: 16.0 * eps }
+        Self { segs: RectIndex::with_footprint(segs, |r, (s, _), cell| segment_footprint(r, s, cell)), tol: 16.0 * eps }
     }
 
     /// The front-most input whose outline passes through `p`.
@@ -1020,6 +1090,36 @@ pub(crate) fn map(shapes: &[Shape]) -> Option<Map> {
     }
     let close = |a: usize, b: usize| matches!((points.get(a), points.get(b)), (Some(p), Some(q)) if p.distance(*q) <= tol);
     let mut joined: Vec<usize> = (0..points.len()).collect();
+    // Where two passes of one path cross another (an open path's way there and back, coincident
+    // outlines), the sweep can also join its two cuts, a rounding error apart, with a stub of that
+    // length: a speck of a piece, and a vertex twice over. Such stubs are no edges: their ends are
+    // one vertex. The sweep moves points by a few `eps` at most up and down its frame; along a path
+    // that runs nearly level in it (where the height a cut is found at pins its position down
+    // least) a cut can slide further, here up to a small fraction of the precision results are
+    // tidied to, below which no edge is drawn anyway. A vertex's cluster stays within those bounds
+    // as a whole: a run of short, nearly level segments (a finely flattened or traced path) is real
+    // geometry, not one stub after another, and must not collapse into one vertex.
+    let (stub_y, stub_x) = (4.0 * eps, (DEFAULT_PRECISION / 16.0).max(4.0 * eps));
+    let mut extent: Vec<kurbo::Rect> = points.iter().map(|&p| kurbo::Rect::from_points(p, p)).collect();
+    for (segs, [v0, v1]) in &pieces {
+        let Some(&p0) = points.get(*v0) else { continue };
+        if !segs.iter().flat_map(|s| [s.c.p1, s.c.p2, s.c.p3]).all(|p| (p.y - p0.y).abs() <= stub_y && (p.x - p0.x).abs() <= stub_x) {
+            continue;
+        }
+        let (a, b) = (find(&mut joined, *v0), find(&mut joined, *v1));
+        let (Some(&ra), Some(&rb)) = (extent.get(a), extent.get(b)) else { continue };
+        let both = ra.union(rb);
+        if a == b || both.width() > stub_x || both.height() > stub_y {
+            continue;
+        }
+        let (root, child) = (a.min(b), a.max(b));
+        if let Some(p) = joined.get_mut(child) {
+            *p = root;
+        }
+        if let Some(r) = extent.get_mut(root) {
+            *r = both;
+        }
+    }
     for (k, (_, [a, b])) in pieces.iter().enumerate() {
         let Some(&Some(m)) = mids.get(k) else { continue };
         let (cx, cy) = cell_of(m);
@@ -1940,12 +2040,147 @@ mod tests {
         assert_eq!(RectIndex::<usize>::new(Vec::new()).at(Point::ZERO, 1.0).count(), 0);
     }
 
+    #[test]
+    fn rect_index_reads_a_diagonal_hatch_only_near_the_point() {
+        // 2,000 parallel diagonals a tenth of a point apart: the bounds of every line left of a
+        // point hold it, so an index of the bounds alone handed half the hatch to each lookup
+        // (quadratic in the hatch, #937). Filed by pieces, a lookup gets the lines of its
+        // neighbourhood (a few cells' worth), among them every line through the point.
+        let n = 2000;
+        let items: Vec<_> = (0..n)
+            .map(|k| {
+                let d = f64::from(k) * 0.1;
+                let s = PathSeg::Line(kurbo::Line::new((d, 0.0), (d + 200.0, 200.0)));
+                (s.bounding_box(), (s, k))
+            })
+            .collect();
+        let index = RectIndex::with_footprint(items.clone(), |r, (s, _), cell| segment_footprint(r, s, cell));
+        for p in [Point::new(100.0, 100.0), Point::new(130.25, 60.0), Point::new(250.0, 150.0), Point::new(399.9, 200.0)] {
+            let got: Vec<u32> = index.at(p, 0.1).map(|(_, k)| *k).collect();
+            assert!(got.len() <= n as usize / 4, "{p:?}: {} candidates", got.len());
+            let through: Vec<u32> =
+                items.iter().filter(|(_, (s, _))| kurbo::ParamCurveNearest::nearest(s, p, 1e-9).distance_sq <= 0.01).map(|(_, (_, k))| *k).collect();
+            assert!(!through.is_empty() && through.iter().all(|k| got.contains(k)), "{p:?}: {through:?} vs {got:?}");
+        }
+        // Faces a hatch cuts a square into: thin stripes across the whole grid, each filed under
+        // its own column of cells, so a lookup reads a few of them, not the hatch.
+        let stripes: Vec<_> = (0..n).map(|k| (kurbo::Rect::new(f64::from(k) * 0.1, 0.0, f64::from(k) * 0.1 + 0.1, 200.0), k)).collect();
+        let index = RectIndex::new(stripes);
+        let got: Vec<u32> = index.at(Point::new(100.05, 50.0), 0.0).copied().collect();
+        assert_eq!(got, [1000]);
+        assert!(index.rest.is_empty());
+        // A footprint still finds a point on the item but off the grid's cells' edges, and a
+        // degenerate grid (collinear items) is divided along its length.
+        let line = PathSeg::Line(kurbo::Line::new((0.0, 0.0), (1000.0, 0.0)));
+        let items: Vec<_> = (0..10).map(|k| (line.bounding_box(), (line, k))).collect();
+        let index = RectIndex::with_footprint(items, |r, (s, _), cell| segment_footprint(r, s, cell));
+        assert_eq!(index.at(Point::new(333.3, 0.0), 0.1).count(), 10);
+        assert_eq!(index.at(Point::new(1000.0, 0.0), 0.1).count(), 10);
+        assert_eq!(index.at(Point::new(-5.0, 0.0), 0.1).count(), 0);
+    }
+
     fn poly(pts: &[(f64, f64)], closed: bool) -> SubPath {
         SubPath::polyline(&pts.iter().map(|&(x, y)| Point::new(x, y)).collect::<Vec<_>>(), closed)
     }
 
     fn ends(sp: &SubPath) -> (Point, Point) {
         (sp.anchors[0].p, sp.anchors[sp.anchors.len() - 1].p)
+    }
+
+    /// Each piece cuts out of the input it is keyed by, losing just its own length (what erasing
+    /// it does), and none is a speck.
+    fn assert_pieces_cut_out(shapes: &[Shape], arr: &BuilderArrangement) {
+        for e in arr.edges.iter().chain(&arr.lines) {
+            let len = e.path.length();
+            assert!(len > 1e-3, "a speck of a piece, keyed {}: {:?}", e.key, e.path);
+            let s = &shapes[e.key as usize];
+            let cut = cut_out(&s.path, &e.path.subpaths[0], false, 0.05).unwrap_or_else(|| panic!("{:?} not on input {}", e.path, e.key));
+            let lost = s.path.length() - cut.length();
+            assert!((lost - len).abs() <= 1e-6 * s.path.length(), "input {} lost {lost} for a piece {len} long", e.key);
+        }
+    }
+
+    #[test]
+    fn a_line_crossed_where_its_two_passes_part_is_cut_once() {
+        // The shrunk case of `pieces_cut_out_of_their_inputs`: the sweep cut the first line's way
+        // there and its way back by the third line a rounding error (1.2e-6) apart, joined by a
+        // stub. The line came back as a speck keyed by the third line and a piece running from
+        // the crossing out to (10, 70) and back to the other cut, which erasing took twice over.
+        let s = [line((10.0, 70.0), (80.0, 20.0), 0), line((10.0, 40.0), (70.0, 90.0), 0), line((20.0, 80.0), (20.0, 50.0), 0)];
+        let arr = shape_builder(&s, true);
+        assert_pieces_cut_out(&s, &arr);
+        // The first line cut by both others, the other two once each.
+        let count = |k: u64| arr.lines.iter().filter(|l| l.key == k).count();
+        assert_eq!((count(0), count(1), count(2)), (3, 2, 2), "{:?}", arr.lines);
+        let at = Point::new(20.0, 70.0 - 50.0 / 7.0);
+        for k in [0, 2] {
+            assert!(arr.lines.iter().filter(|l| l.key == k).all(|l| {
+                let (a, b) = ends(&l.path.subpaths[0]);
+                a.distance(b) > 1.0 && l.path.subpaths[0].anchors.len() == 2
+            }));
+            assert_eq!(
+                arr.lines
+                    .iter()
+                    .filter(|l| l.key == k && [ends(&l.path.subpaths[0]).0, ends(&l.path.subpaths[0]).1].iter().any(|p| p.distance(at) < 1e-9))
+                    .count(),
+                2
+            );
+        }
+    }
+
+    #[test]
+    fn a_run_of_tiny_level_segments_is_not_contracted_as_stubs() {
+        // 2000 segments of 1e-4 (0.2 pt in all), nearly level: each one alone is as short as a
+        // stub the sweep leaves between two cuts, but chained they are real geometry, and the
+        // stub contraction must not pull them into one vertex.
+        let pts: Vec<Point> = (0..=2000).map(|k| Point::new(f64::from(k) * 1e-4, f64::from(k) * 1e-8)).collect();
+        let run = Shape::new(PathData::single(SubPath::polyline(&pts, false)), FillRule::NonZero, 0);
+        let whole = run.path.length();
+        let s = [run, line((0.1003, -1.0), (0.1003, 1.0), 0)];
+        let arr = shape_builder(&s, false);
+        let pieces: Vec<&Shape> = arr.lines.iter().filter(|l| l.key == 0).collect();
+        assert_eq!(pieces.len(), 2, "cut once by the line: {}", pieces.len());
+        let total: f64 = pieces.iter().map(|l| l.path.length()).sum();
+        // Where the line crosses, one segment may be taken for a stub (it is as short as one),
+        // moving the cut by less than a stub's reach; the rest of the run stays.
+        assert!((total - whole).abs() <= DEFAULT_PRECISION / 16.0, "{total} of {whole}");
+        for l in &pieces {
+            let (a, b) = ends(&l.path.subpaths[0]);
+            assert!(a.distance(b) > 0.09, "a piece collapsed: {a:?} {b:?}");
+        }
+        assert_eq!(arr.lines.iter().filter(|l| l.key == 1).count(), 2);
+    }
+
+    #[test]
+    fn a_dense_hatch_at_exact_binary_steps_cuts_each_line_once_per_crossing() {
+        // Lines every 0.25 or 0.5 pt (exact in binary) cut a crossing line or a circle where two
+        // passes of each line met it a rounding error apart, adding a speck and a piece there.
+        let hatch = |n: i32, step: f64, f: &dyn Fn(f64) -> Shape| -> Vec<Shape> { (1..=n).map(|k| f(step * f64::from(k))).collect() };
+        // Horizontal lines across a diagonal: each in two pieces, the diagonal in n + 1.
+        let mut s = vec![line((-3.0, -2.0), (33.0, 31.0), 0)];
+        s.extend(hatch(119, 0.25, &|y| line((-5.0, y), (35.0, y), 0)));
+        let arr = shape_builder(&s, false);
+        assert_pieces_cut_out(&s, &arr);
+        assert_eq!(arr.lines.iter().filter(|l| l.key == 0).count(), 120);
+        assert!((1..=119).all(|k| arr.lines.iter().filter(|l| l.key == k).count() == 2));
+        assert_eq!(arr.lines.len(), 120 + 2 * 119);
+        // Sloping lines across a 45° one.
+        let mut s = vec![line((-3.0, -3.0), (33.0, 33.0), 0)];
+        s.extend(hatch(59, 0.5, &|v| line((v - 40.0, -5.0), (v + 40.0, 35.0), 0)));
+        let arr = shape_builder(&s, false);
+        assert_pieces_cut_out(&s, &arr);
+        assert_eq!(arr.lines.len(), 60 + 2 * 59, "{}", arr.lines.len());
+        // Vertical lines across a circle: n + 1 strips, each line in three pieces, the circle's
+        // outline in two per line.
+        let mut s = vec![Shape::new(shapes::ellipse(Rect::new(0.0, 0.0, 30.0, 30.0)), FillRule::NonZero, 0)];
+        s.extend(hatch(119, 0.25, &|x| line((x, -5.0), (x, 35.0), 0)));
+        let arr = shape_builder(&s, true);
+        assert_pieces_cut_out(&s, &arr);
+        assert_eq!(arr.regions.len(), 120);
+        assert!(arr.regions.iter().all(|r| r.sources == [0]));
+        assert!((1..=119).all(|k| arr.lines.iter().filter(|l| l.key == k).count() == 3));
+        assert_eq!(arr.lines.len(), 3 * 119);
+        assert_eq!(arr.edges.len(), 2 * 119);
     }
 
     #[test]

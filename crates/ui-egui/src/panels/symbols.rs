@@ -155,7 +155,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
         }
         ui.min_rect()
     });
-    let zone = ui.interact(list_rect, ui.id().with("symbols-drop"), Sense::hover());
+    let zone = ui.interact(list_rect, ui.scope_id().with("symbols-drop"), Sense::hover());
     if let Some(ids) = widgets::art_drop(ui, &zone)
         && let Err(e) = app.run("symbol.new", json!({ "ids": ids }))
     {

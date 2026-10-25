@@ -323,6 +323,9 @@ pub fn load_with(name: &str, bytes: &[u8], opts: &LoadOptions) -> Result<Loaded>
         crate::cmd::threads::reflow(&Document::new(1.0, 1.0), &mut doc);
     } else if !doc.text_threads.is_empty() {
         crate::cmd::threads::share_optical_margin(&mut doc);
+        // A frame whose first paragraph continues from the frame before draws it without the
+        // paragraph's first-line indent and list marker.
+        crate::cmd::threads::mark_continued(&mut doc);
     }
     if let Some(mode) = opts.color_mode.filter(|m| *m != doc.color_mode) {
         super::super::colormgmt::set_color_mode(&mut doc, mode, true, None, opts.grays);
@@ -463,8 +466,12 @@ fn open_loaded(s: &mut Session, loaded: Loaded, links: Resolved, path: Option<St
     st.converted = converted;
     st.imported_from = source_path;
     st.import_losses = losses;
-    let title = s.documents()[index].title();
-    Ok(super::merge(json!({ "index": index, "title": title, "format": format.id, "warnings": warnings, "restored": restored }), links.to_json()))
+    let opened = &s.documents()[index];
+    let (title, file_info_title) = (opened.title(), opened.doc.title.clone());
+    Ok(super::merge(
+        json!({ "index": index, "title": title, "fileInfoTitle": file_info_title, "format": format.id, "warnings": warnings, "restored": restored }),
+        links.to_json(),
+    ))
 }
 
 /// A file named by a command's params: `{path}` (read from disk) or `{name, dataBase64}`.

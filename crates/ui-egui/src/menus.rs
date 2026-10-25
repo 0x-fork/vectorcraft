@@ -231,6 +231,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "{bullet?: \"dot\"|\"dash\"|\"circle\"|\"square\"|\"none\"} Type › Bullets and Numbering › Apply Bullets: the selected type's paragraphs (or those the Type tool's selection touches) become a bulleted list with that bullet (text.setFormat {bullet}); without it, a list keeps its bullet and other paragraphs take the dot (text.setFormat {list: \"bullet\"}); \"none\" turns the list off",
     ),
     (
+        "type.applyNumbers",
+        "Apply Numbers",
+        "",
+        "{number?: \"arabic\"|\"upperLetters\"|\"lowerLetters\"|\"upperRoman\"|\"lowerRoman\"|\"twoDigits\"|\"threeDigits\"|\"none\"} Type › Bullets and Numbering › Apply Numbers: the selected type's paragraphs (or those the Type tool's selection touches) become a numbered list in that number style (text.setFormat {number}); without it, a numbered list keeps its style and other paragraphs are numbered 1, 2, 3 (text.setFormat {list: \"number\"}); \"none\" turns the list off",
+    ),
+    (
         "align.horizontalLeft",
         "Horizontal Align Left",
         "",
@@ -1416,6 +1422,7 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             crate::panels::paragraph::align(app, justify)
         }
         "type.applyBullets" => crate::panels::paragraph::apply_bullets(app, p),
+        "type.applyNumbers" => crate::panels::paragraph::apply_numbers(app, p),
         id if let Some(b) = crate::panels::align::button(id) => crate::panels::align::run_button(app, b),
         "view.gradientAnnotator" => flag(&mut app.ui.view.gradient_annotator),
         "view.livePaintGaps" => flag(&mut app.ui.view.live_paint_gaps),
@@ -2504,7 +2511,7 @@ pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
         "file.save" => app.session.active().is_some_and(|d| d.path.is_none() || d.converted || d.is_dirty()),
         "type.bold" | "type.italic" => crate::panels::character::text_style(app).is_some(),
         id if crate::panels::paragraph::ALIGN_COMMANDS.iter().any(|c| c.0 == id) => crate::panels::character::text_style(app).is_some(),
-        "type.applyBullets" => crate::panels::character::text_style(app).is_some(),
+        "type.applyBullets" | "type.applyNumbers" => crate::panels::character::text_style(app).is_some(),
         id if let Some(b) = crate::panels::align::button(id) => enabled(app, b.command()),
         "file.reveal" => app.services.reveal.is_some() && app.session.active().is_some_and(|d| d.path.is_some()),
         "file.cancelExport" | "file.exportInBackground" => app.background.jobs.iter().any(|j| j.progress.is_some() && !j.cancelled()),
@@ -3001,7 +3008,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                     ],
                 ),
                 cp("Smart Punctuation…", "type.smartPunctuation", json!({"quotes": true, "dashes": true, "ellipsis": true, "scope": "selection"})),
-                sub("Bullets and Numbering", vec![c("Apply Bullets", "type.applyBullets")]),
+                sub("Bullets and Numbering", vec![c("Apply Bullets", "type.applyBullets"), c("Apply Numbers", "type.applyNumbers")]),
                 Sep,
                 c("Create Outlines", "type.createOutlines"),
                 c("Scale Text Attributes", "type.scaleTextAttributes"),
@@ -3382,7 +3389,7 @@ pub fn context_items(app: &VectorcraftApp) -> Vec<Item> {
         }
         // The paragraphs of the selected type, or those the Type tool's selection touches.
         if crate::panels::character::text_style(app).is_some() {
-            v.push(sub("Bullets and Numbering", vec![c("Apply Bullets", "type.applyBullets")]));
+            v.push(sub("Bullets and Numbering", vec![c("Apply Bullets", "type.applyBullets"), c("Apply Numbers", "type.applyNumbers")]));
         }
         v.extend([
             c("Make Guides", "view.guides.make"),
@@ -3459,7 +3466,7 @@ pub fn menu_bar(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> f32 {
     // its text (#516), the frame after the click that chose them (that click takes the keyboard
     // from it again).
     type Field = (egui::Id, egui::text_edit::TextEditState);
-    let (field_key, chosen_key) = (egui::Id::new("menu-bar-field"), egui::Id::new("menu-bar-field-event"));
+    let (field_key, chosen_key) = (egui::Id::unique("menu-bar-field"), egui::Id::unique("menu-bar-field-event"));
     if let Some(((field, state), e)) = ctx.data(|d| d.get_temp::<(Field, egui::Event)>(chosen_key)) {
         ctx.data_mut(|d| d.remove::<(Field, egui::Event)>(chosen_key));
         state.store(&ctx, field);
@@ -3473,12 +3480,17 @@ pub fn menu_bar(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> f32 {
     // No application menu in the window (as in Illustrator): the bar starts at File on every
     // platform. The VectorCraft menu stays in the tree: the native Mac bar takes it from there.
     let tree: Vec<(&str, Vec<Item>)> = tree.into_iter().filter(|(title, _)| *title != "VectorCraft").collect();
+    // A menu bar for its layout and menu-button style, but the titles use `Popup::menu` directly:
+    // egui 0.37's `MenuButton` opens the title under a resting pointer while another menu is open,
+    // and the app switches titles on movement only (`switch_on_hover`, the native behaviour).
     let (end, open) = egui::MenuBar::new()
         .ui(ui, |ui| {
             let mut titles = Vec::with_capacity(tree.len());
             for (title, items) in tree.iter() {
                 let text = egui::RichText::new(tl!(title)).size(13.0).color(t.text);
-                titles.push(ui.menu_button(text, |ui| menu_body(app, ui, items, &mut clicked)).response);
+                let resp = ui.add(egui::Button::new(text));
+                egui::Popup::menu(&resp).show(|ui| menu_body(app, ui, items, &mut clicked));
+                titles.push(resp);
             }
             (ui.cursor().min.x, switch_on_hover(ui.ctx(), &titles))
         })
@@ -3583,7 +3595,7 @@ fn render_row(app: &VectorcraftApp, ui: &mut egui::Ui, row: &Row, checks: bool, 
     let sampled = p.get("font").and_then(Value::as_str).filter(|_| id == "text.setStyle" && app.session.prefs.font_preview);
     let r = match sampled {
         Some(family) => {
-            let slot = ui.id().with(("font-sample", family));
+            let slot = egui::IdSalt::new(("font-sample", family));
             let button = egui::Button::new(text).right_text(egui::Atom::custom(slot, crate::font_menu::MENU_SAMPLE_SIZE));
             let out = ui.add_enabled_ui(row.enabled, |ui| button.atom_ui(ui)).inner;
             if let Some(rect) = out.rect(slot) {
@@ -4450,10 +4462,10 @@ mod tests {
                 egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 200.0))), ..Default::default() };
             let mut out = ctx.run_ui(raw, |ui| {
                 let ctx = ui.ctx().clone();
-                let covered = ui.interact(egui::Rect::from_center_size(p, egui::vec2(80.0, 24.0)), egui::Id::new("covered"), egui::Sense::click());
+                let covered = ui.interact(egui::Rect::from_center_size(p, egui::vec2(80.0, 24.0)), egui::Id::unique("covered"), egui::Sense::click());
                 let q = p + egui::vec2(0.0, 100.0);
-                let free = ui.interact(egui::Rect::from_center_size(q, egui::vec2(80.0, 24.0)), egui::Id::new("free"), egui::Sense::click());
-                egui::Area::new(egui::Id::new("popup")).order(egui::Order::Foreground).fixed_pos(p - egui::vec2(10.0, 10.0)).show(&ctx, |ui| {
+                let free = ui.interact(egui::Rect::from_center_size(q, egui::vec2(80.0, 24.0)), egui::Id::unique("free"), egui::Sense::click());
+                egui::Area::new(egui::Id::unique("popup")).order(egui::Order::Foreground).fixed_pos(p - egui::vec2(10.0, 10.0)).show(&ctx, |ui| {
                     ui.allocate_space(egui::vec2(20.0, 20.0));
                 });
                 reaches = (pointer_reaches_title(&ctx, &covered, p), pointer_reaches_title(&ctx, &free, q));
@@ -4770,7 +4782,7 @@ mod tests {
         let e = ed::entry("view.preciseCursors").expect("listed in the editor");
         assert_eq!((e.label.as_str(), e.group.as_str(), e.is_tool), ("Precise Cursors", "View", false));
         assert_eq!(ed::default_of("view.preciseCursors"), None, "no default key");
-        let mut overrides = std::collections::BTreeMap::new();
+        let mut overrides = craft_keymap::Overrides::new();
         assert_eq!(ed::effective_in(&overrides, "view.preciseCursors"), None);
         assert_eq!(ed::assign(&mut overrides, "view.preciseCursors", Some("Cmd+Alt+Shift+U"), false), Ok(vec![]));
         let chord = ed::effective_in(&overrides, "view.preciseCursors").expect("assigned");
@@ -4922,7 +4934,7 @@ mod tests {
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 1000.0));
         let tree = menu_tree();
         let (_, file) = tree.iter().find(|(t, _)| *t == "File").unwrap();
-        let id = egui::Id::new("test-menu");
+        let id = egui::Id::unique("test-menu");
         for _ in 0..3 {
             let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
             let mut out = ctx.run_ui(input, |ui| {
@@ -4946,7 +4958,7 @@ mod tests {
         crate::theme::install_fonts(&ctx);
         let tree = menu_tree();
         let (_, window) = tree.iter().find(|(t, _)| *t == "Window").unwrap();
-        let id = egui::Id::new("test-long-menu");
+        let id = egui::Id::unique("test-long-menu");
         let rect = |height: f32| {
             let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, height));
             for _ in 0..3 {
