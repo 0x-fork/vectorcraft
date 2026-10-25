@@ -302,14 +302,21 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     let object = target_key(app);
     let same = |a: &Value, b: &Value| a["preset"] == b["preset"] && a["params"] == b["params"];
     let mut restored = false;
+    // Another object: the settings that wait for the one left are kept until it is selected again,
+    // also when a plain image or nothing is selected next.
+    if object != st.object
+        && let Some(left) = st.object
+        && !st.synced.is_null()
+        && st.params != st.synced["params"]
+    {
+        st.drafts.insert(left, (st.preset.clone(), st.params.clone(), st.synced.clone()));
+    }
+    // A plain image (or nothing) keeps the panel's settings, which no longer wait for the object left.
+    if stored.is_none() && object != st.object {
+        st.synced = Value::Null;
+        st.object = object;
+    }
     if let Some(t) = stored.filter(|t| *t != st.synced || object != st.object) {
-        // Another object: the settings that wait for the one left are kept until it is selected again.
-        if object != st.object
-            && let Some(left) = st.object
-            && st.params != st.synced["params"]
-        {
-            st.drafts.insert(left, (std::mem::take(&mut st.preset), std::mem::take(&mut st.params), st.synced.clone()));
-        }
         // A change of the object's view alone (here or in the Control bar) keeps the settings that
         // wait in the panel with Preview off.
         if object != st.object || !same(&t, &st.synced) {
@@ -889,6 +896,29 @@ mod tests {
         assert_eq!(undo(&app), steps + 1);
         frame(&mut app, &ctx, vec![]);
         assert_eq!(undo(&app), steps + 1, "traced once");
+    }
+
+    #[test]
+    fn settings_that_wait_are_kept_when_a_plain_image_is_traced_in_between() {
+        let mut app = traced_app();
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let a = first_selected(&app).unwrap().id;
+        click(&mut app, &ctx, "Preview");
+        click(&mut app, &ctx, "Strokes");
+        let img = image::RgbaImage::from_fn(20, 20, |_, y| image::Rgba(if y < 10 { [0, 0, 0, 255] } else { [255, 255, 255, 255] }));
+        let mut png = vec![];
+        img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+        let data = vectorcraft_format::base64_encode(&png);
+        app.run("file.place", json!({"name": "plain.png", "dataBase64": data, "link": false})).unwrap();
+        assert!(target(&app).1, "a plain image is selected");
+        frame(&mut app, &ctx, vec![]);
+        click(&mut app, &ctx, "Strokes");
+        click(&mut app, &ctx, "Trace");
+        assert_eq!(target(&app).2.unwrap()["params"]["strokes"], json!(false), "the image is traced with the panel's settings");
+        app.run("select.set", json!({"ids": [a.0]})).unwrap();
+        frame(&mut app, &ctx, vec![]);
+        assert_eq!(pstate::<TraceUi>(&ctx, "image-trace").params["strokes"], json!(true), "A's change still waits");
     }
 
     #[test]
