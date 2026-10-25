@@ -182,26 +182,27 @@ impl<T> RectIndex<T> {
             }
             // The item's cells, counted before they are filed: past the grid's budget the item,
             // and the ones after it, are scanned instead (the index stays bounded in memory).
-            let needed: usize = spans.iter().map(|(xs, ys)| (xs.end() - xs.start() + 1) * (ys.end() - ys.start() + 1)).sum();
-            if !scan && needed > budget {
+            // Pieces of one segment that fall in the same cell (a degenerate grid's tiny cells)
+            // count and file it once: the pieces come in order, so the repeats are consecutive.
+            let mut mine: Vec<usize> = if scan {
+                Vec::new()
+            } else {
+                spans.iter().flat_map(|(xs, ys)| ys.clone().flat_map(|y| xs.clone().map(move |x| y * cols + x))).collect()
+            };
+            mine.dedup();
+            if !scan && mine.len() > budget {
                 scan = true;
             }
             if scan {
                 rest.push(i);
                 continue;
             }
-            budget -= needed;
-            for (xs, ys) in spans {
-                for y in ys {
-                    for x in xs.clone() {
-                        // Pieces of one segment that fall in the same cell (a degenerate grid's
-                        // tiny cells) file it once: the item's pieces come in order.
-                        if let Some(c) = cells.get_mut(y * cols + x)
-                            && c.last() != Some(&index)
-                        {
-                            c.push(index);
-                        }
-                    }
+            budget -= mine.len();
+            for c in mine {
+                if let Some(c) = cells.get_mut(c)
+                    && c.last() != Some(&index)
+                {
+                    c.push(index);
                 }
             }
         }
@@ -2153,7 +2154,9 @@ mod tests {
         let line = PathSeg::Line(kurbo::Line::new((0.0, 0.0), (1000.0, 0.0)));
         let items: Vec<_> = (0..10).map(|k| (line.bounding_box(), (line, k))).collect();
         let index = RectIndex::with_footprint(items, |r, (s, _), cell| segment_footprint(r, s, cell));
+        assert!(index.rest.is_empty(), "every line is in the grid, {} scanned", index.rest.len());
         assert!(index.cells.iter().all(|c| c.len() <= 10), "{:?}", index.cells.iter().map(Vec::len).collect::<Vec<_>>());
+        assert!(index.cells.iter().map(Vec::len).sum::<usize>() >= 10, "the lines are filed");
         assert_eq!(index.at(Point::new(500.0, 0.0), 0.1).count(), 10);
         // 4,096 coincident vertical segments: one column, a row per segment, every segment along
         // every row would be 16 million references; the budget keeps it to a few hundred per item.
