@@ -1458,7 +1458,7 @@ fn a_color_whose_every_path_straightens_to_no_area_is_left_out_of_the_palette() 
     // A light rectangle with a black block on it and a one-pixel row of a pale blue along its lower
     // edge, on a transparent background. Traced with a library of the light, the black and a
     // blue, the row is the only part in the blue.
-    const BLUE: [u8; 3] = [40, 120, 240];
+    const BLUE: [u8; 3] = [60, 130, 235];
     let img = Raster::from_fn(200, 120, |x, y| {
         if (60..140).contains(&x) && (70..90).contains(&y) {
             BLACK
