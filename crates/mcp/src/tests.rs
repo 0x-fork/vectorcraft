@@ -744,6 +744,41 @@ fn headless_file_tools_take_relative_paths() {
 }
 
 #[test]
+fn headless_file_tools_send_paths_as_given() {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    struct Recording(Rc<RefCell<Vec<Value>>>);
+    impl Backend for Recording {
+        fn call(&mut self, _: &str, params: Value) -> Result<Value, String> {
+            self.0.borrow_mut().push(params);
+            Ok(json!({}))
+        }
+        fn has_ui(&self) -> bool {
+            false
+        }
+        fn describe(&self) -> String {
+            "test".into()
+        }
+    }
+
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let mut s = Server::new(Box::new(Recording(seen.clone())));
+    call(&mut s, 1, "open_file", json!({"path": "rel/in.svg"}));
+    call(&mut s, 2, "save_file", json!({"path": "rel/out.vectorcraft"}));
+    call(&mut s, 3, "export", json!({"path": "rel/out.png"}));
+    call(&mut s, 4, "export", json!({"format": "svg", "options": {"path": "rel/opt.svg"}}));
+    call(&mut s, 5, "screenshot", json!({"path": "rel/shot.png"}));
+    let seen = seen.borrow();
+    assert_eq!(seen.len(), 5, "{seen:?}");
+    assert_eq!(seen[0]["path"], "rel/in.svg");
+    assert_eq!(seen[1]["path"], "rel/out.vectorcraft");
+    assert_eq!(seen[2]["params"]["path"], "rel/out.png");
+    assert_eq!(seen[3]["params"]["path"], "rel/opt.svg");
+    assert_eq!(seen[4]["path"], "rel/shot.png");
+}
+
+#[test]
 fn remote_rejects_uncorrelated_replies_without_replaying() {
     for reply in [
         json!({"ok": true, "result": {}}).to_string(),
