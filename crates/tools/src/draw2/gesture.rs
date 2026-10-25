@@ -2,7 +2,8 @@
 //! Knife, Smooth, Path Eraser and Join.
 //!
 //! Pencil and Paintbrush preview the fitted path live (`path.freehand` re-applied on the snapshot)
-//! and commit on release; Alt on release (or ending near the start) closes the path, and starting
+//! and commit on release; with Live curve fitting off, the Pencil's preview joins the stroke's
+//! points with straight segments and the release fits them; Alt on release (or ending near the start) closes the path, and starting
 //! near an end of a selected open path continues it. Shift held at the press draws a straight
 //! Pencil line at 45° steps from the Constrain Angle instead, and Alt held at the press (with Alt
 //! key toggles to Smooth Tool off) draws a straight line at any angle. The Pencil's new path starts and ends on
@@ -50,6 +51,10 @@ pub struct GestureTool {
     /// "Alt key toggles to Smooth Tool": holding Alt with the Pencil tool smooths selected paths
     /// instead of closing the path (Pencil only, off by default).
     pub alt_smooth: bool,
+    /// "Live curve fitting": the Pencil's preview fits the stroke while it is drawn; off, the
+    /// preview shows the points joined by straight segments and the release fits them (Pencil
+    /// only, on by default).
+    pub live_fit: bool,
     /// Active drag is smoothing with the Pencil tool.
     smoothing: bool,
     /// Active Pencil drag draws a straight line (Shift or Alt held at the press): the stroke is
@@ -105,6 +110,7 @@ impl GestureTool {
             keep_selected: id != "blobBrush",
             // Off, as Pencil Tool Options ships it: Alt keeps drawing a closed path until it is on.
             alt_smooth: false,
+            live_fit: true,
             smoothing: false,
             straight: false,
             unconstrained: false,
@@ -417,7 +423,12 @@ impl Tool for GestureTool {
                 }
                 if crate::previews_at(self.points.len()) {
                     self.previewed = self.points.len();
-                    out.push(Action::Preview("path.freehand".into(), self.freehand_params(false)));
+                    let mut v = self.freehand_params(false);
+                    if !self.live_fit {
+                        // Live curve fitting off: the release fits the stroke (`finish`).
+                        v["fit"] = json!(false);
+                    }
+                    out.push(Action::Preview("path.freehand".into(), v));
                 }
                 out
             }
@@ -492,8 +503,9 @@ impl Tool for GestureTool {
     }
     fn deactivate(&mut self, _cx: &ToolContext) -> Vec<Action> {
         let began = self.began;
-        // Drags past the last preview are in the stroke kept, too.
-        let stale = (began && self.previewed != self.points.len() && self.draws_path() && !self.smoothing)
+        // Drags past the last preview are in the stroke kept, too, and with Live curve fitting
+        // off the stroke kept is fitted.
+        let stale = (began && (self.previewed != self.points.len() || !self.live_fit) && self.draws_path() && !self.smoothing)
             .then(|| Action::Preview("path.freehand".into(), self.freehand_params(false)));
         self.snap.clear();
         self.active = false;
@@ -557,6 +569,7 @@ impl Tool for GestureTool {
                     "fidelity": self.fidelity,
                     "fill": self.fill,
                     "altSmooth": self.alt_smooth,
+                    "liveFit": self.live_fit,
                     "keepSelected": self.keep_selected,
                     "editWithin": self.edit_within,
                     "closeWithin": self.close_within
@@ -583,6 +596,7 @@ impl Tool for GestureTool {
             "size" => self.size = v.as_f64().unwrap_or(self.size).clamp(0.1, 1000.0),
             "fill" => self.fill = v.as_bool().unwrap_or(self.fill),
             "altSmooth" => self.alt_smooth = v.as_bool().unwrap_or(self.alt_smooth),
+            "liveFit" if self.id == "pencil" => self.live_fit = v.as_bool().unwrap_or(self.live_fit),
             "keepSelected" => self.keep_selected = v.as_bool().unwrap_or(self.keep_selected),
             "mergeOnlySelection" => self.merge_only_selection = v.as_bool().unwrap_or(self.merge_only_selection),
             "editWithin" => self.edit_within = v.as_f64().unwrap_or(self.edit_within).clamp(0.0, 100.0),
@@ -675,6 +689,47 @@ mod tests {
         assert!(matches!(&last[0], Action::Preview(_, v) if v["closed"] == false && v["style"] == "pencil"));
         assert_eq!(last[1], Action::Commit);
         assert!(!t.busy());
+    }
+
+    /// Live curve fitting is the Pencil's, on by default. Off, the previews while a stroke is drawn
+    /// ask for the points unfitted (`fit: false`), and the release's preview is fitted as before.
+    #[test]
+    fn pencil_with_live_curve_fitting_off_previews_the_stroke_unfitted() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let stroke = [(0.0, 0.0), (10.0, 5.0), (20.0, 0.0), (30.0, 6.0), (40.0, 0.0)];
+        // The `fit` each preview sends: those while drawn, then the release's.
+        let fits = |t: &mut GestureTool| {
+            let acts = drag(t, &cx, &stroke, Mods::default());
+            let fit = |a: &Action| if let Action::Preview(_, v) = a { Some(v.get("fit").cloned()) } else { None };
+            let (drawn, release) = acts.split_at(acts.len() - 1);
+            (drawn.iter().flatten().filter_map(fit).collect::<Vec<_>>(), release[0].iter().filter_map(fit).collect::<Vec<_>>())
+        };
+        let mut t = GestureTool::new("pencil");
+        assert_eq!(t.options()["liveFit"], json!(true));
+        let (drawn, release) = fits(&mut t);
+        assert!(!drawn.is_empty() && drawn.iter().all(Option::is_none), "{drawn:?}");
+        assert_eq!(release, [None]);
+        t.set_option("liveFit", &json!(false));
+        assert_eq!(t.options()["liveFit"], json!(false));
+        let (drawn, release) = fits(&mut t);
+        assert!(!drawn.is_empty() && drawn.iter().all(|f| *f == Some(json!(false))), "{drawn:?}");
+        assert_eq!(release, [None], "the release fits the stroke");
+        // Choosing another tool while the stroke is drawn keeps it fitted, too.
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0));
+        for &(x, y) in &stroke[1..] {
+            t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, x, y));
+        }
+        let acts = t.deactivate(&cx);
+        assert!(matches!(acts.as_slice(), [Action::Preview(_, v), Action::Commit] if v.get("fit").is_none()), "{acts:?}");
+        // The Paintbrush has no such option, and its previews are fitted.
+        let mut t = GestureTool::new("paintbrush");
+        t.set_option("liveFit", &json!(false));
+        assert!(t.options().get("liveFit").is_none());
+        let (drawn, _) = fits(&mut t);
+        assert!(!drawn.is_empty() && drawn.iter().all(Option::is_none), "{drawn:?}");
     }
 
     /// Keep selected is on by default, and every Pencil and Paintbrush preview sends it.

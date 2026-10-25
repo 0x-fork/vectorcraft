@@ -1074,6 +1074,7 @@ font-technology	Variable	可變
 	Fill Color	填色顏色
 	Fill new strokes	為新筆畫套用填色
 	Alt key toggles to Smooth Tool	Alt 鍵切換為平滑工具
+	Live curve fitting	即時曲線擬合
 	Keep selected	保持選取狀態
 	Merge only with selection	僅與選取物件合併
 	Consider Open Filled Paths as Closed	將有填色的開放路徑視為封閉路徑

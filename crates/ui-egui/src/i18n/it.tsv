@@ -1109,6 +1109,7 @@ font-technology	Variable	Variabili
 	Fill and Stroke	Riempimento e traccia
 	Fill new strokes	Riempi nuove tracce
 	Alt key toggles to Smooth Tool	Il tasto Alt attiva lo strumento Smussa
+	Live curve fitting	Adattamento della curva in tempo reale
 	Keep selected	Mantieni selezionato
 	Merge only with selection	Unisci solo con la selezione
 	Consider Open Filled Paths as Closed	Considera chiusi i tracciati aperti con riempimento

@@ -1089,6 +1089,7 @@ font-technology	Variable	Променливи
 	Fill and Stroke	Запълване и щрих
 	Fill new strokes	Запълване на нови щрихове
 	Alt key toggles to Smooth Tool	Клавишът Alt превключва към инструмент „Гладкост“
+	Live curve fitting	Напасване на кривата в реално време
 	Fill Color	Цвят на запълване
 	Fill New Type Objects With Placeholder Text	Запълване на нови текстови обекти с примесен текст
 	Fill Rule	Правило за запълване

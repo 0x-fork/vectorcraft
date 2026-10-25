@@ -1048,6 +1048,7 @@
 	Fill and Stroke	填色和描边
 	Fill new strokes	为新描边应用填色
 	Alt key toggles to Smooth Tool	Alt 键切换为平滑工具
+	Live curve fitting	实时曲线拟合
 	Keep selected	保持选择状态
 	Merge only with selection	仅与所选对象合并
 	Consider Open Filled Paths as Closed	将有填色的开放路径视为闭合路径

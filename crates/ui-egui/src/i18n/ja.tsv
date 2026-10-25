@@ -1513,6 +1513,7 @@ font-technology	Variable	バリアブル
 	Fill and Stroke	塗りと線
 	Fill new strokes	新しいストロークに塗りを適用
 	Alt key toggles to Smooth Tool	Alt キーでスムーズツールに切り替え
+	Live curve fitting	描画中にカーブを調整
 	Keep selected	選択を保持
 	Merge only with selection	選択範囲とのみ結合
 	Consider Open Filled Paths as Closed	塗りのある開いたパスを閉じたパスとみなす

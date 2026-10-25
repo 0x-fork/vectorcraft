@@ -1055,6 +1055,7 @@ font-technology	Variable	Μεταβλητές
 	Fill and Stroke	Γέμισμα και περίγραμμα
 	Fill new strokes	Γέμισμα νέων περιγραμμάτων
 	Alt key toggles to Smooth Tool	Το πλήκτρο Alt αλλάζει στο εργαλείο Εξομάλυνση (Smooth Tool)
+	Live curve fitting	Προσαρμογή καμπύλης σε πραγματικό χρόνο
 	Fill Color	Χρώμα γεμίσματος
 	Fill New Type Objects With Placeholder Text	Συμπλήρωση νέων αντικειμένων κειμένου με κείμενο υπόδειξης
 	Fill Rule	Κανόνας γεμίσματος
