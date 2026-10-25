@@ -171,11 +171,14 @@ pub(super) fn file_part(s: &str) -> String {
 /// trailing periods and spaces, and with `-` after a Windows device name that is the whole name or
 /// comes before its first period: `CON`, `PRN`, `AUX`, `NUL`, `COM1` to `COM9` and `LPT1` to `LPT9`,
 /// also with `¹`, `²` or `³` for the digit, in any case (`CON.png` becomes `CON-.png`). The same on
-/// every platform.
+/// every platform. Spaces between the device name and the period are dropped (`CON .png` becomes
+/// `CON-.png`).
 pub(crate) fn safe_file_name(s: &str) -> String {
     let name = file_part(s);
     let name = name.trim_end_matches(['.', ' ']);
     let (base, rest) = name.split_at(name.find('.').unwrap_or(name.len()));
+    // Windows ignores spaces before the extension, so `CON .png` is the CON device too.
+    let base = base.trim_end_matches(' ');
     let upper = base.to_ascii_uppercase();
     let numbered = |n: &str| n.chars().count() == 1 && n.chars().all(|c| matches!(c, '1'..='9' | '¹' | '²' | '³'));
     let device = matches!(upper.as_str(), "CON" | "PRN" | "AUX" | "NUL")
@@ -1008,7 +1011,7 @@ pub(super) fn export_settings(s: &mut Session, _: &Value) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
-    use super::ScreenSize;
+    use super::{ScreenSize, safe_file_name};
 
     #[test]
     fn size_parse_refuses_signs_and_exponents() {
@@ -1019,5 +1022,15 @@ mod tests {
         assert_eq!(ScreenSize::parse("1.5"), Some(ScreenSize::Scale(1.5)));
         assert_eq!(ScreenSize::parse("100W"), Some(ScreenSize::Width(100.0)));
         assert_eq!(ScreenSize::parse("72ppi"), Some(ScreenSize::Ppi(72.0)));
+    }
+
+    #[test]
+    fn device_name_with_space_before_extension_is_protected() {
+        assert_eq!(safe_file_name("CON.png"), "CON-.png");
+        assert_eq!(safe_file_name("CON .png"), "CON-.png");
+        assert_eq!(safe_file_name("NUL .png"), "NUL-.png");
+        assert_eq!(safe_file_name("COM1 .png"), "COM1-.png");
+        assert_eq!(safe_file_name("lpt9  .png"), "lpt9-.png");
+        assert_eq!(safe_file_name("My CON .png"), "My CON .png");
     }
 }
