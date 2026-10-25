@@ -432,6 +432,8 @@ pub struct CacheKey {
     pub anti_alias: bool,
     /// Type › Highlight Alternate Glyphs (#394).
     pub highlight_alternate_glyphs: bool,
+    /// Type › Highlight Substituted Fonts.
+    pub highlight_substituted_fonts: bool,
     /// [`vectorcraft_render::placed_document::generation`]: placed documents' bitmaps made since.
     pub placed: u64,
     /// View › Pixel Preview: the document pixels rendered (x0, y0, x1, y1), one per point, shown

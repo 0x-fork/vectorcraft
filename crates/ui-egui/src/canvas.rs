@@ -421,6 +421,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
         rot: v.rotation,
         anti_alias: app.session.prefs.anti_aliased_artwork,
         highlight_alternate_glyphs: app.session.prefs.highlight_alternate_glyphs,
+        highlight_substituted_fonts: app.session.prefs.highlight_substituted_fonts,
         placed: vectorcraft_render::placed_document::generation(),
         pixel,
         smooth_images,
@@ -494,6 +495,8 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             highlight_substitutions: true,
             // Type › Highlight Alternate Glyphs (#394): pink behind OpenType substitutions.
             highlight_alternate_glyphs: app.session.prefs.highlight_alternate_glyphs,
+            // Type › Highlight Substituted Fonts: pink behind text in a substitute font.
+            highlight_substituted_fonts: app.session.prefs.highlight_substituted_fonts,
             // General › Anti-aliased Artwork: off, edges are hard on screen (raster effects and
             // pattern tiles stay smooth), as in Illustrator.
             anti_alias: if app.session.prefs.anti_aliased_artwork { vectorcraft_render::AntiAlias::Art } else { vectorcraft_render::AntiAlias::None },
@@ -5612,6 +5615,37 @@ mod tests {
         assert!(off.iter().filter(|&&a| a == 255).count() > 1000, "the disc is still painted");
         app.session.execute("prefs.set", &json!({"key": "antiAliasedArtwork", "value": true})).unwrap();
         assert!(partial(&alphas(&mut app).expect("re-rendered")) > 50, "smooth again");
+    }
+
+    /// Type › Highlight Substituted Fonts: on (the default), type in a missing font has pink
+    /// behind it on the canvas; off, it does not, and turning it either way re-renders.
+    #[test]
+    fn highlight_substituted_fonts_preference_reaches_the_canvas() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
+        app.canvas.worker_started = true; // render on this thread
+        app.session.execute("text.create", &json!({"x": 20, "y": 120, "text": "Hamburg", "size": 60, "font": "Missing Family"})).unwrap();
+        let ctx = egui::Context::default();
+        // How many pink pixels the art's raster uploaded by one frame has, None when it was not
+        // re-rendered.
+        let pink = |app: &mut VectorcraftApp| -> Option<usize> {
+            let (_, mut delta) = frame_output(app, &ctx);
+            let art = app.canvas.texture.as_ref().unwrap().id();
+            let n = delta.set.iter().find(|e| e.0.eq(&art)).and_then(|e| e.1.last()).map(|d| {
+                let egui::ImageData::Color(img) = &d.image;
+                img.pixels.iter().filter(|c| c.a() != 0 && c.r() > c.g().saturating_add(30) && c.b() > c.g()).count()
+            });
+            delta.clear();
+            n
+        };
+        let on = pink(&mut app).expect("the first frame renders the art");
+        assert!(on > 100, "on by default: the text has pink behind it ({on} pixels)");
+        assert!(app.canvas.shown.as_ref().is_some_and(|(_, o)| o.highlight_substituted_fonts));
+        app.session.execute("prefs.set", &json!({"key": "highlightSubstitutedFonts", "value": false})).unwrap();
+        assert_eq!(pink(&mut app), Some(0), "the preference off re-renders without the highlight");
+        assert!(app.canvas.key.as_ref().is_some_and(|k| !k.highlight_substituted_fonts));
+        app.session.execute("prefs.set", &json!({"key": "highlightSubstitutedFonts", "value": true})).unwrap();
+        assert_eq!(pink(&mut app), Some(on), "on again, as before");
     }
 
     /// A drag of an object with raster effects (#1257): the drag's frames render while

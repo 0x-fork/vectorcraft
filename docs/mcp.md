@@ -2784,8 +2784,9 @@ off, an empty window, and the Home button or `app.home` still shows the screen),
 default: on, a click away from a panel popped out of the icon column puts it away), `displayPrintSize` (off by
 default: View › Actual Size / `view.actualSize` is one document point per screen point; on, one document inch fills
 96 screen points, an inch at the system's reference density whatever the display scaling). `highlightAlternateGlyphs` (off by default: on, the canvas paints a pink cell behind glyphs OpenType features
-substituted — ligatures, contextual forms — on screen; Document Setup's Highlight Substituted Fonts / Glyphs stay
-separate). `blackOnScreen`
+substituted — ligatures, contextual forms — on screen; Document Setup's Highlight Substituted Glyphs stays
+separate). `highlightSubstitutedFonts` (on by default: the canvas paints pink behind text drawn in a substitute for a
+missing font, in every document). `blackOnScreen`
 (Appearance of Black › On Screen, `accurate` by default) sets how the canvas shows pure CMYK black, black ink alone
 at 100%: `accurate` shows it through the CMYK profile, a dark grey, and `rich` shows it as RGB black. Rich blacks,
 black tints and images show the same either way, and exports are unchanged. `blackOutput` (Appearance of Black ›
@@ -2901,8 +2902,13 @@ Pen's second anchor at (150, 431), in line with the square's centre.
   matched without regard to case: a word with no hyphens is never hyphenated (`typography`), and a word with hyphens
   breaks only where they are (`hap-pen`). `prefs.set` pushes the list into the hyphenator and reflows open documents.
 - `highlightAlternateGlyphs` (off by default): Preferences › Type › Highlight Alternate Glyphs. On, the canvas paints
-  pink behind OpenType substitutions (ligatures, contextual forms). Document Setup's Highlight Substituted Fonts /
-  Glyphs stay separate. Agents set it with `prefs.set`; the desktop canvas reads it on the next paint.
+  pink behind OpenType substitutions (ligatures, contextual forms). Document Setup's Highlight Substituted Glyphs
+  stays separate. Agents set it with `prefs.set`; the desktop canvas reads it on the next paint.
+- `highlightSubstitutedFonts` (on by default): Preferences › Type › Highlight Substituted Fonts. On, the canvas paints
+  pink behind text drawn in a substitute for a missing font, in every open document. Off, no document shows that
+  highlight. `document.setup` ignores this key and adds a `warnings` entry that names `prefs.set` to its reply. A file
+  saved with the key in its Document Setup still opens and keeps the value it was saved with, and the preference
+  decides whether that file shows the highlight.
 
 ```json
 {"name":"run_command","arguments":{"command":"prefs.set","params":{"values":{"typeSizeIncrement":4,"trackingIncrement":50}}}}
