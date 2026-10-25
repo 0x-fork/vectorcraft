@@ -2722,3 +2722,52 @@ fn pencil_option_takes_a_hundredth_and_smooth_keeps_its_floor() {
         assert_eq!(s.tool_options_of(tool)["fidelity"].as_f64(), Some(if tool == "smooth" { 0.05 } else { 0.02 }), "{tool}");
     }
 }
+
+/// A selected compound path (a shape with a hole) is overdrawn as its paths are: a Pencil stroke
+/// starting and ending on its outer path, or on its hole, redraws that member path, draws no new
+/// path, and leaves the compound path selected, so the next stroke redraws it too.
+#[test]
+fn pencil_redraws_a_selected_compound_path() {
+    let mut s = session();
+    s.execute("select.none", &json!({})).unwrap();
+    let ring = |cx: f64, rx: f64, ry: f64| -> Vec<serde_json::Value> {
+        (0..72)
+            .map(|i| {
+                let a = f64::from(i * 5).to_radians();
+                json!([cx + rx * a.cos(), 300.0 + ry * a.sin()])
+            })
+            .collect()
+    };
+    let outer = s.execute("path.freehand", &json!({"points": ring(400.0, 150.0, 90.0), "closed": true})).unwrap()["id"].as_u64().unwrap();
+    let hole = s.execute("path.freehand", &json!({"points": ring(380.0, 60.0, 30.0), "closed": true})).unwrap()["id"].as_u64().unwrap();
+    s.execute("select.set", &json!({"ids": [outer, hole]})).unwrap();
+    s.execute("object.compoundPath.make", &json!({})).unwrap();
+    let compound = s.doc().unwrap().selection.objects.clone();
+    assert_eq!(compound.len(), 1);
+    let members = |s: &Session| -> Vec<PathData> {
+        s.doc().unwrap().doc.node(compound[0]).unwrap().children().unwrap().iter().map(|c| c.path_data().unwrap().clone()).collect()
+    };
+    let before = members(&s);
+    let v = view();
+    s.select_tool("pencil", v).unwrap();
+    let count = |s: &Session| s.doc().unwrap().doc.layers[0].children().map_or(0, |c| c.len());
+    let stroke = |s: &mut Session, pts: &[(f64, f64)]| {
+        s.pointer(&PointerEvent::new(PointerKind::Down, pts[0].0, pts[0].1), v).unwrap();
+        for &(x, y) in &pts[1..] {
+            s.pointer(&PointerEvent::new(PointerKind::Drag, x, y), v).unwrap();
+        }
+        let l = pts[pts.len() - 1];
+        s.pointer(&PointerEvent::new(PointerKind::Up, l.0, l.1), v).unwrap();
+    };
+    // Over the outer path's right side, bowing outward: from (550, 300) round to (520, 360).
+    stroke(&mut s, &[(550.0, 300.0), (575.0, 315.0), (580.0, 335.0), (560.0, 355.0), (520.0, 360.0)]);
+    assert_eq!(count(&s), 1, "no new path");
+    assert_eq!(s.doc().unwrap().selection.objects, compound, "the compound path stays selected");
+    let after = members(&s);
+    assert!(after[0] != before[0] && after[1] == before[1], "the outer path is redrawn, the hole left alone");
+    // Then over the hole's left side: the compound path is still the one redrawn.
+    stroke(&mut s, &[(320.0, 300.0), (310.0, 290.0), (312.0, 280.0), (330.0, 274.0)]);
+    assert_eq!(count(&s), 1, "no new path");
+    assert_eq!(s.doc().unwrap().selection.objects, compound);
+    assert!(members(&s)[1] != before[1], "the hole is redrawn");
+}

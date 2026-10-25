@@ -843,10 +843,13 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
         if let Some((si, sp)) = redraw_section(&pd, &pts, fit_tol, within) {
             s.edit(if brush { "Paintbrush" } else { "Pencil" }, |d, sel| {
                 *path_mut(d, id)?.subpaths.get_mut(si).ok_or_else(|| bad(C, "no such subpath"))? = sp;
+                // A member path of a compound path is redrawn in it: the compound path is what is
+                // selected.
+                let whole = d.parent_of(id).filter(|p| d.node(*p).is_some_and(|n| matches!(n.kind, NodeKind::Compound { .. }))).unwrap_or(id);
                 if keep_selected {
-                    sel.set([id]);
+                    sel.set([whole]);
                 } else {
-                    sel.remove(id);
+                    sel.remove(whole);
                 }
                 Ok(())
             })?;
