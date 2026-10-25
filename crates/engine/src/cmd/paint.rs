@@ -504,6 +504,13 @@ fn apply_paint(s: &mut Session, p: &Value, paint: Paint, fill: bool) -> Result<V
             let new_paint = keep_pattern_xf(&paint, p, n.appearance.paint_at(index, fill));
             let placed = place_paint(&new_paint, p, item_paint_bounds(n, index, fill));
             n.appearance.set_paint_at(index, fill, placed);
+            if !fill
+                && paint.is_none()
+                && let Some(stroke) = n.appearance.stroke_at_mut(index)
+            {
+                // A stroke without paint has no weight; painting it again restores the 1 pt default.
+                stroke.width = 0.0;
+            }
             Ok(())
         },
         |d, changed| {
