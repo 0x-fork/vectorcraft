@@ -290,7 +290,7 @@ pub fn tool_definitions() -> Vec<Value> {
         tool(
             "set_paint",
             "Set paint",
-            "Set fill, stroke and/or stroke weight on the selection (or `ids`) and as the default for new art.",
+            "Set fill, stroke and/or stroke weight on the selection (or `ids`) and as the default for new art. Returns {applied, objects}: `objects` counts the objects painted, as paint.setFill, paint.setStroke and stroke.set report them (the largest of their counts); when it is 0, a `note` says that only the default for new art changed.",
             obj(
                 json!({
                     "fill": paint_schema("Fill"),
@@ -388,7 +388,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "path": string("Destination file (omit to get dataBase64)"),
                     "scale": num("Raster pixels per point (default 1)"),
                     "artboard": {"type": "integer", "minimum": 0, "description": "0-based artboard (default: the first; PDF and .ai default: all)"},
-                    "range": string("1-based artboards such as \"1-3, 5\" (PDF and .ai: one page each; SVG and SVGZ: one file each; EPS: one file each, after a central file of the whole document when there are two or more; rasters, DXF, EMF and WMF: one, or one file each with options.useArtboards: true)"),
+                    "range": string("1-based artboards such as \"1-3, 5\" (PDF and .ai: one page each; SVG and SVGZ: one file each; EPS: one file each, after a central file of the whole document when there are two or more and art shows; rasters, DXF, EMF and WMF: one, or one file each with options.useArtboards: true)"),
                     "selection": {"type": "boolean", "description": "Export only the selection, cropped to it"},
                     "outlineText": {"type": "boolean", "description": "SVG/SVGZ: true writes text as outlines (viewable without the fonts). DXF takes it too (type outlined anyway unless preserve: editability). PDF uses options.advanced.outlineText instead (default false: live text)"},
                     "options": {"type": "object", "description": "More format options, passed through (see run_command document.formats), e.g. {\"quality\": 80} for jpg or {\"advanced\": {\"outlineText\": true}} for PDF text as outlines (default false: live text)"},
@@ -520,11 +520,11 @@ fn req_str<'a>(a: &'a Args, k: &str) -> Result<&'a str, String> {
     a.get(k).and_then(Value::as_str).filter(|s| !s.is_empty()).ok_or_else(|| format!("missing string argument `{k}`"))
 }
 
-/// A file tool's path made absolute against this process's working directory. An empty path is
-/// returned as given.
-fn absolute_path(p: &str) -> Result<String, String> {
-    if p.is_empty() {
-        return Ok(String::new());
+/// A file tool's path made absolute against this process's working directory when it goes to the app
+/// (`--connect`). Headless, and for an empty path, it is returned as given.
+fn absolute_path(b: &dyn Backend, p: &str) -> Result<String, String> {
+    if p.is_empty() || !b.has_ui() {
+        return Ok(p.to_owned());
     }
     let abs = std::path::absolute(p).map_err(|e| format!("{p}: {e}"))?;
     abs.into_os_string().into_string().map_err(|abs| format!("{p}: the absolute path {} is not UTF-8", abs.to_string_lossy()))
@@ -590,15 +590,20 @@ fn paint_steps(a: &Args) -> Result<(Vec<Step<'static>>, Map<String, Value>), Str
     Ok((steps, applied))
 }
 
-fn apply_paint(b: &mut dyn Backend, a: &Args, ids: Option<Value>) -> Result<Value, String> {
+/// Sets the paint `a` gives on `ids` (default: the selection) and as the default for new art.
+/// Returns the paint applied and the most objects one of its edits painted (the `objects` of the
+/// `paint.setFill`, `paint.setStroke` and `stroke.set` replies).
+fn apply_paint(b: &mut dyn Backend, a: &Args, ids: Option<Value>) -> Result<(Value, u64), String> {
     let (steps, applied) = paint_steps(a)?;
+    let mut objects = 0;
     for (cmd, mut p) in steps {
         if let Some(ids) = &ids {
             p["ids"] = ids.clone();
         }
-        exec(b, cmd, p)?;
+        let r = exec(b, cmd, p)?;
+        objects = objects.max(r.get("objects").and_then(Value::as_u64).unwrap_or(0));
     }
-    Ok(Value::Object(applied))
+    Ok((Value::Object(applied), objects))
 }
 
 /// Checks `draw_path` / `draw_shape`'s `dash`, `cap`, `join`, `opacity`, `name` and `effects`
@@ -838,7 +843,7 @@ fn transform(b: &mut dyn Backend, a: &Args) -> Result<Value, String> {
 }
 
 fn screenshot(b: &mut dyn Backend, a: &Args) -> Result<ToolResult, String> {
-    let path = a.get("path").and_then(Value::as_str).map(absolute_path).transpose()?;
+    let path = a.get("path").and_then(Value::as_str).map(|p| absolute_path(b, p)).transpose()?;
     let path = path.as_deref();
     let window = a.get("window").and_then(Value::as_bool) == Some(true);
     let max = max_side(a)?;
@@ -1063,8 +1068,14 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Args) -> Result<ToolResult, Str
             if !["fill", "stroke", "strokeWidth"].iter().any(|k| a.contains_key(*k)) {
                 return Err("give at least one of `fill`, `stroke`, `strokeWidth`".into());
             }
-            let ids = a.get("ids").cloned();
-            j(json!({"applied": apply_paint(b, a, ids)?}))
+            let (applied, objects) = apply_paint(b, a, a.get("ids").cloned())?;
+            let mut reply = json!({"applied": applied, "objects": objects});
+            if objects == 0 {
+                reply["note"] = json!(
+                    "no object was painted (nothing selected, or `ids` is empty or holds no object this paint applies to): only the paint for new art changed"
+                );
+            }
+            j(reply)
         }
         "press_key" => {
             let mut p = json!({"key": req_str(a, "key")?});
@@ -1084,9 +1095,12 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Args) -> Result<ToolResult, Str
             j(b.call("ui.set", json!({"panel": req_str(a, "panel")?}))?)
         }
         "screenshot" => screenshot(b, a),
-        "open_file" => j(b.call("app.open", json!({"path": absolute_path(req_str(a, "path")?)?}))?),
+        "open_file" => {
+            let path = absolute_path(b, req_str(a, "path")?)?;
+            j(b.call("app.open", json!({"path": path}))?)
+        }
         "save_file" => {
-            let mut p = json!({"path": a.get("path").and_then(Value::as_str).map(absolute_path).transpose()?});
+            let mut p = json!({"path": a.get("path").and_then(Value::as_str).map(|p| absolute_path(b, p)).transpose()?});
             for k in SAVE_FILE_OPTIONS {
                 if let Some(v) = a.get(k).filter(|v| !v.is_null()) {
                     p[k] = v.clone();
@@ -1121,7 +1135,7 @@ fn dispatch(b: &mut dyn Backend, name: &str, a: &Args) -> Result<ToolResult, Str
                 }
             }
             if let Some(path) = params.get("path").and_then(Value::as_str) {
-                let path = absolute_path(path)?;
+                let path = absolute_path(b, path)?;
                 params.insert("path".into(), json!(path));
             }
             let cmd = if a.get("selection").and_then(Value::as_bool) == Some(true) { "document.exportSelection" } else { "document.export" };

@@ -360,10 +360,12 @@ fn parse_measure(s: &str, default: Unit) -> Option<f64> {
             };
         }
     }
+    // Plain decimals only, as in `number_unit` (`str::parse` would accept `1e5`, `inf`, `nan`).
+    let plain = |t: &str| t.trim().chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-') && t.trim().parse::<f64>().is_ok();
     if let Some((p, pt)) = s.split_once('p')
         && !p.is_empty()
-        && p.trim().parse::<f64>().is_ok()
-        && (pt.is_empty() || pt.trim().parse::<f64>().is_ok())
+        && plain(p)
+        && (pt.is_empty() || plain(pt))
         && !s.ends_with("pt")
         && !s.ends_with("px")
     {
@@ -2712,6 +2714,13 @@ mod tests {
         assert_eq!(Unit::Points.parse("-0p6"), Some(-6.0));
         assert_eq!(Unit::Points.parse("-2p"), Some(-24.0));
         assert_eq!(Unit::Points.parse("2p6"), Some(30.0));
+    }
+
+    #[test]
+    fn pica_form_rejects_exponent_notation() {
+        for s in ["1e5p", "infp", "nanp", "infp3", "1p1e2"] {
+            assert_eq!(Unit::Points.parse(s), None, "{s}");
+        }
     }
 }
 

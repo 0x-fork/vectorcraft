@@ -930,9 +930,16 @@ mod tests {
         assert!(wrong.is_empty(), "{wrong:#?}");
     }
 
-    /// Ctrl and Ctrl+Alt chords that type no text still run their commands while the Type tool
-    /// edits, and with the Selection tool a Ctrl+Alt press runs its chord as before. Ctrl+L is New
-    /// Layer, and Ctrl+Alt+L is New Layer Options…, which opens Layer Options for a new layer.
+    /// What egui reports for the command key: Cmd on a Mac, Ctrl elsewhere. The keymap reads a
+    /// Mac's Ctrl as a key of its own, so Ctrl+L there is not Cmd+L.
+    fn command_key() -> Modifiers {
+        if crate::keymap::platform().is_mac() { Modifiers::MAC_CMD | Modifiers::COMMAND } else { Modifiers::CTRL | Modifiers::COMMAND }
+    }
+
+    /// Ctrl and Ctrl+Alt chords (Cmd and Cmd+Alt on a Mac) that type no text still run their
+    /// commands while the Type tool edits, and with the Selection tool a Ctrl+Alt press runs its
+    /// chord as before. Ctrl+L is New Layer, and Ctrl+Alt+L is New Layer Options…, which opens
+    /// Layer Options for a new layer.
     #[test]
     fn ctrl_alt_chords_without_typed_text_still_run() {
         let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
@@ -944,20 +951,21 @@ mod tests {
         let layers = text_and_layers(&mut app, id).1;
         let new_layer_options =
             |app: &VectorcraftApp| app.ui.dialog.as_ref().is_some_and(|d| d.kind == "layerOptions" && d.fields.get("mode") == Some(&json!("new")));
-        let m = Modifiers::COMMAND | Modifiers::CTRL;
-        let ctrl_l = egui::Event::Key { key: Key::L, physical_key: Some(Key::L), pressed: true, repeat: false, modifiers: m };
-        frame(&mut app, vec![egui::Event::ModifiersChanged(m), ctrl_l]);
+        let m = command_key();
+        frame(&mut app, press(Key::L, m));
         assert_eq!(text_and_layers(&mut app, id), ("Hi".into(), layers + 1), "Ctrl+L while editing: New Layer");
         assert!(app.ui.dialog.is_none(), "Ctrl+L opens no dialog");
         app.select_tool("type");
         app.session.apply_actions(vec![vectorcraft_tools::Action::Notify("text.editNew".into())]).unwrap();
         assert!(app.session.tool_wants_text());
-        frame(&mut app, ctrl_alt_press(Key::L, None));
+        frame(&mut app, press(Key::L, m | Modifiers::ALT));
         assert!(new_layer_options(&app), "Ctrl+Alt+L with no text typed while editing: New Layer Options…");
         assert_eq!(text_and_layers(&mut app, id), ("Hi".into(), layers + 1), "no layer is added until OK");
         crate::dialogs::cancel(&mut app);
         app.select_tool("selection");
-        frame(&mut app, ctrl_alt_press(Key::L, Some("ł")));
+        let mut typed = press(Key::L, m | Modifiers::ALT);
+        typed.push(egui::Event::Text("ł".into()));
+        frame(&mut app, typed);
         assert!(new_layer_options(&app), "Selection tool: Ctrl+Alt+L runs New Layer Options… as before");
         assert_eq!(text_and_layers(&mut app, id), ("Hi".into(), layers + 1), "no layer is added until OK");
     }
@@ -1419,7 +1427,8 @@ mod tests {
 
     /// A command bound to Cmd+Escape runs without the active tool's Escape: the Pen tool's path
     /// stays open, isolation mode stays on, and the Type tool goes on editing its text. With nothing
-    /// bound to it, Cmd+Escape goes to the tool as Escape does.
+    /// bound to it, Cmd+Escape goes to the tool as Escape does. Windows keeps Cmd+Escape (Ctrl+Esc)
+    /// for the Start menu, so no command can be bound to it there and it goes to the tool.
     #[test]
     fn a_command_on_cmd_escape_runs_without_the_tools_escape() {
         let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
@@ -1427,12 +1436,17 @@ mod tests {
         let id = app.session.execute("shape.rectangle", &json!({"x": 10, "y": 10, "width": 50, "height": 30})).unwrap()["id"].clone();
         let grid = app.ui.view.grid;
         let cmd_escape = || press(Key::Escape, Modifiers::COMMAND);
+        let bindable = crate::keymap::platform() != craft_keymap::Platform::Windows;
         bind_grid(&mut app, Some("Cmd+Escape"));
         app.select_tool("pen");
         click_at(&mut app, 100.0);
         let objects = click_at(&mut app, 150.0);
         frame(&mut app, cmd_escape());
-        assert_eq!((click_at(&mut app, 200.0), app.ui.view.grid), (objects, !grid), "Cmd+Escape runs Show Grid and the path stays open");
+        if bindable {
+            assert_eq!((click_at(&mut app, 200.0), app.ui.view.grid), (objects, !grid), "Cmd+Escape runs Show Grid and the path stays open");
+        } else {
+            assert_eq!((click_at(&mut app, 200.0), app.ui.view.grid), (objects + 1, grid), "Windows: Cmd+Escape stays unbound and ends the path");
+        }
         let text = app.session.execute("text.create", &json!({"x": 20, "y": 250, "text": "Hi"})).unwrap()["id"].clone();
         let edit = |app: &mut VectorcraftApp| {
             app.session.execute("select.set", &json!({"ids": [text]})).unwrap();
@@ -1440,14 +1454,22 @@ mod tests {
             app.session.apply_actions(vec![vectorcraft_tools::Action::Notify("text.editNew".into())]).unwrap();
             assert!(app.session.tool_wants_text());
         };
-        edit(&mut app);
-        frame(&mut app, cmd_escape());
-        assert_eq!((app.session.tool_wants_text(), app.ui.view.grid), (true, grid), "Cmd+Escape runs Show Grid and the Type tool goes on editing");
+        if bindable {
+            edit(&mut app);
+            frame(&mut app, cmd_escape());
+            assert_eq!(
+                (app.session.tool_wants_text(), app.ui.view.grid),
+                (true, grid),
+                "Cmd+Escape runs Show Grid and the Type tool goes on editing"
+            );
+        }
         app.select_tool("selection");
         app.session.execute("object.isolate", &json!({"id": id})).unwrap();
         let isolated = |app: &VectorcraftApp| app.session.active().unwrap().isolation.is_some();
-        frame(&mut app, cmd_escape());
-        assert_eq!((isolated(&app), app.ui.view.grid), (true, !grid), "Cmd+Escape runs Show Grid and isolation mode stays on");
+        if bindable {
+            frame(&mut app, cmd_escape());
+            assert_eq!((isolated(&app), app.ui.view.grid), (true, !grid), "Cmd+Escape runs Show Grid and isolation mode stays on");
+        }
         bind_grid(&mut app, None);
         frame(&mut app, cmd_escape());
         assert!(!isolated(&app), "nothing bound: Cmd+Escape leaves isolation mode as Escape does");
