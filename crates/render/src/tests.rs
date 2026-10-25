@@ -1003,7 +1003,8 @@ fn supersampled_art_leaves_no_seam_between_shapes_that_meet() {
 
 /// A supersampled render draws Outline view's lines one output pixel wide, as an unsupersampled
 /// one does, instead of a quarter of a pixel: the line down x = 50.5 draws darker than 64 of 255
-/// either way. So do the outlines of type and a dotted guide along y = 90.5.
+/// either way, and no wider than one pixel. So do the outlines of type and a dotted guide along
+/// y = 90.5.
 #[test]
 fn supersampled_outlines_stay_one_pixel_wide() {
     let _fonts = crate::tests_fontchange::fonts_steady();
@@ -1039,6 +1040,29 @@ fn supersampled_outlines_stay_one_pixel_wide() {
     let guide_darkest = |r: &Rendered| (10..=90).flat_map(|x| (89..=92).map(move |y| (x, y))).map(|(x, y)| r.pixel(x, y)[0]).min().unwrap();
     assert!(guide_darkest(&draw(false)) < 64, "unsupersampled guide: {}", guide_darkest(&draw(false)));
     assert!(guide_darkest(&draw(true)) < 64, "supersampled guide: {}", guide_darkest(&draw(true)));
+    // One pixel wide, not wider: across each line, the pixels darker than `dark` are one pixel. The
+    // path lies on pixel centers; the type's stems do not, and the guide's dots are 1.5 pixels
+    // wide, so their edges are softer.
+    let widest = |values: Vec<u8>, dark: u8| {
+        let mut runs = vec![0usize];
+        for v in values {
+            if v < dark {
+                *runs.last_mut().unwrap() += 1;
+            } else if runs.last() != Some(&0) {
+                runs.push(0);
+            }
+        }
+        runs.into_iter().max().unwrap()
+    };
+    for supersample in [false, true] {
+        let r = draw(supersample);
+        let row = |y: u32, xs: std::ops::RangeInclusive<u32>| xs.map(|x| r.pixel(x, y)[0]).collect::<Vec<_>>();
+        assert_eq!(widest(row(50, 44..=56), 200), 1, "path, supersample {supersample}: {:?}", row(50, 44..=56));
+        // Below the H's crossbar, across its two stems.
+        assert_eq!(widest(row(76, 56..=95), 128), 1, "type, supersample {supersample}: {:?}", row(76, 56..=95));
+        let guide = (10..=90).map(|x| widest((86..=95).map(|y| r.pixel(x, y)[0]).collect(), 128)).max().unwrap();
+        assert_eq!(guide, 1, "guide, supersample {supersample}");
+    }
 }
 
 /// #1613: a zero-length subpath (`m` then `L` to the same point, as `.ai` files write dots) is a
