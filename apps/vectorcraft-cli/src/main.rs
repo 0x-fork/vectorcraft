@@ -104,8 +104,9 @@ USAGE:
       --replace-lossy is given.       --editing-data opens a .ai or an EPS with editing data from its editing copy
       even where that draws differently from its PDF part or page (which can be older), as long as
       it can be read. A PDF OUT omits the embedded native document unless --preserve-editing is
-      given (the app's Save As PDF still defaults to keeping it). With --preserve-editing the
-      result's warnings say the attachment was written.
+      given (the app's Save As PDF still defaults to keeping it). With --preserve-editing, when the
+      attachment is written the result's warnings say so (it is left out, with its own warning, for
+      --artboard or a --range without every artboard).
       The result has the export's warnings, and importWarnings for what reading IN left out.
       --ai-version 7 writes a .ai as the legacy version 7 (layers, groups and type kept; one file
       per artboard, OUT-<artboard>.ai when there are several; default pdf, PDF-compatible), with
@@ -340,9 +341,10 @@ fn convert(args: &[String]) -> Result<(), String> {
         && vectorcraft_engine::cmd::fileio::format_for_name(&output).is_some_and(|f| f.id == "pdf")
         && let Some(obj) = r.as_object_mut()
     {
-        let path = obj.get("path").and_then(|p| p.as_str()).unwrap_or(&output);
-        const ATTACHMENT: &str = "vectorcraft-editing.vectorcraft";
-        let embedded = std::fs::read(path).is_ok_and(|bytes| bytes.windows(ATTACHMENT.len()).any(|w| w == ATTACHMENT.as_bytes()));
+        // The export leaves the attachment out (with this warning) for --artboard or a --range
+        // without every artboard; otherwise it writes it. Read that from the result, not the file.
+        let skipped = vectorcraft_engine::cmd::fileio::pdf::EDITING_NEEDS_EVERY_ARTBOARD;
+        let embedded = !obj.get("warnings").and_then(Value::as_array).is_some_and(|w| w.iter().any(|w| w.as_str() == Some(skipped)));
         if embedded {
             let note = "The PDF embeds the native VectorCraft document as an attachment (preserveEditing).";
             if let Some(Value::Array(w)) = obj.get_mut("warnings") {

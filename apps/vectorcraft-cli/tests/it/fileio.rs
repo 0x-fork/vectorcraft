@@ -60,6 +60,13 @@ fn convert_pdf_omits_editing_data_unless_preserve_editing() {
     let bytes = std::fs::read(&kept).unwrap();
     assert!(bytes.windows(b"vectorcraft-editing.vectorcraft".len()).any(|w| w == b"vectorcraft-editing.vectorcraft"), "{r}");
     assert!(r["warnings"].as_array().is_some_and(|w| w.iter().any(|w| w.as_str().is_some_and(|s| s.contains("preserveEditing")))), "{r}");
+    // A --range without every artboard leaves the attachment out: no "embeds" note, even when the
+    // output's own name contains the attachment's name.
+    let part = tmp("vectorcraft-editing.vectorcraft.pdf");
+    let r: Value = serde_json::from_str(&ok(&["convert", &pdf, &part, "--preserve-editing", "--range", "2"])).unwrap();
+    let warnings = r["warnings"].as_array().cloned().unwrap_or_default();
+    assert!(warnings.iter().any(|w| w.as_str().is_some_and(|s| s.contains("every artboard"))), "{r}");
+    assert!(!warnings.iter().any(|w| w.as_str().is_some_and(|s| s.contains("preserveEditing"))), "{r}");
 }
 
 #[test]
