@@ -799,7 +799,7 @@ pub fn shape_builder_with_gap(shapes: &[Shape], edges: bool, gap: f64) -> Builde
         })
         .filter(|(faces, pieces)| !faces.is_empty() || !pieces.is_empty());
     let Some((faces, pieces)) = planar else {
-        return BuilderArrangement { regions: crate::regions(shapes), ..Default::default() };
+        return BuilderArrangement { regions: filled_regions(shapes), ..Default::default() };
     };
     let is_line = |i: u64| shapes.get(i as usize).is_some_and(|s| !s.path.subpaths.iter().any(|sp| sp.closed));
     let (lines, outline): (Vec<Shape>, Vec<Shape>) = pieces.into_iter().partition(|e| is_line(e.key));
@@ -812,6 +812,25 @@ pub fn shape_builder_with_gap(shapes: &[Shape], edges: bool, gap: f64) -> Builde
         regions
     };
     BuilderArrangement { regions, lines: if has_open { lines } else { Vec::new() }, edges: if edges { outline } else { Vec::new() } }
+}
+
+/// The regions of the shapes' filled areas. A shape that fills nothing (open paths that enclose no
+/// area, such as cutting lines) is left out, so a flood of them cannot push the arrangement past its
+/// size budget and take the filled shapes down with it; the regions keep the original indices.
+fn filled_regions(shapes: &[Shape]) -> Vec<crate::Region> {
+    let fills = |s: &Shape| s.path.subpaths.iter().any(|sp| sp.closed || encloses_area(sp));
+    let keep: Vec<usize> = (0..shapes.len()).filter(|&i| shapes.get(i).is_some_and(fills)).collect();
+    if keep.len() == shapes.len() {
+        return crate::regions(shapes);
+    }
+    let kept: Vec<Shape> = keep.iter().filter_map(|&i| shapes.get(i).cloned()).collect();
+    crate::regions(&kept)
+        .into_iter()
+        .map(|mut r| {
+            r.sources = r.sources.iter().filter_map(|&s| keep.get(s).copied()).collect();
+            r
+        })
+        .collect()
 }
 
 /// Does `sp`, closed, enclose an area (rather than retrace itself)? The Shape Builder closes the
@@ -1907,9 +1926,9 @@ mod tests {
     fn shape_builder_closed_only_or_degenerate_is_the_filled_arrangement() {
         let s = [rect(0.0, 0.0, 100.0, 100.0, 0), rect(50.0, 0.0, 150.0, 100.0, 1)];
         assert_eq!(shape_builder(&s, false), BuilderArrangement { regions: crate::regions(&s), ..Default::default() });
-        // A broken line can't be swept: what the filled areas give (nothing here, without a panic).
+        // A broken line can't be swept and fills nothing: the filled areas still give their regions.
         let s = [rect(0.0, 0.0, 100.0, 100.0, 0), line((0.0, 0.0), (f64::NAN, 1.0), 1)];
-        assert_eq!(shape_builder(&s, false), BuilderArrangement { regions: crate::regions(&s), ..Default::default() });
+        assert_eq!(shape_builder(&s, false), BuilderArrangement { regions: crate::regions(&s[..1]), ..Default::default() });
         // Zero-length and doubled-back lines don't break it either.
         let s = [
             rect(0.0, 0.0, 100.0, 100.0, 0),

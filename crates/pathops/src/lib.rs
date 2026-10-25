@@ -15,7 +15,9 @@ mod pathfinder;
 mod planar;
 mod trap;
 
-pub use boolean::{BoolOp, DEFAULT_PRECISION, area, boolean, boolean_n, normalize, try_boolean, try_normalize, unite_all};
+pub use boolean::{
+    BoolOp, DEFAULT_PRECISION, area, boolean, boolean_n, normalize, try_area, try_boolean, try_boolean_n, try_normalize, try_unite_all, unite_all,
+};
 pub use edit::{
     AverageAxis, SIMPLIFY_LEVEL, SimplifiedPart, SimplifyOptions, add_anchor_points, auto_simplify_level, average, join, remove_anchor,
     remove_redundant_points, simplify, simplify_level_tolerance, simplify_part, simplify_with, smooth, split_into_grid,

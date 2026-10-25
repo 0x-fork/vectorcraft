@@ -452,7 +452,7 @@ fn run_pf(s: &mut Session, op: PathfinderOp) -> Result<Value> {
                 let parts: Vec<(PathData, FillRule)> = lv.iter().filter_map(node_path).collect();
                 let refs: Vec<(&PathData, FillRule)> = parts.iter().map(|(p, r)| (p, *r)).collect();
                 let name = n.name.clone().or_else(|| lv.iter().find_map(|l| l.name.clone()));
-                push(po::unite_all(&refs), FillRule::NonZero, style_of(top), name);
+                push(po::try_unite_all(&refs).map_err(|e| EngineError::Other(e.to_string()))?, FillRule::NonZero, style_of(top), name);
             } else {
                 for l in &lv {
                     if let Some((p, r)) = node_path(l) {

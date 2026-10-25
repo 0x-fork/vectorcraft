@@ -41,6 +41,10 @@ impl Counts {
 /// in two Fenwick trees over their y extents, so this costs O(n log n) however they lie, and stops
 /// as soon as the count passes `cap`.
 pub(crate) fn overlaps_within(boxes: &[Rect], cap: usize) -> bool {
+    // `f64::total_cmp` puts -0.0 before +0.0 although they are equal, which would hide an overlap
+    // between a box ending at -0.0 and one starting at +0.0; adding 0.0 maps -0.0 to +0.0.
+    let boxes: Vec<Rect> = boxes.iter().map(|b| Rect::new(b.x0 + 0.0, b.y0 + 0.0, b.x1 + 0.0, b.y1 + 0.0)).collect();
+    let boxes = boxes.as_slice();
     let mut ys: Vec<f64> = boxes.iter().flat_map(|b| [b.y0, b.y1]).collect();
     ys.sort_by(f64::total_cmp);
     ys.dedup_by(|a, b| a.total_cmp(b).is_eq());
@@ -97,5 +101,14 @@ mod tests {
         // Disjoint boxes, many of them: none overlap.
         let apart: Vec<Rect> = (0..10_000).map(|i| Rect::new(i as f64 * 3.0, 0.0, i as f64 * 3.0 + 1.0, 1.0)).collect();
         assert!(overlaps_within(&apart, 0));
+    }
+
+    /// Boxes that touch at a signed zero still overlap: -0.0 and +0.0 are the same position.
+    #[test]
+    fn touching_at_a_signed_zero_counts_as_an_overlap() {
+        let below = Rect::new(0.0, -1.0, 1.0, -0.0);
+        let above = Rect::new(0.0, 0.0, 1.0, 1.0);
+        assert!(!overlaps_within(&[below, above], 0));
+        assert!(overlaps_within(&[below, above], 1));
     }
 }

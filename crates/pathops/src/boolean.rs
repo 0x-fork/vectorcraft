@@ -663,14 +663,43 @@ pub fn try_boolean(a: &PathData, a_rule: FillRule, b: &PathData, b_rule: FillRul
     Ok(all_contours_to_path(&c, &tidy))
 }
 
+/// [`boolean_n`] that reports a refused input ([`PathOpsError::TooComplex`], non-finite
+/// coordinates) instead of returning an empty path.
+pub fn try_boolean_n(paths: &[(&PathData, FillRule)], pred: impl Fn(&[bool]) -> bool) -> Result<PathData, PathOpsError> {
+    let bps: Vec<(BezPath, FillRule)> = paths.iter().map(|(p, r)| (fill_bezpath(p), *r)).collect();
+    let arr = Arrangement::new(bps)?;
+    Ok(all_contours_to_path(&arr.contours(pred), &arr.tidy))
+}
+
 /// N-ary boolean: the area where `pred(inside_flags)` holds, `inside_flags[i]` telling whether a
-/// point is inside `paths[i]` under its fill rule.
+/// point is inside `paths[i]` under its fill rule. A refused input gives an empty path; callers that
+/// can report an error use [`try_boolean_n`].
 pub fn boolean_n(paths: &[(&PathData, FillRule)], pred: impl Fn(&[bool]) -> bool) -> PathData {
     let bps: Vec<(BezPath, FillRule)> = paths.iter().map(|(p, r)| (fill_bezpath(p), *r)).collect();
     match Arrangement::new(bps) {
         Ok(arr) => all_contours_to_path(&arr.contours(pred), &arr.tidy),
         Err(_) => PathData::default(),
     }
+}
+
+/// [`unite_all`] that reports a refused input instead of leaving it out of the union or returning
+/// an empty path.
+pub fn try_unite_all(paths: &[(&PathData, FillRule)]) -> Result<PathData, PathOpsError> {
+    let mut all = BezPath::new();
+    for (p, r) in paths {
+        let bp = fill_bezpath(p);
+        if bp.elements().is_empty() {
+            continue;
+        }
+        for ct in normalize_bez(&bp, *r)?.contours() {
+            all.extend(ct.path.iter());
+        }
+    }
+    if all.elements().is_empty() {
+        return Ok(PathData::default());
+    }
+    let tidy = Tidy::keeping(DEFAULT_PRECISION, paths.iter().map(|(p, _)| fill_bezpath(p)).collect::<Vec<_>>().iter());
+    Ok(all_contours_to_path(&normalize_bez(&all, FillRule::NonZero)?, &tidy))
 }
 
 /// Union of many filled paths. Each input is first normalised on its own, then all are swept
@@ -695,6 +724,12 @@ pub fn unite_all(paths: &[(&PathData, FillRule)]) -> PathData {
         Ok(c) => all_contours_to_path(&c, &tidy),
         Err(_) => PathData::default(),
     }
+}
+
+/// [`area`] that reports a refused input instead of an area of zero.
+pub fn try_area(path: &PathData, rule: FillRule) -> Result<f64, PathOpsError> {
+    let c = normalize_bez(&fill_bezpath(path), rule)?;
+    Ok(c.contours().map(|ct| ct.path.area()).sum::<f64>().abs())
 }
 
 /// Unsigned filled area of a path under a fill rule (normalises first, so it is exact for

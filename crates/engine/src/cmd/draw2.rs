@@ -1515,7 +1515,7 @@ fn blob(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let mut inputs: Vec<(&PathData, FillRule)> = vec![(&region, FillRule::NonZero)];
     inputs.extend(merge_ids.iter().map(|(_, pd, r)| (pd, *r)));
-    let merged = po::unite_all(&inputs);
+    let merged = po::try_unite_all(&inputs).map_err(|e| EngineError::Other(e.to_string()))?;
     let Some(((keep, _, _), rest)) = merge_ids.split_last() else {
         return insert_look(s, "Blob Brush", path_kind(region), ap, None, keep_selected);
     };
