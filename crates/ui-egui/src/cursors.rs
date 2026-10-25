@@ -77,22 +77,37 @@ fn eyedropper(p: &mut Ink, o: Pos2) {
     line(p, o + vec2(11.0, -19.0), o + vec2(19.0, -11.0));
 }
 
+/// The selection arrow's axis: the midline between its two edges at the tip, a unit vector.
+/// The pen nib lies along it, so swapping between the Pen and the selection tools (Cmd/Ctrl)
+/// doesn't rotate the cursor.
+fn arrow_axis() -> Vec2 {
+    let a = arrow_points(Pos2::ZERO);
+    let (e1, e2) = (a[1] - a[0], a[6] - a[0]);
+    (e1.normalized() + e2.normalized()).normalized()
+}
+
+/// The Pen family's nib: the pen-tool icon's, swung round onto the selection arrow's axis
+/// (`arrow_axis`, down-right) so swapping to the selection tools doesn't rotate the cursor, its
+/// point on the hotspot `o`. In nib coordinates `u` runs along the axis and `v` across it: the
+/// silhouette is symmetric about the axis — the point, shoulders flaring to their widest
+/// two-thirds back, then a narrower flat heel. The slit runs back along the axis from the point,
+/// widening into the round breather hole; both are cut to the halo's white. Every Pen cursor is
+/// this nib plus a badge below right of it saying what a click does.
 fn pen(p: &mut Ink, o: Pos2, badge: &str) {
-    // Nib pointing to the top-left hotspot.
-    let pts = vec![o, o + vec2(4.0, 12.0), o + vec2(8.0, 16.0), o + vec2(16.0, 8.0), o + vec2(12.0, 4.0)];
-    poly(p, pts, INK, INK);
-    p.circle_filled(o + vec2(6.0, 6.0), 1.4, HALO);
-    line(p, o + vec2(10.0, 14.0), o + vec2(14.0, 18.0));
-    let b = o + vec2(16.0, 14.0);
+    let d = arrow_axis();
+    let n = vec2(-d.y, d.x);
+    let at = |u: f32, v: f32| o + u * d + v * n;
+    poly(p, vec![at(0.0, 0.0), at(10.5, -6.3), at(15.5, -3.0), at(15.5, 3.0), at(10.5, 6.3)], INK, INK);
+    // The slit is a wedge opening at the point, widening into the round breather hole.
+    p.add(Shape::convex_polygon(vec![at(2.0, 0.0), at(10.4, -0.85), at(10.4, 0.85)], HALO, Stroke::NONE));
+    p.circle_filled(at(11.8, 0.0), 1.7, HALO);
+    let b = o + vec2(13.0, 12.0);
     match badge {
         "o" => {
             p.circle_stroke(b + vec2(3.0, 3.0), 3.0, Stroke::new(3.0, HALO));
             p.circle_stroke(b + vec2(3.0, 3.0), 3.0, Stroke::new(1.2, INK));
         }
-        "+" => {
-            line(p, b + vec2(0.0, 3.0), b + vec2(6.0, 3.0));
-            line(p, b + vec2(3.0, 0.0), b + vec2(3.0, 6.0));
-        }
+        "+" => strokes(p, &[vec![b + vec2(0.0, 3.0), b + vec2(6.0, 3.0)], vec![b + vec2(3.0, 0.0), b + vec2(3.0, 6.0)]]),
         "-" => line(p, b + vec2(0.0, 3.0), b + vec2(6.0, 3.0)),
         "/" => line(p, b + vec2(0.0, 6.0), b + vec2(5.0, 0.0)),
         "~" => {
@@ -108,14 +123,18 @@ fn pen(p: &mut Ink, o: Pos2, badge: &str) {
             let sq = [(3.0, -1.0), (7.0, -1.0), (7.0, 3.0), (3.0, 3.0)].map(|(x, y)| b + vec2(x, y));
             poly(p, sq.to_vec(), INK, INK);
         }
-        "^" => {
-            line(p, b + vec2(0.0, 6.0), b + vec2(3.0, 0.0));
-            line(p, b + vec2(3.0, 0.0), b + vec2(6.0, 6.0));
-        }
+        "^" => strokes(p, &[vec![b + vec2(0.0, 6.0), b + vec2(3.0, 0.0)], vec![b + vec2(3.0, 0.0), b + vec2(6.0, 6.0)]]),
         "*" => {
-            line(p, b + vec2(0.0, 0.0), b + vec2(6.0, 6.0));
-            line(p, b + vec2(6.0, 0.0), b + vec2(0.0, 6.0));
-            line(p, b + vec2(3.0, -1.0), b + vec2(3.0, 7.0));
+            // The new-path star: eight spokes on the badge's centre.
+            strokes(
+                p,
+                &[
+                    vec![b + vec2(0.6, 0.6), b + vec2(5.4, 5.4)],
+                    vec![b + vec2(5.4, 0.6), b + vec2(0.6, 5.4)],
+                    vec![b + vec2(3.0, 0.0), b + vec2(3.0, 6.0)],
+                    vec![b + vec2(0.0, 3.0), b + vec2(6.0, 3.0)],
+                ],
+            );
         }
         _ => {}
     }
@@ -841,16 +860,45 @@ mod tests {
         assert!(body[3] == 255 && body[..3].iter().all(|&c| c < 40), "{body:?}");
     }
 
+    /// The pen nib is a fountain pen's lying along the selection arrow's axis: its point on the
+    /// hotspot, the slit running back along it into the round breather hole, the heel clipped
+    /// at the back.
+    #[test]
+    fn the_pen_nib_has_a_slit_and_a_breather_hole() {
+        for ppp in [1.0f32, 2.0] {
+            let img = rasterize(Cursor::PenDrawing, ppp).expect("a bitmap");
+            let [hx, hy] = img.hotspot.map(usize::from);
+            let at = |x: f32, y: f32| {
+                let (px, py) = ((hx as f32 + x * ppp) as usize, (hy as f32 + y * ppp) as usize);
+                if px < img.size[0] as usize && py < img.size[1] as usize { pixel(&img, px, py) } else { [0; 4] }
+            };
+            // The breather hole, ~12 points along the axis ((4.6, 10.9) on screen): fully white.
+            let hole = at(4.6, 10.9);
+            assert!(hole[3] > 200 && hole[0] > 192, "the breather hole at {ppp}: {hole:?}");
+            // The slit on the way to the hole: white over a black field.
+            let slit = at(2.4, 5.5);
+            assert!(slit[3] > 40 && slit[0] > 128, "the slit at {ppp}: {slit:?}");
+            // The body past the hole is solid ink.
+            let body = at(5.5, 12.9);
+            assert!(body[3] > 200 && body[0] < 64, "the nib's body at {ppp}: {body:?}");
+            // The heel's corners carry ink out near the bitmap's edge.
+            for (x, y) in [(8.8f32, 13.1), (3.3, 15.4)] {
+                let corner = at(x, y);
+                assert!(corner[3] > 0, "a heel corner at {ppp} ({x}, {y}): {corner:?}");
+            }
+        }
+    }
+
     /// The Pen drawing a path is the same nib as the new-path Pen, without the asterisk.
     #[test]
     fn the_drawing_pen_has_no_new_path_asterisk() {
         for ppp in [1.0, 2.0] {
             let (new, drawing) = (rasterize(Cursor::Pen, ppp).unwrap(), rasterize(Cursor::PenDrawing, ppp).unwrap());
             assert_eq!(new.hotspot, drawing.hotspot, "at {ppp}");
-            // The asterisk's center, 19 × 17 points from the hotspot.
+            // The asterisk's center, 16 × 15 points from the hotspot.
             let at = |img: &CustomCursorImage| {
                 let [hx, hy] = img.hotspot.map(usize::from);
-                let (x, y) = (hx + (19.0 * ppp) as usize, hy + (17.0 * ppp) as usize);
+                let (x, y) = (hx + (16.0 * ppp) as usize, hy + (15.0 * ppp) as usize);
                 if x < img.size[0] as usize && y < img.size[1] as usize { pixel(img, x, y)[3] } else { 0 }
             };
             assert_eq!(at(&new), 255, "the new-path Pen has its asterisk at {ppp}");

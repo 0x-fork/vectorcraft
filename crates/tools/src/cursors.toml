@@ -146,7 +146,7 @@ shown_when = [
     "With Use Precise Cursors on, the crosshair shows instead.",
 ]
 hotspot = "The nib's tip."
-look = "A pen nib. Every Pen-family cursor is this nib with a different badge."
+look = "A fountain-pen nib pointing up-left along the selection arrow's axis (so swapping to the selection tools doesn't rotate the cursor), its slit widening into the breather hole and its heel clipped at the back; the shape approximates the pen tool's icon. Every Pen-family cursor is this nib with a different badge."
 
 [[cursor]]
 id = "PenDrawing"
