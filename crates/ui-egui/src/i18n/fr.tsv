@@ -3087,6 +3087,7 @@ font-technology	Variable	Variables
 	Snap to Grid	Magnétisme de la grille
 	Snap to Pixel	Magnétisme du pixel
 	Precise Cursors	Pointeurs précis
+	Image Trace Preview	Aperçu de la vectorisation de l’image
 	Snap to Point	Magnétisme du point
 	Snap to Unit	Magnétisme de l’unité
 	Snapping Tolerance	Tolérance du magnétisme

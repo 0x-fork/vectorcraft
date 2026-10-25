@@ -3,8 +3,9 @@
 //! Strokes with the widest line stroked. With an Image Trace object selected and Preview on (the
 //! default, kept with the UI preferences), changing a setting re-traces it (one undo step per
 //! change; sliders apply when released); with Preview off, the changes wait in the panel until
-//! Trace applies them, or until Preview is turned on again. Changing the view redraws the object
-//! without tracing again. With an image selected, Trace makes a new Image Trace object.
+//! Trace applies them, or until Preview is turned on again; they stay with their object while
+//! another one is selected. `imageTrace.preview` turns Preview on or off. Changing the view redraws
+//! the object without tracing again. With an image selected, Trace makes a new Image Trace object.
 //! The public documentation of the panel describes Preview as showing the result of the current
 //! settings (<https://web.archive.org/web/20250831090623/https://helpx.adobe.com/illustrator/using/image-trace.html>).
 
@@ -74,6 +75,9 @@ struct TraceUi {
     object: Option<(u64, NodeId)>,
     /// Preview was off at the panel's last frame.
     preview_off: bool,
+    /// The settings that wait for objects no longer selected, by document and object: the preset,
+    /// the parameters, and the object's stored settings they were changed from.
+    drafts: std::collections::HashMap<(u64, NodeId), (String, Value, Value)>,
 }
 
 /// Each preset: its name, its parameters, and those of its enhanced version (null if it has none).
@@ -296,12 +300,31 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     let (is_trace, is_image, stored) = target(app);
     let any_trace = any_trace(app);
     let object = target_key(app);
+    let same = |a: &Value, b: &Value| a["preset"] == b["preset"] && a["params"] == b["params"];
+    let mut restored = false;
     if let Some(t) = stored.filter(|t| *t != st.synced || object != st.object) {
+        // Another object: the settings that wait for the one left are kept until it is selected again.
+        if object != st.object
+            && let Some(left) = st.object
+            && st.params != st.synced["params"]
+        {
+            st.drafts.insert(left, (std::mem::take(&mut st.preset), std::mem::take(&mut st.params), st.synced.clone()));
+        }
         // A change of the object's view alone (here or in the Control bar) keeps the settings that
         // wait in the panel with Preview off.
-        if object != st.object || t["preset"] != st.synced["preset"] || t["params"] != st.synced["params"] {
+        if object != st.object || !same(&t, &st.synced) {
             st.preset = t["preset"].as_str().unwrap_or("Custom").to_string();
             st.params = t["params"].clone();
+        }
+        // The object selected again shows the settings that wait for it, unless its own settings
+        // changed since (Undo, or a trace from elsewhere).
+        if object != st.object
+            && let Some((preset, params, from)) = object.and_then(|k| st.drafts.remove(&k))
+            && same(&from, &t)
+        {
+            st.preset = preset;
+            st.params = params;
+            restored = true;
         }
         st.view = TraceView::of(&t);
         st.synced = t;
@@ -508,8 +531,10 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     }
     ui.horizontal(|ui| {
         let preview = app.ui.image_trace_preview;
-        if widgets::check(ui, tl!("Preview"), preview, true) {
-            app.ui.image_trace_preview = !preview;
+        if widgets::check(ui, tl!("Preview"), preview, true)
+            && let Err(e) = app.run("imageTrace.preview", json!({}))
+        {
+            app.ui.status = e;
         }
         let r = ui.add_enabled_ui(is_trace || is_image, |ui| widgets::flat_button(ui, tl!("Trace"), 80.0)).inner;
         if r.on_disabled_hover_text(tl!("Select an image to trace")).clicked() {
@@ -519,10 +544,12 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             app.run("imageTrace.expand", json!({})).ok();
         }
     });
-    // Preview turned on (the checkbox, or `ui.set`): the selected object shows the settings that
-    // waited in the panel. With no Image Trace object selected, they wait until it is selected again.
+    // Preview turned on (the checkbox, `imageTrace.preview` or `ui.set`): the selected object is
+    // traced with the settings that waited in the panel. With no Image Trace object selected, it is
+    // traced when it is selected again. An object whose settings waited while another object was
+    // selected is traced when it is selected again with Preview on.
     let preview = app.ui.image_trace_preview;
-    retrace |= preview && st.preview_off && is_trace && st.params != st.synced["params"];
+    retrace |= preview && (st.preview_off || restored) && is_trace && st.params != st.synced["params"];
     if is_trace || !preview {
         st.preview_off = !preview;
     }
@@ -823,6 +850,72 @@ mod tests {
         assert_eq!(pstate::<TraceUi>(&ctx, "image-trace").params["strokes"], json!(false), "the panel shows B's own settings");
         click(&mut app, &ctx, "Trace");
         assert_eq!(target(&app).2.unwrap()["params"]["strokes"], json!(false), "B is traced with its own settings");
+    }
+
+    #[test]
+    fn settings_that_wait_come_back_when_their_object_is_selected_again() {
+        let mut app = traced_app();
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let a = first_selected(&app).unwrap().id;
+        app.run("edit.duplicate", json!({})).unwrap();
+        let b = first_selected(&app).unwrap().id;
+        let shown = |ctx: &egui::Context| pstate::<TraceUi>(ctx, "image-trace").params["strokes"].clone();
+        let undo = |app: &VectorcraftApp| app.session.active().unwrap().history.undo.len();
+        app.run("select.set", json!({"ids": [a.0]})).unwrap();
+        click(&mut app, &ctx, "Preview");
+        click(&mut app, &ctx, "Strokes");
+        app.run("select.set", json!({"ids": [b.0]})).unwrap();
+        frame(&mut app, &ctx, vec![]);
+        assert_eq!(shown(&ctx), json!(false), "B's own settings");
+        app.run("select.set", json!({"ids": [a.0]})).unwrap();
+        frame(&mut app, &ctx, vec![]);
+        assert_eq!(shown(&ctx), json!(true), "A's change still waits");
+        let steps = undo(&app);
+        click(&mut app, &ctx, "Trace");
+        assert_eq!(target(&app).2.unwrap()["params"]["strokes"], json!(true), "A is traced with its change");
+        assert_eq!(undo(&app), steps + 1);
+        // Preview turned on while B is selected: A is traced with its change when it is selected again.
+        let a = first_selected(&app).unwrap().id;
+        click(&mut app, &ctx, "Strokes");
+        app.run("select.set", json!({"ids": [b.0]})).unwrap();
+        frame(&mut app, &ctx, vec![]);
+        click(&mut app, &ctx, "Preview");
+        assert!(app.ui.image_trace_preview);
+        let steps = undo(&app);
+        app.run("select.set", json!({"ids": [a.0]})).unwrap();
+        frame(&mut app, &ctx, vec![]);
+        assert_eq!(target(&app).2.unwrap()["params"]["strokes"], json!(false), "traced with the change that waited");
+        assert_eq!(undo(&app), steps + 1);
+        frame(&mut app, &ctx, vec![]);
+        assert_eq!(undo(&app), steps + 1, "traced once");
+    }
+
+    #[test]
+    fn settings_that_wait_are_dropped_when_their_object_changed_since() {
+        let mut app = traced_app();
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let a = first_selected(&app).unwrap().id;
+        app.run("edit.duplicate", json!({})).unwrap();
+        let b = first_selected(&app).unwrap().id;
+        app.run("select.set", json!({"ids": [a.0]})).unwrap();
+        click(&mut app, &ctx, "Preview");
+        click(&mut app, &ctx, "Strokes");
+        app.run("select.set", json!({"ids": [b.0]})).unwrap();
+        frame(&mut app, &ctx, vec![]);
+        // A's settings as they were when the change was made, other than its settings now.
+        let mut st: TraceUi = pstate(&ctx, "image-trace");
+        let key = (app.session.active().unwrap().uid, a);
+        let draft = st.drafts.get_mut(&key).expect("the change waits for A");
+        assert_eq!(draft.1["strokes"], json!(true));
+        draft.2["params"]["threshold"] = json!(1);
+        set_pstate(&ctx, "image-trace", st);
+        app.run("select.set", json!({"ids": [a.0]})).unwrap();
+        frame(&mut app, &ctx, vec![]);
+        let shown = pstate::<TraceUi>(&ctx, "image-trace");
+        assert_eq!(shown.params, target(&app).2.unwrap()["params"], "the panel shows A's settings as they are now");
+        assert!(shown.drafts.is_empty(), "the change is dropped");
     }
 
     #[test]
