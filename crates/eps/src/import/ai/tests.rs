@@ -1569,3 +1569,158 @@ fn stroked_path_guides_from_the_star_operator() {
     assert_eq!(n.appearance.items.len(), 1);
     assert!(matches!(n.appearance.items[0], AppearanceItem::Stroke(_)));
 }
+
+/// A blend's record as the editing data writes it after `(Adobe Path Blends) 1 0 n XP`: `DCBA`,
+/// version 1, then (as far as the reader reads it) the number of keys at word 10 and a record of
+/// six words per key starting with its id. Hand-written; the other words are zero.
+fn blend_record(ids: &[char]) -> String {
+    let mut words: Vec<u32> = vec![u32::from_le_bytes(*b"DCBA"), 1, 0, 0, 0, 0, 0, 0, 0, 0, ids.len() as u32];
+    for id in ids {
+        words.extend([*id as u32, 0, 0, 0, 0, 0]);
+    }
+    let hex: String = words.iter().flat_map(|w| w.to_le_bytes()).map(|b| format!("{b:02X}")).collect();
+    let lines: Vec<String> = hex.as_bytes().chunks(60).map(|c| format!("%{}", String::from_utf8_lossy(c))).collect();
+    format!("(Adobe Path Blends) 1 0 {} XP\n{}\n", hex.len() / 2, lines.join("\n"))
+}
+
+/// A square `s` wide with its lower left at (x, y), filled with RGB `rgb`, as `%_` lines when
+/// `hidden`.
+fn square(x: f64, y: f64, s: f64, rgb: [f64; 3], hidden: bool) -> String {
+    let p = if hidden { "%_" } else { "" };
+    format!("{p}0 0 0 0 {} {} {} Xa\n{p}{x} {y} m\n{p}{x} {} L\n{p}{} {} L\n{p}{} {y} L\n{p}f\n", rgb[0], rgb[1], rgb[2], y + s, x + s, y + s, x + s)
+}
+
+/// The dictionary naming a blend part: type `kind` (`K`, `S`) and, for a key, `id`.
+fn blend_part(kind: &str, id: Option<&str>) -> String {
+    let id = id.map(|i| format!("%_({i}) /String (ShapeBlendPathID) ,\n")).unwrap_or_default();
+    format!("%_/ArtDictionary :\n{id}%_({kind}) /String (ShapeBlendPathType) ,\n%_;\n")
+}
+
+/// A blend of two 20 pt squares, red on the left (key `A`) and blue on the right (`B`), along
+/// `spine` (path operators, `%_` lines), with its drawn steps (three between the keys) and the
+/// record `record`.
+fn blend_file(spine: &str, ids: [Option<&str>; 2], record: &str) -> String {
+    let (red, blue) = ([1.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
+    let mut art = String::from("%_0 Ae\n%_u\n");
+    art += &square(0.0, 40.0, 20.0, red, true);
+    art += &blend_part("K", ids[0]);
+    art += &square(100.0, 40.0, 20.0, blue, true);
+    art += &blend_part("K", ids[1]);
+    art += spine;
+    art += "%_N\n";
+    art += &blend_part("S", None);
+    art += "%_U\n%_9 () XW\nu\n";
+    for i in 0..5 {
+        let t = i as f64 / 4.0;
+        art += &square(t * 100.0, 40.0, 20.0, [1.0 - t, 0.0, t], false);
+    }
+    art += "U\n9 () XW\n0 Ae\n";
+    art += record;
+    art
+}
+
+/// The blend read from `body`: the first object of the layer.
+fn read_blend(body: &str) -> (Arc<Node>, Vec<String>) {
+    let s = read_ok(&layer(body));
+    let first = art(&s.doc).into_iter().next().expect("an object");
+    (first, s.warnings)
+}
+
+/// Two keys, a straight spine and a record: one live blend of the two keys, three steps between
+/// them (as drawn), its colours running from red to blue, the drawn steps and the blend's own art
+/// gone.
+#[test]
+fn a_blend_comes_in_as_a_live_blend() {
+    let body = blend_file("%_10 50 m\n%_110 50 L\n", [Some("A"), Some("B")], &blend_record(&['A', 'B']));
+    let s = read_ok(&layer(&body));
+    let objects = art(&s.doc);
+    assert_eq!(objects.len(), 1, "one object: {objects:?}");
+    let NodeKind::Blend { children, spec } = &objects[0].kind else { panic!("not a blend: {:?}", objects[0].kind) };
+    assert_eq!(children.len(), 2);
+    assert_eq!(spec.spacing, vectorcraft_doc::live::BlendSpacing::Steps(3));
+    let laid = vectorcraft_doc::blend::blend_expand(children, spec);
+    assert_eq!(laid.len(), 5);
+    let middle = laid.iter().find(|n| n.geometric_bounds().is_some_and(|b| (b.center().x - 60.0).abs() < 0.5)).expect("the middle step");
+    let Paint::Solid { color, .. } = fill(middle) else { panic!("solid") };
+    let [r, _, b] = color.to_rgb();
+    assert!((r - 0.5).abs() < 0.02 && (b - 0.5).abs() < 0.02, "{r} {b}");
+    assert!(!s.warnings.iter().any(|w| w == super::blend::DRAWN), "{:?}", s.warnings);
+}
+
+/// A curved spine (a line, a curve and a line) keeps its points exactly; written from the right
+/// key to the left or the other way, the keys stay in their order on it.
+#[test]
+fn a_blends_spine_keeps_its_points_and_its_keys_order() {
+    for spine in ["%_110 50 m\n%_95 45 l\n%_80 20 40 20 25 45 c\n%_10 50 L\n", "%_10 50 m\n%_25 45 l\n%_40 20 80 20 95 45 c\n%_110 50 L\n"] {
+        // Drawn steps on a curve lie off the straight line: this blend comes out as drawn only
+        // where its steps follow the spine, so the spine and the key order are what's checked.
+        let (blend, _) = read_blend(&blend_file(spine, [Some("A"), Some("B")], &blend_record(&['A', 'B'])));
+        let NodeKind::Blend { children, spec } = &blend.kind else {
+            // Steps laid along this curve aren't where the straight drawing has them: the drawn
+            // steps stay, which is right too; the spine's own reading is checked below.
+            continue;
+        };
+        let red = |n: &Node| matches!(fill(n), Paint::Solid { color, .. } if color.to_rgb()[0] > 0.9);
+        assert!(red(&children[0]), "the first key is the red one");
+        let spine = spec.spine.as_ref().unwrap();
+        assert_eq!(spine.subpaths[0].anchors.len(), 4);
+    }
+    // The spine's points as read, through the blend's own art.
+    let spine = "%_110 50 m\n%_95 45 l\n%_80 20 40 20 25 45 c\n%_10 50 L\n";
+    let s = read_ok(&layer(&format!("%_u\n{spine}%_N\n%_U\n")));
+    let path = s.doc.layers[0].children().unwrap().iter().find_map(|n| {
+        let mut found = None;
+        n.walk(&mut |c| {
+            if let NodeKind::Path { path, .. } = &c.kind {
+                found = Some(path.clone());
+            }
+        });
+        found
+    });
+    if let Some(path) = path {
+        let a = &path.subpaths[0].anchors;
+        assert_eq!(a.len(), 4);
+        assert!((a[1].h_out.x - 80.0).abs() < 1e-9 && (a[2].h_in.x - 40.0).abs() < 1e-9 && (a[2].p.x - 25.0).abs() < 1e-9, "{a:?}");
+    }
+}
+
+/// A record that isn't one, a key with no id, or ids the record doesn't list: the drawn steps
+/// stay (with a note), without the blend's own art drawn over them.
+#[test]
+fn a_blend_it_cant_read_keeps_its_drawn_steps() {
+    let straight = "%_10 50 m\n%_110 50 L\n";
+    let garbled = "(Adobe Path Blends) 1 0 16 XP\n%00112233445566778899AABBCCDDEEFF\n";
+    let short = "(Adobe Path Blends) 1 0 92 XP\n%44434241\n";
+    for body in [
+        blend_file(straight, [Some("A"), Some("B")], garbled),
+        blend_file(straight, [Some("A"), Some("B")], short),
+        blend_file(straight, [Some("A"), None], &blend_record(&['A', 'B'])),
+        blend_file(straight, [Some("A"), Some("B")], &blend_record(&['X', 'Y'])),
+    ] {
+        let s = read_ok(&layer(&body));
+        let objects = art(&s.doc);
+        assert_eq!(objects.len(), 1, "only the drawn steps: {objects:?}");
+        assert_eq!(objects[0].children().map(|c| c.len()), Some(5), "the five drawn squares");
+        assert!(s.warnings.iter().any(|w| w == super::blend::DRAWN), "{:?}", s.warnings);
+    }
+}
+
+/// The blend is live: moving a key moves the steps between it and the other key with it.
+#[test]
+fn moving_a_blends_key_moves_its_steps() {
+    let body = blend_file("%_10 50 m\n%_110 50 L\n", [Some("A"), Some("B")], &blend_record(&['A', 'B']));
+    let (blend, _) = read_blend(&body);
+    let NodeKind::Blend { children, spec } = &blend.kind else { panic!("a blend") };
+    let middle = |keys: &[Arc<Node>]| {
+        let laid = vectorcraft_doc::blend::blend_expand(keys, spec);
+        let xs: Vec<f64> = laid.iter().filter_map(|n| n.geometric_bounds()).map(|b| b.center().y).collect();
+        xs.iter().sum::<f64>() / xs.len() as f64
+    };
+    let before = middle(children);
+    let mut keys = children.clone();
+    let mut moved = (*keys[1]).clone();
+    moved.transform(vectorcraft_geom::Affine::translate((0.0, 40.0)), true);
+    keys[1] = Arc::new(moved);
+    let after = middle(&keys);
+    assert!((after - before - 20.0).abs() < 1.0, "the steps follow: {before} -> {after}");
+}

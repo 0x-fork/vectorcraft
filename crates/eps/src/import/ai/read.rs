@@ -505,6 +505,10 @@ struct Reader<'a> {
     drawn_looks: usize,
     /// Nodes read from `%_` lines.
     hidden_ids: HashSet<NodeId>,
+    /// The blend part each object's dictionary names (`ShapeBlendPathType`, `ShapeBlendPathID`).
+    blend_roles: super::blend::Roles,
+    /// A blend's record being read from the `%` lines after its `XP`: its length and hex digits.
+    blend_record: Option<(usize, Vec<u8>)>,
     /// A group just ended, its state (`Xy`, `Xd`, `XW`) not yet read.
     group_ended: bool,
     /// A layer's own state (`Xy` after its art, before `LB`), until something says the art moves on.
@@ -667,6 +671,8 @@ impl<'a> Reader<'a> {
             warnings: Vec::new(),
             drawn_looks: 0,
             hidden_ids: HashSet::new(),
+            blend_roles: HashMap::new(),
+            blend_record: None,
             clip_fills: HashSet::new(),
             looks: HashSet::new(),
             compound_groups: HashSet::new(),
@@ -745,6 +751,16 @@ impl<'a> Reader<'a> {
     fn comment(&mut self, c: &[u8]) -> Result<(), String> {
         let line = String::from_utf8_lossy(c);
         let line = line.trim_end();
+        if let Some((len, hex)) = self.blend_record.as_mut() {
+            if !line.is_empty() && line.bytes().all(|b| b.is_ascii_hexdigit()) {
+                hex.extend_from_slice(line.as_bytes());
+                if hex.len() >= *len * 2 {
+                    self.end_blend();
+                }
+                return Ok(());
+            }
+            self.end_blend();
+        }
         if let Some(r) = self.raster.as_mut()
             && r.operands.is_some()
             && !line.is_empty()
@@ -1129,6 +1145,9 @@ impl<'a> Reader<'a> {
     // ---- operators -------------------------------------------------------------------------
 
     fn op(&mut self, w: &str, hidden: bool) -> Result<(), String> {
+        if self.blend_record.is_some() {
+            self.end_blend();
+        }
         match w {
             // The writer's placeholder for a number the object doesn't have (a radial gradient's
             // highlight `-- -- angle length Bh`): a NaN keeps the other operands where they are.
@@ -1398,6 +1417,14 @@ impl<'a> Reader<'a> {
                     r.operands = Some(vals);
                 }
             }
+            // A plugin group ends; a blend's record follows on `%` lines.
+            "XP" => {
+                let name = vals.iter().find_map(V::text).unwrap_or_default();
+                let len = Self::nums(&vals).last().copied().unwrap_or(0.0);
+                if name == super::blend::PLUGIN && len.is_finite() && len > 0.0 && len <= super::blend::MAX_RECORD as f64 {
+                    self.blend_record = Some((len as usize, vec![]));
+                }
+            }
             _ if IGNORED.contains(&w) => {}
             // Before the art, the setup runs procedures of the printing format.
             _ if self.frames.is_empty() => {}
@@ -1646,9 +1673,49 @@ impl<'a> Reader<'a> {
         self.frames.iter().all(|f| !matches!(&f.kind, Kind::Layer(a) if !a.visible))
     }
 
+    /// A blend's record read: the blend's own art (the group of its key objects and spine, on `%_`
+    /// lines) and its drawn steps (the group after it) become one live blend, or, where they can't,
+    /// the drawn steps stay, without the blend's own art drawn over them (see [`super::blend`]).
+    fn end_blend(&mut self) {
+        let Some((_, hex)) = self.blend_record.take() else { return };
+        let ids = super::blend::hex_bytes(&hex).as_deref().and_then(super::blend::record_ids);
+        let roles = &self.blend_roles;
+        let Some(f) = self.frames.last_mut() else { return };
+        let n = f.children.len();
+        let (Some(at), Some(drawn)) = (n.checked_sub(2), n.checked_sub(1)) else { return };
+        let part_of_blend = |node: &Node| node.children().is_some_and(|c| c.iter().any(|k| roles.contains_key(&k.id)));
+        let (Some(edit), Some(steps)) = (f.children.get(at), f.children.get(drawn)) else { return };
+        if !part_of_blend(edit) || !matches!(steps.kind, NodeKind::Group { clip: false, .. }) {
+            self.warn(super::blend::DRAWN);
+            return;
+        }
+        let live = ids.and_then(|ids| super::blend::live_blend(edit, steps, &ids, roles));
+        let Some(mut steps) = f.children.pop() else { return };
+        let Some(_edit) = f.children.pop() else { return };
+        match live {
+            Some(kind) => {
+                let mut blend = Node::new(self.doc.alloc_id(), kind);
+                (blend.name, blend.visible, blend.locked) = (steps.name.take(), steps.visible, steps.locked);
+                (blend.opacity, blend.blend, blend.isolate, blend.knockout) = (steps.opacity, steps.blend, steps.isolate, steps.knockout);
+                f.children.push(blend);
+            }
+            None => {
+                f.children.push(steps);
+                self.warn(super::blend::DRAWN);
+            }
+        }
+    }
+
     /// An object's dictionary: its name (`AIArtName`, or the XML id `AI10_ArtUID`), and the
     /// opacity mask it may carry.
     fn art_dictionary(&mut self, o: &Obj) {
+        // A blend's key object or spine.
+        if let Some(kind) = o.text("ShapeBlendPathType")
+            && let Some(id) = self.last_object().map(|n| n.id)
+            && self.blend_roles.len() < 100_000
+        {
+            self.blend_roles.insert(id, (kind, o.text("ShapeBlendPathID")));
+        }
         // An envelope (a distortion, `AIDeformStyle` / `DeformValue`) is written on `%_` lines as
         // a group holding the mesh that shapes it; the distorted art the file's PDF part draws
         // follows on plain lines. That mesh isn't art, so it goes (#2405).
