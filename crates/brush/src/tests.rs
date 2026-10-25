@@ -363,6 +363,12 @@ fn stain_mixes_type_strokes_too() {
     let mut art = type_art(red.clone(), red);
     tint_node(&mut art, &blue, 1.0);
     assert_eq!(run_paints(&[art]), [(Paint::solid(blue), Paint::solid(blue))]);
+    // Characters painted with a global swatch lose the link, as a path's paint does: the mixed color
+    // is not the swatch's color.
+    let linked = Paint::Solid { color: Color::rgb(1.0, 0.0, 0.0), swatch: Some("Red".into()), tint: 0.5 };
+    let mut art = type_art(linked.clone(), linked);
+    tint_node(&mut art, &blue, 1.0);
+    assert_eq!(run_paints(&[art]), [(Paint::solid(blue), Paint::solid(blue))]);
 }
 
 #[test]
