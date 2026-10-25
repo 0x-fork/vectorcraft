@@ -473,6 +473,54 @@ fn canceling_undo_groups_keeps_the_journal_entries_made_outside_them() {
     assert_eq!(r.active_index(), s.active_index());
 }
 
+/// A batch that edits the canceled group's document and then a document without a group keeps the
+/// steps outside the group in the journal, so a replay draws the edit the second document keeps.
+#[test]
+fn canceling_an_undo_group_keeps_a_batchs_steps_in_other_documents() {
+    let mut s = Session::new();
+    s.execute("file.new", &json!({"created": null})).unwrap();
+    s.execute("file.new", &json!({"created": null})).unwrap();
+    let objects = |s: &Session| s.documents().iter().map(|d| d.doc.node_count()).collect::<Vec<_>>();
+    let before = objects(&s);
+    let steps = json!([rect_step(10), rect_step(20), {"command": "document.activate", "params": {"index": 1}}, rect_step(30)]);
+    for (id, p) in [
+        ("document.activate", json!({"index": 0})),
+        ("edit.undoGroup.begin", json!({})),
+        ("command.batch", json!({ "commands": steps })),
+        ("shape.rectangle", rect_step(50)["params"].clone()),
+        ("edit.undoGroup.end", json!({"cancel": true})),
+    ] {
+        s.execute(id, &p).unwrap();
+    }
+    assert_eq!(objects(&s), vec![before[0], before[1] + 2], "only the group's edits are undone");
+    let (_, batch) = s.journal.iter().find(|(id, _)| id == "command.batch").unwrap();
+    assert_eq!(batch["commands"], json!([steps[2], steps[3]]));
+    let r = replayed(&s);
+    assert_eq!(documents(&r), documents(&s));
+    assert_eq!(r.active_index(), s.active_index());
+
+    // Undo scopes in two documents canceled one at a time: the second cancel finds its own step after
+    // the first one took a step out of the batch, and the third document's edit stays.
+    s.execute("file.new", &json!({"created": null})).unwrap();
+    let before = objects(&s);
+    assert!(s.set_active(0));
+    let first = s.begin_undo_scope().unwrap();
+    assert!(s.set_active(1));
+    let second = s.begin_undo_scope().unwrap();
+    assert!(s.set_active(0));
+    let activate = |index: usize| json!({"command": "document.activate", "params": {"index": index}});
+    let steps = json!([rect_step(10), activate(1), rect_step(30), activate(2), rect_step(50)]);
+    s.execute("command.batch", &json!({ "commands": steps })).unwrap();
+    s.end_undo_scope(first, true);
+    s.end_undo_scope(second, true);
+    assert_eq!(objects(&s), vec![before[0], before[1], before[2] + 1]);
+    let (_, batch) = s.journal.iter().rev().find(|(id, _)| id == "command.batch").unwrap();
+    assert_eq!(batch["commands"], json!([steps[1], steps[3], steps[4]]));
+    let r = replayed(&s);
+    assert_eq!(documents(&r), documents(&s));
+    assert_eq!(r.active_index(), s.active_index());
+}
+
 /// The edits made in an undo group (a scrubbed numeric field, #400) are one undo step, journaled
 /// one by one; a cancelled group undoes them and leaves the journal as it was.
 #[test]
