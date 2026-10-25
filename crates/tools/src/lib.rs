@@ -30,6 +30,7 @@ pub mod pen;
 pub mod pie;
 pub mod place;
 pub mod printtiling;
+pub mod repeat_grid;
 pub mod rulerguide;
 pub mod select;
 pub mod settings;
