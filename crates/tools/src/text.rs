@@ -21,7 +21,7 @@
 //! underlined, until the IME commits it (it then goes through [`Tool::text_input`]) or clears it.
 
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use serde_json::{Value, json};
 use vectorcraft_doc::hit::hit_test;
@@ -74,7 +74,7 @@ type CachedLayout = ((u64, TextObject), Arc<TextLayout>);
 static NEXT_EDIT_SESSION: Mutex<u64> = Mutex::new(0);
 
 fn next_edit_session() -> u64 {
-    let mut next = NEXT_EDIT_SESSION.lock().unwrap_or_else(|e| e.into_inner());
+    let mut next = NEXT_EDIT_SESSION.lock().unwrap_or_else(PoisonError::into_inner);
     let session = next.checked_add(1).unwrap_or(u64::MAX);
     *next = session;
     session
@@ -103,8 +103,8 @@ pub struct TypeTool {
     typing: Option<Typing>,
     preedit: Option<Preedit>,
     /// A command from outside the tool (`settle_interaction`, an external edit while typing) ended
-    /// the typing session, while the text stays open for editing. The next IME commit then starts
-    /// a fresh session over that edit, so it is application-origin, never `InputMethod`.
+    /// the typing session, while the text stays open for editing. A commit over that edit is
+    /// application-origin unless an IME deletion has already begun a fresh typing session.
     typing_ended: bool,
     /// Where the button went down, and where new type goes from there (snapped to Smart Guides).
     press: Option<(Point, Point)>,
@@ -434,6 +434,7 @@ impl TypeTool {
         }
         if self.typing.is_none() {
             out.push(Action::Begin("Typing".into()));
+            self.typing_ended = false;
         }
         let len = match &self.typing {
             Some(ty) => edit::runs_len(&ty.cur),
@@ -928,15 +929,18 @@ impl Tool for TypeTool {
         if self.editing.is_none() {
             return true;
         }
-        let normalized: String =
-            s.chars().filter(|c| !c.is_control() || matches!(c, '\n' | '\t')).map(|c| if c == '\r' { '\n' } else { c }).collect();
-        if normalized != s {
-            return false;
-        }
-        if normalized.is_empty() {
+        if s.is_empty() {
             return true;
         }
-        if cx.doc.setup.typographers_quotes && matches!(normalized.as_str(), "\"" | "'") {
+        // A straight quote's direction depends on the character before the insertion. During a
+        // commit this check still sees the pre-edit at the caret, while `text_input` replaces it
+        // from its start; with a custom pair whose opening quote is straight, that can look
+        // verbatim here and then be rewritten. Never claim verbatim for one.
+        if cx.doc.setup.typographers_quotes && matches!(s, "\"" | "'") {
+            return false;
+        }
+        let Some(normalized) = self.input_text(cx, s) else { return false };
+        if normalized != s {
             return false;
         }
         let clip: String = self.clipboard.iter().map(|r| r.text.as_str()).collect();
@@ -1211,78 +1215,7 @@ impl Tool for TypeTool {
             }
             None => None,
         };
-        let removed = preedit.as_ref().map_or(0, |r| r.end - r.start);
-        let logical_len = len - removed;
-        let to_logical = |byte: usize| -> usize {
-            match &preedit {
-                Some(r) if byte > r.start && byte < r.end => r.start,
-                Some(r) if byte >= r.end => byte - removed,
-                _ => byte,
-            }
-        };
-        let cursor = to_logical(caret);
-        let anchor = to_logical(anchor);
-        let selection_start = cursor.min(anchor);
-        let selection_end = cursor.max(anchor);
-        let selection_len = selection_end - selection_start;
-        if selection_len > max_bytes {
-            return ImeSurrounding::Unavailable("the selection is wider than the IME surrounding-text limit");
-        }
-        let budget = max_bytes - selection_len;
-        let before_available = selection_start;
-        let after_available = logical_len - selection_end;
-        let mut before = (budget / 2).min(before_available);
-        let mut after = (budget - before).min(after_available);
-        before = (budget - after).min(before_available);
-        after = (budget - before).min(after_available);
-        let mut window_start = selection_start - before;
-        let mut window_end = selection_end + after;
-        let logical_boundary = |byte: usize| -> bool {
-            match &preedit {
-                Some(r) if byte == r.start => true,
-                Some(r) if byte < r.start => plain_is_boundary(&segments, byte),
-                Some(_) => plain_is_boundary(&segments, byte + removed),
-                None => plain_is_boundary(&segments, byte),
-            }
-        };
-        while window_start < selection_start && !logical_boundary(window_start) {
-            window_start += 1;
-        }
-        while selection_end < window_end && !logical_boundary(window_end) {
-            window_end -= 1;
-        }
-        let to_original = |byte: usize| -> usize {
-            match &preedit {
-                Some(r) if byte > r.start => byte + removed,
-                _ => byte,
-            }
-        };
-        let original_start = to_original(window_start);
-        let original_end = to_original(window_end);
-        let mut text = String::with_capacity(window_end - window_start);
-        match &preedit {
-            Some(r) => {
-                if window_start < r.start {
-                    let first_end = original_end.min(r.start);
-                    if original_start < first_end {
-                        copy_plain_range(&segments, original_start, first_end, &mut text);
-                    }
-                }
-                if r.start < window_end {
-                    let second_start = r.end.max(original_start);
-                    if second_start < original_end {
-                        copy_plain_range(&segments, second_start, original_end, &mut text);
-                    }
-                }
-            }
-            None => {
-                if original_start < original_end {
-                    copy_plain_range(&segments, original_start, original_end, &mut text);
-                }
-            }
-        }
-        debug_assert_eq!(text.len(), window_end - window_start, "removing the pre-edit must preserve the logical window length");
-        ImeSurrounding::Available { text, cursor: cursor - window_start, anchor: anchor - window_start }
+        ime_surrounding_window(&segments, preedit, len, caret, anchor, max_bytes)
     }
     fn composing(&self) -> bool {
         self.preedit.is_some()
@@ -1483,6 +1416,90 @@ impl Tool for TypeTool {
         }
         if self.vertical { Cursor::TypeVertical } else { Cursor::Text }
     }
+}
+
+/// The logical IME surrounding window: the pre-edit is removed and the caret/anchor offsets
+/// are remapped around it. `preedit` has already been validated against `segments`.
+fn ime_surrounding_window(
+    segments: &[&str],
+    preedit: Option<Range<usize>>,
+    len: usize,
+    caret: usize,
+    anchor: usize,
+    max_bytes: usize,
+) -> ImeSurrounding {
+    let removed = preedit.as_ref().map_or(0, |r| r.end - r.start);
+    let logical_len = len - removed;
+    let to_logical = |byte: usize| -> usize {
+        match &preedit {
+            Some(r) if byte > r.start && byte < r.end => r.start,
+            Some(r) if byte >= r.end => byte - removed,
+            _ => byte,
+        }
+    };
+    let cursor = to_logical(caret);
+    let anchor = to_logical(anchor);
+    let selection_start = cursor.min(anchor);
+    let selection_end = cursor.max(anchor);
+    let selection_len = selection_end - selection_start;
+    if selection_len > max_bytes {
+        return ImeSurrounding::Unavailable("the selection is wider than the IME surrounding-text limit");
+    }
+    let budget = max_bytes - selection_len;
+    let before_available = selection_start;
+    let after_available = logical_len - selection_end;
+    let mut before = (budget / 2).min(before_available);
+    let mut after = (budget - before).min(after_available);
+    before = (budget - after).min(before_available);
+    after = (budget - before).min(after_available);
+    let mut window_start = selection_start - before;
+    let mut window_end = selection_end + after;
+    let logical_boundary = |byte: usize| -> bool {
+        match &preedit {
+            Some(r) if byte == r.start => true,
+            Some(r) if byte < r.start => plain_is_boundary(segments, byte),
+            Some(_) => plain_is_boundary(segments, byte + removed),
+            None => plain_is_boundary(segments, byte),
+        }
+    };
+    while window_start < selection_start && !logical_boundary(window_start) {
+        window_start += 1;
+    }
+    while selection_end < window_end && !logical_boundary(window_end) {
+        window_end -= 1;
+    }
+    let to_original = |byte: usize| -> usize {
+        match &preedit {
+            Some(r) if byte > r.start => byte + removed,
+            _ => byte,
+        }
+    };
+    let original_start = to_original(window_start);
+    let original_end = to_original(window_end);
+    let mut text = String::with_capacity(window_end - window_start);
+    match &preedit {
+        Some(r) => {
+            if window_start < r.start {
+                let first_end = original_end.min(r.start);
+                if original_start < first_end {
+                    copy_plain_range(segments, original_start, first_end, &mut text);
+                }
+            }
+            if r.start < window_end {
+                let second_start = r.end.max(original_start);
+                if second_start < original_end {
+                    copy_plain_range(segments, second_start, original_end, &mut text);
+                }
+            }
+        }
+        None => {
+            if original_start < original_end {
+                copy_plain_range(segments, original_start, original_end, &mut text);
+            }
+        }
+    }
+    debug_assert_eq!(text.len(), window_end - window_start, "removing the pre-edit must preserve the logical window length");
+    ImeSurrounding::Available { text, cursor: cursor - window_start, anchor: anchor - window_start }
 }
 
 #[cfg(test)]

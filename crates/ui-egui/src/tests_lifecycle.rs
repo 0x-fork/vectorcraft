@@ -1159,6 +1159,63 @@ fn an_ime_commit_the_document_rewrites_is_other() {
 }
 
 #[test]
+fn an_ime_quote_commit_uses_the_character_before_its_pre_edit() {
+    let (mut app, id) = app_with_text("a");
+    // The pre-edit ends in an opening quote, but replacement starts after the letter `a`.
+    app.run("document.setup", json!({"quotes": {"double": ["\"", "”"]}})).unwrap();
+    let ctx = egui::Context::default();
+    ime_frame(&mut app, &ctx, vec![], |_| {});
+    ime_frame(&mut app, &ctx, vec![], |_| {});
+    begin_typing(&mut app, &ctx, id);
+    app.session.set_tool_option("select", &json!({"start": 1, "end": 1}));
+    ime_frame(&mut app, &ctx, vec![], |_| {});
+    ime_frame(&mut app, &ctx, vec![preedit("\"", 1)], |_| {});
+    let committed = ime_frame(&mut app, &ctx, vec![Event::Ime(egui::ImeEvent::Commit("\"".into()))], |_| {}).expect("still editing");
+    assert_eq!(plain(&app, id), "a”", "the document inserts its closing quote");
+    assert_eq!(committed.change_cause, egui::output::ImeChangeCause::Other, "a rewritten quote is not an unchanged IME insertion");
+}
+
+/// An outside command can end the typing session (`endTyping`) while the Type tool still owns
+/// the IME. The IME's following `DeleteSurrounding` starts a new typing session; that session
+/// must clear the ended marker, so after its commit and a caret move the next ordinary IME
+/// commit is an accepted `InputMethod` mutation, not an application edit.
+#[test]
+fn ime_delete_surrounding_after_end_typing_keeps_the_next_commit_input_method() {
+    let (mut app, id) = app_with_text("abc");
+    let ctx = egui::Context::default();
+    ime_frame(&mut app, &ctx, vec![], |_| {});
+    ime_frame(&mut app, &ctx, vec![], |_| {});
+    begin_typing(&mut app, &ctx, id);
+    app.session.set_tool_option("select", &json!({"start": 3, "end": 3}));
+    ime_frame(&mut app, &ctx, vec![], |_| {});
+    // A real typing session, settled by an outside command as `settle_interaction` does.
+    ime_frame(&mut app, &ctx, vec![Event::Text("x".into())], |_| {}).expect("typing owns the IME");
+    assert_eq!(plain(&app, id), "abcx");
+    ime_frame(&mut app, &ctx, vec![], |app| {
+        app.session.commit_interaction().expect("the typing preview is committed");
+        app.session.set_tool_option("endTyping", &json!(true));
+    });
+    // The IME deletes the typed character and commits its replacement in the new session.
+    let deleted = ime_frame(
+        &mut app,
+        &ctx,
+        vec![Event::Ime(egui::ImeEvent::DeleteSurroundingBytes { before_bytes: 1, after_bytes: 0 }), Event::Ime(egui::ImeEvent::Commit("Z".into()))],
+        |_| {},
+    )
+    .expect("the Type tool still owns the IME");
+    assert_eq!(plain(&app, id), "abcZ");
+    assert_eq!(deleted.change_cause, egui::output::ImeChangeCause::InputMethod);
+    // A caret move ends the deletion's session. The following IME commit starts a fresh session;
+    // because no outside command ended that session, the commit is InputMethod.
+    let left = egui::Event::Key { key: egui::Key::ArrowLeft, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() };
+    ime_frame(&mut app, &ctx, vec![left], |_| {});
+    let committed =
+        ime_frame(&mut app, &ctx, vec![Event::Ime(egui::ImeEvent::Commit("Q".into()))], |_| {}).expect("the Type tool still owns the IME");
+    assert_eq!(plain(&app, id), "abcQZ");
+    assert_eq!(committed.change_cause, egui::output::ImeChangeCause::InputMethod, "a caret move is not an application-side reset");
+}
+
+#[test]
 fn a_reloaded_document_gets_a_new_ime_replacement_epoch() {
     let (mut app, id) = app_with_text("Same");
     let ctx = egui::Context::default();

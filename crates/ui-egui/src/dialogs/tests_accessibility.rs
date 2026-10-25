@@ -8,7 +8,8 @@ use egui_kittest::kittest::Queryable;
 use serde_json::json;
 use vectorcraft_engine::Session;
 
-use super::*;
+use super::show;
+use crate::VectorcraftApp;
 
 type Harness = egui_kittest::Harness<'static, VectorcraftApp>;
 
