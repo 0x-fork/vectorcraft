@@ -285,6 +285,13 @@ pub struct ArtBrush {
     pub scale: ArtScale,
     /// Width in percent.
     pub width: f64,
+    /// How the width varies along a stroke: `None` (Fixed) always `width`; Pressure goes from
+    /// `width` at the lightest pen pressure to [`Self::width_max`] at the heaviest.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width_mode: Option<Variation>,
+    /// The width at the heaviest pen pressure (%), for Pressure (`width` without one).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub width_max: Option<f64>,
     pub flip_along: bool,
     pub flip_across: bool,
     /// When true, art is placed on each run between sharp corners so folds do not overlap.
@@ -295,6 +302,15 @@ pub struct ArtBrush {
 impl ArtBrush {
     /// The range of the width (%).
     pub const WIDTH_RANGE: (f64, f64) = (1.0, 1000.0);
+
+    /// The widths (%) at the lightest and the heaviest pen pressure: `width` for both unless the
+    /// width follows the pressure.
+    pub fn width_range(&self) -> (f64, f64) {
+        match self.width_mode {
+            Some(Variation::Pressure) => (self.width, self.width_max.unwrap_or(self.width)),
+            _ => (self.width, self.width),
+        }
+    }
 }
 
 impl Default for ArtBrush {
@@ -304,6 +320,8 @@ impl Default for ArtBrush {
             direction: Direction::LeftToRight,
             scale: ArtScale::Stretch,
             width: 100.0,
+            width_mode: None,
+            width_max: None,
             flip_along: false,
             flip_across: false,
             overlap: false,
@@ -508,6 +526,11 @@ impl Brush {
             }
             BrushKind::Art(a) => {
                 a.width = within(a.width, ArtBrush::WIDTH_RANGE, 100.0);
+                // The width follows the pen's pressure or stays fixed.
+                if a.width_mode != Some(Variation::Pressure) {
+                    a.width_mode = None;
+                }
+                a.width_max = a.width_max.map(|w| within(w, ArtBrush::WIDTH_RANGE, a.width));
                 if let ArtScale::BetweenGuides { start, end } = &mut a.scale {
                     *start = within(*start, (0.0, 1.0), 0.0);
                     *end = within(*end, (0.0, 1.0), 1.0);
@@ -592,7 +615,7 @@ pub fn stroke_pieces(doc: &Document, brush: &Brush, bp: &BezPath, stroke: &Strok
     let mut out = match &brush.kind {
         BrushKind::Calligraphic(c) => calli::calligraphic(c, bp, w, stroke, &brush.name),
         BrushKind::Bristle(b) => calli::bristle(b, bp, w, &stroke.paint, &brush.name),
-        BrushKind::Art(a) => warp::art(a, bp, w),
+        BrushKind::Art(a) => warp::art(a, bp, w, stroke.pressure.as_ref()),
         BrushKind::Scatter(s) => warp::scatter(s, bp, w, stroke.pressure.as_ref(), &brush.name),
         BrushKind::Pattern(p) => warp::pattern(p, bp, w),
     };
