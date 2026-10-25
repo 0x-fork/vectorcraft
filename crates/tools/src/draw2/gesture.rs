@@ -600,6 +600,11 @@ impl Tool for GestureTool {
             return o;
         }
         o.push(Overlay::Path { path: polyline(&self.points), color, width, dashed: self.id == "knife" });
+        if cx.measurement_labels && self.id == "blobBrush" {
+            let last = self.points[self.points.len() - 1];
+            let length = self.points.windows(2).map(|w| w[0].distance(w[1])).sum();
+            o.push(Overlay::Measure { p: last + vectorcraft_geom::Vec2::new(cx.tol(12.0), cx.tol(12.0)), text: format!("L: {}", cx.len(length)) });
+        }
         o
     }
     fn cursor(&self, cx: &ToolContext, p: Point, m: Mods) -> Cursor {
@@ -930,6 +935,24 @@ mod tests {
         t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 0.0, 0.0).with_mods(alt));
         t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 10.0, 5.0).with_mods(alt));
         assert_eq!(t.cursor(&cx, at, Mods::default()), Cursor::Smooth, "a smoothing drag");
+    }
+
+    #[test]
+    fn blob_brush_drag_shows_scrub_length_measurement_labels() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let on = ToolContext { measurement_labels: true, ..cx(&d, &s, &p) };
+        let off = ToolContext { measurement_labels: false, ..cx(&d, &s, &p) };
+        let mut t = GestureTool::new("blobBrush");
+        t.pointer(&on, &PointerEvent::new(PointerKind::Down, 50.0, 150.0));
+        t.pointer(&on, &PointerEvent::new(PointerKind::Drag, 150.0, 150.0));
+        let want = format!("L: {}", on.len(100.0));
+        assert!(t.overlays(&on).iter().any(|o| matches!(o, Overlay::Measure { text, .. } if text == &want)));
+        let mut quiet = GestureTool::new("blobBrush");
+        quiet.pointer(&off, &PointerEvent::new(PointerKind::Down, 50.0, 150.0));
+        quiet.pointer(&off, &PointerEvent::new(PointerKind::Drag, 150.0, 150.0));
+        assert!(!quiet.overlays(&off).iter().any(|o| matches!(o, Overlay::Measure { .. })));
     }
 
     /// The Blob Brush has Keep selected and Merge only with selection, both off by default, and its
