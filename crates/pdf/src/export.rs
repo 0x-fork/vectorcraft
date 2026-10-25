@@ -1661,7 +1661,7 @@ impl Exporter<'_> {
                 // The outlines left to fill as paths: all of them, or those real text leaves.
                 let outlines = match plain.as_deref().filter(|_| !fill.is_none() && !ex.area_paint(fill, true)) {
                     Some(text) => {
-                        let (mut left, unwritten) = ex.glyph_text(s, &layout, i, text, fill, true);
+                        let (mut left, unwritten) = ex.glyph_text(s, &layout, i, text, fill, true, Some(false));
                         images = Some(unwritten);
                         left.extend(run_bars.iter());
                         Cow::Owned(left)
@@ -1701,7 +1701,17 @@ impl Exporter<'_> {
                     s.push_transform(&text_space);
                     // The paint only lets the writer write the text; the glyphs it can't write
                     // as text draw nothing, and colour bitmap glyphs are drawn already.
-                    self.glyph_text(s, &layout, i, text, &Paint::solid(Color::gray(0.0)), false);
+                    self.glyph_text(s, &layout, i, text, &Paint::solid(Color::gray(0.0)), false, None);
+                    s.pop();
+                });
+            } else if let Some(text) = plain.as_deref().filter(|_| layout.glyphs.iter().any(|g| g.run == i && g.bend.is_some())) {
+                // Glyphs bent along a path were drawn as their outlines (text is set straight):
+                // they are written again as invisible text, straight where they stand, so they can
+                // still be selected, searched and copied.
+                self.invisible = true;
+                crate::forms::form(s, Mark::Invisible, |s| {
+                    s.push_transform(&text_space);
+                    self.glyph_text(s, &layout, i, text, &Paint::solid(Color::gray(0.0)), false, Some(true));
                     s.pop();
                 });
             }
@@ -1771,7 +1781,21 @@ impl Exporter<'_> {
     /// indices of those it can't write or draw (SVG glyphs) are returned with the outlines. The
     /// hyphen the layout adds where it breaks a line inside a word ([`break_hyphen`]) is written
     /// as the character its glyph stands for, on its own after the glyphs before it.
-    fn glyph_text(&mut self, s: &mut Surface, layout: &TextLayout, run: usize, text: &str, fill: &Paint, images: bool) -> (BezPath, Vec<usize>) {
+    ///
+    /// `bent`: `Some(false)` writes the glyphs bent along a path ([`vectorcraft_text::GlyphBend`])
+    /// as outlines, not text (text is set straight); `Some(true)` writes only those, as text where
+    /// they stand straight; `None` writes all of them as text.
+    #[allow(clippy::too_many_arguments)]
+    fn glyph_text(
+        &mut self,
+        s: &mut Surface,
+        layout: &TextLayout,
+        run: usize,
+        text: &str,
+        fill: &Paint,
+        images: bool,
+        bent: Option<bool>,
+    ) -> (BezPath, Vec<usize>) {
         let (mut rest, mut unwritten) = (BezPath::new(), vec![]);
         let mut line: Option<GlyphLine> = None;
         // The characters the glyphs stand for: the plain text, then, when the run has glyphs that
@@ -1782,6 +1806,14 @@ impl Exporter<'_> {
             let coloured = g.image.is_some() || g.colour.is_some();
             if coloured && !images {
                 continue;
+            }
+            match (bent, g.bend.is_some()) {
+                (Some(false), true) => {
+                    rest.extend(g.outline.iter());
+                    continue;
+                }
+                (Some(true), false) => continue,
+                _ => {}
             }
             // A list marker's glyphs stand for no character of the text either; they are not
             // line-break hyphens, whatever the marker.
