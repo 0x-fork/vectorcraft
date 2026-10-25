@@ -67,6 +67,7 @@ mod tools_float;
 pub mod touch;
 mod ui_fonts;
 pub mod unsaved;
+pub mod updates_ui;
 pub mod widgets;
 pub mod workspaces;
 
@@ -496,6 +497,7 @@ pub struct VectorcraftApp {
     ui_ctx: Option<egui::Context>,
     /// Installed fonts added to the UI's for characters its own fonts lack (CJK names…).
     ui_fonts: ui_fonts::UiFonts,
+    pub(crate) updates_rt: updates_ui::Runtime,
     /// The status bar's frame rate ([`frame_rate`]).
     frame_rate: frame_rate::FrameRate,
     /// Canvas rect of the last frame (screen points), for control-channel coordinate mapping.
@@ -802,6 +804,7 @@ impl VectorcraftApp {
             context: 0,
             ui_ctx: None,
             ui_fonts: Default::default(),
+            updates_rt: Default::default(),
             frame_rate: Default::default(),
             canvas_rect: None,
             hover_doc: None,
@@ -1748,6 +1751,7 @@ impl VectorcraftApp {
         let now = now_secs();
         self.perf.fps = self.frame_rate.frame(now, self.perf.frame_ms / 1000.0);
         self.sync_views();
+        updates_ui::tick(self, ctx);
         // Read the system clipboard only when that alone decides whether Paste is enabled. A
         // background thread reads it where the host installs one (an unresponsive owner must never
         // stall the frame loop); otherwise, or once that thread is gone, it is read here, at most a
@@ -2306,6 +2310,7 @@ impl VectorcraftApp {
         // The canvas and the panels: one docking layout. Tab hides the panels but not the canvas.
         egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| panel_docking::show(self, ui));
         dialogs::show(self, &ctx);
+        updates_ui::show(self, &ctx);
         export_progress::show(self, &ctx);
         plugin_runs::show(self, &ctx);
         palette::show(self, &ctx);

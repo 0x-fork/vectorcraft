@@ -554,6 +554,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "{} opens the Save PDF dialog; with params = document.exportPdf options written to path (asked when missing; viewAfterSaving opens the file) → {path, bytes, warnings}",
     ),
     ("help.about", "About VectorCraft", "", "{}"),
+    ("help.checkForUpdates", "Check for Updates…", "", "{}"),
     ("help.commandPalette", "Search Commands…", "Cmd+Shift+/", "{}"),
     ("app.quit", "Quit VectorCraft", "Cmd+Q", "{}"),
     (
@@ -1679,6 +1680,7 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             app.ui.about = true;
             Ok(Value::Null)
         }
+        "help.checkForUpdates" => crate::updates_ui::check(app),
         "help.commandPalette" => {
             app.ui.palette_open = !app.ui.palette_open;
             app.ui.palette_query.clear();
@@ -3223,6 +3225,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                 c("Search Commands…", "help.commandPalette"),
                 todos("VectorCraft Help…", "F1"),
                 Sep,
+                c("Check for Updates…", "help.checkForUpdates"),
                 c("About VectorCraft", "help.about"),
             ],
         ),
