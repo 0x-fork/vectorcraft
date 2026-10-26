@@ -101,7 +101,7 @@ USAGE:
       SVG's data-* attributes; --outline-text writes SVG text as paths, --decimals sets SVG's coordinate
       precision (1–7, default 3). OUT may not be IN when reading
       IN left things out (hidden text, art or layers it could not read; the notes say which) unless
-      --replace-lossy is given.       --editing-data opens a .ai or an EPS with editing data from its editing copy
+      --replace-lossy is given. --editing-data opens a .ai or an EPS with editing data from its editing copy
       even where that draws differently from its PDF part or page (which can be older), as long as
       it can be read. A PDF OUT omits the embedded native document unless --preserve-editing is
       given (the app's Save As PDF still defaults to keeping it). With --preserve-editing, when the
