@@ -540,6 +540,11 @@ pub struct UiState {
     /// never used): it opens with them.
     #[serde(default)]
     pub move_options: Value,
+    /// The Transform Each fields it was last confirmed with (scale, move, rotate, reflect, random,
+    /// reference point, Transform Objects and Preview, not Copy; null: never used): it opens on
+    /// them (#1732).
+    #[serde(default)]
+    pub transform_each: Value,
     /// The DXF Import Options chosen last (fit, scaleLineweights, center, mergeLayers; null:
     /// never used).
     #[serde(default)]
@@ -861,6 +866,7 @@ impl Default for UiState {
             offset_path: Value::Null,
             simplify: Value::Null,
             move_options: Value::Null,
+            transform_each: Value::Null,
             dxf_import: Value::Null,
             home: None,
             trace_hold_source: None,
