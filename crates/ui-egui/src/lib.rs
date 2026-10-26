@@ -1341,7 +1341,7 @@ impl VectorcraftApp {
         let scale = f64::from(ctx.pixels_per_point());
         let pixels = |points: f32, what: &str| -> Result<usize, String> {
             let value = f64::from(points) * scale;
-            if !value.is_finite() || value < 1.0 || value > 100_000.0 {
+            if !value.is_finite() || !(1.0..=100_000.0).contains(&value) {
                 return Err(format!("the window's {what} ({points} points × {scale} DPI) cannot size a screenshot"));
             }
             Ok(value.round() as usize)

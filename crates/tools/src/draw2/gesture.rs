@@ -162,7 +162,7 @@ impl GestureTool {
     /// Does a stroke show as the path it draws while it is drawn? Not with the Pencil's Live preview
     /// off: then the drag shows as a thin line (an overlay) until the release.
     fn previews(&self) -> bool {
-        !(self.id == "pencil" && !self.live_preview)
+        self.id != "pencil" || self.live_preview
     }
 
     /// Add a stroke sample.
