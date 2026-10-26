@@ -120,7 +120,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Character",
             [],
             None,
-            "{ids?|id?, font?, style?, size?: pt, leading?: pt|\"auto\", tracking?: 1/1000 em, justify?: \"auto\" (the start of each paragraph's direction)|\"left\"|\"center\"|\"right\"|\"justifyAll\", fill?: colour, keepModel?: bool (as paint.setFill), features?: [\"dlig\", \"-liga\", …] OpenType, start?: byte, end?: byte} (size/leading are document points after object scaling; with a range: the character attributes style that range and justify the paragraphs it touches; without: all the text) → {ids, overflow?: [id…] (area type and type on a path whose text no longer fits; left out when all fits)}",
+            "{ids?|id?, font?, style? (font alone: the style is kept when the new family has it, else its closest), size?: pt, leading?: pt|\"auto\", tracking?: 1/1000 em, justify?: \"auto\" (the start of each paragraph's direction)|\"left\"|\"center\"|\"right\"|\"justifyAll\", fill?: colour, keepModel?: bool (as paint.setFill), features?: [\"dlig\", \"-liga\", …] OpenType, start?: byte, end?: byte} (size/leading are document points after object scaling; with a range: the character attributes style that range and justify the paragraphs it touches; without: all the text) → {ids, overflow?: [id…] (area type and type on a path whose text no longer fits; left out when all fits)}",
             has_doc,
             set_style
         ),
@@ -811,6 +811,10 @@ fn set_style(s: &mut Session, p: &Value) -> Result<Value> {
             style_chars(t, range, |st| {
                 if let Some(f) = &font {
                     st.font_family = f.clone();
+                    // Keep the style when the new family has it, else its closest match (#4128).
+                    if style.is_none() {
+                        super::textedit::fit_font_style(st);
+                    }
                 }
                 if let Some(f) = &style {
                     st.font_style = f.clone();
@@ -853,6 +857,9 @@ fn set_style(s: &mut Session, p: &Value) -> Result<Value> {
                     st.font_family = f.clone();
                     st.font_version = None;
                     st.font_axes.clear();
+                    if style.is_none() {
+                        super::textedit::fit_font_style(st);
+                    }
                 }
                 if let Some(f) = &style {
                     st.font_style = f.clone();
