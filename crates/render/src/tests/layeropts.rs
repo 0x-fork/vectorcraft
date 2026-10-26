@@ -5,7 +5,7 @@ use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::{Appearance, ImageBlob, ImageObject, Node, NodeId, NodeKind};
 use vectorcraft_geom::shapes;
 
-use super::*;
+use crate::*;
 
 /// A red square (10..40) and a 30×30 red image at (50, 10), on one layer set up by `layer`.
 fn doc(layer: impl FnOnce(&mut NodeKind)) -> Document {

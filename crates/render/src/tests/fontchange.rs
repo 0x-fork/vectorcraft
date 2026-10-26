@@ -7,7 +7,7 @@ use vectorcraft_doc::text::{CharStyle, TextObject};
 use vectorcraft_doc::{Node, NodeKind};
 use vectorcraft_geom::Point;
 
-use super::*;
+use crate::*;
 
 /// Taken to add fonts, or to look up an installed one by name (`FontDb::face` loads it, which
 /// changes the fonts too). Renderers lay type out again when the fonts change, so tests of what
@@ -28,7 +28,7 @@ pub(crate) fn adding_fonts() -> RwLockWriteGuard<'static, ()> {
 
 /// The bundled Source Serif 4 renamed `family` (as long as the original name).
 fn serif_as(family: &str) -> Vec<u8> {
-    let mut data = include_bytes!("../../../assets/fonts/SourceSerif4-Regular.ttf").to_vec();
+    let mut data = include_bytes!("../../../../assets/fonts/SourceSerif4-Regular.ttf").to_vec();
     let utf16 = |s: &str| s.encode_utf16().flat_map(u16::to_be_bytes).collect::<Vec<u8>>();
     for (from, to) in [(utf16("Source Serif 4"), utf16(family)), (b"Source Serif 4".to_vec(), family.as_bytes().to_vec())] {
         assert_eq!(from.len(), to.len());

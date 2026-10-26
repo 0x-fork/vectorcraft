@@ -2,7 +2,7 @@
 
 use vectorcraft_doc::{Document, ImageBlob, ImageObject, Node, NodeKind};
 
-use super::*;
+use crate::*;
 
 fn doc_with_red_image() -> Document {
     let mut d = Document::new(40.0, 40.0);

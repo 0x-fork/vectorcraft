@@ -1,7 +1,7 @@
 //! Clip groups clip by any clipping path (M3.26): compound holes, even-odd fills, the union of a
 //! group's members, text outlines; with nothing to clip by the clipped art is hidden.
 
-use super::*;
+use crate::*;
 use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::{Appearance, CharStyle};
 use vectorcraft_geom::{PathData, Point, SubPath, shapes};

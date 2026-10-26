@@ -1,6 +1,6 @@
 //! Drawing again only what an edit changed gives the pixels of drawing it all again.
 
-use super::*;
+use crate::*;
 use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::Appearance;
 use vectorcraft_geom::{Point, shapes};

@@ -6,7 +6,7 @@ use vectorcraft_doc::text::{CharStyle, TextObject};
 use vectorcraft_doc::{Appearance, Effect, Node, NodeKind};
 use vectorcraft_geom::{Point, shapes};
 
-use super::*;
+use crate::*;
 
 /// Type blurred by `radius` points (Gaussian Blur, or Feather when `feather`) over a rectangle
 /// that overlays at half opacity; without the type when `radius` is `None`.

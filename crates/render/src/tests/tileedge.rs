@@ -1,6 +1,6 @@
 //! Pattern editing mode: the tile edge in the Tile Edge Color, and Show Swatch Bounds.
 
-use super::*;
+use crate::*;
 use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::pattern::{PatternDef, PatternEdit, TileType};
 use vectorcraft_doc::{Appearance, Node};

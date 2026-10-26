@@ -5,7 +5,7 @@ use vectorcraft_color::{Gradient, GradientPaint, Paint};
 use vectorcraft_doc::{Appearance, AppearanceItem, Node, StrokeGradientMode, StrokeLayer};
 use vectorcraft_geom::PathData;
 
-use super::*;
+use crate::*;
 
 const SIZE: u32 = 200;
 

@@ -2848,54 +2848,6 @@ thread_local! {
 }
 
 #[cfg(test)]
+use tests::fontchange as tests_fontchange;
+#[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod tests_adjust;
-#[cfg(test)]
-mod tests_alternate;
-#[cfg(test)]
-mod tests_bitmapglyphs;
-#[cfg(test)]
-mod tests_blend;
-#[cfg(test)]
-mod tests_changed;
-#[cfg(test)]
-mod tests_charstroke;
-#[cfg(test)]
-mod tests_clip;
-#[cfg(test)]
-mod tests_cmykblend;
-#[cfg(test)]
-mod tests_colrglyphs;
-#[cfg(test)]
-mod tests_container;
-#[cfg(test)]
-mod tests_dither;
-#[cfg(test)]
-mod tests_fontchange;
-#[cfg(test)]
-mod tests_freeform;
-#[cfg(test)]
-mod tests_fxzoom;
-#[cfg(test)]
-mod tests_isolation;
-#[cfg(test)]
-mod tests_knockout;
-#[cfg(test)]
-mod tests_layeropts;
-#[cfg(test)]
-mod tests_memory;
-#[cfg(test)]
-mod tests_objectfx;
-#[cfg(test)]
-mod tests_placed_document;
-#[cfg(test)]
-mod tests_rasterize;
-#[cfg(test)]
-mod tests_setup;
-#[cfg(test)]
-mod tests_strokegradient;
-#[cfg(test)]
-mod tests_tileedge;
-#[cfg(test)]
-mod tests_viewraster;

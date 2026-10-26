@@ -2,7 +2,7 @@
 //! cell behind them on screen when the preference is on. Preferences › Type › Highlight
 //! Substituted Fonts does the same for text drawn in a substitute for a missing font.
 
-use super::*;
+use crate::*;
 
 /// Highlight Substituted Fonts follows the preference passed in [`RenderOptions`] for every
 /// document, whatever a document's own setup stored: on, type in a missing font has pink behind

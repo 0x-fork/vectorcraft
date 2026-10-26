@@ -1,6 +1,6 @@
 //! Blending in CMYK documents ([`crate::ink`]): blend modes and opacity composite inks.
 
-use super::*;
+use crate::*;
 use vectorcraft_color::blend::MASK_LUM;
 use vectorcraft_color::{BlendMode as Blend, Color, Gradient, GradientKind, GradientPaint, GradientStop, Paint};
 use vectorcraft_doc::{Appearance, ColorMode, ImageBlob, ImageObject, Node, OpacityMask};

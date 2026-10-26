@@ -1,6 +1,6 @@
 //! Knockout groups, the knockout shape and the page group (Transparency panel).
 
-use super::*;
+use crate::*;
 use vectorcraft_color::{BlendMode as Blend, Color, Paint};
 use vectorcraft_doc::{Appearance, Knockout, Node};
 use vectorcraft_geom::shapes;

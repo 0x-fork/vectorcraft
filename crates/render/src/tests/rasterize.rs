@@ -6,7 +6,7 @@ use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::{Appearance, Effect, Node};
 use vectorcraft_geom::{Anchor, PathData, Point, SubPath, shapes};
 
-use super::*;
+use crate::*;
 
 /// A red shape (`path`, over 10..30 pt) with the effects `fx` (id, params), in a document whose
 /// raster effects resolution is `ppi`.

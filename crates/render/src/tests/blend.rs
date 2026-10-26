@@ -1,7 +1,7 @@
 //! Blend-mode accuracy: every mode matches the reference formulas ([`blend_rgb`]) within 1/255
 //! (see [`tolerance`]), whether it is an object's blend mode, a fill's or a group's.
 
-use super::*;
+use crate::*;
 use vectorcraft_color::blend::blend_rgb;
 use vectorcraft_color::{BlendMode as Blend, Color, Paint};
 use vectorcraft_doc::{Appearance, Node};

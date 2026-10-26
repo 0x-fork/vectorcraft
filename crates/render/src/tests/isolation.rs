@@ -1,7 +1,7 @@
 //! Non-isolated transparency groups: blending inside a group with opacity or a blend mode reaches
 //! the art below the group unless Isolate Blending is on (checked against the reference formulas).
 
-use super::*;
+use crate::*;
 use vectorcraft_color::blend::{blend_rgb, composite};
 use vectorcraft_color::{BlendMode as Blend, Color, Paint};
 use vectorcraft_doc::{Appearance, Knockout, Node};

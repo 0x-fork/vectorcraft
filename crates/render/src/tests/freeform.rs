@@ -1,6 +1,6 @@
 //! Freeform gradients: the rendered colour grid against the colour field.
 
-use super::*;
+use crate::*;
 use vectorcraft_color::freeform::spread_scale;
 use vectorcraft_color::{Color, Freeform, FreeformPoint, Gradient, GradientKind, GradientPaint, Paint};
 use vectorcraft_doc::{Appearance, Node};

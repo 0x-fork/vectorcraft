@@ -11,7 +11,7 @@ use vectorcraft_doc::text::{CharStyle, TextObject};
 use vectorcraft_doc::{Appearance, AppearanceItem, Document, Effect, FillLayer, ImageBlob, ImageObject, Knockout, Node, NodeKind, StrokeLayer};
 use vectorcraft_geom::{Point, shapes};
 
-use super::*;
+use crate::*;
 
 fn fx(id: &str, params: Value) -> Effect {
     Effect { id: id.into(), params, visible: true }

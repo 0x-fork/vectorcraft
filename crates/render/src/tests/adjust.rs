@@ -9,7 +9,7 @@ use vectorcraft_doc::text::{CharStyle, TextObject};
 use vectorcraft_doc::{Appearance, Effect, ImageBlob, ImageObject, Node, NodeKind, Symbol};
 use vectorcraft_geom::{Point, shapes};
 
-use super::*;
+use crate::*;
 
 fn fx(id: &str, params: Value) -> Effect {
     Effect { id: id.into(), params, visible: true }

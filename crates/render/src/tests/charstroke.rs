@@ -6,7 +6,7 @@ use vectorcraft_doc::text::{CharStyle, TextObject};
 use vectorcraft_doc::{AppearanceItem, Dash, LineJoin, Node, NodeKind};
 use vectorcraft_geom::Point;
 
-use super::*;
+use crate::*;
 use crate::tests_fontchange::fonts_steady;
 
 const SIZE: u32 = 200;

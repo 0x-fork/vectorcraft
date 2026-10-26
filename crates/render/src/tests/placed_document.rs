@@ -5,7 +5,7 @@ use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::{Appearance, ImageBlob, LinkInfo, Node, NodeId, NodeKind, PlacedDocument};
 use vectorcraft_geom::shapes;
 
-use super::*;
+use crate::*;
 
 /// Every file reads as a 40×20 artboard filled blue; a file whose bytes start with `loop` also
 /// places itself (the same key) in its middle, and one whose bytes start with `bad` can't be read.
