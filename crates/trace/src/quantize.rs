@@ -1271,21 +1271,7 @@ fn rare_colours(img: &Raster, own: &[bool], choose: &[bool], hk: &HistKey, cente
             *o = best.and_then(|b| b.2);
         }
     }
-    let mut out: Vec<[f64; 3]> = vec![];
-    let mut traced_as = vec![];
-    for (((_, _, c, _), o), &from) in chosen.iter().zip(&onto).zip(&other_of) {
-        if let Some(o) = o {
-            traced_as.push((*c, *o, from));
-            continue;
-        }
-        if out.len() >= RARE_BUDGET {
-            break;
-        }
-        let lab = oklab(*c);
-        if out.iter().all(|o| dist(oklab(*o), lab) >= RARE_APART) {
-            out.push(*c);
-        }
-    }
+    let (out, traced_as) = kept_rare(chosen.iter().zip(&onto).zip(&other_of).map(|(((_, _, c, _), o), &from)| (*c, *o, from)));
     // The index in `centers` followed by `out` of a palette color or a rare color, or of the kept
     // rare color one that is not kept traces as.
     let index = |from: usize| -> Option<usize> {
@@ -1308,6 +1294,33 @@ fn rare_colours(img: &Raster, own: &[bool], choose: &[bool], hk: &HistKey, cente
         .collect();
     (out, traced_as)
 }
+
+/// Of `colors` (a rare color, the rare color it traces as, and where the other color of its pair
+/// comes from), largest region first: the rare colors kept, at most [`RARE_BUDGET`] and each at
+/// least [`RARE_APART`] from the ones before it, and every color that traces as another, past the
+/// budget too.
+pub(crate) fn kept_rare(colors: impl IntoIterator<Item = ([f64; 3], Option<[f64; 3]>, Option<usize>)>) -> (Vec<[f64; 3]>, Vec<TracedAsColor>) {
+    let dist = |a: [f64; 3], b: [f64; 3]| (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f64>().sqrt();
+    let mut out: Vec<[f64; 3]> = vec![];
+    let mut traced_as = vec![];
+    for (c, o, from) in colors {
+        if let Some(o) = o {
+            traced_as.push((c, o, from));
+            continue;
+        }
+        if out.len() >= RARE_BUDGET {
+            continue;
+        }
+        let lab = oklab(c);
+        if out.iter().all(|o| dist(oklab(*o), lab) >= RARE_APART) {
+            out.push(c);
+        }
+    }
+    (out, traced_as)
+}
+
+/// A color, the rare color it traces as, and where the other color of its pair comes from.
+pub(crate) type TracedAsColor = ([f64; 3], [f64; 3], Option<usize>);
 
 /// Whether `c` (sRGB) lies between two of `centers`, as anti-aliasing mixes them: within 12 levels
 /// of the line between them, and at least an eighth of the way from each.
