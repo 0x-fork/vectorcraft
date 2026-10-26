@@ -173,6 +173,8 @@ mod tests_sysclip_emf;
 #[cfg(test)]
 mod tests_sysclip_probe;
 #[cfg(test)]
+mod tests_tab_overflow;
+#[cfg(test)]
 mod tests_taskbar;
 #[cfg(test)]
 mod tests_transparencygrid;
