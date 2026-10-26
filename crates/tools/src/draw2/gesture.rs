@@ -36,6 +36,9 @@ pub struct GestureTool {
     near_start: bool,
     /// Pencil/Paintbrush continuing a selected open path: (path, continue from its start).
     extend: Option<(NodeId, bool)>,
+    /// A Pencil stroke continuing a selected open path: the other paths selected at the press,
+    /// whose open ends it connects to.
+    connect_to: Vec<NodeId>,
     /// Pencil/Paintbrush starting on a selected path away from its ends: (path, Edit Selected
     /// Paths' distance in points); the stroke redraws the section it ends on (#2850).
     redraw: Option<(NodeId, f64)>,
@@ -107,6 +110,7 @@ impl GestureTool {
             began: false,
             near_start: false,
             extend: None,
+            connect_to: vec![],
             redraw: None,
             fidelity,
             size: 10.0,
@@ -232,12 +236,17 @@ impl GestureTool {
     /// The selected open path whose end is near `p` (Edit Selected Paths, off at 0 pixels), and
     /// that end.
     fn find_extend(&self, cx: &ToolContext, p: Point) -> Option<(NodeId, bool, Point)> {
+        self.find_end(cx, p, &cx.selection.objects)
+    }
+
+    /// [`Self::find_extend`] among `ids`.
+    fn find_end(&self, cx: &ToolContext, p: Point, ids: &[NodeId]) -> Option<(NodeId, bool, Point)> {
         if self.edit_within <= 0.0 {
             return None;
         }
         let tol = cx.tol(self.edit_within);
         let editable = cx.doc.editable();
-        for id in &cx.selection.objects {
+        for id in ids {
             let Some(pd) = cx.doc.node(*id).and_then(|n| n.path_data()) else { continue };
             if !editable(*id) {
                 continue;
@@ -316,7 +325,14 @@ impl GestureTool {
                 let near = pts.last().is_some_and(|&end| self.ends_near_start(cx, end));
                 // A straight line has two points: closing it would draw it back over itself.
                 let closed = !self.straight && ((m.alt && !self.alt_smooth) || (self.extend.is_none() && near));
-                vec![Action::Preview("path.freehand".into(), self.freehand_params(closed)), Action::Commit]
+                let mut params = self.freehand_params(closed);
+                // A Pencil stroke that continues a selected path and ends on an open end of another
+                // path selected at the press connects the two.
+                let connect = pts.last().and_then(|&end| self.find_end(cx, end, &self.connect_to));
+                if let Some((other, at_start, _)) = connect {
+                    params["connect"] = json!({"id": other.0, "end": if at_start { "start" } else { "end" }});
+                }
+                vec![Action::Preview("path.freehand".into(), params), Action::Commit]
             }
             "blobBrush" => vec![Action::Exec(
                 "path.blob".into(),
@@ -367,6 +383,11 @@ impl Tool for GestureTool {
                 self.unconstrained = self.straight && !ev.mods.shift;
                 let extend = if self.draws_path() && !self.smoothing { self.find_extend(cx, p) } else { None };
                 self.extend = extend.map(|(id, at_start, _)| (id, at_start));
+                // The stroke's previews select the path it continues, so the others are kept now.
+                self.connect_to = match self.extend {
+                    Some((id, _)) if self.id == "pencil" => cx.selection.objects.iter().copied().filter(|o| *o != id).collect(),
+                    _ => vec![],
+                };
                 self.redraw = if self.draws_path() && !self.smoothing && self.extend.is_none() { self.find_redraw(cx, p) } else { None };
                 // A path continued starts at its end, one redrawn on it; a new one where it snaps.
                 // A straight line is constrained from the end it continues, so it starts there.
@@ -475,6 +496,7 @@ impl Tool for GestureTool {
                 self.unconstrained = false;
                 self.clear();
                 self.extend = None;
+                self.connect_to.clear();
                 self.redraw = None;
                 out
             }
@@ -1342,6 +1364,48 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// A Pencil stroke from an end of a selected open path to an end of another selected open path
+    /// connects the two; it does not when the other path is not selected, and the Paintbrush does
+    /// not connect.
+    #[test]
+    fn pencil_connects_a_stroke_from_one_selected_path_to_an_end_of_another() {
+        let (mut d, _) = doc_with_rect();
+        let l = d.layers[0].id;
+        let add = |d: &mut vectorcraft_doc::Document, a: (f64, f64), b: (f64, f64)| {
+            let id = d.alloc_id();
+            let line = vectorcraft_geom::PathData::from_bezpath(&vectorcraft_geom::BezPath::from_vec(vec![
+                vectorcraft_geom::PathEl::MoveTo(Point::new(a.0, a.1)),
+                vectorcraft_geom::PathEl::LineTo(Point::new(b.0, b.1)),
+            ]));
+            d.insert(Some(l), 1, vectorcraft_doc::Node::path(id, line, vectorcraft_doc::Appearance::default_art())).unwrap();
+            id
+        };
+        let a = add(&mut d, (300.0, 300.0), (400.0, 300.0));
+        let b = add(&mut d, (500.0, 400.0), (600.0, 400.0));
+        let p = paint();
+        let stroke = [(400.0, 300.0), (450.0, 350.0), (499.0, 401.0)];
+        let mut both = Selection::default();
+        both.set([a, b]);
+        let mut one = Selection::default();
+        one.set([a]);
+        // The previews select the path continued: after the press only it is selected.
+        let last = |tool: &str, at_press: &Selection| {
+            let mut t = GestureTool::new(tool);
+            t.pointer(&cx(&d, at_press, &p), &PointerEvent::new(PointerKind::Down, stroke[0].0, stroke[0].1));
+            let after = cx(&d, &one, &p);
+            t.pointer(&after, &PointerEvent::new(PointerKind::Drag, stroke[1].0, stroke[1].1));
+            t.pointer(&after, &PointerEvent::new(PointerKind::Drag, stroke[2].0, stroke[2].1));
+            let acts = t.pointer(&after, &PointerEvent::new(PointerKind::Up, stroke[2].0, stroke[2].1));
+            let Some(Action::Preview(_, v)) = acts.first() else { panic!("{acts:?}") };
+            v.clone()
+        };
+        let v = last("pencil", &both);
+        assert_eq!((v["extend"].clone(), v["connect"].clone()), (json!({"id": a.0, "end": "end"}), json!({"id": b.0, "end": "start"})));
+        assert!(last("paintbrush", &both).get("connect").is_none(), "the Paintbrush");
+        let v = last("pencil", &one);
+        assert!(v.get("extend").is_some() && v.get("connect").is_none(), "{v}");
     }
 
     /// Close paths when ends are within 0 turns closing off: a stroke that ends exactly where it

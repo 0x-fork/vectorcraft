@@ -178,6 +178,90 @@ fn pencil_continues_selected_open_path() {
     assert_eq!(p.subpaths[0].anchors[0].p, Point::new(100.0, 100.0));
 }
 
+/// Connect two paths: with two open paths selected, a Pencil stroke from an end of one to an end
+/// of the other joins them into one path, the first one's, in one undo step. A path that is not
+/// selected is not joined.
+#[test]
+fn pencil_connects_two_selected_paths_from_an_end_of_one_to_an_end_of_the_other() {
+    let stroke = [(201.0, 101.0), (230.0, 130.0), (270.0, 180.0), (299.0, 199.0)];
+    // The stroke ends on the second path's start, then on its end.
+    for (b_from, b_to) in [((300.0, 200.0), (400.0, 200.0)), ((400.0, 200.0), (300.0, 200.0))] {
+        let mut s = session();
+        let a = line(&mut s, 100.0, 100.0, 200.0, 100.0);
+        let b = line(&mut s, b_from.0, b_from.1, b_to.0, b_to.1);
+        s.execute("select.set", &json!({"ids": [a.0, b.0]})).unwrap();
+        s.select_tool("pencil", view()).unwrap();
+        assert_eq!(gesture(&mut s, &stroke, Mods::default()), 1, "{b_from:?}: one undo step");
+        let ps = paths(&s);
+        assert_eq!(ps.len(), 1, "{b_from:?}: the second path is joined on");
+        assert_eq!(ps[0].0, a);
+        let sp = &ps[0].1.subpaths[0];
+        assert!(!sp.closed);
+        assert_eq!(sp.anchors[0].p, Point::new(100.0, 100.0));
+        assert_eq!(sp.anchors[sp.anchors.len() - 1].p, Point::new(400.0, 200.0), "{b_from:?}");
+        assert_eq!(sp.anchors.iter().filter(|x| x.p == Point::new(300.0, 200.0)).count(), 1, "{b_from:?}: one anchor where they meet");
+        assert_eq!(s.doc().unwrap().selection.objects, vec![a]);
+    }
+    // The second path is not selected: the first is continued and the second left as it was.
+    let mut s = session();
+    let a = line(&mut s, 100.0, 100.0, 200.0, 100.0);
+    let b = line(&mut s, 300.0, 200.0, 400.0, 200.0);
+    s.execute("select.set", &json!({"ids": [a.0]})).unwrap();
+    drag(&mut s, "pencil", &stroke, Mods::default());
+    assert_eq!(paths(&s).len(), 2);
+    assert_eq!(path(&s, b).anchor_count(), 2);
+    assert!(path(&s, a).anchor_count() >= 3, "continued");
+    assert!(path(&s, a).subpaths[0].anchors.iter().all(|x| x.p != Point::new(400.0, 200.0)));
+}
+
+/// `path.freehand`'s connect takes the other path's last open subpath and leaves the rest of it,
+/// whose direct-selected anchors follow their subpaths; it refuses the path it extends and an end
+/// other than "start" or "end".
+#[test]
+fn pencil_connect_keeps_the_rest_of_a_compound_path_and_refuses_the_extended_path() {
+    let mut s = session();
+    let a = line(&mut s, 100.0, 100.0, 200.0, 100.0);
+    let d = "M300 200 L400 200 M300 400 L400 400 M0 500 L50 500 L50 550 Z";
+    let bc = NodeId(s.execute("path.create", &json!({ "d": d })).unwrap()["id"].as_u64().unwrap());
+    let points = json!([[200, 100], [250, 250], [400, 400]]);
+    for end in [json!("middle"), json!(1), json!(null)] {
+        let bad = json!({"points": points, "extend": {"id": a.0, "end": "end"}, "connect": {"id": bc.0, "end": end}});
+        assert!(s.execute("path.freehand", &bad).is_err(), "{bad}");
+    }
+    assert_eq!((path(&s, a).anchor_count(), path(&s, bc).subpaths.len()), (2, 3), "refused: nothing changed");
+    s.execute("select.anchors", &json!({"id": bc.0, "anchors": [[0, 1], [1, 0], [2, 2]], "mode": "set"})).unwrap();
+    let connect = json!({"points": points, "extend": {"id": a.0, "end": "end"}, "connect": {"id": bc.0, "end": "end"}, "keepSelected": false});
+    s.execute("path.freehand", &connect).unwrap();
+    let left = path(&s, bc);
+    assert_eq!(left.subpaths.len(), 2, "the other subpaths stay");
+    assert_eq!(left.subpaths[0].anchors[0].p, Point::new(300.0, 200.0));
+    let anchors: Vec<_> = s.doc().unwrap().selection.anchors.get(&bc).into_iter().flatten().copied().collect();
+    assert_eq!(anchors, vec![(0, 1), (1, 2)], "the joined subpath's anchor goes, the closed one's moves down");
+    let sp = &path(&s, a).subpaths[0];
+    assert_eq!(sp.anchors[sp.anchors.len() - 1].p, Point::new(300.0, 400.0));
+    assert!(sp.anchors.iter().any(|x| x.p == Point::new(400.0, 400.0)));
+    assert!(s.execute("path.freehand", &json!({"points": points, "extend": {"id": a.0}, "connect": {"id": a.0}})).is_err());
+}
+
+/// With Keep selected off, a compound path whose direct-selected anchors all lie on the subpath
+/// that connect joins on is no longer selected, and Delete then has nothing to delete.
+#[test]
+fn pencil_connect_deselects_a_path_whose_selected_anchors_were_all_joined_on() {
+    let mut s = session();
+    let a = line(&mut s, 100.0, 100.0, 200.0, 100.0);
+    let d = "M300 200 L400 200 M300 400 L400 400 M0 500 L50 500 L50 550 Z";
+    let bc = NodeId(s.execute("path.create", &json!({ "d": d })).unwrap()["id"].as_u64().unwrap());
+    s.execute("select.anchors", &json!({"id": bc.0, "anchors": [[1, 0], [1, 1]], "mode": "set"})).unwrap();
+    let points = json!([[200, 100], [250, 250], [400, 400]]);
+    let connect = json!({"points": points, "extend": {"id": a.0, "end": "end"}, "connect": {"id": bc.0, "end": "end"}, "keepSelected": false});
+    s.execute("path.freehand", &connect).unwrap();
+    let sel = s.doc().unwrap().selection.clone();
+    assert!(!sel.contains(bc) && !sel.anchors.contains_key(&bc) && !sel.segments.contains_key(&bc), "{sel:?}");
+    assert!(s.execute("edit.clear", &json!({})).is_err(), "nothing selected");
+    let left = path(&s, bc);
+    assert_eq!((left.subpaths.len(), left.anchor_count()), (2, 5), "{left:?}");
+}
+
 /// Edit Selected Paths in the middle of a path (#2850): a Pencil stroke that starts and ends on a
 /// selected path replaces the section between, drawn either way; the path stays one path with
 /// its ends, and is one undo step.
