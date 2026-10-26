@@ -759,8 +759,11 @@ impl<'a> Reader<'a> {
         let line = line.trim_end();
         if let Some((len, hex)) = self.blend_record.as_mut() {
             if !line.is_empty() && line.bytes().all(|b| b.is_ascii_hexdigit()) {
-                hex.extend_from_slice(line.as_bytes());
-                if hex.len() >= *len * 2 {
+                // As many digits as the record says it has, no more.
+                let wanted = len.saturating_mul(2);
+                let take = wanted.saturating_sub(hex.len()).min(line.len());
+                hex.extend_from_slice(line.as_bytes().get(..take).unwrap_or_default());
+                if hex.len() >= wanted {
                     self.end_blend();
                 }
                 return Ok(());
