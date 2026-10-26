@@ -1537,6 +1537,8 @@ mod tests {
         }
     }
 
+    /// Both stroke rows expose named Weight inputs, and the drop-shadow effect names its Blur input and
+    /// Color radio button.
     #[test]
     fn inline_stroke_weight_and_effect_fields_are_named() {
         use egui_kittest::kittest::Queryable;

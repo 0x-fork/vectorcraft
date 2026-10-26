@@ -1211,6 +1211,7 @@ mod tests {
         assert_eq!((app.session.tool_id(), app.session.tool_options()), ("eyedropper", json!({"stop": "gradient", "brushKeyColor": false})));
     }
 
+    /// The gradient panel names its Angle and Aspect Ratio inputs.
     #[test]
     fn angle_and_aspect_fields_are_named() {
         use egui_kittest::kittest::Queryable;

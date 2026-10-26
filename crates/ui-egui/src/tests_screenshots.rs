@@ -14,6 +14,8 @@ use crate::{Services, VectorcraftApp};
 
 const SCREEN: egui::Vec2 = vec2(320.0, 200.0);
 
+/// Build a screenshot test app with a write service, control channel and temporary directory on a
+/// 100 by 100 document.
 fn app(tag: &str) -> (VectorcraftApp, std::sync::mpsc::Sender<ControlRequest>, std::path::PathBuf) {
     let dir = vectorcraft_testkit::temp_dir(tag);
     let services =
@@ -24,12 +26,14 @@ fn app(tag: &str) -> (VectorcraftApp, std::sync::mpsc::Sender<ControlRequest>, s
     (app, tx, dir)
 }
 
+/// Submit a `ui.screenshot` control request and return its reply receiver.
 fn request(tx: &std::sync::mpsc::Sender<ControlRequest>, params: serde_json::Value) -> std::sync::mpsc::Receiver<serde_json::Value> {
     let (req, reply) = ControlRequest::new("ui.screenshot", params);
     tx.send(req).unwrap();
     reply
 }
 
+/// Run one tick-then-UI host frame at the requested screen size and discard texture deltas.
 fn frame_at(app: &mut VectorcraftApp, ctx: &egui::Context, size: egui::Vec2, events: Vec<Event>) -> egui::FullOutput {
     let raw = egui::RawInput { events, screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)), ..Default::default() };
     app.begin_host_iteration();
@@ -41,6 +45,7 @@ fn frame_at(app: &mut VectorcraftApp, ctx: &egui::Context, size: egui::Vec2, eve
     out
 }
 
+/// Run one host frame at the standard 320 by 200 screenshot size.
 fn frame(app: &mut VectorcraftApp, ctx: &egui::Context) -> egui::FullOutput {
     frame_at(app, ctx, SCREEN, vec![])
 }
@@ -85,6 +90,8 @@ fn admit(app: &mut VectorcraftApp, ctx: &egui::Context) {
     allow_due(app);
 }
 
+/// One admitted capture completes once, writes the named file, replies with its size and releases
+/// the reservation.
 #[test]
 fn a_request_saves_one_file_and_replies_once() {
     let (mut app, tx, dir) = app("screenshot-one");
@@ -108,6 +115,7 @@ fn a_request_saves_one_file_and_replies_once() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// A timed-out request replies once and writes nothing; a later completion is inert.
 #[test]
 fn a_timed_out_request_writes_nothing_and_a_late_completion_is_inert() {
     let (mut app, tx, dir) = app("screenshot-timeout");
@@ -133,6 +141,8 @@ fn a_timed_out_request_writes_nothing_and_a_late_completion_is_inert() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// A completion collected after the deadline is neither encoded nor written and replies once with
+/// the no-frame error.
 #[test]
 fn a_completion_that_arrives_after_the_deadline_is_not_saved() {
     let (mut app, tx, dir) = app("screenshot-deadline");
@@ -157,6 +167,8 @@ fn a_completion_that_arrives_after_the_deadline_is_not_saved() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Admission refuses a fifth request without evicting the four pending ones and releases capacity
+/// when one completes.
 #[test]
 fn admission_rejects_more_than_four_requests_without_evicting_one_and_releases_a_finished_one() {
     let (mut app, tx, dir) = app("screenshot-admission");
@@ -188,6 +200,8 @@ fn admission_rejects_more_than_four_requests_without_evicting_one_and_releases_a
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Pixels with a different size are stale, produce no reply or file, and a retry with the matching
+/// image completes the request.
 #[test]
 fn an_image_of_another_size_is_stale_and_retried() {
     let (mut app, tx, dir) = app("screenshot-size");
@@ -213,6 +227,8 @@ fn an_image_of_another_size_is_stale_and_retried() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Changing and restoring the DPI still invalidates in-flight pixels by epoch; the retry for the
+/// current geometry succeeds.
 #[test]
 fn a_geometry_change_and_change_back_still_rejects_the_old_pixels() {
     let (mut app, tx, dir) = app("screenshot-epoch");
@@ -243,6 +259,8 @@ fn a_geometry_change_and_change_back_still_rejects_the_old_pixels() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Switching documents while a capture is in flight fails the request instead of saving new-
+/// document pixels.
 #[test]
 fn a_document_change_while_a_capture_is_in_flight_fails_instead_of_saving_it() {
     let (mut app, tx, dir) = app("screenshot-document");
@@ -266,6 +284,8 @@ fn a_document_change_while_a_capture_is_in_flight_fails_instead_of_saving_it() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Switching documents during settle fails at issuance without ever issuing a capture or keeping a
+/// reservation.
 #[test]
 fn a_document_change_during_the_settle_fails_at_issuance_without_issuing_a_capture() {
     let (mut app, tx, dir) = app("screenshot-document-settle");
@@ -292,6 +312,7 @@ fn a_document_change_during_the_settle_fails_at_issuance_without_issuing_a_captu
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// A second stale-sized completion answers the request once with an error and writes nothing.
 #[test]
 fn a_second_stale_completion_replies_once_with_an_error_and_writes_nothing() {
     let (mut app, tx, dir) = app("screenshot-stale-twice");
@@ -315,6 +336,8 @@ fn a_second_stale_completion_replies_once_with_an_error_and_writes_nothing() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// A hidden window's logic pass requests a hidden paint instead of issuing the queued capture; the
+/// capture remains pending.
 #[test]
 fn a_hidden_window_is_asked_to_paint_the_queued_capture() {
     let (mut app, tx, dir) = app("screenshot-hidden");
@@ -336,6 +359,7 @@ fn a_hidden_window_is_asked_to_paint_the_queued_capture() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// An oversized claimed image is refused from the reply-encoding budget before any copy or encode.
 #[test]
 fn a_data_reply_over_the_encoding_budget_is_refused_before_encoding() {
     let (mut app, _tx, _dir) = app("screenshot-encoding");
@@ -347,6 +371,8 @@ fn a_data_reply_over_the_encoding_budget_is_refused_before_encoding() {
     assert!(answer["error"].as_str().unwrap_or_default().contains("reply-encoding limit"), "{answer}");
 }
 
+/// A path plus data capture writes the file and omits an oversized inline PNG; without a path the
+/// same request fails.
 #[test]
 fn a_path_plus_data_capture_writes_the_file_and_omits_an_oversized_inline_png() {
     let (mut app, _tx, dir) = app("screenshot-path-data");

@@ -459,6 +459,7 @@ impl Session {
         self.with_tool_cx(view, |t, cx| t.ime_session_matches_document(cx))
     }
 
+    /// Whether the active tool currently owns keyboard text input, as the Type tool does while editing.
     pub fn tool_wants_text(&self) -> bool {
         self.tool.wants_text()
     }

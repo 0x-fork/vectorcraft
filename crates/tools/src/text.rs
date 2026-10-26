@@ -86,6 +86,8 @@ type CachedLayout = ((u64, TextObject), Arc<TextLayout>);
 /// A mutex (not an `AtomicU64`) keeps this available on wasm targets without 64-bit atomics.
 static NEXT_EDIT_SESSION: Mutex<u64> = Mutex::new(0);
 
+/// Return the next process-wide edit-session id. It saturates at `u64::MAX` instead of wrapping to
+/// zero; the final id can repeat only after 2^64 sessions.
 fn next_edit_session() -> u64 {
     let mut next = NEXT_EDIT_SESSION.lock().unwrap_or_else(PoisonError::into_inner);
     let session = next.checked_add(1).unwrap_or(u64::MAX);
@@ -170,6 +172,8 @@ impl TypeTool {
         l
     }
 
+    /// The edited text used to find word and paragraph boundaries for selection: the typing session's
+    /// runs, or the document's current text when there is no live session or it has gone stale.
     fn plain(&self, cx: &ToolContext) -> String {
         let document = self.editing.and_then(|id| Self::text(cx, id));
         match &self.typing {
@@ -321,6 +325,8 @@ impl TypeTool {
         out
     }
 
+    /// Begin a new edit session for `id` at `caret`, assigning a fresh session id and clearing typing,
+    /// pre-edit and goal state.
     fn start_editing(&mut self, id: NodeId, caret: usize) {
         self.edit_session = next_edit_session();
         self.editing = Some(id);
@@ -1008,6 +1014,8 @@ impl Tool for TypeTool {
         let clip: String = self.clipboard.iter().map(|r| r.text.as_str()).collect();
         !(self.preedit.is_none() && normalized.len() > 1 && normalized == clip && !cx.paste_plain_text)
     }
+    /// Whether the typing session still describes the edited document; a session ended by an outside
+    /// command reports false until a replacement commit starts a new one.
     fn ime_session_matches_document(&self, cx: &ToolContext) -> bool {
         match (self.editing, &self.typing) {
             (Some(id), Some(ty)) => Self::text(cx, id).is_none_or(|t| ty.cur == t.runs),
@@ -1017,6 +1025,8 @@ impl Tool for TypeTool {
             _ => true,
         }
     }
+    /// Handle an editing key: ignore keys while an IME composes, remap arrows in vertical text, step
+    /// type attributes with Alt, and otherwise edit, navigate or end the session.
     fn key(&mut self, cx: &ToolContext, key: ToolKey, mods: Mods) -> Vec<Action> {
         // The IME owns the keys while it composes (the UI doesn't send them; this is a guard).
         if self.preedit.is_some() {
@@ -1183,6 +1193,9 @@ impl Tool for TypeTool {
         self.preedit = Some(Preedit { range: start..end, active: active_chars.and_then(|r| char_range_to_bytes(&text, r)) });
         out
     }
+    /// Delete the requested bytes or characters before and after the selection or marked text,
+    /// preserving the selection direction and composition and refusing a stale session; byte counts
+    /// round inward to UTF-8 boundaries.
     fn ime_delete_surrounding(&mut self, cx: &ToolContext, before: usize, after: usize, unit: SurroundingUnit) -> Vec<Action> {
         let Some(id) = self.editing else { return vec![] };
         // The document changed under the session (undo, a panel edit): the ranges below would index
@@ -1235,11 +1248,16 @@ impl Tool for TypeTool {
         }
         self.delete_ranges(cx, &ranges)
     }
+    /// Return the active Type tool's stable IME owner (document uid, target id, replacement epoch),
+    /// or `None` when nothing is being edited.
     fn ime_target(&self, cx: &ToolContext) -> Option<(u64, u64, u64)> {
         let id = self.editing?;
         Self::text(cx, id)?;
         Some((cx.revision.0, id.0, self.edit_session))
     }
+    /// Return a bounded logical text window around the caret, anchor and optional pre-edit; a stale
+    /// typing session publishes the document's current text, and unusable or non-boundary offsets
+    /// return `Unavailable` rather than stale data.
     fn ime_surrounding(&self, cx: &ToolContext, max_bytes: usize) -> ImeSurrounding {
         let Some(id) = self.editing else {
             return ImeSurrounding::Unavailable("no text object is being edited");
@@ -1279,6 +1297,7 @@ impl Tool for TypeTool {
         };
         ime_surrounding_window(&segments, preedit, len, caret, anchor, max_bytes)
     }
+    /// Whether an IME pre-edit is currently shown for this Type-tool session.
     fn composing(&self) -> bool {
         self.preedit.is_some()
     }

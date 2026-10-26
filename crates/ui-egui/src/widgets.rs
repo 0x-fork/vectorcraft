@@ -16,12 +16,15 @@ use crate::{icons, scrub};
 struct HashOnly<T>(T);
 
 impl<T: std::hash::Hash> std::hash::Hash for HashOnly<T> {
+    /// Hash only the wrapped id salt, deliberately omitting the debug-only identity that egui 0.37's
+    /// `AsIdSalt` requires.
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
 impl<T> std::fmt::Debug for HashOnly<T> {
+    /// Format any `HashOnly` salt as the fixed text `widget id` so ids do not expose their value.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("widget id")
     }
@@ -246,6 +249,8 @@ struct NextLabel {
     next_auto_id: egui::Id,
 }
 
+/// Record a label's widget id, viewport, pass, position and next auto id so only the immediately
+/// following field can take the label.
 fn remember_next_label(ui: &Ui, id: egui::Id) {
     let label = NextLabel {
         id,
@@ -3579,6 +3584,7 @@ pub(crate) mod look_tests {
         assert!(lit(&hovered, row), "the row under the pointer is lit: {row:?}");
     }
 
+    /// Each painted row label names its own numeric field rather than the field's internal salt.
     #[test]
     fn a_label_rows_input_is_named_by_the_row_label() {
         use egui_kittest::kittest::Queryable;
@@ -3599,6 +3605,7 @@ pub(crate) mod look_tests {
         assert!(h.query_by_role_and_label(egui::accesskit::Role::TextInput, "plugin-angle").is_none(), "no internal widget id");
     }
 
+    /// A label followed by a checkbox or other widget does not name a later field.
     #[test]
     fn a_label_does_not_name_a_field_after_another_widget() {
         use egui_kittest::kittest::Queryable;
@@ -3655,6 +3662,7 @@ pub(crate) mod look_tests {
         }
     }
 
+    /// The Enter and focus guard's reconstructed id equals the id egui gives the ComboBox button.
     #[test]
     fn a_combos_keyboard_guard_reads_the_combos_own_button_id() {
         crate::i18n::set_current(crate::i18n::Lang::EN);

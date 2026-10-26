@@ -333,6 +333,7 @@ pub(crate) fn button_id() -> egui::Id {
     egui::Id::unique("edit-toolbar-button")
 }
 
+/// Stable id of the floating edit toolbar.
 pub(crate) fn toolbar_id() -> egui::Id {
     egui::Id::unique("edit-toolbar-toolbar")
 }

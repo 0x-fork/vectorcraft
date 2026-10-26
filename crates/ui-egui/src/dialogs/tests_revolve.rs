@@ -56,6 +56,7 @@ impl Harness {
         self.texts.iter().find(|(s, _)| s == text).map(|(_, r)| *r).unwrap_or_else(|| panic!("missing text {text:?}"))
     }
 
+    /// Return the rectangle of the widget drawn under `Id::unique(id)` in the revolve test harness.
     fn response(&self, id: impl std::hash::Hash + std::fmt::Debug) -> Rect {
         self.ctx.read_response(Id::unique(id)).unwrap().rect
     }

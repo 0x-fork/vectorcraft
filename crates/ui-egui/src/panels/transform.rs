@@ -971,6 +971,7 @@ mod tests {
         assert_eq!(constrained(0.0, 50.0, Some(10.0), None), (10.0, 50.0));
     }
 
+    /// The Transform panel names its Rotate and Shear inputs.
     #[test]
     fn rotate_and_shear_fields_are_named() {
         use egui_kittest::kittest::Queryable;

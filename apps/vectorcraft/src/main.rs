@@ -108,6 +108,8 @@ impl eframe::App for App {
         file_access::unconfined(|| self.logic_frame(ctx, frame));
         self.app.finish_ime_logic(ctx);
     }
+    /// Restore the borderless caption, apply platform menu and pen input, and hand the frame to the
+    /// app's raw-input hook while the keyboard user is unconfined.
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw: &mut egui::RawInput) {
         // winit gives the window its caption back when it changes the window's flags (maximize,
         // restore, …): take it off again before the frame is laid out (#1758).

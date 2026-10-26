@@ -126,10 +126,12 @@ struct ColumnDrag {
     ids: Vec<u64>,
 }
 
+/// Stable id for the layers panel's per-name UI state.
 fn key(name: &str) -> egui::Id {
     egui::Id::unique(("layers-panel", name))
 }
 
+/// Temp-memory key for the layer rename editor.
 fn rename_id() -> egui::Id {
     egui::Id::unique("layers-rename")
 }

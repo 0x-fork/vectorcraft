@@ -131,6 +131,7 @@ pub(crate) fn end_document_drag(ctx: &egui::Context) {
     });
 }
 
+/// Temp-memory key for the active canvas drag state.
 fn drag_id() -> egui::Id {
     egui::Id::unique("canvas-drag")
 }
@@ -3084,10 +3085,12 @@ fn ime_geometry(app: &mut VectorcraftApp, ctx: &egui::Context, xf: &Xf) {
 /// out rather than spilling over its neighbours.
 const MIN_LABELLED_ARTBOARD: f32 = 24.0;
 
+/// Temp-memory key recording an artboard-name press before its edit field opens.
 fn name_press_id() -> egui::Id {
     egui::Id::unique("canvas-artboard-name-press")
 }
 
+/// Temp-memory key for the artboard name field currently being edited.
 fn name_edit_id() -> egui::Id {
     egui::Id::unique("canvas-artboard-name-edit")
 }
@@ -4689,6 +4692,8 @@ mod tests {
                 })
                 .unwrap_or_else(|| panic!("no {text:?} text"))
         }
+        /// Build raw input with a fixed 800 by 600 screen so headless frames keep a stable canvas texture
+        /// size.
         fn raw() -> egui::RawInput {
             egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))), ..Default::default() }
         }
@@ -8755,6 +8760,8 @@ mod tests {
         assert_eq!(plain(&app, id), "雅がくらくか");
     }
 
+    /// Reset to a blank document, select the Type tool and click document point (100, 100), returning
+    /// the screen position used by IME fixtures.
     fn type_at(app: &mut VectorcraftApp, ctx: &egui::Context) -> egui::Pos2 {
         app.session.prefs.placeholder_text = false;
         app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();

@@ -514,6 +514,8 @@ fn apply_type_event(
     }
 }
 
+/// Process one frame's events against the keymap at most once per context, viewport and frame, so
+/// reruns cannot fire a shortcut or tool key twice.
 pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context) {
     // One UI pass takes a frame's events. A discarded rerun and a test helper that also calls
     // `logic` see the same events again; they must not fire a shortcut or tool key twice. The

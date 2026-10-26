@@ -8,6 +8,7 @@ use vectorcraft_engine::Session;
 
 use crate::VectorcraftApp;
 
+/// Build a new 400 by 300 document with one selected rectangle for lifecycle fixtures.
 fn app() -> VectorcraftApp {
     let mut app = VectorcraftApp::new(Session::new(), Default::default());
     app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
@@ -16,10 +17,12 @@ fn app() -> VectorcraftApp {
     app
 }
 
+/// Count child objects across every layer of the active document.
 fn objects(app: &VectorcraftApp) -> usize {
     app.session.active().map_or(0, |st| st.doc.layers.iter().map(|l| l.children().map_or(0, |c| c.len())).sum())
 }
 
+/// Return the number of undo entries in the active document's history.
 fn undo(app: &VectorcraftApp) -> usize {
     app.session.active().map_or(0, |st| st.history.undo.len())
 }
@@ -34,6 +37,8 @@ fn screen() -> egui::Rect {
 /// (which only pastes when the app copied text itself).
 const PASTE_SVG: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>"#;
 
+/// A discarded rerun must execute a duplicate paste exactly once while the host iteration still
+/// ticks once.
 #[test]
 fn a_discarded_rerun_ticks_once_and_runs_a_duplicate_once() {
     let mut app = app();
@@ -75,6 +80,8 @@ fn a_discarded_rerun_ticks_once_and_runs_a_duplicate_once() {
     assert_eq!(undo(&app), before_undo + 1, "one undo step");
 }
 
+/// Logic-only iterations advance the host clock but never read the stale raw events a hidden window
+/// replays.
 #[test]
 fn logic_only_iterations_tick_without_replaying_input() {
     let mut app = app();
@@ -103,6 +110,8 @@ fn logic_only_iterations_tick_without_replaying_input() {
     assert_eq!(undo(&app), before_undo, "no command ran hidden");
 }
 
+/// A visible frame consumes a paste once; later logic-only iterations with the same raw input must
+/// not replay it.
 #[test]
 fn a_consumed_event_is_not_replayed_by_a_later_logic_iteration() {
     let mut app = app();
@@ -157,6 +166,8 @@ fn ime_frame(
     out.platform_output.ime
 }
 
+/// Create a blank 400 by 300 document with one text object and return the app and node id;
+/// placeholder text is disabled so the object is the only text.
 fn app_with_text(text: &str) -> (VectorcraftApp, u64) {
     let mut app = VectorcraftApp::new(Session::new(), Default::default());
     app.session.prefs.placeholder_text = false;
@@ -165,6 +176,7 @@ fn app_with_text(text: &str) -> (VectorcraftApp, u64) {
     (app, id)
 }
 
+/// Read the plain text of the given text node in these lifecycle fixtures.
 fn plain(app: &VectorcraftApp, id: u64) -> String {
     match &app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id)).unwrap().kind {
         vectorcraft_doc::NodeKind::Text(t) => t.plain_text(),
@@ -172,6 +184,8 @@ fn plain(app: &VectorcraftApp, id: u64) -> String {
     }
 }
 
+/// Send a pointer move and a primary press/release pair through the production tick then UI
+/// lifecycle.
 fn click(app: &mut VectorcraftApp, ctx: &egui::Context, at: egui::Pos2) {
     let button =
         |pos: egui::Pos2, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
@@ -191,6 +205,7 @@ fn begin_typing(app: &mut VectorcraftApp, ctx: &egui::Context, id: u64) -> egui:
     at
 }
 
+/// Build an IME pre-edit event whose active clause is an empty character range at `chars`.
 fn preedit(t: &str, chars: usize) -> Event {
     Event::Ime(egui::ImeEvent::Preedit { text: t.into(), active_range_chars: Some(chars..chars) })
 }
@@ -210,6 +225,7 @@ fn interruption_editor() -> (VectorcraftApp, egui::Context, u64, egui::Pos2) {
     (app, ctx, id, point)
 }
 
+/// Build a one-character or one-byte IME delete-surrounding event according to `bytes`.
 fn surrounding_delete(bytes: bool) -> Event {
     Event::Ime(if bytes {
         egui::ImeEvent::DeleteSurroundingBytes { before_bytes: 1, after_bytes: 0 }
@@ -218,10 +234,13 @@ fn surrounding_delete(bytes: bool) -> Event {
     })
 }
 
+/// Build the reset-completed event for the app's current pending IME request.
 fn reset_marker(app: &VectorcraftApp, ctx: &egui::Context) -> Event {
     Event::ImeResetCompleted { request_id: crate::ime::pending_request(app, ctx).expect("a real interruption requested a fence") }
 }
 
+/// Click the given point, assert the resulting custom descriptor publishes the real reset request,
+/// and return that request.
 fn pointer_reset(app: &mut VectorcraftApp, ctx: &egui::Context, point: egui::Pos2) -> egui::ImeResetId {
     let press = Event::PointerButton { pos: point, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() };
     let output = ime_frame(app, ctx, vec![Event::PointerMoved(point), press], |_| {}).expect("the destination still edits text");
@@ -232,10 +251,13 @@ fn pointer_reset(app: &mut VectorcraftApp, ctx: &egui::Context, point: egui::Pos
     request
 }
 
+/// Build a pressed, non-repeat key event with the given key and modifiers.
 fn pressed(key: egui::Key, modifiers: egui::Modifiers) -> Event {
     Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }
 }
 
+/// A replacement fence admits an immediate fresh suffix without an old terminal, for empty and non-
+/// empty pre-edits and for same- and next-batch ordering.
 #[test]
 fn reset_fence_without_an_old_terminal_admits_the_immediate_fresh_suffix() {
     for terminal_pending in [false, true] {
@@ -261,6 +283,8 @@ fn reset_fence_without_an_old_terminal_admits_the_immediate_fresh_suffix() {
     }
 }
 
+/// Only the newest reset request for this viewport, context and destination completes; old, foreign
+/// and duplicate markers cannot retire it or admit input.
 #[test]
 fn newest_full_reset_id_rejects_old_foreign_and_duplicate_controls() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -308,6 +332,8 @@ fn newest_full_reset_id_rejects_old_foreign_and_duplicate_controls() {
     assert_eq!(plain(&app, id), "abQRcdé", "a duplicate marker cannot retire the new live preview");
 }
 
+/// A pressed navigation key retires the old fence, moves the caret once, and the final destination
+/// publishes a replacement fence before its suffix is accepted.
 #[test]
 fn pressed_navigation_retires_the_old_fence_until_the_real_destination_is_known() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -334,6 +360,8 @@ fn pressed_navigation_retires_the_old_fence_until_the_real_destination_is_known(
     assert_eq!(plain(&app, id), "abがcdé");
 }
 
+/// A real permitted command key still runs while composing or after retirement; the cached
+/// composing flag must not swallow Cmd+R.
 #[test]
 fn a_pressed_command_runs_after_composition_retirement_and_after_its_fence() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -353,6 +381,8 @@ fn a_pressed_command_runs_after_composition_retirement_and_after_its_fence() {
     assert_eq!(app.ui.view.rulers, !rulers);
 }
 
+/// A request allocated in a discarded pass is retired; an unavailable final pass leaves no token,
+/// and the same caret re-arms once when visible again.
 #[test]
 fn discarded_request_then_hidden_output_rearms_the_same_caret_once() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -397,6 +427,8 @@ fn discarded_request_then_hidden_output_rearms_the_same_caret_once() {
     assert_eq!(plain(&app, id), "abがcdé");
 }
 
+/// Stock text remains editable while custom fences retire; returning from stock focus and losing
+/// window focus each allocate a fresh fence.
 #[test]
 fn stock_field_and_focus_loss_retire_custom_fences_without_consuming_stock_text() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -444,6 +476,8 @@ fn stock_field_and_focus_loss_retire_custom_fences_without_consuming_stock_text(
     assert_eq!(plain(&app, id), "aがbcdé");
 }
 
+/// Text, paste and cut events before a deferred pointer's real handler are dropped; the pointer
+/// still moves the caret and publishes a replacement fence.
 #[test]
 fn a_deferred_pointer_drops_text_and_clipboard_until_its_real_handler_and_fence() {
     for paste in [false, true] {
@@ -476,6 +510,8 @@ fn a_deferred_pointer_drops_text_and_clipboard_until_its_real_handler_and_fence(
     }
 }
 
+/// A hidden route allocates no reset; an old marker and pointer suffix are inert and cannot lend a
+/// token to a later stock field.
 #[test]
 fn hidden_pointer_and_marker_leave_no_token_for_a_later_stock_field() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -516,6 +552,8 @@ fn hidden_pointer_and_marker_leave_no_token_for_a_later_stock_field() {
     assert!(crate::ime::pending_request(&app, &ctx).is_none());
 }
 
+/// A hidden logic pass settles a changed composition without allocating, leaving no token for a
+/// later stock field.
 #[test]
 fn hidden_logic_with_a_changed_composition_leaves_no_token_for_a_later_stock_field() {
     let (mut app, ctx, id, _) = interruption_editor();
@@ -542,6 +580,8 @@ fn hidden_logic_with_a_changed_composition_leaves_no_token_for_a_later_stock_fie
     assert!(stock.reset_request.is_none(), "hidden logic leaves no token for the stock field");
 }
 
+/// Home suspends before input, so an interrupted commit allocates no reset and its old marker
+/// cannot rearm or leak into a stock field.
 #[test]
 fn home_with_an_interrupted_commit_allocates_no_reset_and_leaves_no_stock_token() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -573,6 +613,8 @@ fn home_with_an_interrupted_commit_allocates_no_reset_and_leaves_no_stock_token(
     assert!(crate::ime::pending_request(&app, &ctx).is_none(), "the old marker cannot rearm a retired fence");
 }
 
+/// A command batch that opens the palette allocates no speculative reset; the palette's stock field
+/// receives no custom token.
 #[test]
 fn command_palette_opened_by_a_commit_batch_gets_no_speculative_reset() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -598,6 +640,8 @@ fn command_palette_opened_by_a_commit_batch_gets_no_speculative_reset() {
     assert_eq!(plain(&app, id), "axbcdé", "the application text lands at the fenced caret");
 }
 
+/// Presses that end on an invalid destination release no custom descriptor and allocate no reset
+/// for the stock field.
 #[test]
 fn multiple_pointer_presses_ending_on_an_invalid_destination_leave_no_stock_token() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -627,6 +671,8 @@ fn multiple_pointer_presses_ending_on_an_invalid_destination_leave_no_stock_toke
     assert!(stock.reset_request.is_none(), "the invalidated final pointer leaves no stock token");
 }
 
+/// Cmd+X and Cmd+V in a deferred command batch are dropped until the replacement fence, leaving the
+/// text and undo history unchanged.
 #[test]
 fn deferred_command_key_forms_drop_cmd_x_and_cmd_v_until_the_fence() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -655,6 +701,8 @@ fn deferred_command_key_forms_drop_cmd_x_and_cmd_v_until_the_fence() {
     assert_ne!(first, second);
 }
 
+/// A live composition alone requests no reset; a stock field publishes no custom token, and
+/// returning to Type accepts fresh composition.
 #[test]
 fn a_stock_field_with_an_active_composition_but_no_guard_gets_no_reset_request() {
     let (mut app, ctx, id, _) = interruption_editor();
@@ -687,6 +735,8 @@ fn a_stock_field_with_an_active_composition_but_no_guard_gets_no_reset_request()
     assert_eq!(plain(&app, id), "aがbcdé", "a clear adapter accepts fresh composition without a stale latch");
 }
 
+/// Opening a modal after the canvas suspends the fence; returning to the same caret allocates a new
+/// fence and old input stays stale.
 #[test]
 fn a_modal_dialog_suspends_a_live_fence_and_the_same_caret_rearms() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -711,6 +761,8 @@ fn a_modal_dialog_suspends_a_live_fence_and_the_same_caret_rearms() {
     assert_eq!(plain(&app, id), "aがbcdé");
 }
 
+/// An absent pass starts a new context generation for the same owner and publishes a replacement
+/// fence on return.
 #[test]
 fn a_same_owner_absent_pass_gets_a_new_generation_and_replacement_fence() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -731,6 +783,8 @@ fn a_same_owner_absent_pass_gets_a_new_generation_and_replacement_fence() {
     assert_eq!(plain(&app, id), "aがbcdé");
 }
 
+/// An occluded pass leaves the marker inert and keeps the guard suspended until a visible pass re-
+/// arms it.
 #[test]
 fn geometry_loss_before_a_marker_keeps_the_fence_suspended_until_reactivation() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -757,6 +811,8 @@ fn geometry_loss_before_a_marker_keeps_the_fence_suspended_until_reactivation() 
     assert_eq!(plain(&app, id), "aがbcdé");
 }
 
+/// Settling a preview through an application selection change allocates exactly one fence for the
+/// post-settlement destination, with no preflight retry.
 #[test]
 fn settling_a_preview_without_a_pointer_allocates_one_request_after_the_commit() {
     let (mut app, ctx, id, _) = interruption_editor();
@@ -778,6 +834,8 @@ fn settling_a_preview_without_a_pointer_allocates_one_request_after_the_commit()
     assert_eq!(plain(&app, id), "aがbcdé");
 }
 
+/// Marked text left without a recorded composition triggers an interrupting descriptor whose
+/// request-bound fence admits only fresh input.
 #[test]
 fn an_untokened_marked_text_interruption_binds_a_request() {
     let (mut app, ctx, id, _) = interruption_editor();
@@ -793,6 +851,8 @@ fn an_untokened_marked_text_interruption_binds_a_request() {
     assert_eq!(plain(&app, id), "abcdが");
 }
 
+/// Logic inside a full UI pass preserves the fence; repeated standalone logic keeps it blocked and
+/// the first UI return re-arms once.
 #[test]
 fn full_pass_logic_keeps_its_fence_but_standalone_logic_rearms_once() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -834,6 +894,8 @@ fn full_pass_logic_keeps_its_fence_but_standalone_logic_rearms_once() {
     assert_eq!(plain(&app, id), "aがbcdé");
 }
 
+/// An application edit that preserves the caret but changes committed text invalidates the fence
+/// before its raw suffix runs.
 #[test]
 fn same_caret_external_edit_invalidates_a_fence_before_its_raw_suffix() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -858,6 +920,8 @@ fn same_caret_external_edit_invalidates_a_fence_before_its_raw_suffix() {
     assert_eq!(plain(&app, id), "Aがbcdé");
 }
 
+/// An auxiliary viewport observes only its own guard; a replacement egui context rejects the old
+/// request and publishes a new one.
 #[test]
 fn a_replaced_context_and_auxiliary_ui_cannot_reuse_the_root_fence() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -895,6 +959,8 @@ fn a_replaced_context_and_auxiliary_ui_cannot_reuse_the_root_fence() {
     assert_eq!(plain(&app, id), "aがbcdé");
 }
 
+/// A hidden logic pass neither interrupts an intact composition nor retries acknowledgement; non-
+/// empty and old-terminal input stays rejected.
 #[test]
 fn hidden_logic_preserves_an_uninterrupted_composition_and_no_ack_stays_closed() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -917,6 +983,8 @@ fn hidden_logic_preserves_an_uninterrupted_composition_and_no_ack_stays_closed()
     }
 }
 
+/// A real pointer interruption rejects following-batch IME deletes and commits without previewing
+/// them, then admits fresh input only after its fence.
 #[test]
 fn pointer_interruption_rejects_next_batch_ime_mutations_and_allows_fresh_input() {
     for bytes in [false, true] {
@@ -949,6 +1017,8 @@ fn pointer_interruption_rejects_next_batch_ime_mutations_and_allows_fresh_input(
     }
 }
 
+/// Late composition input after clicking another text object cannot mutate either object; the
+/// replacement target's fence admits only its own commit.
 #[test]
 fn target_switch_rejects_late_composition_input_before_mutating_the_new_text() {
     for bytes in [false, true] {
@@ -986,6 +1056,8 @@ fn target_switch_rejects_late_composition_input_before_mutating_the_new_text() {
     }
 }
 
+/// A composition's own delete plus commit, and a non-composing pointer commit, remain accepted
+/// single undoable edits.
 #[test]
 fn valid_composition_delete_commit_and_noncomposing_pointer_commit_stay_accepted() {
     for bytes in [false, true] {
@@ -1010,6 +1082,8 @@ fn valid_composition_delete_commit_and_noncomposing_pointer_commit_stay_accepted
     assert_eq!(plain(&app, id), "abcd");
 }
 
+/// A stale non-empty pre-edit stays rejected across idle frames until its matching fence; only
+/// post-fence input changes text.
 #[test]
 fn a_stale_nonempty_preedit_stays_rejected_until_its_matching_fence() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -1034,6 +1108,8 @@ fn a_stale_nonempty_preedit_stays_rejected_until_its_matching_fence() {
     assert_eq!(plain(&app, id), text);
 }
 
+/// An application caret change settles the preview at its old position and rejects old input
+/// without changing the document.
 #[test]
 fn an_external_caret_change_keeps_preview_at_its_old_position_and_rejects_old_input() {
     let (mut app, ctx, id, _) = interruption_editor();
@@ -1051,6 +1127,8 @@ fn an_external_caret_change_keeps_preview_at_its_old_position_and_rejects_old_in
     assert_eq!(undo(&app), steps);
 }
 
+/// An application edit while typing makes the payload and following commit `Other` and publishes
+/// the document's current text, not the stale session.
 #[test]
 fn external_edit_while_typing_is_other_and_ime_commit_uses_the_document_text() {
     let (mut app, id) = app_with_text("Same");
@@ -1083,6 +1161,7 @@ fn external_edit_while_typing_is_other_and_ime_commit_uses_the_document_text() {
     assert_eq!((payload.text.as_str(), payload.cursor, payload.anchor), ("XYZy", 4, 4));
 }
 
+/// A dialog opened after the canvas takes IME ownership away from the Type tool on that pass.
 #[test]
 fn a_dialog_opened_after_the_canvas_takes_the_ime_away_from_the_type_tool() {
     let (mut app, id) = app_with_text("Same");
@@ -1103,6 +1182,8 @@ fn a_dialog_opened_after_the_canvas_takes_the_ime_away_from_the_type_tool() {
     assert!(during.is_none(), "the canvas must not own the IME while a dialog opened after it: {during:?}");
 }
 
+/// Home removes the Type tool owner, clears marked text and asks the system IME to discard its
+/// composition.
 #[test]
 fn home_takes_down_a_live_composition() {
     let (mut app, id) = app_with_text("Same");
@@ -1121,6 +1202,8 @@ fn home_takes_down_a_live_composition() {
     assert!(!app.session.tool_composing(), "no stale composition survives Home");
 }
 
+/// Closing the active document removes the IME owner, clears marked text and asks the system IME to
+/// discard its composition.
 #[test]
 fn closing_the_document_takes_down_a_live_composition() {
     let (mut app, id) = app_with_text("Same");
@@ -1137,6 +1220,8 @@ fn closing_the_document_takes_down_a_live_composition() {
     assert!(app.take_ime_discard(), "the system IME is told to drop its marked text");
 }
 
+/// A commit whose text the document rewrites through smart quotes or control filtering is reported
+/// as `Other`, not `InputMethod`.
 #[test]
 fn an_ime_commit_the_document_rewrites_is_other() {
     let (mut app, id) = app_with_text("Same");
@@ -1158,6 +1243,8 @@ fn an_ime_commit_the_document_rewrites_is_other() {
     assert_eq!(filtered.change_cause, egui::output::ImeChangeCause::Other, "filtering is not an IME insertion");
 }
 
+/// Smart-quote replacement examines the character before the pre-edit, so the rewritten commit is
+/// reported as `Other`.
 #[test]
 fn an_ime_quote_commit_uses_the_character_before_its_pre_edit() {
     let (mut app, id) = app_with_text("a");
@@ -1215,6 +1302,8 @@ fn ime_delete_surrounding_after_end_typing_keeps_the_next_commit_input_method() 
     assert_eq!(committed.change_cause, egui::output::ImeChangeCause::InputMethod, "a caret move is not an application-side reset");
 }
 
+/// Reloading a document keeps its uid and text-node id but changes the edit-session replacement
+/// epoch.
 #[test]
 fn a_reloaded_document_gets_a_new_ime_replacement_epoch() {
     let (mut app, id) = app_with_text("Same");
@@ -1372,10 +1461,12 @@ fn an_unavailable_ime_boundary_carries_the_document_revision() {
     assert!(after.unavailable_revision().is_some_and(|after| after > revision), "the document revision advanced");
 }
 
+/// Build a primary-pointer button event at `at` with the requested press state.
 fn primary_button(at: egui::Pos2, pressed: bool) -> Event {
     Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() }
 }
 
+/// Build a left-arrow key event marked as a physical key press or release.
 fn left_key(pressed: bool) -> Event {
     Event::Key { key: egui::Key::ArrowLeft, physical_key: Some(egui::Key::ArrowLeft), pressed, repeat: false, modifiers: Default::default() }
 }
@@ -1432,6 +1523,8 @@ fn a_pointer_before_same_batch_terminal_input_preserves_the_interrupted_text() {
     }
 }
 
+/// Application navigation before a same-batch pending terminal is applied once; the old
+/// delete/commit suffix is rejected and only input after the fence is admitted.
 #[test]
 fn application_navigation_before_same_batch_pending_terminal_rejects_its_mutations() {
     for bytes in [false, true] {
@@ -1485,6 +1578,8 @@ fn terminal_before_a_same_batch_pointer_is_accepted_in_both_composition_states()
     }
 }
 
+/// A terminal followed by application navigation keeps the valid commit and runs the navigation; an
+/// active IME's own navigation does not interrupt it.
 #[test]
 fn terminal_before_navigation_is_accepted_and_active_ime_navigation_stays_owned() {
     for bytes in [false, true] {
@@ -1505,6 +1600,8 @@ fn terminal_before_navigation_is_accepted_and_active_ime_navigation_stays_owned(
     }
 }
 
+/// A pointer marker without an observed old composition does not reject a direct commit; terminal
+/// text still executes before pointer placement.
 #[test]
 fn a_pointer_marker_without_an_old_composition_does_not_reject_a_direct_commit() {
     let (mut app, ctx, id, point) = interruption_editor();
@@ -1517,6 +1614,8 @@ fn a_pointer_marker_without_an_old_composition_does_not_reject_a_direct_commit()
     assert_eq!(plain(&app, id), "abcd");
 }
 
+/// A move within an already-held gesture before a same-batch terminal interrupts the old
+/// composition; the retained move reaches the tool and only the live preview commits.
 #[test]
 fn a_held_pointer_move_before_same_batch_terminal_also_interrupts_the_old_composition() {
     for bytes in [false, true] {
