@@ -6,7 +6,7 @@ use vectorcraft_doc::{Node, NodeKind};
 use vectorcraft_geom::Point;
 use vectorcraft_text::test_fonts::{COLOUR_CHAR, COLOUR_LARGE, colour_bitmap_family, colour_bitmap_font};
 
-use super::{Affine, Document, RenderOptions, Rendered, Renderer};
+use super::*;
 
 /// 100 pt [`COLOUR_CHAR`] in the colour bitmap test font (`sbix` or `CBDT`), filled blue, its
 /// baseline at (20, 120), on a white 160×160 page.

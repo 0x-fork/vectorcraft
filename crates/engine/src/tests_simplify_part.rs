@@ -10,7 +10,7 @@ use vectorcraft_doc::NodeKind;
 use vectorcraft_geom::kurbo::ParamCurveNearest;
 use vectorcraft_geom::{ParamCurve, PathData, SubPath};
 
-use super::{NodeId, Session};
+use super::*;
 
 fn session() -> Session {
     let mut s = Session::new();
