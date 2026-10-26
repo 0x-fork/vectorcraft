@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use serde_json::json;
 
-use crate::*;
 use crate::cmd::recovery::{FolderStore, MemoryStore, RecoveryStore};
+use crate::*;
 
 /// A session keeping its copies in `store`, with one modified document.
 fn session_in(store: &Arc<MemoryStore>) -> Session {

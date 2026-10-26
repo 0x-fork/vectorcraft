@@ -41,9 +41,7 @@ fn the_image_trace_preview_is_a_command() {
 #[test]
 fn control_input_rejects_excessive_counts_before_mutation() {
     // Only modest over-limit values on the baseline: never exercise an unbounded loop.
-    for (method, params) in
-        [("ui.click", json!({"count": 17})), ("ui.drag", json!({"steps": 257})), ("ui.drag", json!({"steps": 2, "count": 17}))]
-    {
+    for (method, params) in [("ui.click", json!({"count": 17})), ("ui.drag", json!({"steps": 257})), ("ui.drag", json!({"steps": 2, "count": 17}))] {
         let mut app = VectorcraftApp::new(Session::new(), Services::default());
         app.synthetic.push(egui::Event::Text("already queued".into()));
         let before = format!("{:?}", app.synthetic);
@@ -276,8 +274,7 @@ fn dialog_set_refuses_a_field_the_dialog_does_not_have() {
             assert_eq!(r["ok"], *ok, "{kind} {field}: {r}");
         }
     };
-    let moved =
-        [("copy", true), ("preview", true), ("distance", true), ("discard", false), ("copies", false), ("corners", false), ("origin", false)];
+    let moved = [("copy", true), ("preview", true), ("distance", true), ("discard", false), ("copies", false), ("corners", false), ("origin", false)];
     set(&mut app, "move", json!({"dx": "0 pt", "dy": "0 pt"}), &moved);
     set(
         &mut app,

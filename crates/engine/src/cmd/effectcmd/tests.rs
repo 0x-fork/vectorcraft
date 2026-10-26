@@ -95,11 +95,7 @@ fn an_earlier_perspective_strength_is_set_as_its_angle() {
     let angle_of = |pct: f64| effects::merged_params(effects::EXTRUDE, &json!({"perspective": pct}))["perspectiveAngle"].as_f64().unwrap();
     let angle = angle_of(60.0);
     assert!((angle - 30.12).abs() < 0.01, "{angle}");
-    assert!(
-        params(&s).get("perspective").is_none() && (params(&s)["perspectiveAngle"].as_f64().unwrap() - angle).abs() < 1e-12,
-        "{}",
-        params(&s)
-    );
+    assert!(params(&s).get("perspective").is_none() && (params(&s)["perspectiveAngle"].as_f64().unwrap() - angle).abs() < 1e-12, "{}", params(&s));
     s.execute("effect.setParams", &json!({"index": 0, "params": {"perspective": 100}, "ids": [id.0], "item": null})).unwrap();
     assert!((params(&s)["perspectiveAngle"].as_f64().unwrap() - angle_of(100.0)).abs() < 1e-12);
     // A file of then: the strength stored; setting an angle replaces it.
@@ -114,11 +110,8 @@ fn an_earlier_perspective_strength_is_set_as_its_angle() {
 #[test]
 fn an_earlier_light_direction_is_set_as_rotation_and_height() {
     let (mut s, id) = session_with_rect();
-    s.execute(
-        "effect.apply",
-        &json!({"effect": effects::ROTATE, "ids": [id.0], "item": null, "params": {"lightAzimuth": 180, "lightElevation": 0}}),
-    )
-    .unwrap();
+    s.execute("effect.apply", &json!({"effect": effects::ROTATE, "ids": [id.0], "item": null, "params": {"lightAzimuth": 180, "lightElevation": 0}}))
+        .unwrap();
     let params = |s: &Session| node(s, id).appearance.effects[0].params.clone();
     // Straight from behind the object, level with it.
     assert!(params(&s).get("lightAzimuth").is_none() && params(&s).get("lightElevation").is_none(), "{}", params(&s));

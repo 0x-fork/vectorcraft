@@ -547,9 +547,9 @@ fn pencil_shows_the_continuation_cursor_over_an_end_a_line_continues() {
     let shift_alt = Mods { shift: true, alt: true, ..Default::default() };
     // The release's stroke: a straight line that continues the path.
     let continues = |acts: &[Vec<Action>]| {
-        acts.last().and_then(|a| a.first()).is_some_and(
-            |a| matches!(a, Action::Preview(_, v) if v.get("extend").is_some() && v["points"].as_array().is_some_and(|q| q.len() == 2)),
-        )
+        acts.last()
+            .and_then(|a| a.first())
+            .is_some_and(|a| matches!(a, Action::Preview(_, v) if v.get("extend").is_some() && v["points"].as_array().is_some_and(|q| q.len() == 2)))
     };
     for alt_smooth in [false, true] {
         for m in [Mods::default(), shift, alt, shift_alt] {

@@ -150,8 +150,7 @@ fn widgets_of_a_non_square_rectangle_follow_the_drawn_corners() {
     assert_eq!(radius(&a[1]), 40.0);
     // The four arcs, each a quarter circle of radius 40 starting on a side.
     let arcs = red(t.as_ref()).expect("the limit shows");
-    let starts: Vec<_> =
-        arcs.elements().iter().filter_map(|e| if let vectorcraft_geom::PathEl::MoveTo(p) = e { Some(*p) } else { None }).collect();
+    let starts: Vec<_> = arcs.elements().iter().filter_map(|e| if let vectorcraft_geom::PathEl::MoveTo(p) = e { Some(*p) } else { None }).collect();
     assert_eq!(starts, [Point::new(260.0, 100.0), Point::new(300.0, 140.0), Point::new(140.0, 180.0), Point::new(100.0, 140.0)]);
     // Back below the limit, the outline goes.
     assert_eq!(radius(&t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 130.0, 130.0))[0]), 30.0);

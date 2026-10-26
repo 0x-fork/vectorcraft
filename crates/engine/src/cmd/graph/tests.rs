@@ -17,9 +17,7 @@ fn fmt_value_does_not_saturate_beyond_i64() {
 fn graph(s: &mut Session, ty: &str) -> NodeId {
     let csv = ",2024,2025\nQ1,3,2\nQ2,5,4\nQ3,-1,6";
     NodeId(
-        s.execute("graph.create", &json!({"type": ty, "x": 100, "y": 100, "width": 300, "height": 200, "csv": csv})).unwrap()["id"]
-            .as_u64()
-            .unwrap(),
+        s.execute("graph.create", &json!({"type": ty, "x": 100, "y": 100, "width": 300, "height": 200, "csv": csv})).unwrap()["id"].as_u64().unwrap(),
     )
 }
 
@@ -326,11 +324,7 @@ fn painting_a_line_series_stroke_sets_its_persistent_colour() {
     assert!(s.doc().unwrap().doc.node(id).unwrap().extras().graph.as_ref().unwrap().series_paints[0].fill.is_none());
     s.execute("graph.setData", &json!({"rows": [[1, 2], [3, 4]]})).unwrap();
     assert!(
-        group(s.doc().unwrap().doc.node(id).unwrap(), "2024")
-            .children()
-            .unwrap()
-            .iter()
-            .any(|n| n.appearance.stroke_paint().color() == Some(blue))
+        group(s.doc().unwrap().doc.node(id).unwrap(), "2024").children().unwrap().iter().any(|n| n.appearance.stroke_paint().color() == Some(blue))
     );
 }
 
@@ -539,8 +533,7 @@ fn a_row_with_an_empty_label_keeps_its_values_in_place() {
 fn blanks_read_back_as_null_and_year_header_rows_still_read_as_headers() {
     let mut s = Session::new();
     s.execute("file.new", &json!({"width": 800, "height": 800})).unwrap();
-    let r =
-        s.execute("graph.create", &json!({"type": "line", "x": 0, "y": 0, "width": 300, "height": 200, "rows": [[1, null], [2, 3]]})).unwrap();
+    let r = s.execute("graph.create", &json!({"type": "line", "x": 0, "y": 0, "width": 300, "height": 200, "rows": [[1, null], [2, 3]]})).unwrap();
     let id = NodeId(r["id"].as_u64().unwrap());
     assert_eq!(s.execute("graph.setData", &json!({"id": id.0})).unwrap()["rows"], json!([[1.0, null], [2.0, 3.0]]));
     // A label followed by empty cells is a header with no series names, as before blanks existed.
@@ -560,8 +553,7 @@ fn a_huge_ragged_grid_is_capped() {
 fn a_label_only_row_stays_with_blank_values() {
     let mut s = Session::new();
     s.execute("file.new", &json!({"width": 800, "height": 800})).unwrap();
-    let r =
-        s.execute("graph.create", &json!({"type": "column", "x": 0, "y": 0, "width": 300, "height": 200, "csv": ",a\nQ1,1\nQ2\nQ3,3"})).unwrap();
+    let r = s.execute("graph.create", &json!({"type": "column", "x": 0, "y": 0, "width": 300, "height": 200, "csv": ",a\nQ1,1\nQ2\nQ3,3"})).unwrap();
     let id = NodeId(r["id"].as_u64().unwrap());
     let spec = s.doc().unwrap().doc.node(id).unwrap().extras().graph.clone().unwrap();
     assert_eq!(spec.categories, vec!["Q1", "Q2", "Q3"]);
@@ -743,9 +735,7 @@ fn bar_graphs_take_stacked_bar_series() {
     s.execute("file.new", &json!({"width": 800, "height": 800})).unwrap();
     let csv = ",a,b,c\nQ1,10,20,-5\nQ2,10,20,-5";
     let id = NodeId(
-        s.execute("graph.create", &json!({"type": "bar", "x": 0, "y": 0, "width": 300, "height": 200, "csv": csv})).unwrap()["id"]
-            .as_u64()
-            .unwrap(),
+        s.execute("graph.create", &json!({"type": "bar", "x": 0, "y": 0, "width": 300, "height": 200, "csv": csv})).unwrap()["id"].as_u64().unwrap(),
     );
     assert!(s.execute("graph.setType", &json!({"seriesIndexes": [1], "type": "column"})).is_err());
     s.execute("graph.setType", &json!({"seriesIndexes": [1, 2], "type": "stackedBar"})).unwrap();
@@ -988,13 +978,7 @@ fn data_without_a_right_axis_series_drops_its_assignment() {
 /// Bounds of the straight lines in the Axes group.
 fn axis_lines(s: &Session, id: NodeId) -> Vec<vectorcraft_geom::Rect> {
     let n = s.doc().unwrap().doc.node(id).unwrap().clone();
-    group(&n, "Axes")
-        .children()
-        .unwrap()
-        .iter()
-        .filter(|c| matches!(c.kind, NodeKind::Path { .. }))
-        .filter_map(|c| c.geometric_bounds())
-        .collect()
+    group(&n, "Axes").children().unwrap().iter().filter(|c| matches!(c.kind, NodeKind::Path { .. })).filter_map(|c| c.geometric_bounds()).collect()
 }
 
 fn axis_texts(s: &Session, id: NodeId) -> Vec<String> {
@@ -1560,8 +1544,7 @@ fn a_repeating_column_design_stacks_a_copy_per_ten_and_chops_or_scales_the_last(
     assert!(near(copies[0], at(260.0, 300.0)) && near(copies[1], at(220.0, 260.0)) && near(copies[2], at(180.0, 220.0)), "{copies:?}");
     let NodeKind::Group { clip: true, children } = &parts[3].kind else { panic!("the last copy is clipped: {:?}", parts[3].kind) };
     assert!(near(frames(&parts[3])[0], at(140.0, 180.0)), "a whole copy");
-    let (clip, copy) =
-        (children[0].geometric_bounds().unwrap(), vectorcraft_render::painted_bounds(&s.doc().unwrap().doc, &children[1]).unwrap());
+    let (clip, copy) = (children[0].geometric_bounds().unwrap(), vectorcraft_render::painted_bounds(&s.doc().unwrap().doc, &children[1]).unwrap());
     assert_eq!(clip.y0, 160.0, "cut off at the value");
     // Its sides and its foot, strokes included, are not cut.
     assert!(clip.x0 <= copy.x0 && clip.x1 >= copy.x1 && clip.y1 >= copy.y1 && copy.x0 < plain.x0, "{clip:?} {copy:?}");
@@ -1580,13 +1563,8 @@ fn a_repeating_column_design_stacks_a_copy_per_ten_and_chops_or_scales_the_last(
     let art = vectorcraft_doc::Node::group(d.alloc_id(), vec![std::sync::Arc::new(frame), std::sync::Arc::new(inner)]);
     d.graph_designs.push(vectorcraft_doc::GraphDesign { name: "Brushed".into(), art: std::sync::Arc::new(art) });
     let options = ColumnDesign { design: "Brushed".into(), column_type: ColumnType::Repeating, ..ColumnDesign::default() };
-    let g = GraphSpec {
-        rows: vec![vec![35.0]],
-        axis_min: Some(0.0),
-        axis_max: Some(50.0),
-        series_columns: vec![Some(options)],
-        ..GraphSpec::default()
-    };
+    let g =
+        GraphSpec { rows: vec![vec![35.0]], axis_min: Some(0.0), axis_max: Some(50.0), series_columns: vec![Some(options)], ..GraphSpec::default() };
     let out = super::generate(&mut d, &g);
     let column = out.iter().find(|n| n.extras().series_index == Some(0)).unwrap().children().unwrap()[0].clone();
     let last = column.children().unwrap().last().unwrap().clone();
@@ -1963,13 +1941,8 @@ fn a_repeating_design_shows_its_totals_once_at_the_value_end_and_a_sliding_one_b
     let art = vectorcraft_doc::Node::group(d.alloc_id(), vec![std::sync::Arc::new(frame), std::sync::Arc::new(total)]);
     d.graph_designs.push(vectorcraft_doc::GraphDesign { name: "Dotted".into(), art: std::sync::Arc::new(art) });
     let options = ColumnDesign { design: "Dotted".into(), ..ColumnDesign::default() };
-    let g = GraphSpec {
-        rows: vec![vec![35.0]],
-        axis_min: Some(0.0),
-        axis_max: Some(50.0),
-        series_columns: vec![Some(options)],
-        ..GraphSpec::default()
-    };
+    let g =
+        GraphSpec { rows: vec![vec![35.0]], axis_min: Some(0.0), axis_max: Some(50.0), series_columns: vec![Some(options)], ..GraphSpec::default() };
     let out = super::generate(&mut d, &g);
     let column = out.iter().find(|n| n.extras().series_index == Some(0)).unwrap().children().unwrap()[0].clone();
     let (text, at) = totals_of(&column.children().unwrap()[1..]).remove(0);
@@ -2115,9 +2088,7 @@ fn totals_take_their_places_from_the_two_digits_after_the_percent_sign() {
 
 fn make(s: &mut Session, ty: &str, csv: &str) -> NodeId {
     NodeId(
-        s.execute("graph.create", &json!({"type": ty, "x": 100, "y": 100, "width": 300, "height": 200, "csv": csv})).unwrap()["id"]
-            .as_u64()
-            .unwrap(),
+        s.execute("graph.create", &json!({"type": ty, "x": 100, "y": 100, "width": 300, "height": 200, "csv": csv})).unwrap()["id"].as_u64().unwrap(),
     )
 }
 
@@ -2152,10 +2123,8 @@ fn a_bar_in_a_label_breaks_the_line() {
     let legend: Vec<_> = group(&n, "Legend").children().unwrap().iter().map(|c| (**c).clone()).collect();
     let NodeKind::Text(t) = &legend[0].kind else { panic!() };
     assert_eq!(t.plain_text(), "Total\nSales\n2023");
-    let (a, b) = (
-        series_parts(&s, id, 0).last().unwrap().geometric_bounds().unwrap(),
-        series_parts(&s, id, 1).last().unwrap().geometric_bounds().unwrap(),
-    );
+    let (a, b) =
+        (series_parts(&s, id, 0).last().unwrap().geometric_bounds().unwrap(), series_parts(&s, id, 1).last().unwrap().geometric_bounds().unwrap());
     assert!((b.y0 - a.y0 - 3.0 * 9.0 * 1.8).abs() < 1e-6, "{a:?} {b:?}");
 }
 
@@ -2269,10 +2238,7 @@ fn legends_in_wedges_put_the_series_labels_inside_the_pie() {
     s.execute("document.save", &json!({"path": path})).unwrap();
     s.execute("document.open", &json!({"path": path})).unwrap();
     let g = spec(&s, id);
-    assert_eq!(
-        (g.pie_legend_in_wedges, g.pie_position, g.pie_sort),
-        (true, vectorcraft_doc::PiePosition::Stacked, vectorcraft_doc::PieSort::All)
-    );
+    assert_eq!((g.pie_legend_in_wedges, g.pie_position, g.pie_sort), (true, vectorcraft_doc::PiePosition::Stacked, vectorcraft_doc::PieSort::All));
     let v = serde_json::to_value(GraphSpec::default()).unwrap();
     for k in ["pieLegendInWedges", "piePosition", "pieSort"] {
         assert!(v.get(k).is_none(), "{k}");
@@ -2464,8 +2430,7 @@ fn the_legend_across_top_keeps_above_labels_over_the_plot() {
     s.execute("graph.setType", &json!({"legendAcrossTop": true})).unwrap();
     let n = s.doc().unwrap().doc.node(id).unwrap().clone();
     let axes_top = group(&n, "Axes").children().unwrap().iter().filter_map(|c| c.geometric_bounds()).map(|b| b.y0).fold(f64::MAX, f64::min);
-    let legend_bottom =
-        group(&n, "Legend").children().unwrap().iter().filter_map(|c| c.geometric_bounds()).map(|b| b.y1).fold(f64::MIN, f64::max);
+    let legend_bottom = group(&n, "Legend").children().unwrap().iter().filter_map(|c| c.geometric_bounds()).map(|b| b.y1).fold(f64::MIN, f64::max);
     assert!(legend_bottom < axes_top, "{legend_bottom} above {axes_top}");
     // No legend: nothing across the top either.
     s.execute("graph.setType", &json!({"legend": false})).unwrap();

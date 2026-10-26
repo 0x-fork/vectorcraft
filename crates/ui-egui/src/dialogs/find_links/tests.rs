@@ -108,8 +108,7 @@ fn find_in_folder_relinks_the_missing_files_to_the_files_found() {
     let d = app.ui.dialog.as_ref().unwrap();
     assert_eq!((d.str("state"), pick(d, "a.png"), pick(d, "b.png")), ("done".to_string(), &json!(a), &json!(b)));
     let text = frame(&mut app);
-    for label in
-        ["Find Linked Files", "a.png", "b.png", "Same file", "Don't Relink", "Find in Folder…", "Copy into the document's folder", "Relink"]
+    for label in ["Find Linked Files", "a.png", "b.png", "Same file", "Don't Relink", "Find in Folder…", "Copy into the document's folder", "Relink"]
     {
         assert!(text.contains(label), "{label} in {text}");
     }

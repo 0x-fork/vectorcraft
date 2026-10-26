@@ -4,8 +4,8 @@
 use serde_json::{Value, json};
 use vectorcraft_color::Color;
 
-use crate::*;
 use crate::cmd::color_value;
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

@@ -6,8 +6,8 @@ use vectorcraft_doc::{NodeKind, TextObject};
 use vectorcraft_geom::Point;
 use vectorcraft_tools::{Mods, PointerEvent, PointerKind, ToolKey};
 
-use crate::*;
 use crate::cmd::clipboard::{AI, BITMAP, EPS, FILE_HEAD, PASTE_ORDER, PDF, PNG, SVG, TEXT, file_flavour};
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

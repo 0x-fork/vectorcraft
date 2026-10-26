@@ -3,8 +3,8 @@
 
 use serde_json::{Value, json};
 
-use crate::*;
 use crate::cmd::flatten::Highlight;
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

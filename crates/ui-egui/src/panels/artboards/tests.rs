@@ -195,8 +195,7 @@ fn double_clicks_go_to_or_rename_and_options_edits_the_rows_artboard() {
         })
         .unwrap();
     let events = |at: egui::Pos2, clicks: usize| {
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         std::iter::once(egui::Event::PointerMoved(at)).chain((0..clicks).flat_map(|_| [button(true), button(false)])).collect::<Vec<_>>()
     };
     // Artboard 2's number: it is active, no rename starts.
@@ -285,8 +284,7 @@ fn the_panel_menus_rename_numbers_several_selected_artboards() {
                 _ => None,
             })
             .unwrap();
-        let button =
-            |pressed| egui::Event::PointerButton { pos: item, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: item, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         ctx.run_ui(raw(vec![egui::Event::PointerMoved(item), button(true), button(false)]), |ui| menu(app, ui)).textures_delta.clear();
     };
     let frame = |app: &mut VectorcraftApp, events| ctx.run_ui(raw(events), |ui| show(app, ui)).textures_delta.clear();
@@ -530,8 +528,7 @@ fn the_options_icon_opens_artboard_options_for_its_rows_artboard() {
         .unwrap();
     let icon = |k: f32| egui::pos2(row.right() - 14.0, row.center().y + 24.0 * k);
     let events = |at: egui::Pos2, clicks: usize| {
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         std::iter::once(egui::Event::PointerMoved(at)).chain((0..clicks).flat_map(|_| [button(true), button(false)])).collect::<Vec<_>>()
     };
     let opened = |app: &mut VectorcraftApp| app.ui.dialog.take().map(|d| (d.kind.clone(), d.f64("index", 9.0), d.f64("width", 0.0)));
@@ -680,8 +677,7 @@ fn bar_frame(app: &mut VectorcraftApp, ctx: &egui::Context, events: Vec<egui::Ev
 /// [`bar_frame`] in a window `width` points wide.
 fn bar_frame_in(app: &mut VectorcraftApp, ctx: &egui::Context, events: Vec<egui::Event>, width: f32) -> Vec<(String, egui::Rect)> {
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(width, 300.0));
-    let mut out =
-        ctx.run_ui(egui::RawInput { screen_rect: Some(screen), events, ..Default::default() }, |ui| crate::chrome::control_bar(app, ui));
+    let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(screen), events, ..Default::default() }, |ui| crate::chrome::control_bar(app, ui));
     out.textures_delta.clear();
     out.shapes
         .iter()
@@ -806,12 +802,8 @@ fn the_control_bar_shows_the_artboard_tools_controls() {
     assert_eq!(boxes.len(), 2, "{boxes:?}");
     let scale = |app: &VectorcraftApp| app.session.tool_options()["scaleArt"].as_bool();
     assert_eq!(scale(&app), Some(false));
-    let press = |pressed| egui::Event::PointerButton {
-        pos: boxes[1].center(),
-        button: egui::PointerButton::Primary,
-        pressed,
-        modifiers: Default::default(),
-    };
+    let press =
+        |pressed| egui::Event::PointerButton { pos: boxes[1].center(), button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
     narrow(&mut app, vec![egui::Event::PointerMoved(boxes[1].center()), press(true)]);
     narrow(&mut app, vec![press(false)]);
     assert_eq!(scale(&app), Some(true));
@@ -918,8 +910,7 @@ fn the_control_bar_adds_deletes_and_opens_artboard_dialogs() {
     // Artboard Options and Rearrange All Artboards: the two buttons between the name and the
     // Transform link.
     let texts = bar_texts(&mut app, &ctx);
-    let between =
-        |texts: &[(String, egui::Rect)]| bar_buttons(&ctx, text_rect(texts, "Artboard 2").right(), text_rect(texts, "Transform").left());
+    let between = |texts: &[(String, egui::Rect)]| bar_buttons(&ctx, text_rect(texts, "Artboard 2").right(), text_rect(texts, "Transform").left());
     let options = between(&texts)[0];
     bar_click(&mut app, &ctx, options.center());
     let d = app.ui.dialog.take().unwrap();
@@ -992,8 +983,7 @@ fn dragging_a_row_onto_new_artboard_duplicates_it() {
     // The bottom bar's buttons sit under its divider, New Artboard second from the right.
     let bar = rect_of(t.divider).unwrap();
     let new = pos2(bar.right() - 24.0 - 4.0 - 12.0, bar.bottom() + 2.0 + 12.0);
-    let button =
-        |at, pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+    let button = |at, pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
     frame(&mut app, vec![egui::Event::PointerMoved(row), button(row, true)]);
     frame(&mut app, vec![egui::Event::PointerMoved(row + vec2(0.0, 12.0))]);
     let held = frame(&mut app, vec![egui::Event::PointerMoved(new)]);

@@ -6,9 +6,9 @@ use serde_json::json;
 use vectorcraft_doc::Unit;
 use vectorcraft_tools::{Mods, Overlay, PointerEvent, PointerKind};
 
-use crate::*;
 use crate::cmd::prefscmds::{PREF_SPECS, PrefKind, UNITS};
 use crate::units::Measure;
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

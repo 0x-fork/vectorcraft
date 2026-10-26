@@ -978,8 +978,7 @@ fn live_paint_tools_skip_hidden_edges() {
         let mut bucket = LivePaintBucketTool::default();
         bucket.pointer(&cx, &ev(PointerKind::Move, x, 50.0).with_mods(shift));
         assert_eq!(edge_x(&bucket.overlays(&cx)), want.map(|w| w.2), "x {x}");
-        let stroked =
-            want.map(|(g, ..)| Action::Exec("livePaint.strokeEdge".into(), json!({ "group": g.0, "point": [x, 50.0], "tolerance": 4.0 })));
+        let stroked = want.map(|(g, ..)| Action::Exec("livePaint.strokeEdge".into(), json!({ "group": g.0, "point": [x, 50.0], "tolerance": 4.0 })));
         assert_eq!(bucket.pointer(&cx, &ev(PointerKind::Down, x, 50.0).with_mods(shift)), stroked.into_iter().collect::<Vec<_>>(), "x {x}");
     }
 }

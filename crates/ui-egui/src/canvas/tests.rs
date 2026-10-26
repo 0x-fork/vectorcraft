@@ -735,11 +735,10 @@ fn double_clicking_an_artboard_name_edits_it() {
     let rect = app.canvas_rect.unwrap();
     let xf = Xf::new(rect, app.view().unwrap());
     let mut target = None;
-    let _ =
-        ctx.run_ui(egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))), ..Default::default() }, |ui| {
-            let ab = &app.session.active().unwrap().doc.artboards[0];
-            target = Some(tool_name_rect(ui.painter(), &xf, ab.rect, 0, &ab.name).center());
-        });
+    let _ = ctx.run_ui(egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))), ..Default::default() }, |ui| {
+        let ab = &app.session.active().unwrap().doc.artboards[0];
+        target = Some(tool_name_rect(ui.painter(), &xf, ab.rect, 0, &ab.name).center());
+    });
     let at = target.unwrap();
     assert!(rect.contains(at), "the name is in the working area, at {at:?} canvas {rect:?}");
     let before = app.session.active().unwrap().doc.artboards.len();
@@ -774,11 +773,10 @@ fn double_clicking_a_locked_artboards_name_leaves_it() {
     let rect = app.canvas_rect.unwrap();
     let xf = Xf::new(rect, app.view().unwrap());
     let mut target = None;
-    let _ =
-        ctx.run_ui(egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))), ..Default::default() }, |ui| {
-            let ab = &app.session.active().unwrap().doc.artboards[0];
-            target = Some(tool_name_rect(ui.painter(), &xf, ab.rect, 0, &ab.name).center());
-        });
+    let _ = ctx.run_ui(egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))), ..Default::default() }, |ui| {
+        let ab = &app.session.active().unwrap().doc.artboards[0];
+        target = Some(tool_name_rect(ui.painter(), &xf, ab.rect, 0, &ab.name).center());
+    });
     let at = target.unwrap();
     let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
     for _ in 0..2 {
@@ -908,8 +906,7 @@ fn a_click_just_outside_the_canvas_does_not_reach_the_tool() {
     frame_under_bar(&mut app, &ctx, vec![]);
     let rect = app.canvas_rect.unwrap();
     let click = |app: &mut VectorcraftApp, p: Pos2| {
-        let button =
-            |pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         frame_under_bar(app, &ctx, vec![egui::Event::PointerMoved(p)]);
         frame_under_bar(app, &ctx, vec![button(true)]);
         frame_under_bar(app, &ctx, vec![button(false)]);
@@ -1124,9 +1121,8 @@ fn guides_from_the_rulers_snap_and_artboard_guides_span_their_artboard() {
     let y = xf.to_screen(Point::new(0.0, 300.0)).y;
     let window = app.canvas_rect.unwrap();
     assert!(
-        s.iter().any(
-            |s| matches!(s, Shape::LineSegment { points, .. } if points[0] == pos2(window.left(), y) && points[1] == pos2(window.right(), y))
-        )
+        s.iter()
+            .any(|s| matches!(s, Shape::LineSegment { points, .. } if points[0] == pos2(window.left(), y) && points[1] == pos2(window.right(), y)))
     );
 }
 
@@ -2014,11 +2010,8 @@ fn a_drag_over_a_wide_blur_draws_the_blur_from_the_still_frame() {
         // for them is shown.
         let run = |app: &mut VectorcraftApp, events: Vec<egui::Event>| {
             let frame = |app: &mut VectorcraftApp, events| {
-                let raw = egui::RawInput {
-                    screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 870.0))),
-                    events,
-                    ..Default::default()
-                };
+                let raw =
+                    egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 870.0))), events, ..Default::default() };
                 let mut out = ctx.run_ui(raw, |ui| show(app, ui));
                 out.textures_delta.clear();
             };
@@ -2042,8 +2035,7 @@ fn a_drag_over_a_wide_blur_draws_the_blur_from_the_still_frame() {
         assert_eq!(app.canvas.from_worker, on_worker);
         assert!(!moved(&app), "a still frame, on the worker: {on_worker}");
         let at = app.canvas_rect.unwrap().center();
-        let button =
-            |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         run(&mut app, vec![egui::Event::PointerMoved(at)]);
         run(&mut app, vec![button(at, true)]);
         for step in [1.0, 2.0, 3.0] {
@@ -2751,9 +2743,8 @@ fn grid_repeat_handles_set_rows_and_spacing_in_one_undo_step_each() {
     let g = handles(&mut app);
     let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
     let drawn = shapes(&mut app, &ctx);
-    let circle_at = |drawn: &[Shape], at: Pos2| {
-        drawn.iter().any(|s| matches!(s, Shape::Circle(c) if c.center.distance(at) < 0.01 && c.radius == HANDLE_RADIUS))
-    };
+    let circle_at =
+        |drawn: &[Shape], at: Pos2| drawn.iter().any(|s| matches!(s, Shape::Circle(c) if c.center.distance(at) < 0.01 && c.radius == HANDLE_RADIUS));
     assert!(circle_at(&drawn, xf.to_screen(g.rows_at)), "the row handle is drawn");
     assert!(circle_at(&drawn, xf.to_screen(g.corner_at)), "the corner handle is drawn");
     app.ui.view.bounding_box = false;
@@ -3040,8 +3031,7 @@ fn a_moving_view_leaves_the_art_under_the_pointer_unhighlighted_until_it_stops()
     let mut time = 0.0;
     let mut outlines = |app: &mut VectorcraftApp, events: Vec<egui::Event>, dt: f64| {
         time += dt;
-        let mut out =
-            ctx.run_ui(egui::RawInput { time: Some(time), screen_rect: Some(screen), events, ..Default::default() }, |ui| show(app, ui));
+        let mut out = ctx.run_ui(egui::RawInput { time: Some(time), screen_rect: Some(screen), events, ..Default::default() }, |ui| show(app, ui));
         out.textures_delta.clear();
         let mut shapes = vec![];
         out.shapes.iter().for_each(|c| flat(&c.shape, &mut shapes));
@@ -3905,12 +3895,8 @@ fn two_fingers_dragged_together_pan_the_canvas() {
 
 /// A canvas frame at input time `t` (seconds) with `events`, for the trackpad rotation tests.
 fn timed_frame(app: &mut VectorcraftApp, ctx: &egui::Context, t: f64, events: Vec<egui::Event>) {
-    let raw = egui::RawInput {
-        screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))),
-        time: Some(t),
-        events,
-        ..Default::default()
-    };
+    let raw =
+        egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0))), time: Some(t), events, ..Default::default() };
     let mut out = ctx.run_ui(raw, |ui| show(app, ui));
     out.textures_delta.clear();
 }
@@ -4023,10 +4009,8 @@ fn fit_artboard_fits_the_artboard_turned_with_the_view() {
     let board = app.session.active().unwrap().doc.artboards[0].rect;
     let q = Xf::new(rect, app.view().unwrap()).quad(board);
     assert!(q.iter().all(|c| rect.contains(*c)), "the turned artboard is on the canvas: {q:?}");
-    let gap = q
-        .iter()
-        .map(|c| (c.x - rect.left()).min(rect.right() - c.x).min(c.y - rect.top()).min(rect.bottom() - c.y))
-        .fold(f32::INFINITY, f32::min);
+    let gap =
+        q.iter().map(|c| (c.x - rect.left()).min(rect.right() - c.x).min(c.y - rect.top()).min(rect.bottom() - c.y)).fold(f32::INFINITY, f32::min);
     assert!(gap < 31.0, "and fills it but for the margin: {gap}");
 }
 
@@ -4306,8 +4290,7 @@ fn a_rotate_view_drag_shows_a_dial_with_the_angle() {
             }
             _ => None,
         });
-        let text =
-            s.iter().find_map(|s| if let Shape::Text(t) = s { Some(t.galley.text().to_string()).filter(|t| t.ends_with('°')) } else { None });
+        let text = s.iter().find_map(|s| if let Shape::Text(t) = s { Some(t.galley.text().to_string()).filter(|t| t.ends_with('°')) } else { None });
         (circle, needle, text)
     };
     assert_eq!(dial(&mut app), (None, None, None), "no dial before a drag");
@@ -4391,8 +4374,7 @@ fn double_clicking_type_with_the_selection_tool_puts_the_caret_there() {
     let ctx = egui::Context::default();
     let timed = |app: &mut VectorcraftApp, time: f64, events: Vec<egui::Event>| {
         let screen = egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0));
-        let mut out =
-            ctx.run_ui(egui::RawInput { screen_rect: Some(screen), time: Some(time), events, ..Default::default() }, |ui| show(app, ui));
+        let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(screen), time: Some(time), events, ..Default::default() }, |ui| show(app, ui));
         out.textures_delta.clear();
     };
     timed(&mut app, 0.0, vec![]);
@@ -4571,8 +4553,7 @@ fn double_clicking_type_with_the_direct_selection_tool_puts_the_caret_there() {
 fn escape_while_editing_in_isolation_returns_to_selection_tool_and_keeps_isolation_until_second_escape() {
     let mut app = VectorcraftApp::new(Session::new(), Default::default());
     app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
-    let tid =
-        app.session.execute("text.create", &json!({"x": 100, "y": 150, "text": "Nested hello", "size": 24})).unwrap()["id"].as_u64().unwrap();
+    let tid = app.session.execute("text.create", &json!({"x": 100, "y": 150, "text": "Nested hello", "size": 24})).unwrap()["id"].as_u64().unwrap();
     // Group the text inside a group.
     app.session.execute("select.all", &json!({})).unwrap();
     app.session.execute("object.group", &json!({})).unwrap();
@@ -4680,8 +4661,7 @@ fn a_library_symbol_dropped_on_the_canvas_is_added_and_placed_there_in_one_step(
 fn a_brush_dropped_on_a_path_is_applied_to_it() {
     let mut app = VectorcraftApp::new(Session::new(), Default::default());
     app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
-    let id =
-        app.session.execute("path.create", &json!({"anchors": [{"x": 100, "y": 150}, {"x": 300, "y": 150}]})).unwrap()["id"].as_u64().unwrap();
+    let id = app.session.execute("path.create", &json!({"anchors": [{"x": 100, "y": 150}, {"x": 300, "y": 150}]})).unwrap()["id"].as_u64().unwrap();
     app.session.execute("select.none", &json!({})).unwrap();
     let ctx = egui::Context::default();
     frame(&mut app, &ctx, vec![]);
@@ -4708,8 +4688,7 @@ fn a_brush_dropped_on_a_path_is_applied_to_it() {
 fn a_library_brush_dropped_on_a_path_is_added_and_applied_in_one_step() {
     let mut app = VectorcraftApp::new(Session::new(), Default::default());
     app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
-    let id =
-        app.session.execute("path.create", &json!({"anchors": [{"x": 100, "y": 150}, {"x": 300, "y": 150}]})).unwrap()["id"].as_u64().unwrap();
+    let id = app.session.execute("path.create", &json!({"anchors": [{"x": 100, "y": 150}, {"x": 300, "y": 150}]})).unwrap()["id"].as_u64().unwrap();
     app.session.execute("select.none", &json!({})).unwrap();
     let ctx = egui::Context::default();
     frame(&mut app, &ctx, vec![]);
@@ -4866,12 +4845,8 @@ fn art_moved_off_the_canvas_waits_and_drops_on_the_panel() {
     let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
     let before = app.session.active().unwrap().doc.clone();
     let undo = app.session.active().unwrap().history.undo.len();
-    let button = |pos: Pos2, pressed: bool| egui::Event::PointerButton {
-        pos,
-        button: egui::PointerButton::Primary,
-        pressed,
-        modifiers: Default::default(),
-    };
+    let button =
+        |pos: Pos2, pressed: bool| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
     let start = xf.to_screen(Point::new(100.0, 100.0));
     let left = |app: &VectorcraftApp| app.session.active().unwrap().doc.node(id).unwrap().geometric_bounds().unwrap().x0;
     let moved_to = |screen: Pos2| 50.0 + xf.to_doc(screen).x - 100.0;
@@ -4904,12 +4879,8 @@ fn art_moved_off_the_canvas_resumes_when_the_pointer_returns() {
     frame(&mut app, &ctx, vec![]);
     let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
     let undo = app.session.active().unwrap().history.undo.len();
-    let button = |pos: Pos2, pressed: bool| egui::Event::PointerButton {
-        pos,
-        button: egui::PointerButton::Primary,
-        pressed,
-        modifiers: Default::default(),
-    };
+    let button =
+        |pos: Pos2, pressed: bool| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
     let start = xf.to_screen(Point::new(100.0, 100.0));
     let left = |app: &VectorcraftApp| app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id)).unwrap().geometric_bounds().unwrap().x0;
     let moved_to = |screen: Pos2| 50.0 + xf.to_doc(screen).x - 100.0;
@@ -4971,12 +4942,8 @@ fn a_move_released_over_a_panel_ends_before_the_panels_draw() {
     let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
     let before = app.session.active().unwrap().doc.clone();
     let undo = app.session.active().unwrap().history.undo.len();
-    let button = |pos: Pos2, pressed: bool| egui::Event::PointerButton {
-        pos,
-        button: egui::PointerButton::Primary,
-        pressed,
-        modifiers: Default::default(),
-    };
+    let button =
+        |pos: Pos2, pressed: bool| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
     let start = xf.to_screen(Point::new(100.0, 100.0));
     frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start), button(start, true)]);
     frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start + vec2(40.0, 0.0))]);
@@ -5035,9 +5002,8 @@ fn japanese_ime_composes_on_the_canvas_with_its_window_at_the_caret() {
     crate::menus::invoke(&mut app, "edit.undo", json!({}));
     assert!(!crate::menus::enabled(&app, "edit.undo"));
     assert_eq!(plain(&app, id), "ががく");
-    let ime2 =
-        typing_frame(&mut app, &ctx, vec![egui::Event::Ime(egui::ImeEvent::Preedit { text: "雅楽".into(), active_range_chars: Some(0..2) })])
-            .unwrap();
+    let ime2 = typing_frame(&mut app, &ctx, vec![egui::Event::Ime(egui::ImeEvent::Preedit { text: "雅楽".into(), active_range_chars: Some(0..2) })])
+        .unwrap();
     assert!(ime2.rect.center().x <= ime.rect.center().x + 1.0, "the window stays at the clause being converted");
     typing_frame(&mut app, &ctx, vec![preedit("", 0), egui::Event::Ime(egui::ImeEvent::Commit("雅楽".into()))]);
     assert_eq!(plain(&app, id), "雅楽");
@@ -5465,12 +5431,11 @@ fn tool_drag_moved_without_pointer_delta() {
     let b = pos2(150.0, 120.0);
     let mut first = false;
     let mut second = false;
-    let mut out =
-        ctx.run_ui(egui::RawInput { screen_rect: Some(rect), events: vec![egui::Event::PointerMoved(a)], ..Default::default() }, |ui| {
-            let pointer = ui.input(|i| i.pointer.clone());
-            first = tool_drag_moved(ui, &xf, a, &pointer);
-            second = tool_drag_moved(ui, &xf, a, &pointer);
-        });
+    let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), events: vec![egui::Event::PointerMoved(a)], ..Default::default() }, |ui| {
+        let pointer = ui.input(|i| i.pointer.clone());
+        first = tool_drag_moved(ui, &xf, a, &pointer);
+        second = tool_drag_moved(ui, &xf, a, &pointer);
+    });
     out.textures_delta.clear();
     assert!(first, "the first drag sample at a position runs");
     assert!(!second, "the same position without a delta is not sent again");
@@ -5494,13 +5459,12 @@ fn stationary_press_is_not_a_drag() {
     let xf = Xf::new(rect, &v);
     let a = pos2(100.0, 100.0);
     let b = pos2(150.0, 120.0);
-    let mut out =
-        ctx.run_ui(egui::RawInput { screen_rect: Some(rect), events: vec![egui::Event::PointerMoved(a)], ..Default::default() }, |ui| {
-            ui.data_mut(|d| {
-                d.remove::<Point>(tool_drag_doc_id());
-                d.insert_temp(tool_press_doc_id(), xf.to_doc(a));
-            });
+    let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), events: vec![egui::Event::PointerMoved(a)], ..Default::default() }, |ui| {
+        ui.data_mut(|d| {
+            d.remove::<Point>(tool_drag_doc_id());
+            d.insert_temp(tool_press_doc_id(), xf.to_doc(a));
         });
+    });
     out.textures_delta.clear();
     let mut held = true;
     out = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), ..Default::default() }, |ui| {
@@ -5751,8 +5715,7 @@ fn the_hosts_pen_pressure_drives_the_tools_under_mouse_events() {
     // One frame per sample: the reader has set the pressure before the frame's mouse events.
     let stroke = |app: &mut VectorcraftApp, pts: &[(f64, f64, Option<f32>)]| {
         let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
-        let button =
-            |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         let mut at = Pos2::ZERO;
         for (i, &(x, y, pressure)) in pts.iter().enumerate() {
             feed.set(pressure);
@@ -6017,8 +5980,7 @@ fn a_mouse_stroke_keeps_every_move_of_a_frame() {
     app.select_tool("pencil");
     let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
     let at = |x: f64, y: f64| xf.to_screen(Point::new(x, y));
-    let button =
-        |p, pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+    let button = |p, pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
     let start = at(100.0, 100.0);
     frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start), button(start, true)]);
     // One frame of a fast stroke: a zigzag of 20 moves, 6 pt apart.
@@ -6050,8 +6012,7 @@ fn a_mouse_stroke_keeps_a_frame_that_ends_where_it_started() {
     app.select_tool("pencil");
     let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
     let at = |x: f64, y: f64| xf.to_screen(Point::new(x, y));
-    let button =
-        |p, pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+    let button = |p, pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
     let (start, a) = (at(100.0, 100.0), at(160.0, 100.0));
     frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start), button(start, true)]);
     frame(&mut app, &ctx, vec![egui::Event::PointerMoved(a)]);
@@ -6122,8 +6083,7 @@ fn the_task_bar_recolors_coloured_art() {
         let bar = task_bar_rect(&ctx).expect("the task bar shows");
         // Right to left: the frame's margin, More Options, Lock, then Recolor.
         let at = pos2(bar.right() - 8.0 - 30.0 - 6.0 - 30.0 - 6.0 - 15.0, bar.center().y);
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         frame(app, &ctx, vec![egui::Event::PointerMoved(at)]);
         frame(app, &ctx, vec![button(true)]);
         frame(app, &ctx, vec![button(false)]);
@@ -6162,8 +6122,7 @@ fn the_task_bar_traces_an_image_then_expands_the_trace() {
         let bar = task_bar_rect(&ctx).expect("the task bar shows");
         // Left to right: the frame's margin, the handle and its spacing, then the first button.
         let at = pos2(bar.left() + 8.0 + 4.0 + 6.0 + 12.0, bar.center().y);
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         frame(app, &ctx, vec![egui::Event::PointerMoved(at)]);
         frame(app, &ctx, vec![button(true)]);
         frame(app, &ctx, vec![button(false)]);
@@ -6198,9 +6157,7 @@ fn task_bar_labels(app: &mut VectorcraftApp, ctx: &egui::Context) -> Vec<(String
     out.shapes
         .iter()
         .filter_map(|c| match &c.shape {
-            egui::Shape::Text(t) if bar.contains(t.visual_bounding_rect().center()) => {
-                Some((t.galley.text().to_string(), t.visual_bounding_rect()))
-            }
+            egui::Shape::Text(t) if bar.contains(t.visual_bounding_rect().center()) => Some((t.galley.text().to_string(), t.visual_bounding_rect())),
             _ => None,
         })
         .collect()
@@ -6258,8 +6215,7 @@ fn the_artboard_tools_task_bar_buttons_act_on_the_selected_artboards() {
     let press = |app: &mut VectorcraftApp, label: &str| {
         let labels = task_bar_labels(app, &ctx);
         let at = labels.iter().find(|(t, _)| t == label).unwrap_or_else(|| panic!("{label} in {labels:?}")).1.center();
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         frame(app, &ctx, vec![egui::Event::PointerMoved(at)]);
         frame(app, &ctx, vec![button(true)]);
         frame(app, &ctx, vec![button(false)]);
@@ -6300,15 +6256,13 @@ fn the_task_bar_connects_cuts_and_converts_direct_selected_anchors() {
     let press = |app: &mut VectorcraftApp, label: &str| {
         let labels = task_bar_labels(app, &ctx);
         let at = labels.iter().find(|(t, _)| t == label).unwrap_or_else(|| panic!("{label} in {labels:?}")).1.center();
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         frame(app, &ctx, vec![egui::Event::PointerMoved(at)]);
         frame(app, &ctx, vec![button(true)]);
         frame(app, &ctx, vec![button(false)]);
     };
-    let subpath = |app: &VectorcraftApp| {
-        app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id)).unwrap().path_data().unwrap().subpaths[0].clone()
-    };
+    let subpath =
+        |app: &VectorcraftApp| app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id)).unwrap().path_data().unwrap().subpaths[0].clone();
     let last_undo = |app: &VectorcraftApp| app.session.active().unwrap().history.undo.last().unwrap().label.clone();
     press(&mut app, "Smooth");
     let a = subpath(&app).anchors[1];
@@ -6700,9 +6654,8 @@ fn gap_label(s: &[Shape]) -> Option<(egui::Rect, Option<egui::Rect>)> {
     let magenta = c32(vectorcraft_tools::guides::MAGENTA);
     let text =
         s.iter().find_map(|s| if let Shape::Text(t) = s { (t.galley.text() == "100.00 pt").then(|| t.visual_bounding_rect()) } else { None })?;
-    let pill = s
-        .iter()
-        .find_map(|s| if let Shape::Rect(r) = s { (r.fill == magenta && r.rect.contains(text.center())).then_some(r.rect) } else { None });
+    let pill =
+        s.iter().find_map(|s| if let Shape::Rect(r) = s { (r.fill == magenta && r.rect.contains(text.center())).then_some(r.rect) } else { None });
     Some((text, pill))
 }
 
@@ -6981,8 +6934,7 @@ fn live_trace_selection_highlight_excludes_the_retained_source_rectangle() {
         })),
     );
     source.visible = false;
-    let art =
-        Node::path(NodeId(3), vectorcraft_geom::shapes::rectangle(vectorcraft_geom::Rect::new(20.0, 30.0, 80.0, 90.0)), Appearance::default());
+    let art = Node::path(NodeId(3), vectorcraft_geom::shapes::rectangle(vectorcraft_geom::Rect::new(20.0, 30.0, 80.0, 90.0)), Appearance::default());
     let mut group = Node::group(NodeId(1), vec![Arc::new(source), Arc::new(art)]);
     let doc = vectorcraft_doc::Document::new(300.0, 300.0);
     let symbols = doc.symbol_boxes();
@@ -7100,8 +7052,7 @@ fn a_double_click_on_a_threaded_out_port_breaks_the_thread() {
     let mut app = VectorcraftApp::new(Session::new(), Default::default());
     app.run("file.new", json!({"width": 600, "height": 400})).unwrap();
     let text = "Words that fill more than the frame holds. ".repeat(10);
-    let a =
-        app.run("text.create", json!({"x": 20, "y": 20, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
+    let a = app.run("text.create", json!({"x": 20, "y": 20, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
     app.run("text.thread.add", json!({"from": a, "at": [300, 200]})).unwrap();
     app.run("select.set", json!({"ids": [a]})).unwrap();
     app.select_tool("selection");

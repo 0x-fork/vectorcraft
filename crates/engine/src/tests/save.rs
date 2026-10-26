@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 use vectorcraft_doc::SavedView;
 use vectorcraft_geom::Point;
 
-use crate::*;
 use crate::cmd::fileio::{SaveMode, save_plan};
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

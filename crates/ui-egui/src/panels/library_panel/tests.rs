@@ -361,12 +361,7 @@ fn accessible() -> egui::Context {
 }
 
 /// One frame of `draw` with `events`, after the frames `ctx` ran.
-fn draw_frame(
-    app: &mut VectorcraftApp,
-    ctx: &egui::Context,
-    draw: &dyn Fn(&mut VectorcraftApp, &mut Ui),
-    events: Vec<Event>,
-) -> egui::FullOutput {
+fn draw_frame(app: &mut VectorcraftApp, ctx: &egui::Context, draw: &dyn Fn(&mut VectorcraftApp, &mut Ui), events: Vec<Event>) -> egui::FullOutput {
     let screen_rect = Some(Rect::from_min_size(Pos2::ZERO, vec2(1200.0, 800.0)));
     let time = Some(ctx.input(|i| i.time) + 0.1);
     let mut out = ctx.run_ui(egui::RawInput { events, time, screen_rect, ..Default::default() }, |ui| draw(app, ui));

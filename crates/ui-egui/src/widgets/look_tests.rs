@@ -194,8 +194,7 @@ fn a_slider_focused_by_a_click_shows_its_outline_only_after_a_key() {
     };
     frame(&ctx, 0.0, vec![], &mut add);
     let at = rail.get().center();
-    let button =
-        |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+    let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
     frame(&ctx, 0.1, vec![egui::Event::PointerMoved(at), button(true)], &mut add);
     frame(&ctx, 0.2, vec![button(false)], &mut add);
     let shapes = frame(&ctx, 0.3, vec![], &mut add);

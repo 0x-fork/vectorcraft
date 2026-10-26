@@ -2,9 +2,9 @@
 
 use serde_json::json;
 
-use crate::*;
 use crate::tests_adjust::{fill_hex, node, red_rect, session};
 use crate::tests_menucmds::{place_undecodable_png, warns_undecoded};
+use crate::*;
 
 #[test]
 fn halftone_turns_art_into_dots_by_tone() {

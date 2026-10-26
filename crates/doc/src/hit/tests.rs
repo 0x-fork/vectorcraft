@@ -552,8 +552,7 @@ world",
 fn objects_at_lists_the_stack() {
     let mut d = Document::new(200.0, 200.0);
     let l = d.layers[0].id;
-    let rect =
-        |d: &mut Document, x: f64| Node::path(d.alloc_id(), shapes::rectangle(Rect::new(x, 0.0, x + 50.0, 50.0)), Appearance::default_art());
+    let rect = |d: &mut Document, x: f64| Node::path(d.alloc_id(), shapes::rectangle(Rect::new(x, 0.0, x + 50.0, 50.0)), Appearance::default_art());
     let a = rect(&mut d, 0.0);
     let (b, c) = (rect(&mut d, 10.0), rect(&mut d, 20.0));
     let (a_id, b_id, c_id, g) = (a.id, b.id, c.id, d.alloc_id());
@@ -702,8 +701,7 @@ fn objects_at_finds_symbol_instances_by_their_art() {
     let art = Node::path(d.alloc_id(), shapes::rectangle(Rect::new(100.0, 60.0, 140.0, 80.0)), Appearance::default_art());
     d.symbols.push(crate::Symbol { name: "Far".into(), art: Arc::new(art) });
     let (layer, top, inner, group) = (d.layers[0].id, d.alloc_id(), d.alloc_id(), d.alloc_id());
-    let instance =
-        |id, dy: f64| Node::new(id, NodeKind::SymbolInstance { symbol: "Far".into(), xf: vectorcraft_geom::Affine::translate((0.0, dy)) });
+    let instance = |id, dy: f64| Node::new(id, NodeKind::SymbolInstance { symbol: "Far".into(), xf: vectorcraft_geom::Affine::translate((0.0, dy)) });
     d.insert(Some(layer), 0, instance(top, 0.0)).unwrap();
     d.insert(Some(layer), 1, Node::group(group, vec![Arc::new(instance(inner, 100.0))])).unwrap();
     let opt = HitOptions::default();
@@ -768,8 +766,7 @@ fn insert_locked(d: &mut Document, parent: NodeId, mut n: Node) -> NodeId {
 fn locked_objects_at_lists_the_locked_stack() {
     let mut d = Document::new(200.0, 200.0);
     let l = d.layers[0].id;
-    let rect =
-        |d: &mut Document, x: f64| Node::path(d.alloc_id(), shapes::rectangle(Rect::new(x, 0.0, x + 50.0, 50.0)), Appearance::default_art());
+    let rect = |d: &mut Document, x: f64| Node::path(d.alloc_id(), shapes::rectangle(Rect::new(x, 0.0, x + 50.0, 50.0)), Appearance::default_art());
     let (a, b) = (rect(&mut d, 0.0), rect(&mut d, 10.0));
     let (a, b) = (insert_locked(&mut d, l, a), insert_locked(&mut d, l, b));
     let (mut inner, locked_group) = (rect(&mut d, 20.0), d.alloc_id());

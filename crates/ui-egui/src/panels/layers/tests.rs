@@ -323,8 +323,7 @@ fn renaming_a_layer_commits_on_enter_and_escape_cancels() {
     let name = |app: &VectorcraftApp| app.session.doc().unwrap().doc.layers[0].display_name();
     let ctx = egui::Context::default();
     let key = |key| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::NONE };
-    let select_all =
-        egui::Event::Key { key: egui::Key::A, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::COMMAND };
+    let select_all = egui::Event::Key { key: egui::Key::A, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::COMMAND };
     // What a double-click on the row does: the name field opens with the name.
     let open = |app: &mut VectorcraftApp| {
         ctx.data_mut(|d| d.insert_temp(egui::Id::unique("layers-rename"), (layer.0, name(app))));
@@ -436,8 +435,7 @@ fn nested() -> (VectorcraftApp, [NodeId; 6]) {
 /// Press and release at `at` with `mods` held, over three frames.
 fn click_with(app: &mut VectorcraftApp, ctx: &egui::Context, at: egui::Pos2, mods: egui::Modifiers) {
     for e in [egui::Event::PointerMoved(at), button(at, true), button(at, false)] {
-        let mut out =
-            ctx.run_ui(egui::RawInput { events: vec![egui::Event::ModifiersChanged(mods), e], ..Default::default() }, |ui| show(app, ui));
+        let mut out = ctx.run_ui(egui::RawInput { events: vec![egui::Event::ModifiersChanged(mods), e], ..Default::default() }, |ui| show(app, ui));
         out.textures_delta.clear();
     }
 }

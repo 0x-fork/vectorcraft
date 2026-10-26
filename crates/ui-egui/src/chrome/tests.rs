@@ -421,12 +421,8 @@ fn the_artboard_navigator_goes_to_artboards_and_fitting_shows_the_current_one() 
     let buttons = navigator(&mut app, &ctx, vec![]);
     assert_eq!(buttons.len(), 4);
     let click = |app: &mut crate::VectorcraftApp, r: egui::Rect| {
-        let b = |pressed| egui::Event::PointerButton {
-            pos: r.center(),
-            button: egui::PointerButton::Primary,
-            pressed,
-            modifiers: Default::default(),
-        };
+        let b =
+            |pressed| egui::Event::PointerButton { pos: r.center(), button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         navigator(app, &ctx, vec![egui::Event::PointerMoved(r.center())]);
         navigator(app, &ctx, vec![b(true)]);
         navigator(app, &ctx, vec![b(false)]);
@@ -494,8 +490,7 @@ fn status_texts(app: &mut crate::VectorcraftApp, ctx: &egui::Context, events: Ve
 /// position, document, selection or either branch of its edit history.
 fn assert_status_coordinates(app: &mut crate::VectorcraftApp, expected: Option<&str>) {
     let hover = app.hover_doc;
-    let before =
-        app.session.active().map(|st| (st.doc.clone(), st.selection.clone(), st.history.undo.len(), st.history.redo.len(), st.is_dirty()));
+    let before = app.session.active().map(|st| (st.doc.clone(), st.selection.clone(), st.history.undo.len(), st.history.redo.len(), st.is_dirty()));
     let ctx = egui::Context::default();
     crate::theme::install_fonts(&ctx);
     let texts = status_texts(app, &ctx, vec![]);
@@ -504,8 +499,7 @@ fn assert_status_coordinates(app: &mut crate::VectorcraftApp, expected: Option<&
     let expected: Vec<&str> = expected.into_iter().flat_map(|text| text.split("  ")).collect();
     assert_eq!(coordinates, expected, "{texts:?}");
     assert_eq!(app.hover_doc, hover, "tools still receive the absolute document position");
-    let after =
-        app.session.active().map(|st| (st.doc.clone(), st.selection.clone(), st.history.undo.len(), st.history.redo.len(), st.is_dirty()));
+    let after = app.session.active().map(|st| (st.doc.clone(), st.selection.clone(), st.history.undo.len(), st.history.redo.len(), st.is_dirty()));
     assert_eq!(after, before, "painting is read-only");
 }
 
@@ -698,11 +692,7 @@ fn artboard_navigation_next(app: &mut crate::VectorcraftApp, ctx: &egui::Context
     }
 }
 
-fn artboard_navigation_properties_frame(
-    app: &mut crate::VectorcraftApp,
-    ctx: &egui::Context,
-    events: Vec<egui::Event>,
-) -> Vec<(String, egui::Rect)> {
+fn artboard_navigation_properties_frame(app: &mut crate::VectorcraftApp, ctx: &egui::Context, events: Vec<egui::Event>) -> Vec<(String, egui::Rect)> {
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 700.0));
     let mut out = ctx.run_ui(egui::RawInput { screen_rect: Some(screen), events, ..Default::default() }, |ui| {
         egui::Panel::right("navigation-properties").exact_size(300.0).show(ui, |ui| crate::panels::properties::show(app, ui));
@@ -911,12 +901,8 @@ fn the_control_bar_isolates_the_selected_object_and_exits_isolation_mode() {
     crate::theme::install_fonts(&ctx);
     let click = |app: &mut crate::VectorcraftApp| {
         let r = isolation_button(app, &ctx, vec![]).expect("the bar shows the isolation button");
-        let press = |pressed| egui::Event::PointerButton {
-            pos: r.center(),
-            button: egui::PointerButton::Primary,
-            pressed,
-            modifiers: Default::default(),
-        };
+        let press =
+            |pressed| egui::Event::PointerButton { pos: r.center(), button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         for e in [egui::Event::PointerMoved(r.center()), press(true), press(false)] {
             isolation_button(app, &ctx, vec![e]);
         }

@@ -4,8 +4,8 @@ use serde_json::{Value, json};
 use vectorcraft_doc::NodeKind;
 use vectorcraft_tools::{PointerEvent, PointerKind};
 
-use crate::*;
 use crate::cmd::prefscmds::{PREF_CATEGORIES, PREF_GROUPS, PREF_SPECS, validate};
+use crate::*;
 
 #[test]
 fn every_spec_matches_a_prefs_field_and_back() {

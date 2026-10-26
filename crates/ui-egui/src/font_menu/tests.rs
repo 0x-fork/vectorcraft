@@ -95,11 +95,8 @@ fn recent_section_rebuilds_and_arrows_skip_its_headings() {
     let mut st = super::MenuState::default();
     let mut frame = |events, recent: &[String]| {
         let mut picked = None;
-        let input = egui::RawInput {
-            events,
-            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 800.0))),
-            ..Default::default()
-        };
+        let input =
+            egui::RawInput { events, screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 800.0))), ..Default::default() };
         let mut out = ctx.run_ui(input, |ui| {
             picked = super::list(
                 ui,
@@ -149,11 +146,7 @@ fn recent_fonts_obey_search_and_favorite_filters() {
     let mut frame = |events| {
         let mut pick = None;
         let mut out = ctx.run_ui(
-            egui::RawInput {
-                events,
-                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 800.0))),
-                ..Default::default()
-            },
+            egui::RawInput { events, screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 800.0))), ..Default::default() },
             |ui| {
                 pick = super::list(
                     ui,
@@ -256,11 +249,7 @@ fn the_variable_filter_lists_only_variable_families() {
     let mut favorites: Vec<String> = vec![];
     let frame = |st: &mut super::MenuState, events, favorites: &[String]| {
         let mut out = ctx.run_ui(
-            egui::RawInput {
-                events,
-                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 800.0))),
-                ..Default::default()
-            },
+            egui::RawInput { events, screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(600.0, 800.0))), ..Default::default() },
             |ui| {
                 super::list(
                     ui,
@@ -291,8 +280,7 @@ fn the_variable_filter_lists_only_variable_families() {
     let click = |st: &mut super::MenuState, favorites: &[String]| {
         let (_, at) = frame(st, vec![], favorites);
         let at = at.expect("the Variable filter is drawn");
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         frame(st, vec![egui::Event::PointerMoved(at), button(true)], favorites);
         frame(st, vec![button(false)], favorites);
         frame(st, vec![], favorites).0

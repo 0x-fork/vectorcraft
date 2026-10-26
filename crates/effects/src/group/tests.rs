@@ -13,11 +13,7 @@ fn skip_without_craft_fonts() -> bool {
 }
 
 fn sq(id: u64, x: f64, color: Color) -> Arc<Node> {
-    Arc::new(Node::path(
-        NodeId(id),
-        shapes::rectangle(Rect::new(x, 0.0, x + 10.0, 10.0)),
-        Appearance::basic(Paint::solid(color), Paint::None, 0.0),
-    ))
+    Arc::new(Node::path(NodeId(id), shapes::rectangle(Rect::new(x, 0.0, x + 10.0, 10.0)), Appearance::basic(Paint::solid(color), Paint::None, 0.0)))
 }
 
 fn group_with(effect: &str) -> Node {
@@ -271,8 +267,7 @@ fn a_transform_on_a_group_paints_each_copy_with_its_own_gradient() {
     let geom = GradientGeom { start: (0.0, 5.0).into(), end: (10.0, 5.0).into(), aspect: 1.0, focal: None };
     let paints = [Paint::Gradient(Box::new(ramp.clone())), Paint::Gradient(Box::new(GradientPaint { geom: Some(geom), ..ramp }))];
     for (k, paint) in paints.into_iter().enumerate() {
-        let square =
-            Arc::new(Node::path(NodeId(1), shapes::rectangle(Rect::new(0.0, 0.0, 10.0, 10.0)), Appearance::basic(paint, Paint::None, 0.0)));
+        let square = Arc::new(Node::path(NodeId(1), shapes::rectangle(Rect::new(0.0, 0.0, 10.0, 10.0)), Appearance::basic(paint, Paint::None, 0.0)));
         let mut g = Node::group(NodeId(10), vec![square]);
         let params = serde_json::json!({"moveH": 30, "copies": 2});
         g.appearance.effects.push(Effect { id: "distort.transform".into(), params, visible: true });

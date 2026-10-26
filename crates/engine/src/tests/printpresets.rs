@@ -3,8 +3,8 @@
 
 use serde_json::json;
 
-use crate::*;
 use crate::cmd::printpresets::DEFAULT_PRESET;
+use crate::*;
 
 fn is_bad_params(r: Result<serde_json::Value>) -> bool {
     matches!(r, Err(EngineError::BadParams { .. }))

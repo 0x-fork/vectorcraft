@@ -99,8 +99,7 @@ fn menu_frame(app: &mut VectorcraftApp, ctx: &egui::Context, events: Vec<egui::E
 fn click_menu_item(app: &mut VectorcraftApp, ctx: &egui::Context, label: &str) {
     let labels = menu_frame(app, ctx, vec![]);
     let at = labels.iter().find(|(t, _)| t.trim() == label).map(|(_, r)| r.center()).unwrap_or_else(|| panic!("no {label} in the menu"));
-    let button =
-        |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+    let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
     menu_frame(app, ctx, vec![egui::Event::PointerMoved(at), button(true)]);
     menu_frame(app, ctx, vec![button(false)]);
 }

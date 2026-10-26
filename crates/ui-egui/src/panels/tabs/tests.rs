@@ -406,8 +406,7 @@ fn an_x_typed_past_the_next_stop_keeps_the_stop_selected() {
     let type_x = |app: &mut VectorcraftApp, shown: &str, typed: &str| {
         let texts = panel_frame(&ctx, app, vec![]);
         let at = texts.iter().find(|(t, _)| t == shown).unwrap_or_else(|| panic!("{shown} in {texts:?}")).1.center();
-        let button =
-            |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
         panel_frame(&ctx, app, vec![egui::Event::PointerMoved(at), button(true)]);
         panel_frame(&ctx, app, vec![button(false)]);
         panel_frame(&ctx, app, vec![key(egui::Key::A, egui::Modifiers::COMMAND)]);

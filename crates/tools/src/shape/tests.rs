@@ -198,10 +198,7 @@ fn click_opens_dialog() {
     let cx = cx(&d, &s, &p);
     let mut t = ShapeTool::new("star");
     t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 10.0, 10.0));
-    assert_eq!(
-        t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 10.0, 10.0)),
-        vec![Action::Dialog("star".into(), json!({"x": 10.0, "y": 10.0}))]
-    );
+    assert_eq!(t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 10.0, 10.0)), vec![Action::Dialog("star".into(), json!({"x": 10.0, "y": 10.0}))]);
 }
 
 #[test]

@@ -591,6 +591,5 @@ pub fn revolve(path: &PathData, bounds: Rect, options: Revolve) -> Result<Vec<Fa
     Ok(faces)
 }
 
-
 #[cfg(test)]
 mod tests;

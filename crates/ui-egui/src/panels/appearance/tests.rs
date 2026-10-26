@@ -427,8 +427,7 @@ fn groups_show_a_contents_row_and_type_a_characters_row_in_their_slot() {
     run(&mut app, "object.group", json!({}));
     run(&mut app, "appearance.addFill", json!({}));
     run(&mut app, "appearance.addStroke", json!({}));
-    let rows =
-        |t: Vec<String>| t.into_iter().filter(|t| ["Fill:", "Stroke:", "Contents", "Characters"].contains(&t.as_str())).collect::<Vec<_>>();
+    let rows = |t: Vec<String>| t.into_iter().filter(|t| ["Fill:", "Stroke:", "Contents", "Characters"].contains(&t.as_str())).collect::<Vec<_>>();
     assert_eq!(rows(frame(&mut app)), ["Stroke:", "Fill:", "Contents"]);
     run(&mut app, "appearance.moveItem", json!({"from": "contents", "to": 1}));
     assert_eq!(rows(frame(&mut app)), ["Stroke:", "Contents", "Fill:"]);
@@ -446,9 +445,7 @@ fn images_show_a_contents_row_with_new_fills_and_strokes_below_it() {
     run(&mut app, "file.new", json!({"width": 100, "height": 100}));
     let rows = |t: Vec<String>| t.into_iter().filter(|t| ["Fill:", "Stroke:", "Contents"].contains(&t.as_str())).collect::<Vec<_>>();
     let mut png = vec![];
-    image::RgbaImage::from_pixel(4, 4, image::Rgba([255, 0, 0, 255]))
-        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
-        .unwrap();
+    image::RgbaImage::from_pixel(4, 4, image::Rgba([255, 0, 0, 255])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
     run(&mut app, "file.place", json!({"name": "red.png", "dataBase64": vectorcraft_format::base64_encode(&png)}));
     assert_eq!(rows(frame(&mut app)), ["Contents"]);
     run(&mut app, "appearance.addStroke", json!({}));

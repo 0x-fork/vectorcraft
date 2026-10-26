@@ -4,8 +4,8 @@
 
 use serde_json::{Value, json};
 
-use crate::*;
 use crate::cmd::{FlattenOptions, FlattenerPreset};
+use crate::*;
 
 fn run(s: &mut Session, id: &str, p: Value) -> Value {
     s.execute(id, &p).unwrap()

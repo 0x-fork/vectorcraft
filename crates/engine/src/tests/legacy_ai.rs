@@ -3,9 +3,9 @@
 
 use serde_json::{Value, json};
 
+use crate::tests_links::Folder;
 use crate::tests_menucmds::{place_undecodable_png, place_undecodable_png_sized};
 use crate::*;
-use crate::tests_links::Folder;
 
 /// Three artboards (named A, B and C) with a rectangle on each, on two layers: the first
 /// rectangle's group (with a second one) on `Layer 1`, the others on `Top`.

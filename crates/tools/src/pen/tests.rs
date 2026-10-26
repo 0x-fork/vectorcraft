@@ -6,8 +6,7 @@ use vectorcraft_doc::Selection;
 fn press_inside_drag_threshold_places_a_corner() {
     let (d, s) = (vectorcraft_doc::Document::new(500.0, 500.0), Selection::default());
     let paint = paint();
-    let cx =
-        ToolContext { zoom: 1.0, smart_guides: false, snap_to_point: false, snap_to_pixel: false, snap_to_grid: false, ..cx(&d, &s, &paint) };
+    let cx = ToolContext { zoom: 1.0, smart_guides: false, snap_to_point: false, snap_to_pixel: false, snap_to_grid: false, ..cx(&d, &s, &paint) };
     let mut pen = PenTool::default();
     pen.pointer(&cx, &PointerEvent::new(PointerKind::Down, 100.0, 100.0));
     assert!(pen.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 101.0, 101.0)).is_empty());
@@ -231,8 +230,7 @@ fn alt_pressed_mid_drag_keeps_the_incoming_handle() {
 fn space_pressed_inside_the_drag_threshold_moves_the_anchor_by_the_next_move_only() {
     let (d, s) = (vectorcraft_doc::Document::new(500.0, 500.0), Selection::default());
     let paint = paint();
-    let cx =
-        ToolContext { zoom: 1.0, smart_guides: false, snap_to_point: false, snap_to_pixel: false, snap_to_grid: false, ..cx(&d, &s, &paint) };
+    let cx = ToolContext { zoom: 1.0, smart_guides: false, snap_to_point: false, snap_to_pixel: false, snap_to_grid: false, ..cx(&d, &s, &paint) };
     let space = Mods { space: true, ..Mods::default() };
     let mut pen = PenTool::default();
     pen.pointer(&cx, &PointerEvent::new(PointerKind::Down, 100.0, 100.0));
@@ -282,10 +280,7 @@ fn space_moves_the_anchor_being_placed() {
     let acts = t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 450.0, 450.0).with_mods(Mods { space: true, ..alt }));
     assert_eq!(
         acts,
-        vec![Action::Preview(
-            "path.appendAnchor".into(),
-            json!({"id": id.0, "x": 400.0, "y": 400.0, "in": [350.0, 400.0], "out": [450.0, 450.0]})
-        )]
+        vec![Action::Preview("path.appendAnchor".into(), json!({"id": id.0, "x": 400.0, "y": 400.0, "in": [350.0, 400.0], "out": [450.0, 450.0]}))]
     );
 }
 
@@ -591,9 +586,8 @@ fn a_drag_from_the_first_anchor_always_closes() {
     // What the tool sees once the preview applied: the path closed.
     d.node_mut(id).unwrap().path_data_mut().unwrap().subpaths[0].closed = true;
     let c = cx(&d, &s, &p);
-    let close = |x: f64, y: f64, alt: bool| {
-        vec![Action::Preview("path.close".into(), json!({"id": id.0, "in": [200.0 - x, 600.0 - y], "independent": alt}))]
-    };
+    let close =
+        |x: f64, y: f64, alt: bool| vec![Action::Preview("path.close".into(), json!({"id": id.0, "in": [200.0 - x, 600.0 - y], "independent": alt}))];
     for (x, y) in [(105.0, 290.0), (130.0, 260.0), (160.0, 240.0)] {
         assert_eq!(t.pointer(&c, &PointerEvent::new(PointerKind::Drag, x, y)), close(x, y, false), "at ({x}, {y})");
     }
@@ -623,12 +617,8 @@ fn clicking_a_selected_blend_spine_adds_a_point() {
         std::sync::Arc::new(vectorcraft_doc::Node::path(id, r, vectorcraft_doc::Appearance::default_art()))
     };
     let (g, k1, k2) = (d.alloc_id(), d.alloc_id(), d.alloc_id());
-    d.insert(
-        Some(l),
-        1,
-        vectorcraft_doc::Node::new(g, NodeKind::Blend { children: vec![key(k1, 100.0), key(k2, 200.0)], spec: Default::default() }),
-    )
-    .unwrap();
+    d.insert(Some(l), 1, vectorcraft_doc::Node::new(g, NodeKind::Blend { children: vec![key(k1, 100.0), key(k2, 200.0)], spec: Default::default() }))
+        .unwrap();
     let mut s = Selection::default();
     s.set([g]);
     let p = paint();
@@ -697,9 +687,10 @@ fn anchors_snap_to_smart_guides() {
     t.pointer(&cx, &PointerEvent::new(PointerKind::Move, 152.0, 318.0));
     let o = t.overlays(&cx);
     assert!(o.iter().any(|o| matches!(o, Overlay::Label { text, p, .. } if text == "align" && *p == Point::new(150.0, 318.0))), "{o:?}");
-    assert!(o.iter().any(
-        |o| matches!(o, Overlay::Path { path, .. } if path.elements().last().and_then(|e| e.end_point()) == Some(Point::new(150.0, 318.0)))
-    ));
+    assert!(
+        o.iter()
+            .any(|o| matches!(o, Overlay::Path { path, .. } if path.elements().last().and_then(|e| e.end_point()) == Some(Point::new(150.0, 318.0))))
+    );
     let from = Point::new(60.0, 300.0);
     let to = Point::new(150.0, 318.0);
     assert!(o.iter().any(|o| matches!(o, Overlay::Measure { text, .. } if text == &cx.segment_measure_label(from, to))));

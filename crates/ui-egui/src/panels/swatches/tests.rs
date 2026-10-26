@@ -229,10 +229,7 @@ fn new_swatch_dialog_prefills_the_active_colour_and_saves_into_the_selected_grou
     app.run("paint.setFill", json!({"color": "#ff8000"})).unwrap();
     new_swatch(&mut app, &["Bright Red".into()], Modifiers::COMMAND);
     let d = app.ui.dialog.as_ref().expect("New Swatch opens its dialog");
-    assert_eq!(
-        (d.kind.as_str(), d.str("name").as_str(), d.str("group").as_str()),
-        (crate::dialogs::new_swatch::KIND, "R=255 G=128 B=0", "Brights")
-    );
+    assert_eq!((d.kind.as_str(), d.str("name").as_str(), d.str("group").as_str()), (crate::dialogs::new_swatch::KIND, "R=255 G=128 B=0", "Brights"));
     assert!(d.bool("spot") && d.bool("global"), "Cmd/Ctrl-click makes a spot colour");
     dialog_frame(&mut app, &ctx);
     crate::dialogs::confirm(&mut app).unwrap();
@@ -487,11 +484,7 @@ fn a_proxy_dropped_on_the_panel_becomes_a_swatch() {
     egui::DragAndDrop::set_payload(&ctx, PanelDrag::paint(Paint::solid(Color::from_hex("#123456").unwrap())));
     let release = Event::PointerButton { pos: at, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE };
     frame(&mut app, &ctx, vec![Event::PointerMoved(at), release], 1.0, show);
-    assert_eq!(
-        names_of(&app, Some("Brights")).last().map(String::as_str),
-        Some("R=18 G=52 B=86"),
-        "dropped on a group's colour: into that group"
-    );
+    assert_eq!(names_of(&app, Some("Brights")).last().map(String::as_str), Some("R=18 G=52 B=86"), "dropped on a group's colour: into that group");
     assert!(egui::DragAndDrop::payload::<PanelDrag>(&ctx).is_none());
 }
 
@@ -679,9 +672,7 @@ fn deselecting_keeps_the_arts_swatch_highlighted() {
 fn images_and_unswatched_text_highlight_no_swatch() {
     let mut app = app();
     let mut png = vec![];
-    image::RgbaImage::from_pixel(4, 4, image::Rgba([255, 0, 0, 255]))
-        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
-        .unwrap();
+    image::RgbaImage::from_pixel(4, 4, image::Rgba([255, 0, 0, 255])).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
     let data = vectorcraft_format::base64_encode(&png);
     app.run("file.place", json!({"name": "a.png", "dataBase64": data, "link": false})).unwrap();
     assert_eq!(active_swatch(&app), None, "an image: no swatch");

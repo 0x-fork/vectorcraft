@@ -505,8 +505,7 @@ fn ruler_guide_origin_leaves_other_snap_modes_unchanged() {
                 let actions = new.pointer(&c, &ev(PointerKind::Drag, pointer.x, pointer.y, Mods::default()), true);
                 assert!((guide_preview_position(&actions, vertical, None) - want).abs() < 1e-8);
                 let mut moved = GuideEdit::default();
-                let (start, to) =
-                    if vertical { ((from, pointer.y), (pointer.x, pointer.y)) } else { ((pointer.x, from), (pointer.x, pointer.y)) };
+                let (start, to) = if vertical { ((from, pointer.y), (pointer.x, pointer.y)) } else { ((pointer.x, from), (pointer.x, pointer.y)) };
                 moved.press(&c, &ev(PointerKind::Down, start.0, start.1, Mods::default())).unwrap();
                 let actions = moved.pointer(&c, &ev(PointerKind::Drag, to.0, to.1, Mods::default())).unwrap();
                 assert!((guide_preview_position(&actions, vertical, Some(from)) - want).abs() < 1e-8);
@@ -584,8 +583,7 @@ fn ruler_guide_readouts_count_from_the_active_artboard_with_artboard_rulers() {
         (vectorcraft_doc::RulerMode::Global, 1, Point::new(5.0, 5.0)),
     ] {
         doc.rulers = rulers;
-        let c =
-            ToolContext { ruler_origin: doc.ruler_origin_for(active), smart_guides: false, snap_to_point: false, ..cx(&doc, &selection, &paint) };
+        let c = ToolContext { ruler_origin: doc.ruler_origin_for(active), smart_guides: false, snap_to_point: false, ..cx(&doc, &selection, &paint) };
         assert_eq!(c.ruler_origin, zero, "{rulers:?} {active}");
         for vertical in [true, false] {
             let mut new = NewGuide::new(&c, vertical, None);

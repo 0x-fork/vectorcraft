@@ -4,9 +4,9 @@
 
 use serde_json::{Value, json};
 
-use crate::*;
 use crate::cmd::importmatches;
 use crate::cmd::shortcutset::{KysEntry, NOT_READABLE, read_kys};
+use crate::*;
 
 fn read(text: &str) -> Value {
     Session::new().execute("shortcutSet.read", &json!({ "data": text, "name": "My Keys.kys" })).unwrap()

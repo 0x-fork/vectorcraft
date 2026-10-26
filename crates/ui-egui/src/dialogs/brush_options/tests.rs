@@ -206,10 +206,7 @@ fn art_options_set_width_scale_direction_flips_and_colorization() {
         (d.f64("width", 0.0), d.str("scaleMode"), d.f64("guideEnd", 0.0), d.str("direction")),
         (100.0, "betweenGuides".into(), 78.0, "leftToRight".into())
     );
-    set(
-        &mut app,
-        json!({"width": 250, "guideStart": 10, "guideEnd": 140, "direction": "bottomToTop", "flipAcross": true, "colorization": "none"}),
-    );
+    set(&mut app, json!({"width": 250, "guideStart": 10, "guideEnd": 140, "direction": "bottomToTop", "flipAcross": true, "colorization": "none"}));
     super::super::confirm(&mut app).unwrap();
     let def = app.run("brush.get", json!({"name": "Arrow"})).unwrap();
     assert_eq!(
@@ -442,10 +439,7 @@ fn pattern_options_show_the_tiles_and_set_scale_spacing_fit() {
     set(&mut app, json!({"scale": 200, "spacing": 30, "fit": "approximate", "flipAlong": true}));
     super::super::confirm(&mut app).unwrap();
     let def = app.run("brush.get", json!({"name": "Diamonds"})).unwrap();
-    assert_eq!(
-        (&def["scale"], &def["spacing"], &def["fit"], &def["flip_along"]),
-        (&json!(200.0), &json!(30.0), &json!("approximate"), &json!(true))
-    );
+    assert_eq!((&def["scale"], &def["spacing"], &def["fit"], &def["flip_along"]), (&json!(200.0), &json!(30.0), &json!("approximate"), &json!(true)));
     assert!((drawn_height(&app, id) / before - 2.0).abs() < 1e-6, "tiles twice the size");
 }
 

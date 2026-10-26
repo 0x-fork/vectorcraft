@@ -5,8 +5,8 @@ use vectorcraft_doc::{NodeId, NodeKind};
 use vectorcraft_geom::{FillRule, PathData, Point};
 use vectorcraft_tools::{Mods, PointerEvent, PointerKind, ToolKey};
 
-use crate::*;
 use crate::tooling::{UiRequest, ViewInfo};
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

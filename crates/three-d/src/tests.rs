@@ -1,8 +1,8 @@
 use super::*;
 
+mod caps;
 mod lighting;
 mod multiple_lights;
-mod caps;
 mod smooth;
 
 #[test]

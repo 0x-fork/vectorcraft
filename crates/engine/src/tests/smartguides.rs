@@ -6,8 +6,8 @@ use vectorcraft_doc::NodeId;
 use vectorcraft_geom::{Point, Rect};
 use vectorcraft_tools::{Mods, Overlay, PointerEvent, PointerKind};
 
-use crate::*;
 use crate::tooling::ViewInfo;
+use crate::*;
 
 /// An 800 × 600 document with a 100 × 100 square at (100, 100), nothing selected.
 fn session() -> Session {

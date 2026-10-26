@@ -74,9 +74,8 @@ fn kinsoku_set_is_set_per_paragraph_and_saved_only_when_not_hard() {
     use vectorcraft_doc::Kinsoku;
     let mut s = Session::new();
     s.execute("file.new", &json!({"width": 400, "height": 400})).unwrap();
-    let id = s.execute("text.create", &json!({"x": 10, "y": 10, "text": "あカッ", "area": {"width": 40, "height": 100}})).unwrap()["id"]
-        .as_u64()
-        .unwrap();
+    let id =
+        s.execute("text.create", &json!({"x": 10, "y": 10, "text": "あカッ", "area": {"width": 40, "height": 100}})).unwrap()["id"].as_u64().unwrap();
     let para = |s: &Session| match &s.doc().unwrap().doc.node(NodeId(id)).unwrap().kind {
         NodeKind::Text(t) => t.para.clone(),
         _ => panic!("text"),
@@ -195,9 +194,8 @@ fn system_layout_sets_the_document_and_every_text_object() {
         _ => panic!("text"),
     };
     let setup = |s: &Session| s.doc().unwrap().doc.setup.clone();
-    let advances = |s: &Session| {
-        vectorcraft_text::layout(vectorcraft_text::FontDb::global(), &text(s, id)).glyphs.iter().map(|g| g.advance).collect::<Vec<_>>()
-    };
+    let advances =
+        |s: &Session| vectorcraft_text::layout(vectorcraft_text::FontDb::global(), &text(s, id)).glyphs.iter().map(|g| g.advance).collect::<Vec<_>>();
     assert!(!setup(&s).system_layout);
     assert!(!text(&s, id).system_layout && !text(&s, other).system_layout);
     assert!(serde_json::to_value(setup(&s)).unwrap().get("systemLayout").is_none());
@@ -409,10 +407,9 @@ fn bulleted_lists_are_set_per_paragraph_saved_and_continued() {
     use vectorcraft_doc::text::{Bullet, ParaList};
     let mut s = Session::new();
     s.execute("file.new", &json!({"width": 400, "height": 400})).unwrap();
-    let id =
-        s.execute("text.create", &json!({"x": 10, "y": 10, "text": "One\nTwo\nThree", "area": {"width": 300, "height": 200}})).unwrap()["id"]
-            .as_u64()
-            .unwrap();
+    let id = s.execute("text.create", &json!({"x": 10, "y": 10, "text": "One\nTwo\nThree", "area": {"width": 300, "height": 200}})).unwrap()["id"]
+        .as_u64()
+        .unwrap();
     let text = |s: &Session| match &s.doc().unwrap().doc.node(NodeId(id)).unwrap().kind {
         NodeKind::Text(t) => (**t).clone(),
         _ => panic!("text"),
@@ -475,10 +472,9 @@ fn numbered_lists_are_set_per_paragraph_saved_and_styled() {
     use vectorcraft_doc::text::{Bullet, NumberStyle, ParaList};
     let mut s = Session::new();
     s.execute("file.new", &json!({"width": 400, "height": 400})).unwrap();
-    let id =
-        s.execute("text.create", &json!({"x": 10, "y": 10, "text": "One\nTwo\nThree", "area": {"width": 300, "height": 200}})).unwrap()["id"]
-            .as_u64()
-            .unwrap();
+    let id = s.execute("text.create", &json!({"x": 10, "y": 10, "text": "One\nTwo\nThree", "area": {"width": 300, "height": 200}})).unwrap()["id"]
+        .as_u64()
+        .unwrap();
     let text = |s: &Session| match &s.doc().unwrap().doc.node(NodeId(id)).unwrap().kind {
         NodeKind::Text(t) => (**t).clone(),
         _ => panic!("text"),
@@ -637,10 +633,9 @@ fn convert_to_text_writes_the_markers_where_they_were_drawn() {
     // text to the next default stop, and 11 to its stop at 72 pt, whose leader the number's tab
     // draws neither before nor after.
     let items = (1..=11).map(|i| format!("Item {i}")).collect::<Vec<_>>().join("\n");
-    let id =
-        s.execute("text.create", &json!({"x": 300, "y": 10, "size": 20, "text": items, "area": {"width": 300, "height": 600}})).unwrap()["id"]
-            .as_u64()
-            .unwrap();
+    let id = s.execute("text.create", &json!({"x": 300, "y": 10, "size": 20, "text": items, "area": {"width": 300, "height": 600}})).unwrap()["id"]
+        .as_u64()
+        .unwrap();
     s.execute("text.setFormat", &json!({"ids": [id], "list": "number"})).unwrap();
     let eleven = 9 * 7 + 8;
     s.execute("text.tabs.set", &json!({"ids": [id], "start": eleven, "end": eleven, "stops": [{"position": 72, "leader": "."}]})).unwrap();
@@ -669,9 +664,8 @@ fn convert_to_text_writes_the_markers_where_they_were_drawn() {
         ("One ", 300, json!([{"position": 200, "align": "right"}]), vec![(200.0, right, String::new())]),
         ("The quick brown fox jumps over the lazy dog", 230, json!([{"position": 100, "align": "right"}, {"position": 150}]), vec![]),
     ] {
-        let id = s
-            .execute("text.create", &json!({"x": 10, "y": 600, "size": 30, "text": text_in, "area": {"width": width, "height": 300}}))
-            .unwrap()["id"]
+        let id = s.execute("text.create", &json!({"x": 10, "y": 600, "size": 30, "text": text_in, "area": {"width": width, "height": 300}})).unwrap()
+            ["id"]
             .as_u64()
             .unwrap();
         s.execute("text.setFormat", &json!({"ids": [id], "list": "number", "composer": "singleLine"})).unwrap();
@@ -680,11 +674,7 @@ fn convert_to_text_writes_the_markers_where_they_were_drawn() {
         s.execute("text.convertListToText", &json!({"ids": [id]})).unwrap();
         assert_eq!(drawn_glyphs(&s, id), before, "{text_in:?}");
         let after = tabs(&s, id, 0);
-        assert_eq!(
-            (after.first().map(|t| (t.1, t.2.as_str())), after.get(1..).map(<[_]>::to_vec)),
-            (Some((left, "")), Some(kept)),
-            "{text_in:?}"
-        );
+        assert_eq!((after.first().map(|t| (t.1, t.2.as_str())), after.get(1..).map(<[_]>::to_vec)), (Some((left, "")), Some(kept)), "{text_in:?}");
     }
     // Overset items, which the layout leaves out, get the stop by the same rule: a 30 pt number is
     // wider than the hanging indent, a 12 pt bullet is not.
@@ -703,8 +693,7 @@ fn convert_to_text_writes_the_markers_where_they_were_drawn() {
     }
     // Point type and vertical type.
     for vertical in [false, true] {
-        let id =
-            s.execute("text.create", &json!({"x": 400, "y": 700, "vertical": vertical, "text": "One\nTwo"})).unwrap()["id"].as_u64().unwrap();
+        let id = s.execute("text.create", &json!({"x": 400, "y": 700, "vertical": vertical, "text": "One\nTwo"})).unwrap()["id"].as_u64().unwrap();
         s.execute("text.setFormat", &json!({"ids": [id], "list": "number"})).unwrap();
         let before = drawn_glyphs(&s, id);
         s.execute("text.convertListToText", &json!({"ids": [id]})).unwrap();
@@ -771,9 +760,8 @@ fn threaded_numbers_convert_to_text_as_the_story_counted_them() {
         vectorcraft_text::layout(vectorcraft_text::FontDb::global(), t).markers.iter().map(|m| m.text.clone()).collect::<Vec<_>>()
     };
     let thread = |s: &mut Session, text: &str| {
-        let a = s.execute("text.create", &json!({"x": 10, "y": 10, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"]
-            .as_u64()
-            .unwrap();
+        let a =
+            s.execute("text.create", &json!({"x": 10, "y": 10, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
         let b = s.execute("shape.rectangle", &json!({"x": 200, "y": 10, "width": 150, "height": 200})).unwrap()["id"].as_u64().unwrap();
         s.execute("select.set", &json!({"ids": [a, b]})).unwrap();
         s.execute("text.thread.create", &json!({})).unwrap();
@@ -814,9 +802,8 @@ fn threaded_numbers_convert_to_text_as_the_story_counted_them() {
     assert!(second.para_at(0).list.is_none(), "the third paragraph's part in the second frame leaves the list too");
     // One item that fits in the first of three frames: the two empty frames after it leave the
     // list too, so the re-flowed thread draws no number before the converted one.
-    let a = s.execute("text.create", &json!({"x": 10, "y": 10, "text": "Item", "area": {"width": 150, "height": 60}})).unwrap()["id"]
-        .as_u64()
-        .unwrap();
+    let a =
+        s.execute("text.create", &json!({"x": 10, "y": 10, "text": "Item", "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
     let b = s.execute("shape.rectangle", &json!({"x": 200, "y": 10, "width": 150, "height": 60})).unwrap()["id"].as_u64().unwrap();
     let c = s.execute("shape.rectangle", &json!({"x": 400, "y": 10, "width": 150, "height": 60})).unwrap()["id"].as_u64().unwrap();
     s.execute("select.set", &json!({"ids": [a, b, c]})).unwrap();
@@ -1049,9 +1036,8 @@ fn leading_model_is_set_per_paragraph_and_saved_only_when_top_to_top() {
     let mut s = Session::new();
     s.execute("file.new", &json!({"width": 400, "height": 400})).unwrap();
     // Exercise ink bounds with bundled glyphs; Japanese outlines require optional craft-fonts.
-    let id = s.execute("text.create", &json!({"x": 10, "y": 10, "text": "A\nB", "area": {"width": 200, "height": 100}})).unwrap()["id"]
-        .as_u64()
-        .unwrap();
+    let id =
+        s.execute("text.create", &json!({"x": 10, "y": 10, "text": "A\nB", "area": {"width": 200, "height": 100}})).unwrap()["id"].as_u64().unwrap();
     let text = |s: &Session| match &s.doc().unwrap().doc.node(NodeId(id)).unwrap().kind {
         NodeKind::Text(t) => (**t).clone(),
         _ => panic!("text"),
@@ -1387,9 +1373,8 @@ fn area_options_columns_change_layout() {
     let mut s = Session::new();
     s.execute("file.new", &json!({"width": 400, "height": 400})).unwrap();
     let text = "word ".repeat(80);
-    let id = s.execute("text.create", &json!({"x": 10, "y": 10, "text": text, "area": {"width": 300, "height": 120}})).unwrap()["id"]
-        .as_u64()
-        .unwrap();
+    let id =
+        s.execute("text.create", &json!({"x": 10, "y": 10, "text": text, "area": {"width": 300, "height": 120}})).unwrap()["id"].as_u64().unwrap();
     s.execute("select.set", &json!({"ids": [id]})).unwrap();
     let q = s.execute("text.areaOptions", &json!({})).unwrap();
     assert_eq!((q["rows"].as_u64(), q["columns"].as_u64()), (Some(1), Some(1)));

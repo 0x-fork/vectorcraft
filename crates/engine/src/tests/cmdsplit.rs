@@ -3,8 +3,8 @@
 
 use serde_json::json;
 
-use crate::*;
 use crate::cmd::{leaf_targets, paint_targets, unique_name};
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

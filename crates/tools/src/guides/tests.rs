@@ -79,10 +79,8 @@ fn scale_snap_lands_the_handle_on_anchors() {
     let l = d.layers[0].id;
     let id = d.alloc_id();
     // A triangle whose apex (320, 400) lines up with none of the edges or centres on x.
-    let tri = vectorcraft_geom::PathData::single(SubPath::polyline(
-        &[Point::new(300.0, 300.0), Point::new(380.0, 300.0), Point::new(320.0, 400.0)],
-        true,
-    ));
+    let tri =
+        vectorcraft_geom::PathData::single(SubPath::polyline(&[Point::new(300.0, 300.0), Point::new(380.0, 300.0), Point::new(320.0, 400.0)], true));
     d.insert(Some(l), 1, Node::path(id, tri, Appearance::default_art())).unwrap();
     let t = Targets::collect(&d, &[], None);
     let snap = |r: Rect, h: Handle, p: Point, shift: bool| {
@@ -133,8 +131,7 @@ fn spacing_guides_space_a_moved_selection_evenly() {
     // Halfway between B and a box at 220–260: 50 either side.
     let mut wide = d.clone();
     let id = wide.alloc_id();
-    wide.insert(Some(l), 0, Node::path(id, vectorcraft_geom::shapes::rectangle(Rect::new(220.0, 300.0, 260.0, 340.0)), Default::default()))
-        .unwrap();
+    wide.insert(Some(l), 0, Node::path(id, vectorcraft_geom::shapes::rectangle(Rect::new(220.0, 300.0, 260.0, 340.0)), Default::default())).unwrap();
     let (dv, ov) = Targets::for_move(&cx(&wide, &s, &p), &s.objects).snap_rect(Rect::new(148.0, 305.0, 188.0, 345.0), 4.0);
     assert_eq!(dv, Vec2::new(2.0, 0.0));
     assert!(lines(&ov) >= 6, "{ov:?}");
@@ -197,9 +194,7 @@ fn display_options_colour_and_hide_the_guides_but_keep_the_snap() {
     let (q, ov) = t.snap_point(Point::new(301.0, 199.0), 4.0);
     assert_eq!(q.y, 200.0);
     assert!(ov.iter().all(|o| matches!(o, Overlay::Line { color, .. } | Overlay::Label { color, .. } if *color == green)), "{ov:?}");
-    assert!(
-        ov.iter().any(|o| matches!(o, Overlay::Line { .. })) && ov.iter().any(|o| matches!(o, Overlay::Label { text, .. } if text == "align"))
-    );
+    assert!(ov.iter().any(|o| matches!(o, Overlay::Line { .. })) && ov.iter().any(|o| matches!(o, Overlay::Label { text, .. } if text == "align")));
     // Alignment Guides off: the point still lines up and says so, without the line.
     let c = ToolContext { alignment_guides: false, ..cx(&d, &s, &p) };
     let t = Targets::collect(&d, &[], None).styled(&c);
@@ -294,10 +289,8 @@ fn dragged_end_of_a_slanted_line_keeps_to_its_extension() {
     // Two anchors moving, the middle one staying put: no telling which one the pointer drags,
     // so neither keeps to the extension of its segment.
     let id = d.alloc_id();
-    let bent = vectorcraft_geom::PathData::single(SubPath::polyline(
-        &[Point::new(250.0, 450.0), Point::new(300.0, 400.0), Point::new(380.0, 340.0)],
-        false,
-    ));
+    let bent =
+        vectorcraft_geom::PathData::single(SubPath::polyline(&[Point::new(250.0, 450.0), Point::new(300.0, 400.0), Point::new(380.0, 340.0)], false));
     d.insert(Some(l), 1, Node::path(id, bent, Appearance::default_art())).unwrap();
     let mut s = Selection::default();
     s.set([id]);

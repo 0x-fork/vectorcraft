@@ -319,8 +319,7 @@ fn numbers_without_units_are_points_reaches_the_fields_and_dims_without_picas() 
 /// choices this version offers are kept (#502).
 #[test]
 fn a_graphics_processor_this_version_does_not_offer_reads_as_automatic() {
-    for (saved, read) in [("powerSaving", "automatic"), ("turbo", "automatic"), ("lowPower", "lowPower"), ("highPerformance", "highPerformance")]
-    {
+    for (saved, read) in [("powerSaving", "automatic"), ("turbo", "automatic"), ("lowPower", "lowPower"), ("highPerformance", "highPerformance")] {
         let mut a = app();
         a.ui.engine_prefs = json!({"gpuPreference": saved});
         restore(&mut a);

@@ -34,6 +34,8 @@ mod pdfx;
 mod presets;
 mod print;
 mod printadvanced;
+mod reader_compat;
+mod reader_streaming;
 mod realtext;
 mod settings;
 pub(super) mod stroke;
@@ -41,8 +43,6 @@ mod strokeout;
 mod text_placement;
 mod textstroke;
 mod webview;
-mod reader_streaming;
-mod reader_compat;
 
 fn doc(w: f64, h: f64) -> Document {
     Document::new(w, h)

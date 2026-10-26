@@ -112,8 +112,7 @@ fn corner_kinds_save_only_when_some_corner_isnt_round() {
     assert_eq!(json["kinds"], serde_json::json!(["round", "chamfer", "round", "round"]));
     assert_eq!(serde_json::from_value::<LiveShape>(json).unwrap(), l);
     // Polygons saved before Live Corners cut theirs read as sharp; a live path round-trips.
-    let p: LiveShape =
-        serde_json::from_value(serde_json::json!({"shape": "polygon", "radius": 10.0, "sides": 5, "xf": [1, 0, 0, 1, 0, 0]})).unwrap();
+    let p: LiveShape = serde_json::from_value(serde_json::json!({"shape": "polygon", "radius": 10.0, "sides": 5, "xf": [1, 0, 0, 1, 0, 0]})).unwrap();
     assert_eq!(p, LiveShape::Polygon { radius: 10.0, sides: 5, xf: Affine::IDENTITY, radii: vec![], kinds: vec![], radii_relative: false });
     let star = shapes::star(Point::new(0.0, 0.0), 20.0, 10.0, 5, 0.0);
     let path = LiveShape::Path { base: star, radii: vec![2.0; 10], kinds: vec![], radii_relative: false };
@@ -395,8 +394,7 @@ fn type_visual_bounds_grow_with_the_character_stroke() {
 /// A group holding a path, a compound, an image and a nested group, as a file writes it.
 fn nested_group() -> Node {
     let path = |id| Node::path(NodeId(id), shapes::rectangle(Rect::new(0.0, 0.0, 10.0, 10.0)), Appearance::default_art());
-    let image =
-        ImageObject { key: "k".into(), width: 2, height: 3, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
+    let image = ImageObject { key: "k".into(), width: 2, height: 3, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
     let inner = Node::new(NodeId(5), NodeKind::Group { children: vec![Arc::new(path(6))], clip: true });
     let compound = Node::new(NodeId(3), NodeKind::Compound { children: vec![Arc::new(path(4))], rule: FillRule::EvenOdd });
     let kids = vec![Arc::new(path(2)), Arc::new(compound), Arc::new(Node::new(NodeId(7), NodeKind::Image(Box::new(image)))), Arc::new(inner)];
@@ -417,10 +415,7 @@ fn kinds_read_back_with_type_first_or_anywhere() {
     let kind = r#"{"children":[],"x":{"deep":[1,2]},"clip":true,"type":"group"}"#;
     assert_eq!(serde_json::from_str::<NodeKind>(kind).unwrap(), NodeKind::Group { children: vec![], clip: true });
     let kind = r#"{"symbol":"S","type":"symbolinstance","later":1,"xf":[1,0,0,1,5,6]}"#;
-    assert_eq!(
-        serde_json::from_str::<NodeKind>(kind).unwrap(),
-        NodeKind::SymbolInstance { symbol: "S".into(), xf: Affine::translate((5.0, 6.0)) }
-    );
+    assert_eq!(serde_json::from_str::<NodeKind>(kind).unwrap(), NodeKind::SymbolInstance { symbol: "S".into(), xf: Affine::translate((5.0, 6.0)) });
     let kind = r#"{"width":2,"type":"image","key":"k","height":3,"xf":[1,0,0,1,0,0]}"#;
     assert!(matches!(serde_json::from_str::<NodeKind>(kind).unwrap(), NodeKind::Image(i) if i.key == "k" && i.height == 3));
     // Defaults as before.

@@ -6,9 +6,9 @@ use serde_json::{Value, json};
 use vectorcraft_geom::Affine;
 use vectorcraft_render::{RenderOptions, Renderer};
 
-use crate::*;
 use crate::cmd::maskedit::MASK_EDIT_LAYER;
 use crate::tests::{history, select_with_a_step_to_redo};
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

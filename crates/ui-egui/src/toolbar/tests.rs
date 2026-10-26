@@ -281,8 +281,7 @@ fn double_clicking_the_line_arc_and_grid_tools_opens_their_tool_options() {
         ("rectangularGrid", "rows", json!(2), "shape.rectangularGrid", "rows"),
         ("polarGrid", "radial", json!(3), "shape.polarGrid", "radial"),
     ];
-    let objects =
-        |app: &VectorcraftApp| app.session.active().unwrap().doc.layers.iter().map(|l| l.children().map_or(0, |c| c.len())).sum::<usize>();
+    let objects = |app: &VectorcraftApp| app.session.active().unwrap().doc.layers.iter().map(|l| l.children().map_or(0, |c| c.len())).sum::<usize>();
     let drag = |app: &mut VectorcraftApp| {
         let view = app.view_info();
         for (kind, x, y) in [
@@ -701,10 +700,7 @@ fn a_flyout_dragged_by_its_bar_floats_until_its_close_box_puts_it_back() {
     // A strip of its nine tools' buttons, its bar under the pointer.
     let drop = bar + vec2(60.0, 40.0);
     assert!(float.height() < 40.0 && float.width() > 9.0 * STRIP_BUTTON.x, "a one-row strip: {float:?}");
-    assert!(
-        (float.right() - 1.0 - BAR / 2.0 - drop.x).abs() < 1.0 && float.y_range().contains(drop.y),
-        "its bar is under the pointer: {float:?}"
-    );
+    assert!((float.right() - 1.0 - BAR / 2.0 - drop.x).abs() < 1.0 && float.y_range().contains(drop.y), "its bar is under the pointer: {float:?}");
     // The same bar moves it.
     let bar = pos2(float.right() - 1.0 - BAR / 2.0, float.bottom() - 6.0);
     drag(&mut app, &ctx, 3.0, bar, &[bar + vec2(0.0, 20.0), bar + vec2(-10.0, 100.0)]);

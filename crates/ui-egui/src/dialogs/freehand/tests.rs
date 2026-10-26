@@ -39,15 +39,9 @@ fn the_fidelity_keys_step_finely_at_the_low_end() {
     assert_eq!(down, up.iter().rev().copied().collect::<Vec<_>>());
     // Ten steps at once (Shift) multiply or divide by ten.
     assert_eq!((fidelity_step(0.01, 10.0), fidelity_step(0.1, 10.0), fidelity_step(1.0, 10.0)), (0.1, 1.0, 10.0));
-    assert_eq!(
-        (fidelity_step(10.0, -10.0), fidelity_step(1.0, -10.0), fidelity_step(0.1, -10.0), fidelity_step(0.03, 10.0)),
-        (1.0, 0.1, 0.01, 0.3)
-    );
+    assert_eq!((fidelity_step(10.0, -10.0), fidelity_step(1.0, -10.0), fidelity_step(0.1, -10.0), fidelity_step(0.03, 10.0)), (1.0, 0.1, 0.01, 0.3));
     // A value between steps goes to the next one in its direction.
-    assert_eq!(
-        (fidelity_step(0.035, 1.0), fidelity_step(0.035, -1.0), fidelity_step(1.5, 1.0), fidelity_step(1.5, -1.0)),
-        (0.04, 0.03, 2.0, 1.0)
-    );
+    assert_eq!((fidelity_step(0.035, 1.0), fidelity_step(0.035, -1.0), fidelity_step(1.5, 1.0), fidelity_step(1.5, -1.0)), (0.04, 0.03, 2.0, 1.0));
 }
 
 #[test]
@@ -86,8 +80,7 @@ fn each_tool_shows_its_options_and_ok_sets_them() {
         (d.f64("fidelity", 0.0), d.bool("fill"), d.bool("altSmooth"), d.f64("closeWithin", 0.0), d.f64("editWithin", 0.0)),
         (1.5, false, false, 15.0, 12.0)
     );
-    for (k, v) in
-        [("fidelity", json!(6.5)), ("fill", json!(true)), ("altSmooth", json!(true)), ("closeWithin", json!(0)), ("editWithin", json!(20))]
+    for (k, v) in [("fidelity", json!(6.5)), ("fill", json!(true)), ("altSmooth", json!(true)), ("closeWithin", json!(0)), ("editWithin", json!(20))]
     {
         d.fields.insert(k.into(), v);
     }

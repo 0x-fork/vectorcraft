@@ -179,8 +179,7 @@ fn art_on_a_locked_artboard_cannot_be_selected_or_edited() {
     let (sub, s1, s2) = (d.alloc_id(), d.alloc_id(), d.alloc_id());
     d.insert(Some(layer), usize::MAX, Node::layer(sub, "Sub", LayerColor::Preset(2))).unwrap();
     for (id, x, y) in [(s1, 300.0, 300.0), (s2, 800.0, 100.0)] {
-        d.insert(Some(sub), usize::MAX, Node::path(id, shapes::rectangle(Rect::new(x, y, x + 10.0, y + 10.0)), Appearance::default_art()))
-            .unwrap();
+        d.insert(Some(sub), usize::MAX, Node::path(id, shapes::rectangle(Rect::new(x, y, x + 10.0, y + 10.0)), Appearance::default_art())).unwrap();
     }
     assert_eq!((top(&d, 305.0, 305.0), top(&d, 805.0, 105.0)), (Some(s1), None));
     assert!(!d.on_locked_artboard(sub));
@@ -378,11 +377,8 @@ fn setup_round_trips_and_old_files_load() {
 
 #[test]
 fn char_position_round_trips() {
-    let st = CharStyle {
-        position: CharPosition::Subscript(ScriptMetrics { size: 50.0, position: 20.0 }),
-        small_caps: Some(75.0),
-        ..CharStyle::default()
-    };
+    let st =
+        CharStyle { position: CharPosition::Subscript(ScriptMetrics { size: 50.0, position: 20.0 }), small_caps: Some(75.0), ..CharStyle::default() };
     let v = serde_json::to_value(&st).unwrap();
     assert_eq!(v["position"], serde_json::json!({"kind": "subscript", "size": 50.0, "position": 20.0}));
     assert_eq!(serde_json::from_value::<CharStyle>(v).unwrap(), st);

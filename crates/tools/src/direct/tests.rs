@@ -942,10 +942,7 @@ fn alt_during_a_drag_by_an_anchor_toggles_the_copy() {
         )
     };
     assert!(t.pointer(&c, &PointerEvent::new(PointerKind::Down, 300.0, 300.0)).is_empty());
-    assert_eq!(
-        t.pointer(&c, &PointerEvent::new(PointerKind::Drag, 250.0, 250.0)),
-        vec![Action::Begin("Move".into()), preview(-50.0, -50.0, false)]
-    );
+    assert_eq!(t.pointer(&c, &PointerEvent::new(PointerKind::Drag, 250.0, 250.0)), vec![Action::Begin("Move".into()), preview(-50.0, -50.0, false)]);
     // The tool sees the document as previewed: B moved along, not where the copy leaves it.
     let (mut moved, _, b2) = two_squares();
     let l = moved.layers[0].id;

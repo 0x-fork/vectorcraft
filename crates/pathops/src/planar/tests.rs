@@ -433,10 +433,7 @@ fn shape_builder_gap_detection_closes_small_gaps() {
     assert!((len - 396.0).abs() < 1e-6, "{len}");
     // Two paths whose ends miss each other: a U and a lid 3 above it.
     let u = Shape::new(
-        PathData::single(SubPath::polyline(
-            &[Point::new(0.0, 0.0), Point::new(0.0, 100.0), Point::new(100.0, 100.0), Point::new(100.0, 0.0)],
-            false,
-        )),
+        PathData::single(SubPath::polyline(&[Point::new(0.0, 0.0), Point::new(0.0, 100.0), Point::new(100.0, 100.0), Point::new(100.0, 0.0)], false)),
         FillRule::NonZero,
         0,
     );
@@ -493,8 +490,7 @@ fn shape_builder_offers_the_gaps_closed_shapes_enclose() {
     assert_eq!(shape_builder(&s, true).regions, regions, "the outline edges don't change them");
     // A ring of four bars that overlap at the corners: the eight pieces of the bars and the
     // square they enclose.
-    let s =
-        [rect(0.0, 0.0, 300.0, 100.0, 0), rect(200.0, 0.0, 300.0, 300.0, 1), rect(0.0, 200.0, 300.0, 300.0, 2), rect(0.0, 0.0, 100.0, 300.0, 3)];
+    let s = [rect(0.0, 0.0, 300.0, 100.0, 0), rect(200.0, 0.0, 300.0, 300.0, 1), rect(0.0, 200.0, 300.0, 300.0, 2), rect(0.0, 0.0, 100.0, 300.0, 3)];
     let regions = shape_builder(&s, false).regions;
     assert_eq!(regions.len(), 9, "{regions:?}");
     let gaps: Vec<&Region> = regions.iter().filter(|r| r.sources.is_empty()).collect();
@@ -847,8 +843,7 @@ fn run_around_stops_at_the_stops_either_side() {
     let edge = &lone.edges[0].path.subpaths[0];
     let corners = [(0.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)].map(Point::from);
     let side = |at: (f64, f64)| {
-        run_around(edge, &corners, Point::from(at), 1e-3)
-            .map(|sp| (sp.closed, PathData::single(sp.clone()).length(), PathData::single(sp).bounds()))
+        run_around(edge, &corners, Point::from(at), 1e-3).map(|sp| (sp.closed, PathData::single(sp.clone()).length(), PathData::single(sp).bounds()))
     };
     assert_eq!(side((50.0, 1.0)), Some((false, 100.0, Some(Rect::new(0.0, 0.0, 100.0, 0.0)))));
     for at in [(0.5, 50.0), (99.0, 50.0), (50.0, 100.0)] {

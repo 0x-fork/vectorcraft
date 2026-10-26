@@ -114,8 +114,7 @@ fn a_popup_covering_a_title_does_not_switch_menus() {
     let mut reaches = (true, false);
     // The popup becomes hit-testable once egui has laid it out: draw a few frames.
     for _ in 0..3 {
-        let raw =
-            egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 200.0))), ..Default::default() };
+        let raw = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 200.0))), ..Default::default() };
         let mut out = ctx.run_ui(raw, |ui| {
             let ctx = ui.ctx().clone();
             let covered = ui.interact(egui::Rect::from_center_size(p, egui::vec2(80.0, 24.0)), egui::Id::unique("covered"), egui::Sense::click());

@@ -239,8 +239,7 @@ fn the_question_comes_back_after_a_dialog_that_took_its_place() {
         vectorcraft_testkit::pdf::pdf(&[page(), page()], None)
     };
     let opened = |name: &str, path: Option<String>, bytes: Vec<u8>| (crate::place::DropTarget::Open, (name.to_string(), path, bytes));
-    let files =
-        vec![opened("a.vectorcraft", Some(doc.to_string_lossy().into_owned()), std::fs::read(&doc).unwrap()), opened("b.pdf", None, pdf())];
+    let files = vec![opened("a.vectorcraft", Some(doc.to_string_lossy().into_owned()), std::fs::read(&doc).unwrap()), opened("b.pdf", None, pdf())];
     crate::place::drop_files(&mut app, files);
     assert_eq!(kind(&app), Some(super::super::import_pdf::KIND));
     super::super::cancel(&mut app);

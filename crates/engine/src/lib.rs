@@ -2597,7 +2597,11 @@ pub(crate) fn adding_fonts() -> std::sync::MutexGuard<'static, ()> {
 }
 
 #[cfg(test)]
-use tests::{adjust as tests_adjust, clip as tests_clip, colormgmt as tests_colormgmt, expand as tests_expand, large_edits as tests_large_edits, links as tests_links, linkspanel as tests_linkspanel, menucmds as tests_menucmds, outlinestroke as tests_outlinestroke, persp_select as tests_persp_select, textimport as tests_textimport};
+use tests::{
+    adjust as tests_adjust, clip as tests_clip, colormgmt as tests_colormgmt, expand as tests_expand, large_edits as tests_large_edits,
+    links as tests_links, linkspanel as tests_linkspanel, menucmds as tests_menucmds, outlinestroke as tests_outlinestroke,
+    persp_select as tests_persp_select, textimport as tests_textimport,
+};
 #[cfg(test)]
 mod tests;
 

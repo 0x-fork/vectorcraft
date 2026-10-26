@@ -55,9 +55,7 @@ fn a_gradient_saved_as_a_swatch_keeps_its_stops_models_in_a_cmyk_document() {
     let colors = |g: &GradientPaint| g.gradient.stops.iter().map(|s| s.color).collect::<Vec<_>>();
     assert_eq!(colors(&g), [Color::rgb8(255, 128, 0), Color::cmyk(0.0, 0.0, 0.0, 1.0)]);
     save_to_swatches(&mut app, &g);
-    let Some(Paint::Gradient(saved)) = app.session.doc().unwrap().doc.swatches.last().map(|w| w.paint.clone()) else {
-        panic!("a gradient swatch")
-    };
+    let Some(Paint::Gradient(saved)) = app.session.doc().unwrap().doc.swatches.last().map(|w| w.paint.clone()) else { panic!("a gradient swatch") };
     assert_eq!(colors(&saved), colors(&g));
 }
 
@@ -150,9 +148,7 @@ impl Panel {
                 .layers()
                 .flat_map(|(_, w)| w.iter())
                 .map(|w| w.rect)
-                .filter(|r| {
-                    (r.width() - size).abs() < 0.5 && (r.height() - size).abs() < 0.5 && (r.center().y - at.y).abs() < 8.0 && r.left() > at.x
-                })
+                .filter(|r| (r.width() - size).abs() < 0.5 && (r.height() - size).abs() < 0.5 && (r.center().y - at.y).abs() < 8.0 && r.left() > at.x)
                 .collect()
         });
         v.sort_by(|a, b| a.left().total_cmp(&b.left()));
@@ -405,10 +401,7 @@ fn double_clicking_a_stop_opens_the_shared_popover_beside_it() {
     let b = |pressed| Event::PointerButton { pos: stop.center(), button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
     p.frame(&mut app, vec![Event::PointerMoved(stop.center()), b(true), b(false), b(true), b(false)], Modifiers::NONE);
     let d = app.ui.dialog.clone().expect("the popover opened");
-    assert_eq!(
-        (d.kind.as_str(), &d.fields["index"], &d.fields["screen"]),
-        ("gradientStop", &json!(1), &json!([stop.left(), stop.bottom() + 4.0]))
-    );
+    assert_eq!((d.kind.as_str(), &d.fields["index"], &d.fields["screen"]), ("gradientStop", &json!(1), &json!([stop.left(), stop.bottom() + 4.0])));
     assert_eq!(app.session.selected_stop(), Some(1));
 }
 

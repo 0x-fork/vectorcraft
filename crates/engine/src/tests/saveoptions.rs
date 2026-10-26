@@ -6,8 +6,8 @@ use std::sync::Arc;
 use serde_json::{Value, json};
 use vectorcraft_color::cms;
 
-use crate::*;
 use crate::tests_links::{Folder, png};
+use crate::*;
 
 /// Three artboards (named A, B and C) with a rectangle on each.
 fn three_boards() -> Session {

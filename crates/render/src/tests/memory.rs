@@ -6,8 +6,8 @@
 use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::{Document, ImageBlob, ImageObject, Node, NodeKind};
 
-use crate::*;
 use crate::tests_fontchange::fonts_steady;
+use crate::*;
 
 /// A `w`×`h` PNG whose pixels depend on `seed` (each test its own image: the store is shared by
 /// the tests running alongside).

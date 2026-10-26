@@ -672,12 +672,8 @@ fn a_shift_move_lined_up_by_smart_guides_stays_on_its_line() {
         let (mut d, id) = doc_with_rect();
         let l = d.layers[0].id;
         let other = d.alloc_id();
-        d.insert(
-            Some(l),
-            1,
-            vectorcraft_doc::Node::path(other, vectorcraft_geom::shapes::rectangle(r), vectorcraft_doc::Appearance::default_art()),
-        )
-        .unwrap();
+        d.insert(Some(l), 1, vectorcraft_doc::Node::path(other, vectorcraft_geom::shapes::rectangle(r), vectorcraft_doc::Appearance::default_art()))
+            .unwrap();
         (d, id)
     };
     let p = paint();
@@ -1020,10 +1016,7 @@ fn marquee_selects_ruler_guides() {
     let a = t.pointer(&cx, &ev(PointerKind::Up, 120.0, 120.0));
     assert_eq!(
         a,
-        vec![
-            Action::Exec("select.set".into(), json!({"ids": [id.0]})),
-            Action::Exec("guide.select".into(), json!({"indexes": [0], "toggle": true})),
-        ]
+        vec![Action::Exec("select.set".into(), json!({"ids": [id.0]})), Action::Exec("guide.select".into(), json!({"indexes": [0], "toggle": true})),]
     );
 }
 
@@ -1484,10 +1477,7 @@ fn loaded_text_threads_into_the_art_on_a_layer_masks_edge() {
     t.pointer(&cx, &ev(PointerKind::Down, port.x, port.y));
     t.pointer(&cx, &ev(PointerKind::Up, port.x, port.y));
     t.pointer(&cx, &ev(PointerKind::Down, 498.5, 450.0));
-    assert_eq!(
-        t.pointer(&cx, &ev(PointerKind::Up, 498.5, 450.0)),
-        vec![Action::Exec("text.thread.add".into(), json!({"from": id.0, "to": art.0}))]
-    );
+    assert_eq!(t.pointer(&cx, &ev(PointerKind::Up, 498.5, 450.0)), vec![Action::Exec("text.thread.add".into(), json!({"from": id.0, "to": art.0}))]);
 }
 
 /// A double-click on type where a layer's clipping mask edge runs through it edits the type,

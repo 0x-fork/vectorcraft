@@ -142,10 +142,7 @@ fn paragraph_mixed_alignment_click_center_and_undo() {
     assert_eq!(alignment_frame(&ctx, &mut app, 28.0).0, [Justify::Center]);
     let node = app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id.as_u64().unwrap())).unwrap();
     let NodeKind::Text(text) = &node.kind else { panic!("text") };
-    assert_eq!(
-        (text.para_at(0).justify, text.para_at(1).justify, text.para_at(2).justify),
-        (Justify::Center, Justify::Center, Justify::JustifyAll)
-    );
+    assert_eq!((text.para_at(0).justify, text.para_at(1).justify, text.para_at(2).justify), (Justify::Center, Justify::Center, Justify::JustifyAll));
     let NodeKind::Text(old) = &before.node(node.id).unwrap().kind else { panic!("text") };
     for i in 0..3 {
         let mut expected = old.para_at(i).clone();
@@ -479,8 +476,7 @@ fn convert_to_text_keeps_the_caret_by_its_character_in_threaded_type() {
     app.run("file.new", json!({"width": 600, "height": 300})).unwrap();
     let long = "The quick brown fox jumps over the lazy dog. ".repeat(4);
     let text = format!("One\nTwo\n{long}\nFour");
-    let a =
-        app.run("text.create", json!({"x": 10, "y": 10, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
+    let a = app.run("text.create", json!({"x": 10, "y": 10, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
     let b = app.run("shape.rectangle", json!({"x": 200, "y": 10, "width": 150, "height": 200})).unwrap()["id"].as_u64().unwrap();
     app.run("select.set", json!({"ids": [a, b]})).unwrap();
     app.run("text.thread.create", json!({})).unwrap();

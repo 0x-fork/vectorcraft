@@ -5,8 +5,8 @@ use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::Node;
 use vectorcraft_tools::{PointerEvent, PointerKind};
 
-use crate::*;
 use crate::tooling::ViewInfo;
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

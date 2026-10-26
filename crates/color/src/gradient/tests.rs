@@ -16,13 +16,7 @@ fn increasing_samples_match_single_samples() {
     let stop = |offset: f32, hex: &str, midpoint: f32| GradientStop { midpoint, ..GradientStop::new(offset, Color::from_hex(hex).unwrap()) };
     let g = Gradient::new(
         GradientKind::Linear,
-        vec![
-            stop(0.1, "#ff0000", 0.3),
-            stop(0.4, "#00ff00", 0.7),
-            stop(0.4, "#0000ff", 0.5),
-            stop(0.2, "#ffff00", 0.5),
-            stop(0.9, "#000000", 0.5),
-        ],
+        vec![stop(0.1, "#ff0000", 0.3), stop(0.4, "#00ff00", 0.7), stop(0.4, "#0000ff", 0.5), stop(0.2, "#ffff00", 0.5), stop(0.9, "#000000", 0.5)],
     );
     let ts: Vec<f32> = (0..=40).map(|k| k as f32 / 40.0).collect();
     let one_by_one: Vec<_> = ts.iter().map(|&t| g.sample_with(t, Color::lerp_keep_model)).collect();

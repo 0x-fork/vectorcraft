@@ -9,8 +9,8 @@ use vectorcraft_geom::Affine;
 use vectorcraft_render::proof::ProofSetup;
 use vectorcraft_render::{RenderOptions, Renderer};
 
-use crate::*;
 use crate::tests_colormgmt::GLOBAL;
+use crate::*;
 
 fn session() -> Session {
     let mut s = Session::new();

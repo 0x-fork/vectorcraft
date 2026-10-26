@@ -79,12 +79,8 @@ fn double_clicking_a_brush_opens_its_options() {
         std::iter::once(egui::Event::PointerMoved(at)).chain((0..n).flat_map(|_| [button(at, true), button(at, false)])).collect()
     };
     let at_time = |app: &mut VectorcraftApp, time: f64, events: Vec<egui::Event>| {
-        let raw = egui::RawInput {
-            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(236.0, 600.0))),
-            time: Some(time),
-            events,
-            ..Default::default()
-        };
+        let raw =
+            egui::RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(236.0, 600.0))), time: Some(time), events, ..Default::default() };
         ctx.run_ui(raw, |ui| show(app, ui)).textures_delta.clear();
     };
     at_time(&mut app, 0.0, vec![]);
@@ -443,8 +439,7 @@ fn previews_render_again_only_when_what_they_show_changes() {
     // Striped Ribbon brings its pattern, Sparkles its symbol: only they render.
     app.run("brush.addFromLibrary", json!({"library": "art-ribbons", "name": "Striped Ribbon"})).unwrap();
     assert_eq!(counted(&ctx, &mut app), (1, n + 1));
-    let symbol_key =
-        |app: &VectorcraftApp, name: &str| super::super::symbols::document_symbols(app.session.active().unwrap()).key(name).unwrap_or(0);
+    let symbol_key = |app: &VectorcraftApp, name: &str| super::super::symbols::document_symbols(app.session.active().unwrap()).key(name).unwrap_or(0);
     let sparkle_before = symbol_key(&app, "Sparkle");
     app.run("brush.addFromLibrary", json!({"library": "scatter-shapes", "name": "Sparkles"})).unwrap();
     assert_eq!(counted(&ctx, &mut app), (1, n + 2));
@@ -458,11 +453,8 @@ fn previews_render_again_only_when_what_they_show_changes() {
     app.session
         .edit("Pattern", |d, _| {
             let p = d.patterns.iter_mut().find(|p| p.name == "Pinstripes").unwrap();
-            let dot = Node::path(
-                NodeId(0),
-                vectorcraft_geom::shapes::ellipse(vectorcraft_geom::Rect::new(0.0, 0.0, 3.0, 3.0)),
-                Appearance::default_art(),
-            );
+            let dot =
+                Node::path(NodeId(0), vectorcraft_geom::shapes::ellipse(vectorcraft_geom::Rect::new(0.0, 0.0, 3.0, 3.0)), Appearance::default_art());
             p.art = vec![std::sync::Arc::new(dot)];
             Ok(())
         })

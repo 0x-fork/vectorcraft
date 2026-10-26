@@ -51,11 +51,8 @@ fn effects_after_a_pattern_fill_keep_their_place_and_size() {
             d.remove(filled).unwrap();
             if with_pattern {
                 let id = d.alloc_id();
-                let n = Node::path(
-                    id,
-                    shapes::rectangle(Rect::new(0.0, 0.0, 80.0, 80.0)),
-                    Appearance::basic(pattern_paint("Checks"), Paint::None, 0.0),
-                );
+                let n =
+                    Node::path(id, shapes::rectangle(Rect::new(0.0, 0.0, 80.0, 80.0)), Appearance::basic(pattern_paint("Checks"), Paint::None, 0.0));
                 d.insert(Some(l), 0, n).unwrap();
             }
             let id = d.alloc_id();
@@ -257,8 +254,7 @@ fn kept_tiles_count_the_images_they_could_not_decode() {
     let mut d = doc_with_pattern(TileType::Grid);
     // A PNG signature with nothing after it.
     d.images.insert("cut".into(), ImageBlob::new("image/png", b"\x89PNG\r\n\x1a\n".to_vec()));
-    let im =
-        ImageObject { key: "cut".into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
+    let im = ImageObject { key: "cut".into(), width: 10, height: 10, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
     d.patterns[0].art = vec![Arc::new(Node::new(NodeId(901), NodeKind::Image(Box::new(im))))];
     let mut r = Renderer::new();
     let start = tiles_rasterized();
@@ -308,11 +304,8 @@ fn edit_mode_draws_only_tile_layer_with_copies() {
 #[test]
 fn repeat_renders_instances() {
     let mut d = Document::new(200.0, 200.0);
-    let sq = Node::path(
-        NodeId(50),
-        shapes::rectangle(Rect::new(0.0, 0.0, 10.0, 10.0)),
-        Appearance::basic(Paint::solid(Color::BLACK), Paint::None, 0.0),
-    );
+    let sq =
+        Node::path(NodeId(50), shapes::rectangle(Rect::new(0.0, 0.0, 10.0, 10.0)), Appearance::basic(Paint::solid(Color::BLACK), Paint::None, 0.0));
     let id = d.alloc_id();
     let l = d.layers[0].id;
     d.insert(Some(l), 0, Node::new(id, NodeKind::Repeat(RepeatSpec::grid(vec![Arc::new(sq)], 10.0, 10.0)))).unwrap();

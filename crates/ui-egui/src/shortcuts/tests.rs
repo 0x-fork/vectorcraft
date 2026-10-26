@@ -30,8 +30,7 @@ fn option_and_altgr_still_type_but_cmd_and_ctrl_chords_do_not() {
 /// the text it typed when `typed` is given.
 fn ctrl_alt_press(key: Key, typed: Option<&str>) -> Vec<egui::Event> {
     let m = Modifiers::CTRL | Modifiers::ALT | Modifiers::COMMAND;
-    let mut v =
-        vec![egui::Event::ModifiersChanged(m), egui::Event::Key { key, physical_key: Some(key), pressed: true, repeat: false, modifiers: m }];
+    let mut v = vec![egui::Event::ModifiersChanged(m), egui::Event::Key { key, physical_key: Some(key), pressed: true, repeat: false, modifiers: m }];
     v.extend(typed.map(|t| egui::Event::Text(t.into())));
     v
 }
@@ -213,8 +212,7 @@ fn cmd_shift_b_while_typing_is_bold_not_the_bounding_box() {
     }
     frame(&mut app, vec![egui::Event::Text("Bold".into())]);
     assert!(app.session.tool_wants_text());
-    let chord =
-        egui::Event::Key { key: Key::B, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::SHIFT };
+    let chord = egui::Event::Key { key: Key::B, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::SHIFT };
     frame(&mut app, vec![chord.clone()]);
     assert!(app.ui.view.bounding_box, "the bounding box stays");
     // The chord reached Bold: the text is in a bold face, or its family has none and says so.
@@ -234,20 +232,15 @@ fn cmd_shift_letters_align_paragraphs() {
     let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
     app.session.execute("file.new", &json!({"width": 200, "height": 200})).unwrap();
     let id = app.session.execute("text.create", &json!({"x": 20, "y": 50, "text": "One\nTwo"})).unwrap()["id"].as_u64().unwrap();
-    let chord =
-        |key| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::SHIFT };
+    let chord = |key| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::SHIFT };
     let paras = |app: &VectorcraftApp| match &app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id)).unwrap().kind {
         vectorcraft_doc::NodeKind::Text(t) => (0..t.paragraph_count()).map(|i| t.para_at(i).justify).collect::<Vec<_>>(),
         _ => panic!("text"),
     };
     app.session.execute("select.set", &json!({"ids": [id]})).unwrap();
-    for (key, want) in [
-        (Key::C, Justify::Center),
-        (Key::R, Justify::Right),
-        (Key::J, Justify::JustifyLeft),
-        (Key::F, Justify::JustifyAll),
-        (Key::L, Justify::Left),
-    ] {
+    for (key, want) in
+        [(Key::C, Justify::Center), (Key::R, Justify::Right), (Key::J, Justify::JustifyLeft), (Key::F, Justify::JustifyAll), (Key::L, Justify::Left)]
+    {
         frame(&mut app, vec![chord(key)]);
         assert_eq!(paras(&app), [want, want], "{key:?}");
     }
@@ -271,8 +264,7 @@ fn cmd_alt_q_resets_tracking_and_kerning() {
     let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
     app.session.execute("file.new", &json!({"width": 200, "height": 200})).unwrap();
     let id = app.session.execute("text.create", &json!({"x": 20, "y": 50, "text": "One Two"})).unwrap()["id"].as_u64().unwrap();
-    let spaced =
-        |app: &mut VectorcraftApp| app.session.execute("text.setRangeStyle", &json!({"id": id, "tracking": 200, "kerning": -40})).unwrap();
+    let spaced = |app: &mut VectorcraftApp| app.session.execute("text.setRangeStyle", &json!({"id": id, "tracking": 200, "kerning": -40})).unwrap();
     let spacing = |app: &mut VectorcraftApp| {
         let r = app.session.execute("text.getRange", &json!({"id": id})).unwrap();
         r["runs"]
@@ -282,8 +274,7 @@ fn cmd_alt_q_resets_tracking_and_kerning() {
             .map(|run| (run["text"].clone(), run["style"]["tracking"].clone(), run["style"]["kerning"].clone()))
             .collect::<Vec<_>>()
     };
-    let chord =
-        egui::Event::Key { key: Key::Q, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::ALT };
+    let chord = egui::Event::Key { key: Key::Q, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::ALT };
     spaced(&mut app);
     app.session.execute("select.set", &json!({"ids": [id]})).unwrap();
     frame(&mut app, vec![chord.clone()]);
@@ -679,11 +670,7 @@ fn a_command_on_cmd_escape_runs_without_the_tools_escape() {
     if bindable {
         edit(&mut app);
         frame(&mut app, cmd_escape());
-        assert_eq!(
-            (app.session.tool_wants_text(), app.ui.view.grid),
-            (true, grid),
-            "Cmd+Escape runs Show Grid and the Type tool goes on editing"
-        );
+        assert_eq!((app.session.tool_wants_text(), app.ui.view.grid), (true, grid), "Cmd+Escape runs Show Grid and the Type tool goes on editing");
     }
     app.select_tool("selection");
     app.session.execute("object.isolate", &json!({"id": id})).unwrap();
@@ -865,8 +852,7 @@ fn shifted_punctuation_shortcuts_work_as_typed() {
     let a = app.session.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 50, "height": 50})).unwrap()["id"].clone();
     let b = app.session.execute("shape.ellipse", &json!({"x": 20, "y": 20, "width": 50, "height": 50})).unwrap()["id"].clone();
     app.session.execute("select.set", &json!({"ids": [a]})).unwrap();
-    let order =
-        |app: &VectorcraftApp| -> Vec<u64> { app.session.doc().unwrap().doc.layers[0].children().unwrap().iter().map(|n| n.id.0).collect() };
+    let order = |app: &VectorcraftApp| -> Vec<u64> { app.session.doc().unwrap().doc.layers[0].children().unwrap().iter().map(|n| n.id.0).collect() };
     let (a, b) = (a.as_u64().unwrap(), b.as_u64().unwrap());
     assert_eq!(order(&app), [a, b]);
     let press = |key, modifiers| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
@@ -1026,8 +1012,7 @@ fn digit_keys_reach_a_dragging_tool_once_per_press() {
     app.session.execute("perspective.attach", &json!({"ids": [id], "plane": "right"})).unwrap();
     app.select_tool("perspectiveSelection");
     let v = app.view_info();
-    let c =
-        app.session.doc().unwrap().doc.node(vectorcraft_engine::doc::NodeId(id.as_u64().unwrap())).unwrap().geometric_bounds().unwrap().center();
+    let c = app.session.doc().unwrap().doc.node(vectorcraft_engine::doc::NodeId(id.as_u64().unwrap())).unwrap().geometric_bounds().unwrap().center();
     app.session.pointer(&PointerEvent::new(PointerKind::Down, c.x, c.y), v).unwrap();
     app.session.pointer(&PointerEvent::new(PointerKind::Drag, c.x + 30.0, c.y), v).unwrap();
     let key = |repeat| egui::Event::Key { key: Key::Num5, physical_key: None, pressed: true, repeat, modifiers: Modifiers::NONE };
@@ -1209,8 +1194,7 @@ fn a_new_context_takes_its_own_frame_zero() {
     let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), Default::default());
     let press = |app: &mut VectorcraftApp| {
         let ctx = egui::Context::default();
-        let ev =
-            egui::Event::Key { key: Key::N, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::ALT };
+        let ev = egui::Event::Key { key: Key::N, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::COMMAND | Modifiers::ALT };
         let mut out = ctx.run_ui(egui::RawInput { events: vec![ev], ..Default::default() }, |ui| handle(app, ui.ctx()));
         out.textures_delta.clear();
     };

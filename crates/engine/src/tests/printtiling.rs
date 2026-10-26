@@ -5,8 +5,8 @@
 use serde_json::{Value, json};
 use vectorcraft_tools::{PointerEvent, PointerKind};
 
-use crate::*;
 use crate::tooling::ViewInfo;
+use crate::*;
 
 /// A 300 × 200 document with a rectangle.
 fn session() -> Session {

@@ -16,11 +16,7 @@ fn panel_frame(app: &mut VectorcraftApp, ctx: &egui::Context, events: Vec<Event>
     out.shapes
         .iter()
         .filter_map(|s| {
-            if let egui::Shape::Text(t) = &s.shape {
-                Some((t.galley.text().to_string(), Rect::from_min_size(t.pos, t.galley.size())))
-            } else {
-                None
-            }
+            if let egui::Shape::Text(t) = &s.shape { Some((t.galley.text().to_string(), Rect::from_min_size(t.pos, t.galley.size()))) } else { None }
         })
         .collect()
 }
@@ -126,8 +122,7 @@ fn start_global_edit_quick_action_and_escape() {
     assert!(tall(&mut app, vec![]).iter().any(|(t, _)| t == "Stop Global Edit"));
     assert_eq!(label(&app), "Stop Global Edit");
     let escape = Event::Key { key: egui::Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Default::default() };
-    let raw =
-        egui::RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(300.0, 1600.0))), events: vec![escape], ..Default::default() };
+    let raw = egui::RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(300.0, 1600.0))), events: vec![escape], ..Default::default() };
     let mut out = ctx.run_ui(raw, |ui| crate::shortcuts::handle(&mut app, ui.ctx()));
     out.textures_delta.clear();
     assert!(!on(&app), "Escape stops Global Edit");
@@ -1331,18 +1326,8 @@ fn the_width_profile_shows_for_a_variable_width_or_the_width_tool() {
     let depth = undo_depth(&app);
     press(&mut app, &ctx, text_at(&texts, "Taper Start").center());
     assert_eq!(undo_depth(&app), depth + 1, "one undo step");
-    let profile = app
-        .session
-        .active()
-        .unwrap()
-        .doc
-        .node(vectorcraft_doc::NodeId(line.as_u64().unwrap()))
-        .unwrap()
-        .appearance
-        .stroke()
-        .unwrap()
-        .profile
-        .clone();
+    let profile =
+        app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(line.as_u64().unwrap())).unwrap().appearance.stroke().unwrap().profile.clone();
     assert_eq!(WidthProfile::id_of(profile.as_ref()), "taperStart");
 }
 

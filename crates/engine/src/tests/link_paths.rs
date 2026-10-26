@@ -5,9 +5,9 @@
 use serde_json::{Value, json};
 use vectorcraft_doc::{NodeId, NodeKind};
 
-use crate::*;
 use crate::cmd::fileio::touched;
 use crate::tests_links::{Folder, RED, place, png, session};
+use crate::*;
 
 /// Paths to other computers (and, on Unix, a local file written as one: `//tmp/…`, which Linux
 /// reads as `/tmp/…`).

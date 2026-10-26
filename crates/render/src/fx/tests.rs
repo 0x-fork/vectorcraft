@@ -164,14 +164,12 @@ fn shadow_rasters_keep_their_node_and_a_byte_budget() {
 #[test]
 fn a_coarser_glow_kept_whole_draws_after_a_pan_as_made_again() {
     let size = (640, 360);
-    for (rect, blur, zoom, center, scale) in [
-        (Rect::new(200.0, 300.0, 400.0, 500.0), 100.0, 5.0, (440.0, 400.0), 2.0),
-        (Rect::new(0.0, 0.0, 595.0, 842.0), 2.0, 8.0, (595.0, 421.0), 3.0),
-    ] {
+    for (rect, blur, zoom, center, scale) in
+        [(Rect::new(200.0, 300.0, 400.0, 500.0), 100.0, 5.0, (440.0, 400.0), 2.0), (Rect::new(0.0, 0.0, 595.0, 842.0), 2.0, 8.0, (595.0, 421.0), 3.0)]
+    {
         let mut d = Document::new(595.0, 842.0);
         let layer = d.layers[0].id;
-        let mut n =
-            Node::path(d.alloc_id(), shapes::rectangle(rect), Appearance::basic(Paint::solid(Color::rgb(0.1, 0.3, 0.9)), Paint::None, 0.0));
+        let mut n = Node::path(d.alloc_id(), shapes::rectangle(rect), Appearance::basic(Paint::solid(Color::rgb(0.1, 0.3, 0.9)), Paint::None, 0.0));
         n.appearance.effects = vec![Effect { id: "stylize.outerGlow".into(), params: json!({"blur": blur}), visible: true }];
         d.insert(Some(layer), 0, n).unwrap();
         let base = Affine::translate((320.0, 180.0)) * Affine::scale(zoom) * Affine::translate((-center.0, -center.1));
@@ -246,8 +244,7 @@ fn per_stroke_raster_effects_use_the_single_threaded_pipeline() {
     if let Some(vectorcraft_doc::AppearanceItem::Stroke(s)) =
         n.appearance.items.iter_mut().find(|i| matches!(i, vectorcraft_doc::AppearanceItem::Stroke(_)))
     {
-        s.effects =
-            vec![Effect { id: "stylize.outerGlow".into(), params: json!({"color": "#ff0000", "opacity": 100, "blur": 6}), visible: true }];
+        s.effects = vec![Effect { id: "stylize.outerGlow".into(), params: json!({"color": "#ff0000", "opacity": 100, "blur": 6}), visible: true }];
     }
     d.remove(id).unwrap();
     d.insert(Some(l), 0, n).unwrap();
@@ -275,10 +272,7 @@ fn shaded_doc(mode: vectorcraft_doc::ColorMode, fill: Color, shade: &str, darkne
     let mut d = doc_with(
         Rect::new(20.0, 20.0, 60.0, 60.0),
         fill,
-        vec![(
-            "stylize.dropShadow",
-            json!({"x": 10, "y": 10, "blur": 0, "opacity": 100, "mode": "normal", "shade": shade, "darkness": darkness}),
-        )],
+        vec![("stylize.dropShadow", json!({"x": 10, "y": 10, "blur": 0, "opacity": 100, "mode": "normal", "shade": shade, "darkness": darkness}))],
     );
     d.color_mode = mode;
     d
@@ -345,11 +339,8 @@ fn a_drop_shadow_with_color_draws_as_before() {
 
 #[test]
 fn shadow_of_offscreen_object_is_not_culled() {
-    let d = doc_with(
-        Rect::new(-60.0, 20.0, -5.0, 60.0),
-        Color::WHITE,
-        vec![("stylize.dropShadow", json!({"x": 30, "y": 0, "blur": 0, "opacity": 100}))],
-    );
+    let d =
+        doc_with(Rect::new(-60.0, 20.0, -5.0, 60.0), Color::WHITE, vec![("stylize.dropShadow", json!({"x": 30, "y": 0, "blur": 0, "opacity": 100}))]);
     let img = render(&d);
     let row: Vec<u32> = (0..10).map(|i| lum(img.pixel(i * 10, 40))).collect();
     assert!(lum(img.pixel(10, 40)) < 100, "{row:?}");
@@ -402,8 +393,7 @@ fn an_outer_glow_blurs_a_solid_silhouette_of_faint_art() {
     // GUARDS: the glow's strength comes from where the art is, not how opaque it is (a glow round a glow relies on it).
     let r = Rect::new(30.0, 30.0, 70.0, 70.0);
     let glow = |fill_opacity: f32| {
-        let mut d =
-            doc_with(r, Color::BLACK, vec![("stylize.outerGlow", json!({"color": "#ff0000", "mode": "normal", "opacity": 100, "blur": 4}))]);
+        let mut d = doc_with(r, Color::BLACK, vec![("stylize.outerGlow", json!({"color": "#ff0000", "mode": "normal", "opacity": 100, "blur": 4}))]);
         let id = d.layers[0].children().unwrap()[0].id;
         d.node_mut(id).unwrap().appearance.fill_mut().unwrap().opacity = fill_opacity;
         render(&d).pixel(29, 50)
@@ -419,8 +409,7 @@ fn an_outer_glow_grows_its_silhouette_by_a_quarter_raster_pixel() {
     // of the document's raster grid, then blurred: a quarter point at 72 ppi, next to nothing at 720.
     let r = Rect::new(30.0, 30.0, 70.0, 70.0);
     let green_outside = |ppi: f64| {
-        let mut d =
-            doc_with(r, Color::BLACK, vec![("stylize.outerGlow", json!({"color": "#ff0000", "mode": "normal", "opacity": 100, "blur": 4}))]);
+        let mut d = doc_with(r, Color::BLACK, vec![("stylize.outerGlow", json!({"color": "#ff0000", "mode": "normal", "opacity": 100, "blur": 4}))]);
         d.raster_effects_ppi = ppi;
         render(&d).pixel(27, 50)[1]
     };
@@ -452,8 +441,7 @@ fn a_glow_too_large_for_a_full_size_raster_keeps_its_solid_silhouette() {
     let opts = RenderOptions { background: Some([255, 255, 255, 255]), ..Default::default() };
     let view = Affine::translate((-1100.0, -1900.0)) * Affine::scale(40.0);
     let glow = |fill_opacity: f32| {
-        let mut d =
-            doc_with(r, Color::BLACK, vec![("stylize.outerGlow", json!({"color": "#ff0000", "mode": "normal", "opacity": 100, "blur": 4}))]);
+        let mut d = doc_with(r, Color::BLACK, vec![("stylize.outerGlow", json!({"color": "#ff0000", "mode": "normal", "opacity": 100, "blur": 4}))]);
         let id = d.layers[0].children().unwrap()[0].id;
         d.node_mut(id).unwrap().appearance.fill_mut().unwrap().opacity = fill_opacity;
         Renderer::new().render(&d, 200, 200, view, &opts).pixel(60, 100)
@@ -477,10 +465,8 @@ fn thirty_stacked_glows_draw_quickly_cached_or_not() {
         Appearance::basic(Paint::solid(Color::BLACK), Paint::None, 0.0),
     );
     instanced.symbols.push(vectorcraft_doc::Symbol { name: "Square".into(), art: std::sync::Arc::new(art) });
-    let mut instance = Node::new(
-        instanced.alloc_id(),
-        vectorcraft_doc::NodeKind::SymbolInstance { symbol: "Square".into(), xf: Affine::translate((30.0, 30.0)) },
-    );
+    let mut instance =
+        Node::new(instanced.alloc_id(), vectorcraft_doc::NodeKind::SymbolInstance { symbol: "Square".into(), xf: Affine::translate((30.0, 30.0)) });
     instance.appearance.effects = glows.into_iter().map(|(id, p)| Effect { id: id.into(), params: p, visible: true }).collect();
     let l = instanced.layers[0].id;
     instanced.insert(Some(l), 0, instance).unwrap();
@@ -655,8 +641,7 @@ fn rasters_drawn_from_a_kept_rasterize_image_count_the_images_it_could_not_decod
 /// renderer draws.
 #[test]
 fn moved_objects_draw_their_effect_rasters_while_interacting() {
-    let effects =
-        vec![("stylize.dropShadow", json!({"x": 4, "y": 3, "blur": 2, "opacity": 80})), ("texture.craquelure", json!({"crackSpacing": 6}))];
+    let effects = vec![("stylize.dropShadow", json!({"x": 4, "y": 3, "blur": 2, "opacity": 80})), ("texture.craquelure", json!({"crackSpacing": 6}))];
     let base = doc_with(Rect::new(20.0, 20.0, 50.0, 46.0), Color::rgb(0.9, 0.4, 0.1), effects);
     let id = base.layers[0].children().unwrap()[0].id;
     // The object moved from where it started, as each frame of a drag moves it.
@@ -851,8 +836,7 @@ fn moved_rasters_need_the_same_content_and_effects() {
     // Feather clips to the outline: a notch in the top edge where the tiles paint nothing
     // (x 29 to 33 and y 20 to 24 once moved) leaves the content's pixels as they were.
     let mut feathered = tiled.clone();
-    feathered.node_mut(id).unwrap().appearance.effects =
-        vec![Effect { id: "stylize.feather".into(), params: json!({"radius": 3}), visible: true }];
+    feathered.node_mut(id).unwrap().appearance.effects = vec![Effect { id: "stylize.feather".into(), params: json!({"radius": 3}), visible: true }];
     assert_eq!(drag(&feathered, &moved(&feathered, true, &|_| {})), (1, true), "feathered");
     let notch = |n: &mut Node| {
         let mut bp = vectorcraft_geom::BezPath::new();

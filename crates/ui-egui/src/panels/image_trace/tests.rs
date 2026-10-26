@@ -150,10 +150,7 @@ fn adjusting_sketch_threshold_changes_the_vector_result_and_can_be_undone() {
         frame(
             &mut app,
             &ctx,
-            vec![
-                Event::PointerMoved(at),
-                Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() },
-            ],
+            vec![Event::PointerMoved(at), Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() }],
         );
     }
     assert_eq!(first_selected(&app).unwrap().children().unwrap().len(), 1, "only the source remains below the ink's luminance");
@@ -180,10 +177,7 @@ fn with_preview_off_a_slider_change_waits_for_trace() {
         frame(
             &mut app,
             &ctx,
-            vec![
-                Event::PointerMoved(at),
-                Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() },
-            ],
+            vec![Event::PointerMoved(at), Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() }],
         );
     }
     assert_eq!(app.session.active().unwrap().history.undo.len(), steps, "no trace while Preview is off");
@@ -381,10 +375,7 @@ fn preview_is_kept_with_the_preferences_and_reset_to_default_leaves_it() {
     for pressed in [true, false] {
         menu_frame(
             &mut app,
-            vec![
-                Event::PointerMoved(at),
-                Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() },
-            ],
+            vec![Event::PointerMoved(at), Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() }],
         );
     }
     assert!(pstate::<TraceUi>(&ctx, "image-trace").params.is_null(), "the panel's settings were reset");
@@ -569,10 +560,8 @@ fn properties_can_reopen_the_trace_controls() {
     }
     let at = at.unwrap();
     for pressed in [true, false] {
-        let events = vec![
-            Event::PointerMoved(at),
-            Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() },
-        ];
+        let events =
+            vec![Event::PointerMoved(at), Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() }];
         let mut out = ctx.run_ui(egui::RawInput { events, ..Default::default() }, |ui| super::super::properties::show(&mut app, ui));
         out.textures_delta.clear();
     }

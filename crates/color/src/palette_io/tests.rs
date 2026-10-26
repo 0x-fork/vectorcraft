@@ -136,8 +136,7 @@ fn gpl_writes_rgb_with_group_headers_and_reads_comments_and_headers() {
     assert_eq!(read("GIMP Palette\n1 2 3 x\n", "Fallback").unwrap().name, "Fallback");
     // Colors and groups share names; an unnamed group is "Color Group".
     let lib = read("GIMP Palette\n0 0 0 Black\n# Group: Black\n1 1 1 Black\n# Group:\n", "x").unwrap();
-    let groups: Vec<(&str, Vec<&str>)> =
-        lib.groups.iter().map(|g| (g.name.as_str(), g.swatches.iter().map(|w| w.name.as_str()).collect())).collect();
+    let groups: Vec<(&str, Vec<&str>)> = lib.groups.iter().map(|g| (g.name.as_str(), g.swatches.iter().map(|w| w.name.as_str()).collect())).collect();
     assert_eq!(groups, [("Black 2", vec!["Black 3"]), ("Color Group", vec![])]);
 }
 
@@ -299,8 +298,7 @@ fn ase_names_unnamed_and_repeated_entries_and_skips_other_blocks() {
     assert_eq!(lib.swatches[2].paint.color(), Some(Color::rgb(1.0, 0.0, 0.0)), "clamped, NaN read as 0");
     assert!(lib.swatches[2].global && !lib.swatches[4].global, "without a color type: process");
     // A group start ends the open group, and groups and colors share names.
-    let groups: Vec<(&str, Vec<&str>)> =
-        lib.groups.iter().map(|g| (g.name.as_str(), g.swatches.iter().map(|w| w.name.as_str()).collect())).collect();
+    let groups: Vec<(&str, Vec<&str>)> = lib.groups.iter().map(|g| (g.name.as_str(), g.swatches.iter().map(|w| w.name.as_str()).collect())).collect();
     assert_eq!(groups, [("Color Group", vec![]), ("Red 3", vec!["Red 4"])]);
     assert_eq!(lib.groups[1].swatches[0].paint.color(), Some(Color::gray(0.0)), "gray level 1 is white");
 }

@@ -309,8 +309,7 @@ fn creation_dialog_frame(app: &mut VectorcraftApp, ctx: &egui::Context, events: 
             _ => {}
         }
     }
-    let input =
-        egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1000.0, 700.0))), events, ..Default::default() };
+    let input = egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1000.0, 700.0))), events, ..Default::default() };
     let mut output = ctx.run_ui(input, |ui| super::super::show(app, ui.ctx()));
     output.textures_delta.clear();
     let mut texts = vec![];

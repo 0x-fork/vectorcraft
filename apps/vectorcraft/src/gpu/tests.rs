@@ -512,12 +512,9 @@ fn panics_in_wgpu_egui_wgpu_and_naga_are_graphics_failures() {
     ] {
         assert!(in_graphics_stack(file), "{file}");
     }
-    for file in [
-        "apps/vectorcraft/src/main.rs",
-        "/home/wgpu/vectorcraft/crates/ui-egui/src/lib.rs",
-        "egui-0.36.2/src/context.rs",
-        "winit-0.30.12/src/x.rs",
-    ] {
+    for file in
+        ["apps/vectorcraft/src/main.rs", "/home/wgpu/vectorcraft/crates/ui-egui/src/lib.rs", "egui-0.36.2/src/context.rs", "winit-0.30.12/src/x.rs"]
+    {
         assert!(!in_graphics_stack(file), "{file}");
     }
 }
@@ -541,8 +538,7 @@ fn a_normal_exit_or_another_failure_does_not_restart() {
     let startup = Startup::default();
     assert_eq!(finish(Ok(Ok(())), &startup), Ok(()));
     // No adapter was picked (none can show the window): the error is returned, nothing restarts.
-    let none =
-        eframe::Error::Wgpu(eframe::egui_wgpu::WgpuError::CustomNativeAdapterSelectionError("no graphics adapter can show the window".into()));
+    let none = eframe::Error::Wgpu(eframe::egui_wgpu::WgpuError::CustomNativeAdapterSelectionError("no graphics adapter can show the window".into()));
     assert_eq!(
         finish(Ok(Err(none)), &startup),
         Err(format!("WGPU error: Adapter selection failed: no graphics adapter can show the window ({HELP})"))

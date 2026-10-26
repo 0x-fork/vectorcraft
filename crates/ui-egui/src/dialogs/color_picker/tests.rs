@@ -371,8 +371,7 @@ impl Drawn {
 /// Runs a dialog frame with real egui input at a physical window size, accounting for UI zoom,
 /// and returns the painted controls for layout and interaction assertions.
 fn draw(ctx: &egui::Context, app: &mut VectorcraftApp, size: egui::Vec2, events: Vec<egui::Event>) -> Drawn {
-    let input =
-        egui::RawInput { screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, size / ctx.zoom_factor())), events, ..Default::default() };
+    let input = egui::RawInput { screen_rect: Some(Rect::from_min_size(egui::Pos2::ZERO, size / ctx.zoom_factor())), events, ..Default::default() };
     let mut out = ctx.run_ui(input, |ui| {
         crate::shortcuts::handle(app, ui.ctx());
         super::super::show(app, ui.ctx());
@@ -502,10 +501,7 @@ fn inline_actions_are_aligned_and_modes_keep_the_window_size() {
         assert!((drawn.control(tl!("Color Models")).width() - ok.width()).abs() < 1.0);
         let after = ctx.memory(|m| m.area_rect(id)).unwrap();
         assert!((before.size() - after.size()).length() < 1.0, "{before:?} vs {after:?}");
-        assert!(
-            drawn.boxes.iter().all(|r| r.left() >= after.left() - 1.0 && r.right() <= after.right() + 1.0),
-            "swatch controls fit horizontally"
-        );
+        assert!(drawn.boxes.iter().all(|r| r.left() >= after.left() - 1.0 && r.right() <= after.right() + 1.0), "swatch controls fit horizontally");
         click_at(&ctx, &mut app, drawn.text(tl!("Color Models")).center());
         assert!(!app.ui.dialog.as_ref().unwrap().bool("swatches"));
     }
@@ -552,12 +548,8 @@ fn warnings_fit_below_the_preview_without_widening_the_dialog() {
     let ok = drawn.control(tl!("OK"));
     let toggle = drawn.control(tl!("Color Swatches"));
     let h = drawn.text("H");
-    let mut warnings: Vec<_> = drawn
-        .boxes
-        .iter()
-        .filter(|r| (r.width() - 16.0).abs() < 0.5 && (r.height() - 16.0).abs() < 0.5 && r.bottom() < h.top())
-        .copied()
-        .collect();
+    let mut warnings: Vec<_> =
+        drawn.boxes.iter().filter(|r| (r.width() - 16.0).abs() < 0.5 && (r.height() - 16.0).abs() < 0.5 && r.bottom() < h.top()).copied().collect();
     warnings.dedup(); // The tile's fill and border share one rectangle.
     assert_eq!(warnings.len(), 2, "gamut and web correction chips are both present");
     for r in &warnings {

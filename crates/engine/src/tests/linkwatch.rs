@@ -3,8 +3,8 @@
 
 use serde_json::{Value, json};
 
-use crate::*;
 use crate::tests_links::{BLUE, Folder, RED, centre_colour, place, png, session};
+use crate::*;
 
 /// Write `bytes` to `path` so its modification time moves even on coarse file systems.
 fn save(path: &str, bytes: &[u8]) {
