@@ -7,7 +7,6 @@ use vectorcraft_geom::{Affine, Rect, shapes};
 
 use crate::bytes::Out;
 use crate::tests::*;
-use crate::*;
 
 /// Every object of the imported document, depth first.
 fn all(d: &Document) -> Vec<Node> {
