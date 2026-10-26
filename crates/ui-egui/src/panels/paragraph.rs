@@ -358,6 +358,15 @@ pub(crate) fn apply_numbers(app: &mut VectorcraftApp, p: &Value) -> Result<Value
     run_on_paragraphs(app, "text.setFormat", params)
 }
 
+/// Type › Bullets and Numbering › Convert to Text (`type.convertListToText`): the markers of the
+/// list paragraphs of the selected type, or of those the Type tool's selection touches, become
+/// characters of the text and the lists are turned off (`text.convertListToText`, which also moves
+/// the Type tool's anchor and caret past the characters inserted at or before them).
+pub(crate) fn convert_list_to_text(app: &mut VectorcraftApp) -> Result<Value, String> {
+    text_style(app).ok_or("select some type first")?;
+    run_on_paragraphs(app, "text.convertListToText", json!({}))
+}
+
 /// The Bullets button and the arrow beside it (Paragraph panel). The button makes the paragraphs
 /// the panel acts on a bulleted list (`text.setFormat {list: "bullet"}`) and shows pressed while
 /// they all are one. The arrow lists the presets (`{bullet}`): None turns the list off, and the
@@ -735,6 +744,7 @@ fn reset_panel(app: &mut VectorcraftApp) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vectorcraft_doc::NodeId;
     use vectorcraft_engine::Session;
 
     fn alignment_row(app: &mut VectorcraftApp, ui: &mut Ui, size: f32) -> egui::Rect {
@@ -1170,6 +1180,80 @@ mod tests {
         app.session.set_tool_option("selectAll", &json!(true));
         reset_panel(&mut app);
         assert_eq!(lists(&app), (None, None));
+    }
+
+    /// Type › Bullets and Numbering › Convert to Text (`type.convertListToText`) acts on the
+    /// paragraphs the Type tool's selection touches: their numbers become characters of the text
+    /// and their list goes, while the other paragraphs stay in the list, and the Type tool's caret
+    /// stays next to the characters it was next to. The menu item is there and is enabled while
+    /// type is selected or edited.
+    #[test]
+    fn convert_to_text_makes_the_selected_paragraphs_numbers_characters() {
+        use vectorcraft_doc::text::{NumberStyle, ParaList};
+        crate::i18n::set_current(crate::i18n::Lang::EN);
+        let (mut app, id) = editing_text("One\nTwo");
+        let text = |app: &VectorcraftApp| {
+            let node = app.session.active().unwrap().doc.node(vectorcraft_doc::NodeId(id.as_u64().unwrap())).unwrap();
+            let NodeKind::Text(text) = &node.kind else { panic!("text") };
+            (text.plain_text(), text.para_at(0).list, text.para_at(1).list)
+        };
+        app.session.set_tool_option("selectAll", &json!(true));
+        app.run("type.applyNumbers", json!({})).unwrap();
+        let numbered = Some(ParaList::numbered(NumberStyle::Arabic));
+        assert_eq!(text(&app), ("One\nTwo".to_string(), numbered, numbered));
+        assert!(crate::menus::enabled(&app, "type.convertListToText"));
+        select_range(&mut app, 5, 5);
+        app.run("type.convertListToText", json!({})).unwrap();
+        assert_eq!(text(&app), ("One\n2.\tTwo".to_string(), numbered, None), "the caret's paragraph");
+        let options = app.session.tool_options();
+        assert_eq!((options["anchor"].as_u64(), options["caret"].as_u64()), (Some(8), Some(8)), "the caret stays after the T of Two");
+        let typemenu = crate::menus::menu_tree().into_iter().find(|(title, _)| *title == "Type").map(|(_, items)| items).unwrap_or_default();
+        let found = typemenu.iter().any(|item| {
+            matches!(item, crate::menus::Item::Sub("Bullets and Numbering", items)
+                if items.iter().any(|i| matches!(i, crate::menus::Item::Cmd("Convert to Text", "type.convertListToText", _))))
+        });
+        assert!(found, "Type › Bullets and Numbering › Convert to Text");
+    }
+
+    /// Convert to Text in threaded type: when the converted paragraph breaks its lines at other
+    /// places and its text moves to the frame before, the Type tool's caret goes with the
+    /// character it was next to, and that frame becomes the selection when it was not selected.
+    #[test]
+    fn convert_to_text_keeps_the_caret_by_its_character_in_threaded_type() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width": 600, "height": 300})).unwrap();
+        let long = "The quick brown fox jumps over the lazy dog. ".repeat(4);
+        let text = format!("One\nTwo\n{long}\nFour");
+        let a =
+            app.run("text.create", json!({"x": 10, "y": 10, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
+        let b = app.run("shape.rectangle", json!({"x": 200, "y": 10, "width": 150, "height": 200})).unwrap()["id"].as_u64().unwrap();
+        app.run("select.set", json!({"ids": [a, b]})).unwrap();
+        app.run("text.thread.create", json!({})).unwrap();
+        app.run("text.setFormat", json!({"ids": [a, b], "list": "number"})).unwrap();
+        let plain = |app: &VectorcraftApp, id: u64| match &app.session.active().unwrap().doc.node(NodeId(id)).unwrap().kind {
+            NodeKind::Text(t) => t.plain_text(),
+            _ => panic!("text"),
+        };
+        assert!(plain(&app, b).starts_with("dog. "), "the second frame starts with the dog: {:?}", plain(&app, b));
+        app.run("select.set", json!({"ids": [b]})).unwrap();
+        app.session.select_tool("type", Default::default()).unwrap();
+        // The caret after the d of dog, at the start of the second frame.
+        app.session.set_tool_option("textSelection", &json!({"editing": b, "anchor": 1, "caret": 1}));
+        assert_eq!(super::super::character::text_editing(&app).map(|(id, _, _)| id), Some(NodeId(b)));
+        app.run("type.convertListToText", json!({})).unwrap();
+        let first = plain(&app, a);
+        assert!(first.ends_with("lazy dog. "), "the dog moved to the first frame: {first:?}");
+        let options = app.session.tool_options();
+        let after_d = first.len() - "og. ".len();
+        assert_eq!(
+            (options["editing"].as_u64(), options["anchor"].as_u64(), options["caret"].as_u64()),
+            (Some(a), Some(after_d as u64), Some(after_d as u64)),
+            "the caret is after the d of dog in the first frame"
+        );
+        assert_eq!(app.session.active().unwrap().selection.objects, vec![NodeId(a)], "the first frame is selected");
+        // The next command keeps the Type tool editing the first frame.
+        app.run("text.setFormat", json!({"ids": [a], "composer": "singleLine"})).unwrap();
+        assert_eq!(super::super::character::text_editing(&app).map(|(id, _, _)| id), Some(NodeId(a)));
     }
 
     /// Reset Panel turns Hyphenate and Roman Hanging Punctuation off and sets the Hyphenation and
