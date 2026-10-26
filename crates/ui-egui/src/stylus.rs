@@ -6,8 +6,10 @@
 //! from XInput2 on a connection of its own and writes it into a [`StylusFeed`]
 //! ([`crate::Services::stylus`]). On macOS, where winit reports none either, the app reads each
 //! event's pressure from AppKit before the window handles it, and also keeps it for that event's
-//! pointer move ([`StylusFeed::set_move`]), so the moves of a fast stroke each get their own. The
-//! canvas uses the feed when a frame's events carry no touch force.
+//! pointer move ([`StylusFeed::set_move`]), so the moves of a fast stroke each get their own. On
+//! Windows, where winit drops which end of the pen is down, the app reads the pressure and the end
+//! from each pointer message of a pen before winit handles it. The canvas uses the feed when a
+//! frame's events carry no touch force.
 //!
 //! The feed also says which end of the pen moved. Turning the pen to its eraser end selects the
 //! Eraser tool, and turning it back to the tip selects the tool used before

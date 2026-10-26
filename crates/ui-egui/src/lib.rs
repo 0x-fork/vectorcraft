@@ -332,7 +332,7 @@ pub struct Services {
     /// pointer visible next to the tool glyph ([`cursors::hide_system_pointer`], #2450).
     pub no_cursor_theme: bool,
     /// The pen pressure and pen end the host reads from the system itself (desktop Linux under
-    /// X11 and XWayland). The canvas uses the pressure when a frame's events carry no touch force,
+    /// X11 and XWayland, macOS and Windows). The canvas uses the pressure when a frame's events carry no touch force,
     /// and the end to switch to the Eraser tool and back. Without it, pen pressure comes from
     /// touch events only ([`stylus`]).
     pub stylus: Option<stylus::StylusFeed>,
