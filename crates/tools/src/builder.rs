@@ -388,12 +388,17 @@ impl BuilderMap {
     /// What a gesture at `p` touches: with `piece_tol` (erasing), the line piece or edge that
     /// close, else the region under it.
     pub fn hit(&self, p: Point, piece_tol: Option<f64>) -> Option<Hit> {
-        let piece = piece_tol.and_then(|t| match (piece_near(&self.lines, p, t), piece_near(&self.edges, p, t)) {
+        self.piece_hit(p, piece_tol).or_else(|| self.region_at(p).map(Hit::Region))
+    }
+
+    /// The line piece or edge within `piece_tol` of `p` that [`Self::hit`] gives (None without
+    /// `piece_tol`).
+    fn piece_hit(&self, p: Point, piece_tol: Option<f64>) -> Option<Hit> {
+        piece_tol.and_then(|t| match (piece_near(&self.lines, p, t), piece_near(&self.edges, p, t)) {
             (Some(l), Some(e)) if e.0 < l.0 => Some(Hit::Edge(e.1)),
             (Some(l), _) => Some(Hit::Line(l.1)),
             (None, e) => e.map(|e| Hit::Edge(e.1)),
-        });
-        piece.or_else(|| self.region_at(p).map(Hit::Region))
+        })
     }
 
     /// The stroke a click at `p` splits with In Merge Mode, Clicking Stroke Splits the Path: the
@@ -439,19 +444,88 @@ impl BuilderMap {
         Some((i, run))
     }
 
+    /// What a Shape Builder gesture at `p` touches: [`Self::hit`], except that while erasing, a
+    /// point in a region that is no more than `2 * piece_tol` across there (see
+    /// [`Self::narrow_at`]) touches the region and not the line piece or edge beside it.
+    pub fn builder_hit(&self, p: Point, piece_tol: Option<f64>) -> Option<Hit> {
+        match (piece_tol, self.piece_hit(p, piece_tol)) {
+            (Some(tol), Some(piece)) => Some(match self.region_at(p) {
+                Some(r) if self.narrow_at(r, p, tol) => Hit::Region(r),
+                _ => piece,
+            }),
+            (_, piece) => piece.or_else(|| self.region_at(p).map(Hit::Region)),
+        }
+    }
+
+    /// Is region `r` no more than `2 * tol` across at `p`, measured from a point of its outline
+    /// within `tol` of `p`, through `p`, to its outline on the other side? Every point on that line
+    /// is then within `tol` of the outline. The points tried are the point of the outline nearest
+    /// `p` and each point of a segment where the segment is square to the line to `p`, so a
+    /// point near the end of a thin bar measures across the bar from its sides as well as along it
+    /// from the end, and splitting a segment in two does not change the answer. False when `p` is
+    /// on the outline or more than `tol` from it.
+    fn narrow_at(&self, r: usize, p: Point, tol: f64) -> bool {
+        use kurbo::{ParamCurve as _, ParamCurveNearest as _};
+        let Some((_, bp, _)) = self.regions.get(r) else { return false };
+        // Each segment with the parameter, point and distance of its point nearest `p`.
+        let near: Vec<(kurbo::PathSeg, f64, Point, f64)> = bp
+            .segments()
+            .map(|seg| {
+                let n = seg.nearest(p, 1e-6);
+                (seg, n.t, seg.eval(n.t), n.distance_sq.sqrt())
+            })
+            .collect();
+        if !near.iter().all(|&(.., d)| d.is_finite() && d > 1e-9) {
+            return false;
+        }
+        let closest = near.iter().map(|&(.., d)| d).fold(f64::INFINITY, f64::min);
+        // A line from `p` no longer than `2 * tol` only meets segments that close to `p`.
+        let reach: Vec<kurbo::PathSeg> = near.iter().filter(|&&(.., d)| d <= 2.0 * tol).map(|&(seg, ..)| seg).collect();
+        // A segment's end is its nearest point when the segment turns away from `p` or stops
+        // short of the point square to it; there, only the nearest point of all the outline and
+        // an end where the segment is square to the line to `p` count.
+        let square = |seg: kurbo::PathSeg, t: f64, n: Point| {
+            use kurbo::ParamCurveDeriv as _;
+            let dir = match seg {
+                kurbo::PathSeg::Line(l) => l.p1 - l.p0,
+                kurbo::PathSeg::Quad(q) => q.deriv().eval(t).to_vec2(),
+                kurbo::PathSeg::Cubic(c) => c.deriv().eval(t).to_vec2(),
+            };
+            let v = p - n;
+            dir.hypot() > 1e-12 && dir.dot(v).abs() <= 1e-6 * dir.hypot() * v.hypot()
+        };
+        let from =
+            |&&(seg, t, n, d): &&(kurbo::PathSeg, f64, Point, f64)| d <= tol && (d == closest || (t > 1e-9 && t < 1.0 - 1e-9) || square(seg, t, n));
+        near.iter().filter(from).any(|&(_, _, n, d)| {
+            let line = kurbo::Line::new(p, p + (p - n) * ((2.0 * tol - d) / d));
+            reach.iter().any(|seg| seg.intersect_line(line).iter().any(|x| x.line_t > 1e-9 && x.line_t <= 1.0))
+        })
+    }
+
     /// What a gesture along the polyline `pts` touches, in order: [`Self::hit`] at each vertex and
     /// at the points [`Self::probes`] picks between them, so it touches every region it crosses,
     /// however narrow.
     pub fn hits_along(&self, pts: &[Point], piece_tol: Option<f64>) -> Touched {
+        self.along(pts, piece_tol, Self::hit)
+    }
+
+    /// What a Shape Builder gesture along the polyline `pts` touches: [`Self::hits_along`] with
+    /// [`Self::builder_hit`], so an erasing gesture also touches each region it goes into where the
+    /// region is no more than `2 * piece_tol` across.
+    pub fn builder_hits_along(&self, pts: &[Point], piece_tol: Option<f64>) -> Touched {
+        self.along(pts, piece_tol, Self::builder_hit)
+    }
+
+    fn along(&self, pts: &[Point], piece_tol: Option<f64>, hit: fn(&Self, Point, Option<f64>) -> Option<Hit>) -> Touched {
         let mut touched = Touched::default();
         let mut last: Option<Point> = None;
         for &p in pts {
             if let Some(a) = last {
                 for q in self.probes(a, p, piece_tol) {
-                    touched.add(self.hit(q, piece_tol));
+                    touched.add(hit(self, q, piece_tol));
                 }
             }
-            touched.add(self.hit(p, piece_tol));
+            touched.add(hit(self, p, piece_tol));
             last = Some(p);
         }
         touched
@@ -1016,7 +1090,7 @@ impl ShapeBuilderTool {
         self.stroke = self.stroke_at(cx, p, self.alt);
         self.hover = match self.stroke {
             Some(_) => None,
-            None => self.cache.get(cx, self.opts.open_filled_as_closed).hit(p, Self::line_tol(cx, self.alt)),
+            None => self.cache.get(cx, self.opts.open_filled_as_closed).builder_hit(p, Self::line_tol(cx, self.alt)),
         };
     }
 
@@ -1028,7 +1102,7 @@ impl ShapeBuilderTool {
     fn touch(&mut self, cx: &ToolContext, from: Option<Point>, to: Point) {
         let pts: Vec<Point> = from.into_iter().chain([to]).collect();
         let tol = Self::line_tol(cx, self.alt);
-        let touched = self.cache.get(cx, self.opts.open_filled_as_closed).hits_along(&pts, tol);
+        let touched = self.cache.get(cx, self.opts.open_filled_as_closed).builder_hits_along(&pts, tol);
         self.touched.extend(&touched);
     }
 
@@ -1894,6 +1968,155 @@ mod tests {
         assert!(t.cache.map.erased_edges(&t.touched).is_empty(), "which goes with the regions");
         // Two regions (mesh + outline each) and the drag's trail, all red.
         assert_eq!(colors(&t.overlays(&cx)), [HIGHLIGHT_RED; 5]);
+    }
+
+    /// Rect A (0..100) and rect B (98..198), both 100 tall, selected: they overlap in a 2 pt strip.
+    fn sliver_rects() -> (Document, Selection) {
+        rects(&[Rect::new(0.0, 0.0, 100.0, 100.0), Rect::new(98.0, 0.0, 198.0, 100.0)])
+    }
+
+    /// The rectangles `rs`, back to front, selected.
+    fn rects(rs: &[Rect]) -> (Document, Selection) {
+        let mut d = Document::new(500.0, 500.0);
+        let l = d.layers[0].id;
+        let mut s = Selection::default();
+        for (k, r) in rs.iter().enumerate() {
+            let id = d.alloc_id();
+            d.insert(Some(l), k, Node::path(id, shapes::rectangle(*r), Appearance::default_art())).unwrap();
+            s.add(id);
+        }
+        (d, s)
+    }
+
+    fn map_of(d: &Document, s: &Selection) -> BuilderMap {
+        BuilderMap::new(d, &sorted_roots(d, &s.objects), true, true).0
+    }
+
+    #[test]
+    fn shape_builder_erase_drag_across_an_overlap_narrower_than_twice_the_tolerance_touches_it() {
+        let (d, s) = sliver_rects();
+        let map = map_of(&d, &s);
+        let strip = map.region_at(Point::new(99.0, 50.0)).unwrap();
+        // Every point of the strip is within 4 pt of its edges.
+        let t = map.builder_hits_along(&[Point::new(50.0, 50.0), Point::new(150.0, 50.0)], Some(4.0));
+        assert_eq!(t.regions.len(), 3, "{t:?}");
+        assert!(t.regions.contains(&strip), "{t:?}");
+        assert!(map.erased_edges(&t).is_empty(), "the strip's edges go with it");
+        // A drag at a shallow angle goes about 10 pt through the strip and touches it too.
+        let t = map.builder_hits_along(&[Point::new(90.0, 10.0), Point::new(106.0, 90.0)], Some(4.0));
+        assert_eq!(t.regions.len(), 3, "{t:?}");
+        // So does a drag that starts in the strip, and one that goes into it and back out.
+        let t = map.builder_hits_along(&[Point::new(99.0, 50.0), Point::new(150.0, 50.0)], Some(4.0));
+        assert!(t.regions.contains(&strip), "{t:?}");
+        let t = map.builder_hits_along(&[Point::new(50.0, 50.0), Point::new(99.0, 50.0), Point::new(50.0, 51.0)], Some(4.0));
+        assert!(t.regions.contains(&strip), "{t:?}");
+        // Merging is unchanged, and so is the plain hit test other tools use.
+        assert_eq!(map.builder_hit(Point::new(99.0, 50.0), Some(4.0)), Some(Hit::Region(strip)));
+        assert!(matches!(map.hit(Point::new(99.0, 50.0), Some(4.0)), Some(Hit::Edge(_))));
+        assert_eq!(map.builder_hit(Point::new(99.0, 50.0), None), Some(Hit::Region(strip)));
+    }
+
+    #[test]
+    fn shape_builder_erase_drag_across_a_thin_bar_touches_it_from_either_side() {
+        // A 1.5 pt bar inside a square, and the same bar on its own.
+        let bar = Rect::new(49.0, 10.0, 50.5, 90.0);
+        for rs in [vec![Rect::new(0.0, 0.0, 100.0, 100.0), bar], vec![bar]] {
+            let (d, s) = rects(&rs);
+            let map = map_of(&d, &s);
+            let inner = map.region_at(Point::new(49.75, 50.0)).unwrap();
+            let t = map.builder_hits_along(&[Point::new(20.0, 50.0), Point::new(80.0, 50.0)], Some(4.0));
+            assert!(t.regions.contains(&inner), "{rs:?}: {t:?}");
+            assert_eq!(t.regions.len(), rs.len(), "{rs:?}: {t:?}");
+            // 0.1 pt from an end, the nearest outline is the end, and the bar is still 1.5 pt
+            // across from its sides: a click there and a drag across the bar there touch it.
+            assert_eq!(map.builder_hit(Point::new(49.75, 10.1), Some(4.0)), Some(Hit::Region(inner)), "{rs:?}");
+            assert_eq!(map.builder_hit(Point::new(49.75, 89.9), Some(4.0)), Some(Hit::Region(inner)), "{rs:?}");
+            let t = map.builder_hits_along(&[Point::new(20.0, 10.1), Point::new(80.0, 10.1)], Some(4.0));
+            assert!(t.regions.contains(&inner), "{rs:?}: {t:?}");
+        }
+        // Near a corner of the square, both of its edges there are close, and the square is wide
+        // across from each: the edge is touched.
+        let (d, s) = rects(&[Rect::new(0.0, 0.0, 100.0, 100.0), bar]);
+        let map = map_of(&d, &s);
+        assert!(matches!(map.builder_hit(Point::new(1.0, 1.0), Some(4.0)), Some(Hit::Edge(_))));
+        // So it is when the square's top edge has a point 2 pt from the corner: the end of the
+        // segment past that point is not where the square is narrow.
+        let mut d = Document::new(500.0, 500.0);
+        let l = d.layers[0].id;
+        let id = d.alloc_id();
+        let pts = [(0.0, 0.0), (2.0, 0.0), (100.0, 0.0), (100.0, 100.0), (0.0, 100.0)].map(|(x, y)| Point::new(x, y));
+        let path = PathData::new(vec![SubPath::polyline(&pts, true)]);
+        d.insert(Some(l), 0, Node::path(id, path, Appearance::default_art())).unwrap();
+        let mut s = Selection::default();
+        s.add(id);
+        let map = map_of(&d, &s);
+        let square = map.region_at(Point::new(50.0, 50.0)).unwrap();
+        assert_eq!(map.regions[square].1.segments().count(), 5, "the point on the top edge stays");
+        assert!(matches!(map.builder_hit(Point::new(1.0, 1.0), Some(4.0)), Some(Hit::Edge(_))));
+        // A bar whose sides each have a point level with a click 0.1 pt from its end: the click
+        // and a drag across the bar there still touch the bar.
+        let mut d = Document::new(500.0, 500.0);
+        let l = d.layers[0].id;
+        let id = d.alloc_id();
+        let pts = [(49.0, 10.0), (50.5, 10.0), (50.5, 10.1), (50.5, 90.0), (49.0, 90.0), (49.0, 10.1)].map(|(x, y)| Point::new(x, y));
+        let path = PathData::new(vec![SubPath::polyline(&pts, true)]);
+        d.insert(Some(l), 0, Node::path(id, path, Appearance::default_art())).unwrap();
+        let mut s = Selection::default();
+        s.add(id);
+        let map = map_of(&d, &s);
+        let split = map.region_at(Point::new(49.75, 50.0)).unwrap();
+        assert_eq!(map.regions[split].1.segments().count(), 6, "the points on the sides stay");
+        assert_eq!(map.builder_hit(Point::new(49.75, 10.1), Some(4.0)), Some(Hit::Region(split)));
+        let t = map.builder_hits_along(&[Point::new(20.0, 10.1), Point::new(80.0, 10.1)], Some(4.0));
+        assert!(t.regions.contains(&split), "{t:?}");
+    }
+
+    #[test]
+    fn shape_builder_erase_drag_along_an_edge_does_not_touch_the_regions_beside_it() {
+        let (d, s) = grid();
+        let map = map_of(&d, &s);
+        // 1 pt above the edges between the top row and the middle one, through all three squares.
+        let t = map.builder_hits_along(&[Point::new(50.0, 99.0), Point::new(250.0, 99.0)], Some(4.0));
+        assert!(t.regions.is_empty(), "{t:?}");
+        assert!(!t.edges.is_empty());
+        // Crossing the edge 2 pt before a junction clips the square below without touching it.
+        let pts = [Point::new(50.0, 99.0), Point::new(97.0, 99.0), Point::new(99.0, 101.0), Point::new(150.0, 101.0)];
+        let t = map.builder_hits_along(&pts, Some(4.0));
+        let clipped = map.region_at(Point::new(99.0, 101.0)).unwrap();
+        assert!(!t.regions.contains(&clipped), "{t:?}");
+    }
+
+    #[test]
+    fn shape_builder_alt_hover_over_a_narrow_overlap_highlights_it() {
+        let (d, s) = sliver_rects();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        let alt = Mods { alt: true, ..Default::default() };
+        t.pointer(&cx, &ev(PointerKind::Move, 99.0, 50.0).with_mods(alt));
+        let strip = t.cache.map.region_at(Point::new(99.0, 50.0));
+        assert_eq!(t.hover, strip.map(Hit::Region));
+        // Beside a wide region, the edge.
+        t.pointer(&cx, &ev(PointerKind::Move, 50.0, 99.0).with_mods(alt));
+        assert!(matches!(t.hover, Some(Hit::Edge(_))), "{:?}", t.hover);
+    }
+
+    #[test]
+    fn shape_builder_alt_drag_highlights_an_overlap_it_crosses_over_two_moves() {
+        let (d, s) = sliver_rects();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeBuilderTool::default();
+        let alt = Mods { alt: true, ..Default::default() };
+        t.pointer(&cx, &ev(PointerKind::Down, 50.0, 50.0).with_mods(alt));
+        // One move ends inside the strip, and the next one leaves it.
+        t.pointer(&cx, &ev(PointerKind::Drag, 99.0, 50.0).with_mods(alt));
+        t.pointer(&cx, &ev(PointerKind::Drag, 150.0, 50.0).with_mods(alt));
+        assert_eq!(t.touched.regions.len(), 3, "{:?}", t.touched);
+        assert!(t.cache.map.erased_edges(&t.touched).is_empty());
+        let acts = t.pointer(&cx, &ev(PointerKind::Up, 150.0, 50.0).with_mods(alt));
+        let Action::Exec(id, v) = &acts[0] else { panic!("{acts:?}") };
+        assert_eq!((id.as_str(), &v["erase"], &v["tolerance"]), ("shapeBuilder.merge", &json!(true), &json!(4.0)));
     }
 
     /// A 3×3 grid of touching 100 pt squares from (0, 0) to (300, 300), selected.
