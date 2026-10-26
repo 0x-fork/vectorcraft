@@ -12,7 +12,7 @@ use vectorcraft_testkit::pdf::{PdfPage, first_extra, pdf_with};
 use vectorcraft_text::{FontDb, FontFace};
 
 use crate::tests_import_fidelity::stream;
-use crate::{ImportOptions, import_with_report};
+use crate::*;
 
 const SOURCE_SANS: &[u8] = include_bytes!("../../../assets/fonts/SourceSans3-Regular.ttf");
 

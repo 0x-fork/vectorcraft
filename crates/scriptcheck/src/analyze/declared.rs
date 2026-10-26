@@ -1,7 +1,6 @@
 //! The names declared, read before the analysis.
 
-use super::sig::{LineBreaks, Read, Sig, for_in, goes_on_after, goes_on_with, is, member_mark, word};
-use super::{Acc, Brackets, HashSet, Lexer, T};
+use super::*;
 
 /// The names a file's function bodies and its global code declare, read before the analysis. A
 /// function's `var` statements and the function declarations directly in its body make the names
