@@ -549,7 +549,7 @@ fn path_kind(path: PathData) -> NodeKind {
 /// Fit a freehand polyline: drop jitter, build a spline through the samples (sharp turns stay
 /// corners) and simplify it to `tol`.
 fn fit_freehand(pts: &[Point], tol: f64, closed: bool) -> SubPath {
-    let min = (tol * 0.3).max(0.05);
+    let min = (tol * 0.3).max(vectorcraft_tools::draw2::MIN_FIDELITY * 0.3);
     let (Some(&p0), Some(&pn)) = (pts.first(), pts.last()) else { return SubPath::new(vec![], closed) };
     let mut kept: Vec<Point> = vec![p0];
     for &p in pts.iter().skip(1) {
@@ -684,7 +684,7 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let pressure = stroke_pressure(&samples);
     let mut pts: Vec<Point> = samples.into_iter().map(|(pt, _)| pt).collect();
-    let tol = number_or(p, "fidelity", 1.5, C)?.clamp(0.05, 100.0);
+    let tol = number_or(p, "fidelity", 1.5, C)?.clamp(vectorcraft_tools::draw2::MIN_FIDELITY, 100.0);
     // The tolerance the stroke is fitted at; with `fit: false` it is not fitted.
     let fit_tol = switch_or(p, "fit", true, C)?.then_some(tol);
     let closed = switch_or(p, "closed", false, C)?;
@@ -1429,7 +1429,7 @@ fn smooth_region(s: &mut Session, p: &Value) -> Result<Value> {
     const C: &str = "path.smoothRegion";
     let pts = points_param(p, "points", C)?;
     let radius = number_or(p, "radius", 12.0, C)?.max(0.0);
-    let tol = number_or(p, "fidelity", 2.5, C)?.clamp(0.05, 100.0);
+    let tol = number_or(p, "fidelity", 2.5, C)?.clamp(vectorcraft_tools::draw2::SMOOTH_MIN_FIDELITY, 100.0);
     let st = s.doc()?;
     let near = |q: Point| dist_to_polyline(&pts, q) <= radius;
     let mut plan = vec![];

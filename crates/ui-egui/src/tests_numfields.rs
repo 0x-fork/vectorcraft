@@ -45,6 +45,37 @@ fn a_focused_field_follows_a_value_changed_from_outside() {
     assert_eq!(frame(50.0, vec![button(away, false)]).0, None);
 }
 
+/// A field with steps of its own (the Pencil's Fidelity, #3328): ↑/↓ take them instead of whole
+/// numbers, ten at once with Shift, and Ctrl/Cmd steps as plainly as no modifier does.
+#[test]
+fn a_stepped_field_takes_its_own_steps() {
+    let ctx = egui::Context::default();
+    crate::theme::install_fonts(&ctx);
+    let mut time = 0.0;
+    let mut frame = |value: f64, events: Vec<Event>| {
+        time += 0.05;
+        let screen_rect = Some(Rect::from_min_size(Pos2::ZERO, vec2(400.0, 200.0)));
+        let mut got = (None, Rect::NOTHING);
+        let mut out = ctx.run_ui(egui::RawInput { events, time: Some(time), screen_rect, focused: true, ..Default::default() }, |ui| {
+            got.0 = widgets::range_field_stepped(ui, "f", value, 0.01..=100.0, "pt", 2, 80.0, |v, n| ((v + 0.01 * n) * 100.0).round() / 100.0);
+            got.1 = ui.min_rect();
+        });
+        out.textures_delta.clear();
+        got
+    };
+    let key = |key, modifiers| Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
+    let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE };
+    let at = frame(0.02, vec![]).1.center();
+    frame(0.02, vec![Event::PointerMoved(at), button(at, true)]);
+    frame(0.02, vec![button(at, false)]);
+    assert_eq!(frame(0.02, vec![key(Key::ArrowUp, Modifiers::NONE)]).0, Some(0.03), "↑ takes one of its steps, not a whole point");
+    assert_eq!(frame(0.03, vec![key(Key::ArrowDown, Modifiers::NONE)]).0, Some(0.02));
+    assert_eq!(frame(0.02, vec![key(Key::ArrowUp, Modifiers::SHIFT)]).0, Some(0.12), "Shift takes ten");
+    assert_eq!(frame(0.12, vec![key(Key::ArrowUp, Modifiers::COMMAND)]).0, Some(0.13), "Cmd takes one");
+    // The steps stop at the field's range.
+    assert_eq!(frame(0.01, vec![key(Key::ArrowDown, Modifiers::NONE)]).0, None, "nothing below 0.01");
+}
+
 /// #1692: a hex field that the focus only passes through shows the color as it is now and commits
 /// nothing. Tab out of an edited field gives the hex field after it the focus in the frame the edit
 /// is committed, and the color changes after the hex field is drawn, as in the Color Picker.
