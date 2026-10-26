@@ -2500,6 +2500,7 @@ font-script	Japanese	汉字
 	Remove Plug-in	移除插件
 	Remove Selected Assets	移除所选资源
 	Remove Threading	移除线程
+	Break Thread	断开串接
 	Remove “{keyword}”	移除“{keyword}”
 	Rename	重命名
 	Rename Asset	重命名资源

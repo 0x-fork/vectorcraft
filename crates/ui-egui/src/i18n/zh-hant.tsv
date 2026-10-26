@@ -3404,6 +3404,7 @@ font-script	Japanese	漢字
 	Remove Plug-in	移除增效模組
 	Remove Selected Assets	移除所選資產
 	Remove Threading	移除串連
+	Break Thread	中斷串連
 	Remove “{keyword}”	移除「{keyword}」
 	Rename	重新命名
 	Rename Asset	重新命名資產

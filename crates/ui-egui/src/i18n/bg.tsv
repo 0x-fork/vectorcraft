@@ -2545,6 +2545,7 @@ font-technology	Variable	Променливи
 	Remove Plug-in	Премахване на добавка
 	Remove Selected Assets	Премахване на избраните активи
 	Remove Threading	Премахване на свързването
+	Break Thread	Прекъсване на свързването
 	Remove “{keyword}”	Премахване на „{keyword}“
 	Rename	Преименуване
 	Rename Asset	Преименуване на актива

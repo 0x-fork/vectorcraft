@@ -2892,6 +2892,7 @@ mark-style	Japanese	Kiểu Nhật
 	Remove Plug-in	Gỡ plug-in
 	Remove Selected Assets	Gỡ các asset đã chọn
 	Remove Threading	Gỡ liên kết chuỗi văn bản
+	Break Thread	Ngắt chuỗi văn bản
 	Remove “{keyword}”	Gỡ “{keyword}”
 	Rename	Đổi tên
 	Rename Asset	Đổi tên asset

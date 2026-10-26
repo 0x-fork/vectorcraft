@@ -10787,6 +10787,36 @@ mod tests {
         assert!(thread_overlays(&app, zoom).is_empty());
     }
 
+    /// A double-click with the Selection tool on the out port of a threaded frame breaks the
+    /// thread there: no new frame is threaded on, and the story flows back into the first frame.
+    #[test]
+    fn a_double_click_on_a_threaded_out_port_breaks_the_thread() {
+        use vectorcraft_tools::text::{Port, port_centre};
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width": 600, "height": 400})).unwrap();
+        let text = "Words that fill more than the frame holds. ".repeat(10);
+        let a =
+            app.run("text.create", json!({"x": 20, "y": 20, "text": text, "area": {"width": 150, "height": 60}})).unwrap()["id"].as_u64().unwrap();
+        app.run("text.thread.add", json!({"from": a, "at": [300, 200]})).unwrap();
+        app.run("select.set", json!({"ids": [a]})).unwrap();
+        app.select_tool("selection");
+        let doc = |app: &VectorcraftApp| app.session.active().unwrap().doc.clone();
+        let before = doc(&app);
+        let NodeKind::Text(t) = &before.node(vectorcraft_doc::NodeId(a)).unwrap().kind else { panic!("not text") };
+        let view = app.view_info();
+        let at = port_centre(t, Port::Out, 1.0 / view.zoom).unwrap();
+        let count = doc(&app).layers[0].children().map_or(0, |c| c.len());
+        for kind in [PointerKind::Down, PointerKind::Up, PointerKind::Down, PointerKind::Up, PointerKind::DoubleClick] {
+            crate::canvas::dispatch(&mut app, &PointerEvent::new(kind, at.x, at.y), view);
+        }
+        let d = doc(&app);
+        assert!(d.text_threads.is_empty(), "the thread is broken");
+        assert_eq!(d.layers[0].children().map_or(0, |c| c.len()), count, "no new frame");
+        let NodeKind::Text(t) = &d.node(vectorcraft_doc::NodeId(a)).unwrap().kind else { panic!("not text") };
+        assert_eq!(t.plain_text(), text, "the story flows into the first frame");
+        assert_eq!(app.session.tool_id(), "selection");
+    }
+
     /// With more than `PORTS_MAX` type objects selected the tools draw no ports, and Show Text
     /// Threads draws only its lines, no port boxes.
     #[test]

@@ -2627,6 +2627,7 @@ mark-style	Japanese	Японский
 	Remove Plug-in	Убрать модуль
 	Remove Selected Assets	Убрать выбранные ресурсы
 	Remove Threading	Убрать связывание
+	Break Thread	Разорвать связывание
 	Remove “{keyword}”	Убрать «{keyword}»
 	Rename	Переименовать
 	Rename Asset	Переименовать ресурс

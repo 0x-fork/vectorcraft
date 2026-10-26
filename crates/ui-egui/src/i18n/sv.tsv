@@ -2545,6 +2545,7 @@ font-technology	Variable	Variabla
 	Remove Plug-in	Ta bort plugin
 	Remove Selected Assets	Ta bort markerade resurser
 	Remove Threading	Ta bort textlänkning
+	Break Thread	Bryt textlänkning
 	Remove “{keyword}”	Ta bort ”{keyword}”
 	Rename	Byt namn
 	Rename Asset	Byt namn på resurs
