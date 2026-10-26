@@ -5,7 +5,7 @@ use vectorcraft_doc::{Document, NodeKind};
 
 use crate::{ImportOptions, TextAs, import_with_report};
 
-const INTER: &[u8] = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
+const INTER: &[u8] = include_bytes!("../../../../assets/fonts/Inter-Regular.ttf");
 
 fn stream(dictionary: &str, content: &[u8]) -> Vec<u8> {
     let mut bytes = format!("<< {dictionary} /Length {} >>\nstream\n", content.len()).into_bytes();

@@ -9,8 +9,8 @@ use vectorcraft_doc::{Document, NodeKind, TextObject};
 
 use crate::*;
 
-const SOURCE_SANS: &[u8] = include_bytes!("../../../assets/fonts/SourceSans3-Regular.ttf");
-const SOURCE_SERIF: &[u8] = include_bytes!("../../../assets/fonts/SourceSerif4-Regular.ttf");
+const SOURCE_SANS: &[u8] = include_bytes!("../../../../assets/fonts/SourceSans3-Regular.ttf");
+const SOURCE_SERIF: &[u8] = include_bytes!("../../../../assets/fonts/SourceSerif4-Regular.ttf");
 
 /// A 300 × 200 pt page with `lines` of (x, y from the top, size, text) in Source Sans 3, and the
 /// same rotated 90° when `rotated`.

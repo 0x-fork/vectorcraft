@@ -14,7 +14,7 @@ use vectorcraft_text::{FontDb, FontFace};
 use crate::tests_import_fidelity::stream;
 use crate::*;
 
-const SOURCE_SANS: &[u8] = include_bytes!("../../../assets/fonts/SourceSans3-Regular.ttf");
+const SOURCE_SANS: &[u8] = include_bytes!("../../../../assets/fonts/SourceSans3-Regular.ttf");
 
 fn sans() -> Arc<FontFace> {
     FontDb::global().find_postscript("SourceSans3-Regular").expect("Source Sans 3 is built in")

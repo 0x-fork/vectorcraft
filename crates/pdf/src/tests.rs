@@ -8,6 +8,42 @@ use vectorcraft_geom::{Affine, FillRule, PathData, Point, Rect, shapes};
 
 use crate::*;
 
+mod blend;
+mod charstroke;
+mod cmykblend;
+mod cmykimages;
+mod compression;
+mod dashalign;
+mod editing;
+mod encrypt;
+mod file_info;
+mod focal;
+mod fx;
+mod import_color;
+pub(super) mod import_fidelity;
+mod import_layers;
+mod import_lines;
+mod import_options;
+mod import_overprint;
+mod layers;
+pub(super) mod live_text;
+mod marks;
+mod output;
+mod pdf13;
+mod pdfx;
+mod presets;
+mod print;
+mod printadvanced;
+mod realtext;
+mod settings;
+pub(super) mod stroke;
+mod strokeout;
+mod text_placement;
+mod textstroke;
+mod webview;
+mod reader_streaming;
+mod reader_compat;
+
 fn doc(w: f64, h: f64) -> Document {
     Document::new(w, h)
 }
