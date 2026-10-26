@@ -6230,6 +6230,7 @@ dependencies = [
  "vello_cpu",
  "wat",
  "weezl 0.2.1",
+ "winsafe",
 ]
 
 [[package]]
