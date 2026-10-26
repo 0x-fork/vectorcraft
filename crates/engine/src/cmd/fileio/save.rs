@@ -300,7 +300,7 @@ fn disagreeing_option(p: &Value, svg: bool) -> std::result::Result<Option<(Strin
             .as_object()
             .into_iter()
             .flatten()
-            .filter(|(k, v)| !v.is_null() && !matches!(k.as_str(), "path" | "format" | "options") && !(svg && k.as_str() == "svg"))
+            .filter(|(k, v)| !(v.is_null() || matches!(k.as_str(), "path" | "format" | "options") || (svg && k.as_str() == "svg")))
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         if svg {
