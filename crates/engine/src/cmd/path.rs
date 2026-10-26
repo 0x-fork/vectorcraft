@@ -408,6 +408,14 @@ fn end_points(sp: &SubPath) -> Option<(Point, Point)> {
     Some((sp.anchors.first()?.p, sp.anchors.last()?.p))
 }
 
+/// Orientations (reverse first, reverse second) that bring the nearest ends together.
+fn nearest_ends(sp_a: &SubPath, sp_b: &SubPath) -> Option<(bool, bool)> {
+    let (fa, la) = end_points(sp_a)?;
+    let (fb, lb) = end_points(sp_b)?;
+    let cands = [(la.distance(fb), false, false), (la.distance(lb), false, true), (fa.distance(fb), true, false), (fa.distance(lb), true, true)];
+    cands.into_iter().min_by(|p, q| p.0.total_cmp(&q.0)).map(|(_, rx, ry)| (rx, ry))
+}
+
 /// Corner or smooth on an anchor a join leaves behind.
 fn join_point(sp: &mut SubPath, ai: usize, smooth: bool) {
     if smooth {
@@ -558,7 +566,14 @@ fn join(s: &mut Session, p: &Value) -> Result<Value> {
         if ids.len() == 2 && ids[0] == ids[1] {
             let id = ids[0];
             let (sa, sb) = subpaths.ok_or_else(|| bad(C, "subpaths required when joining the same path"))?;
-            let (rx, ry) = ends.unwrap_or((false, false));
+            let st = s.doc()?;
+            let p = st.doc.node(id).and_then(|n| n.path_data()).ok_or(EngineError::NoNode(id))?;
+            let spa = p.subpaths.get(sa).ok_or_else(|| EngineError::Other("join needs open paths".into()))?;
+            let spb = p.subpaths.get(sb).ok_or_else(|| EngineError::Other("join needs open paths".into()))?;
+            let (rx, ry) = match ends {
+                Some(e) => e,
+                None => nearest_ends(spa, spb).unwrap_or((false, false)),
+            };
             s.edit("Join", |d, sel| {
                 join_subpaths_in_node(d, id, (sa, sb), (rx, ry), join_kind)?;
                 sel.set([compound_or_self(d, id)]);
@@ -570,7 +585,15 @@ fn join(s: &mut Session, p: &Value) -> Result<Value> {
             && let Some((sa, sb)) = subpaths
         {
             let (a, b) = (ids[0], ids[1]);
-            let (rx, ry) = ends.unwrap_or((false, false));
+            let st = s.doc()?;
+            let pa = st.doc.node(a).and_then(|n| n.path_data()).ok_or(EngineError::NoNode(a))?;
+            let pb = st.doc.node(b).and_then(|n| n.path_data()).ok_or(EngineError::NoNode(b))?;
+            let spa = pa.subpaths.get(sa).ok_or_else(|| EngineError::Other("join needs open paths".into()))?;
+            let spb = pb.subpaths.get(sb).ok_or_else(|| EngineError::Other("join needs open paths".into()))?;
+            let (rx, ry) = match ends {
+                Some(e) => e,
+                None => nearest_ends(spa, spb).unwrap_or((false, false)),
+            };
             s.edit("Join", |d, sel| {
                 join_two(d, a, b, (sa, sb), (rx, ry), join_kind)?;
                 sel.set([compound_or_self(d, a)]);
@@ -812,6 +835,9 @@ fn join(s: &mut Session, p: &Value) -> Result<Value> {
         }
         return Err(EngineError::Other("select paths to join".into()));
     }
+    if ends.is_some() && open_subs.len() > 2 {
+        return Err(bad(C, "`ends` applies to joining exactly two paths"));
+    }
     if open_subs.len() == 1 {
         let (id, si) = open_subs[0];
         s.edit("Join", |d, sel| {
@@ -819,6 +845,26 @@ fn join(s: &mut Session, p: &Value) -> Result<Value> {
             sel.set([compound_or_self(d, id)]);
             Ok(())
         })?;
+        return ok();
+    }
+    if let Some((rx, ry)) = ends
+        && open_subs.len() == 2
+    {
+        let (a, sa) = open_subs[0];
+        let (b, sb) = open_subs[1];
+        if a == b {
+            s.edit("Join", |d, sel| {
+                join_subpaths_in_node(d, a, (sa, sb), (rx, ry), join_kind)?;
+                sel.set([compound_or_self(d, a)]);
+                Ok(())
+            })?;
+        } else {
+            s.edit("Join", |d, sel| {
+                join_two(d, a, b, (sa, sb), (rx, ry), join_kind)?;
+                sel.set([compound_or_self(d, a)]);
+                Ok(())
+            })?;
+        }
         return ok();
     }
 

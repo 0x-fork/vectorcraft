@@ -2169,6 +2169,31 @@ fn join_takes_the_paths_and_the_ends_to_join() {
     }
 }
 
+/// `path.join {ends}` on selected paths honors the requested ends, not the nearest pair.
+#[test]
+fn join_selected_paths_honors_ends_parameter() {
+    let mut s = session();
+    let a = line(&mut s, 0.0, 0.0, 100.0, 0.0);
+    let b = line(&mut s, 110.0, 0.0, 200.0, 0.0);
+    s.select(|_, sel| sel.set([a, b])).unwrap();
+    // The far ends: a's first to b's last (nearest pair would be a's last and b's first).
+    s.execute("path.join", &json!({"ends": ["first", "last"]})).unwrap();
+    let pts: Vec<(f64, f64)> = path(&s, a).subpaths[0].anchors.iter().map(|x| (x.p.x, x.p.y)).collect();
+    assert_eq!(pts, [(100.0, 0.0), (0.0, 0.0), (200.0, 0.0), (110.0, 0.0)]);
+}
+
+/// `path.join {ids, subpaths}` without `ends` computes the nearest pair within those subpaths.
+#[test]
+fn join_subpaths_without_ends_computes_nearest_pair() {
+    let mut s = session();
+    let a = line(&mut s, 0.0, 0.0, 100.0, 0.0);
+    let b = line(&mut s, 200.0, 0.0, 110.0, 0.0);
+    // Nearest ends between a (0..100) and b (200..110) are 100 and 110.
+    s.execute("path.join", &json!({"ids": [a.0, b.0], "subpaths": [0, 0]})).unwrap();
+    let pts: Vec<(f64, f64)> = path(&s, a).subpaths[0].anchors.iter().map(|x| (x.p.x, x.p.y)).collect();
+    assert_eq!(pts, [(0.0, 0.0), (100.0, 0.0), (110.0, 0.0), (200.0, 0.0)]);
+}
+
 /// `path.join {to}` makes the joined anchor a corner or smooth point.
 #[test]
 fn join_to_corner_or_smooth_sets_the_merged_anchor() {
