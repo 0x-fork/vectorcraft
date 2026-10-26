@@ -328,7 +328,8 @@ fn flyout_press(ui: &Ui, resp: &egui::Response, rect: egui::Rect) -> Option<Flyo
 /// Reflect and Shear tools' are their Object › Transform dialogs, the selection tools' are the
 /// Move dialog, and the Pencil, Paintbrush, Smooth, Blob Brush, Eraser and Shape Builder tools' are
 /// their Tool Options, as are the Line Segment, Arc, Rectangular Grid and Polar Grid tools'
-/// ([`crate::dialogs::shapes::open_options`]).
+/// ([`crate::dialogs::shapes::open_options`]). The Type on a Path and Vertical Type on a Path
+/// tools' are Type on a Path Options for the selected type on a path.
 pub fn open_options(app: &mut VectorcraftApp, tool: &str) -> Result<serde_json::Value, String> {
     match tool {
         "dimension" => crate::dialogs::dimension::open(app),
@@ -377,6 +378,17 @@ pub fn open_options(app: &mut VectorcraftApp, tool: &str) -> Result<serde_json::
         _ if vectorcraft_tools::settings::SYMBOLISM.contains(&tool) => Ok(crate::dialogs::symbolism_options::open(app, tool)),
         // The graph tools: Graph Type for the selected graph.
         _ if vectorcraft_tools::extra::is_graph_tool(tool) => crate::menus::graph_dialog(app, "graph.setType"),
+        // The Type on a Path tools: Type on a Path Options for the selected type on a path, as
+        // Type › Type on a Path › Type on a Path Options… opens it.
+        "typeOnPath" | "verticalTypeOnPath" => {
+            let id = "type.pathOptions";
+            if let Some(c) = vectorcraft_engine::find_command(id) {
+                (c.enabled)(&app.session)?;
+            }
+            app.session.execute(id, &json!({})).map_err(|e| e.to_string())?;
+            crate::menus::invoke(app, id, json!({}));
+            Ok(json!({ "dialog": "command" }))
+        }
         _ if vectorcraft_tools::tool_info(tool).is_none() => Err(format!("unknown tool `{tool}`")),
         _ => Err(format!("the {tool} tool has no options")),
     }
@@ -1027,6 +1039,53 @@ pub(crate) mod tests {
         let o = app.session.prefs.eyedropper;
         assert!(o.pick_up.appearance.transparency && !o.apply.appearance.transparency && o.apply.appearance.fill.color);
         assert!(app.run("tool.options", json!({"tool": "lasso"})).is_err());
+    }
+
+    /// A double-click on the Type on a Path or Vertical Type on a Path tool opens Type on a Path
+    /// Options for the selected type on a path, as the menu item does; with nothing selected, or
+    /// with no type on a path selected, nothing opens.
+    #[test]
+    fn double_clicking_a_type_on_a_path_tool_opens_type_on_a_path_options() {
+        for tool in ["typeOnPath", "verticalTypeOnPath"] {
+            let mut app = VectorcraftApp::new(Session::new(), Default::default());
+            app.ui.toolbar_advanced = true;
+            app.run("file.new", json!({"width": 600, "height": 400})).unwrap();
+            app.select_tool(tool);
+            let index = slots(&app).iter().position(|(_, tools)| tools.contains(&tool)).expect("a toolbar slot");
+            let ctx = egui::Context::default();
+            let at = frame_in(&mut app, &ctx, 0.0, vec![], 2000.0)[index].center();
+            let double_click = |app: &mut VectorcraftApp, time: f64| {
+                let b = |pressed| Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Default::default() };
+                frame_in(app, &ctx, time, vec![Event::PointerMoved(at), b(true), b(false), b(true), b(false)], 2000.0);
+                frame_in(app, &ctx, time + 0.1, vec![], 2000.0);
+            };
+            // Nothing selected: nothing opens.
+            double_click(&mut app, 1.0);
+            assert!(app.ui.dialog.is_none(), "{tool}");
+            assert_eq!(app.run("tool.options", json!({ "tool": tool })), Err("nothing selected".into()));
+            // A path that holds no type: nothing opens either.
+            let path = app.run("path.create", json!({"d": "M100 200 L500 200"})).unwrap()["id"].as_u64().unwrap();
+            app.run("select.set", json!({"ids": [path]})).unwrap();
+            double_click(&mut app, 2.0);
+            assert!(app.ui.dialog.is_none(), "{tool}");
+            let e = app.run("tool.options", json!({ "tool": tool })).unwrap_err();
+            assert!(e.contains("`type.pathOptions`: no text objects selected"), "{tool}: {e}");
+            assert!(app.ui.dialog.is_none(), "{tool}");
+            // Type on a path selected: the dialog opens on its options.
+            let r = app.run("text.createInPath", json!({"path": path, "mode": "onPath", "text": "Along", "at": [300, 210]})).unwrap();
+            app.run("select.set", json!({"ids": [r["id"]]})).unwrap();
+            app.run("type.pathOptions", json!({"effect": "skew"})).unwrap();
+            assert_eq!(app.session.tool_id(), tool);
+            double_click(&mut app, 3.0);
+            let d = app.ui.dialog.clone().unwrap_or_else(|| panic!("{tool}: Type on a Path Options"));
+            assert_eq!((d.str("__command"), d.str("__label")), ("type.pathOptions".to_string(), "Type on a Path Options".to_string()));
+            assert_eq!(d.fields.get("effect"), Some(&json!("skew")), "{tool}");
+            assert!(!d.fields.contains_key("start") && !d.fields.contains_key("end"), "{tool}: the menu item's fields");
+            // OK applies what the dialog holds.
+            app.ui.dialog.as_mut().unwrap().fields.insert("effect".into(), json!("gravity"));
+            crate::dialogs::confirm(&mut app).unwrap();
+            assert_eq!(app.session.execute("type.pathOptions", &json!({})).unwrap()["effect"], "gravity", "{tool}");
+        }
     }
 
     #[test]

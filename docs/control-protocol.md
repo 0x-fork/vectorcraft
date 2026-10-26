@@ -187,7 +187,9 @@ tools opens its dialog too (nothing happens without a selection), with the trans
 point. For `lineSegment`, `arc`, `rectangularGrid` and `polarGrid` it opens the tool's Tool Options: the dialog its
 click opens (kind = the tool id), without `x` and `y` and with `__toolOptions: true`, whose `ui.dialog.confirm` runs
 `tool.setOption {tool, values}` and draws nothing; the next drag with the tool and its click dialog use the values
-(the line's `fillLine`, the grids' Default Size `width`, `height` and `reference` too). Gradient tool handles snap to
+(the line's `fillLine`, the grids' Default Size `width`, `height` and `reference` too). For `typeOnPath` and
+`verticalTypeOnPath` it opens Type on a Path Options for the selected type on a path (a `command` dialog running
+`type.pathOptions`), or fails when no type on a path is selected. Gradient tool handles snap to
 anchors, edges and smart guides; Shift constrains them to 45° steps from the `constrainAngle` preference.
 
 Effect dialogs: `engine.execute {command: "effect.dialog", params: {effect, index?, item?}}` opens the `effect` dialog
