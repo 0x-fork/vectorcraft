@@ -1,6 +1,7 @@
 //! Tool Options of the freehand tools (double-click Pencil, Paintbrush, Smooth, Blob Brush or
 //! Eraser): the options each tool keeps, which last across tool switches and are saved with the
-//! preferences. OK sets them with `tool.setOption {tool, values}`.
+//! preferences. OK sets them with `tool.setOption {tool, values}`. The Pencil also has `liveFit`
+//! (Live curve fitting, on: its preview fits the stroke while it is drawn).
 //!
 //! Fields: `tool`; `fidelity` (points; Pencil, Paintbrush and Smooth), `fill` (Pencil and
 //! Paintbrush), `keepSelected` (Pencil, Paintbrush and Blob Brush), `mergeOnlySelection` (Blob
@@ -24,7 +25,7 @@ pub(super) const SPEC: DialogSpec = DialogSpec { heading, body, confirm, min_wid
 pub const TOOLS: [&str; 5] = ["pencil", "paintbrush", "smooth", "blobBrush", "eraser"];
 
 /// The options the dialog edits, in the order it shows them (a tool has those it reports).
-const KEYS: [&str; 8] = ["fidelity", "size", "fill", "altSmooth", "keepSelected", "mergeOnlySelection", "closeWithin", "editWithin"];
+const KEYS: [&str; 9] = ["fidelity", "size", "fill", "altSmooth", "keepSelected", "mergeOnlySelection", "closeWithin", "editWithin", "liveFit"];
 
 /// Width of the label column: wide enough for the tolerances' labels when there are any.
 fn label_w(d: &Dialog) -> f32 {
@@ -117,6 +118,10 @@ fn body(_app: &mut VectorcraftApp, ui: &mut egui::Ui, d: &mut Dialog) -> bool {
     if d.fields.contains_key("editWithin") {
         number(ui, d, ("editWithin", tl!("Edit selected paths within:")), "px", 0, (0.0, 100.0));
     }
+    if d.fields.contains_key("liveFit") {
+        ui.add_space(6.0);
+        check(ui, d, "liveFit", tl!("Live curve fitting"));
+    }
     false
 }
 
@@ -207,6 +212,55 @@ mod tests {
             super::super::confirm(&mut app).unwrap();
             assert_eq!(app.session.tool_options_of(tool)["size"].as_f64(), Some(24.0), "{tool}");
         }
+    }
+
+    /// Live curve fitting (the Pencil's, on by default): on, the path shown while a stroke is
+    /// drawn is fitted; off, it joins the stroke's points with straight segments, and the release
+    /// fits it as with the option on.
+    #[test]
+    fn live_curve_fitting_off_shows_the_points_until_the_release_fits_them() {
+        let mut app = app();
+        // The anchors of the newest path while a wave around height `y0` is drawn and after the
+        // release, with nothing selected (a stroke starting at the end of a selected path would
+        // continue it).
+        let draw = |app: &mut VectorcraftApp, y0: f64| {
+            app.run("select.set", json!({"ids": []})).unwrap();
+            app.select_tool("pencil");
+            let view = app.view_info();
+            let pts: Vec<_> = (0..=40).map(|i| (20.0 + i as f64 * 8.0, y0 + 30.0 * (i as f64 * 0.25).sin())).collect();
+            let pointer = |kind, (x, y)| vectorcraft_tools::PointerEvent::new(kind, x, y);
+            let newest = |app: &VectorcraftApp| {
+                let doc = &app.session.doc().unwrap().doc;
+                doc.layers[0].children().unwrap().last().unwrap().path_data().unwrap().subpaths[0].anchors.clone()
+            };
+            crate::canvas::dispatch(app, &pointer(vectorcraft_tools::PointerKind::Down, pts[0]), view);
+            for p in &pts[1..] {
+                crate::canvas::dispatch(app, &pointer(vectorcraft_tools::PointerKind::Drag, *p), view);
+            }
+            let drawing = newest(app);
+            crate::canvas::dispatch(app, &pointer(vectorcraft_tools::PointerKind::Up, pts[40]), view);
+            (drawing, newest(app))
+        };
+        let corners = |anchors: &[vectorcraft_geom::Anchor]| anchors.iter().all(|a| a.h_in == a.p && a.h_out == a.p);
+        // On by default: the Pencil's dialog shows it and the Paintbrush's does not.
+        app.run("tool.options", json!({"tool": "pencil"})).unwrap();
+        assert!(painted(&mut app).contains("Live curve fitting"));
+        assert!(app.ui.dialog.as_ref().unwrap().bool("liveFit"));
+        super::super::confirm(&mut app).unwrap();
+        let (drawing, on) = draw(&mut app, 100.0);
+        assert!(!corners(&drawing) && drawing.len() < 20, "fitted while drawn: {} anchors", drawing.len());
+        // Off: the points while the stroke is drawn, fitted at the release.
+        app.run("tool.options", json!({"tool": "pencil"})).unwrap();
+        app.ui.dialog.as_mut().unwrap().fields.insert("liveFit".into(), json!(false));
+        super::super::confirm(&mut app).unwrap();
+        app.select_tool("selection");
+        assert_eq!(app.session.tool_options_of("pencil")["liveFit"].as_bool(), Some(false), "it lasts while another tool is chosen");
+        let (drawing, off) = draw(&mut app, 200.0);
+        assert!(corners(&drawing) && drawing.len() > 30, "the points while drawn: {} anchors", drawing.len());
+        assert_eq!(off.len(), on.len(), "the release fits the stroke as with the option on");
+        assert!(off.iter().zip(&on).all(|(a, b)| (a.p.x - b.p.x).abs() < 1e-9 && (a.p.y - b.p.y - 100.0).abs() < 1e-9), "{off:?}");
+        app.run("tool.options", json!({"tool": "paintbrush"})).unwrap();
+        assert!(!painted(&mut app).contains("Live curve fitting"));
     }
 
     #[test]

@@ -267,6 +267,42 @@ fn pencil_with_keep_selected_off_leaves_the_new_path_unselected() {
     assert!(selected(&s).is_empty());
 }
 
+/// `fit: false` (the Pencil's preview with Live curve fitting off) joins the stroke's points with
+/// straight segments: a new path, a continued one and a redrawn section; by default the stroke is
+/// fitted.
+#[test]
+fn freehand_with_fit_off_joins_the_points_with_straight_segments() {
+    let corners = |sp: &vectorcraft_geom::SubPath| sp.anchors.iter().all(|a| a.h_in == a.p && a.h_out == a.p);
+    let at = |sp: &vectorcraft_geom::SubPath| sp.anchors.iter().map(|a| (a.p.x, a.p.y)).collect::<Vec<_>>();
+    let pts = wave(100.0, 400.0, 100.0);
+    let mut s = session();
+    let fitted = s.execute("path.freehand", &json!({"points": pts.iter().map(|p| [p.0, p.1]).collect::<Vec<_>>()})).unwrap();
+    let fitted = path(&s, NodeId(fitted["id"].as_u64().unwrap()));
+    assert!(!corners(&fitted.subpaths[0]) && fitted.subpaths[0].anchors.len() < pts.len(), "fitted by default");
+    let unfitted = s.execute("path.freehand", &json!({"points": pts.iter().map(|p| [p.0, p.1]).collect::<Vec<_>>(), "fit": false})).unwrap();
+    let sp = path(&s, NodeId(unfitted["id"].as_u64().unwrap())).subpaths[0].clone();
+    assert!(corners(&sp) && at(&sp) == pts, "{:?}", at(&sp));
+    // Continued from the end of a selected open path: the line's anchors, then the stroke's points.
+    let l = line(&mut s, 0.0, 300.0, 100.0, 300.0);
+    s.execute("select.set", &json!({"ids": [l.0]})).unwrap();
+    s.execute("path.freehand", &json!({"points": [[100, 300], [150, 330], [200, 290], [250, 320]], "extend": {"id": l.0}, "fit": false})).unwrap();
+    let sp = path(&s, l).subpaths[0].clone();
+    assert!(corners(&sp) && at(&sp) == [(0.0, 300.0), (100.0, 300.0), (150.0, 330.0), (200.0, 290.0), (250.0, 320.0)], "{:?}", at(&sp));
+    // A redrawn section: the stroke's inner points between where it meets the line.
+    let r = line(&mut s, 0.0, 500.0, 300.0, 500.0);
+    s.execute("select.set", &json!({"ids": [r.0]})).unwrap();
+    s.execute(
+        "path.freehand",
+        &json!({"points": [[100, 501], [125, 470], [150, 460], [175, 470], [200, 501]], "redraw": {"id": r.0, "within": 4}, "fit": false}),
+    )
+    .unwrap();
+    let sp = path(&s, r).subpaths[0].clone();
+    assert!(corners(&sp), "{:?}", sp.anchors);
+    let inner: Vec<_> = at(&sp).into_iter().filter(|p| p.1 < 499.0).collect();
+    assert_eq!(inner, [(125.0, 470.0), (150.0, 460.0), (175.0, 470.0)]);
+    assert!(s.execute("path.freehand", &json!({"points": [[0, 0], [1, 1]], "fit": "no"})).is_err());
+}
+
 #[test]
 fn paintbrush_uses_stroke_blob_brush_fills() {
     let mut s = session();

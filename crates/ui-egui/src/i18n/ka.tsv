@@ -5329,6 +5329,7 @@ imageTrace	Outline	კონტური
 	Light/Dark Balance	ნათელი/მუქი ბალანსი
 	Move Anchor Point	საყრდენი წერტილის გადაადგილება
 	Alt key toggles to Smooth Tool	Alt კლავიში ჩართავს გაგლუვების ხელსაწყოს
+	Live curve fitting	მრუდის მორგება ხატვისას
 @msg	{label} keeps 1 of the document's {n} artboards: the file reopens with one. Turn on Preserve Editing Capabilities to keep them all.	{label} ინახავს დოკუმენტის {n} სამუშაო დაფიდან 1-ს: ფაილი ხელახლა ერთით გაიხსნება. ყველას შესანარჩუნებლად ჩართეთ „რედაქტირების შესაძლებლობების შენარჩუნება“.
 	Chalk & Charcoal…	ცარცი და ნახშირი…
 	Chalk & Charcoal	ცარცი და ნახშირი

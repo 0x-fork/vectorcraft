@@ -2296,6 +2296,7 @@ lighting	Light	Světlo
 	Fidelity:	Věrnost:
 	Fill new strokes	Vyplňovat nové tahy
 	Alt key toggles to Smooth Tool	Klávesa Alt přepíná na nástroj Vyhlazení
+	Live curve fitting	Průběžné prokládání křivky
 	Keep selected	Ponechat vybrané
 	Merge only with selection	Sloučit jen s výběrem
 	Consider Open Filled Paths as Closed	Považovat otevřené vyplněné cesty za uzavřené

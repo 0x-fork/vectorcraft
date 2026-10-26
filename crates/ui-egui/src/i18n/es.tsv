@@ -1109,6 +1109,7 @@ font-technology	Variable	Variables
 	Fill and Stroke	Relleno y trazo
 	Fill new strokes	Rellenar trazos nuevos
 	Alt key toggles to Smooth Tool	La tecla Alt cambia a la herramienta Suavizar
+	Live curve fitting	Ajuste de curva en tiempo real
 	Keep selected	Mantener seleccionado
 	Merge only with selection	Combinar solo con la selección
 	Consider Open Filled Paths as Closed	Tratar los trazados abiertos con relleno como cerrados

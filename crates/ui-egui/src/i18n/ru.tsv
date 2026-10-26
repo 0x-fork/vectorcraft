@@ -1107,6 +1107,7 @@ font-technology	Variable	Вариативные
 	Fill and Stroke	Заливка и обводка
 	Fill new strokes	Заполнять новые обводки
 	Alt key toggles to Smooth Tool	Клавиша Alt переключает на инструмент «Сглаживание»
+	Live curve fitting	Подгонка кривой во время рисования
 	Keep selected	Оставлять выбранным
 	Merge only with selection	Объединять только с выделенным
 	Consider Open Filled Paths as Closed	Считать открытые контуры с заливкой замкнутыми

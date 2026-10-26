@@ -1272,6 +1272,7 @@ font-technology	Variable	Biến thiên
 	Fill Grid	Tô lưới
 	Fill new strokes	Tô nét mới
 	Alt key toggles to Smooth Tool	Phím Alt chuyển sang công cụ Làm mượt
+	Live curve fitting	Khớp đường cong khi vẽ
 	Keep selected	Giữ trạng thái đã chọn
 	Merge only with selection	Chỉ hợp nhất với vùng chọn
 	Consider Open Filled Paths as Closed	Coi đường dẫn mở có tô là đường dẫn đóng

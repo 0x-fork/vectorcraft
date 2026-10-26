@@ -1395,6 +1395,7 @@ font-technology	Variable	Változó
 	Fill Color	Kitöltőszín
 	Fill new strokes	Új vonások kitöltése
 	Alt key toggles to Smooth Tool	Az Alt billentyű a Simítás eszközre vált
+	Live curve fitting	Görbeillesztés rajzolás közben
 	Keep selected	Kijelölés megtartása
 	Merge only with selection	Összeolvasztás csak a kijelöléssel
 	Consider Open Filled Paths as Closed	A nyitott kitöltött útvonalak zártnak számítanak

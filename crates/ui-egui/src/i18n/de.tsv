@@ -1086,6 +1086,7 @@ font-technology	Variable	Variabel
 	Fill and Stroke	Fläche und Kontur
 	Fill new strokes	Neue Striche füllen
 	Alt key toggles to Smooth Tool	Alt-Taste schaltet auf Glätten-Werkzeug um
+	Live curve fitting	Kurvenanpassung beim Zeichnen
 	Keep selected	Ausgewählt lassen
 	Merge only with selection	Nur mit Auswahl zusammenfügen
 	Consider Open Filled Paths as Closed	Offene gefüllte Pfade als geschlossen behandeln

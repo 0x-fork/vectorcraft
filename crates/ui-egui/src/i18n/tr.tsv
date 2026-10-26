@@ -5220,6 +5220,7 @@ theme	Appearance	Görünüm
 @msg	{_1} is an exporter (File › Export › Export As…)	{_1} bir dışa aktarma eklentisidir (Dosya › Dışa Aktar › Farklı Dışa Aktar…)
 @msg	`documentData` is {size} bytes (limit {MAX_DOCUMENT_DATA})	`documentData` {size} bayt (sınır {MAX_DOCUMENT_DATA})
 	Alt key toggles to Smooth Tool	Alt tuşu Düzleştirme Aracına geçiş yapar
+	Live curve fitting	Çizerken eğri uydurma
 	Auto-Simplify	Otomatik Basitleştir
 	Drag an item here, or right-click one, to put it in this group.	Bu gruba eklemek için bir öğeyi buraya sürükleyin veya sağ tıklayın.
 	Drop here to take it out of its group	Grup dışına çıkarmak için buraya bırakın

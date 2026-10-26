@@ -1109,6 +1109,7 @@ font-technology	Variable	Variables
 	Fill and Stroke	Fond et contour
 	Fill new strokes	Remplir les nouveaux contours
 	Alt key toggles to Smooth Tool	La touche Alt bascule sur l’outil Arrondi
+	Live curve fitting	Ajustement de la courbe en direct
 	Keep selected	Garder sélectionné
 	Merge only with selection	Fusionner uniquement avec la sélection
 	Consider Open Filled Paths as Closed	Traiter les tracés ouverts avec fond comme fermés

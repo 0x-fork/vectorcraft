@@ -26,7 +26,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Pencil",
             [],
             None,
-            "{points: [[x,y]…] or [[x,y,pressure]…] (pen pressure 0..1: the stroke keeps it, for Calligraphic brushes with Pressure variation; a point without one presses fully), fidelity?: pt (1.5), closed?, style?: \"pencil\"|\"brush\", fill?: bool, keepSelected?: bool (true: the drawn or continued path is selected; false: it is not, and the rest of the selection stays), extend?: {id, end: \"start\"|\"end\"}, redraw?: {id, within?: pt (12)}} fit a freehand stroke → {id}. extend continues the path from that end; redraw (Edit Selected Paths) replaces the section of the path between where the stroke starts and ends, each within `within` of one subpath (the shorter way round a closed one), and draws a new path when the stroke doesn't end on it",
+            "{points: [[x,y]…] or [[x,y,pressure]…] (pen pressure 0..1: the stroke keeps it, for Calligraphic brushes with Pressure variation; a point without one presses fully), fidelity?: pt (1.5), fit?: bool (true; false: the points are joined by straight segments, as the Pencil previews a stroke with Live curve fitting off), closed?, style?: \"pencil\"|\"brush\", fill?: bool, keepSelected?: bool (true: the drawn or continued path is selected; false: it is not, and the rest of the selection stays), extend?: {id, end: \"start\"|\"end\"}, redraw?: {id, within?: pt (12)}} fit a freehand stroke → {id}. extend continues the path from that end; redraw (Edit Selected Paths) replaces the section of the path between where the stroke starts and ends, each within `within` of one subpath (the shorter way round a closed one), and draws a new path when the stroke doesn't end on it",
             has_doc,
             freehand
         ),
@@ -575,11 +575,21 @@ fn fit_freehand(pts: &[Point], tol: f64, closed: bool) -> SubPath {
     fitted.subpaths.into_iter().next().filter(|s| s.anchors.len() >= 2).unwrap_or(sp)
 }
 
+/// The path of a freehand stroke: fitted at `tol` ([`fit_freehand`]), or with no `tol` the points
+/// joined by straight segments (`path.freehand` with `fit: false`).
+fn stroke_subpath(pts: &[Point], tol: Option<f64>, closed: bool) -> SubPath {
+    match tol {
+        Some(tol) => fit_freehand(pts, tol, closed),
+        None => SubPath::new(pts.iter().map(|&p| Anchor::corner(p)).collect(), closed),
+    }
+}
+
 /// Pencil's Edit Selected Paths in the middle of a path: a stroke from one point of a subpath of
 /// `pd` to another, each within `within` of it, replaces the section between them (the shorter
-/// way round a closed subpath) with the stroke fitted at `tol`. The subpath's index and its new
-/// shape; None when the stroke doesn't start and end on the same subpath, or meets it once.
-fn redraw_section(pd: &PathData, pts: &[Point], tol: f64, within: f64) -> Option<(usize, SubPath)> {
+/// way round a closed subpath) with the stroke fitted at `tol` (with no `tol`, unfitted). The
+/// subpath's index and its new shape; None when the stroke doesn't start and end on the same
+/// subpath, or meets it once.
+fn redraw_section(pd: &PathData, pts: &[Point], tol: Option<f64>, within: f64) -> Option<(usize, SubPath)> {
     use kurbo::ParamCurveArclen;
     let (first, last) = (*pts.first()?, *pts.last()?);
     let (si, _, _, _, d_a) = pd.nearest(first)?;
@@ -633,7 +643,7 @@ fn redraw_section(pd: &PathData, pts: &[Point], tol: f64, within: f64) -> Option
     *s0 = s1.p;
     let (Some(e0), Some(e1)) = (stroke.last_mut(), sp.anchors.get(end)) else { return None };
     *e0 = e1.p;
-    let fit = fit_freehand(&stroke, tol, false).anchors;
+    let fit = stroke_subpath(&stroke, tol, false).anchors;
     let (Some(f0), Some(f1)) = (fit.first().copied(), fit.last().copied()) else { return None };
     let inner = fit.get(1..fit.len().saturating_sub(1)).unwrap_or_default();
     let (before, after): (Vec<Anchor>, Vec<Anchor>) = if sp.closed {
@@ -665,6 +675,8 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
     let pressure = stroke_pressure(&samples);
     let mut pts: Vec<Point> = samples.into_iter().map(|(pt, _)| pt).collect();
     let tol = number_or(p, "fidelity", 1.5, C)?.clamp(0.05, 100.0);
+    // The tolerance the stroke is fitted at; with `fit: false` it is not fitted.
+    let fit_tol = switch_or(p, "fit", true, C)?.then_some(tol);
     let closed = switch_or(p, "closed", false, C)?;
     let brush = str_param(p, "style") == Some("brush");
     let keep_selected = switch_or(p, "keepSelected", true, C)?;
@@ -692,7 +704,7 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
         if closing && let Some(l) = pts.last_mut() {
             *l = first;
         }
-        let fit = fit_freehand(&pts, tol, false);
+        let fit = stroke_subpath(&pts, fit_tol, false);
         let mut add = fit.anchors;
         if let (Some(last), Some(a0)) = (sp.anchors.last_mut(), add.first()) {
             last.h_out = a0.h_out;
@@ -748,7 +760,7 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
         let (pd, _) = path_of(&s.doc()?.doc, id)?;
         // shortcut: a stroke pressure profile is left as it was, measured along the old path; fit
         // it to the new length if Calligraphic pressure strokes get redrawn.
-        if let Some((si, sp)) = redraw_section(&pd, &pts, tol, within) {
+        if let Some((si, sp)) = redraw_section(&pd, &pts, fit_tol, within) {
             s.edit(if brush { "Paintbrush" } else { "Pencil" }, |d, sel| {
                 *path_mut(d, id)?.subpaths.get_mut(si).ok_or_else(|| bad(C, "no such subpath"))? = sp;
                 if keep_selected {
@@ -764,7 +776,7 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
     if pts.len() < 2 {
         return Err(bad(C, "need at least two points"));
     }
-    let sp = fit_freehand(&pts, tol, closed);
+    let sp = stroke_subpath(&pts, fit_tol, closed);
     let fill = if filled { s.paint.fill.clone() } else { Paint::None };
     // A pencil path with a fill keeps a stroke of None (#1679); only one that would show nothing
     // gets black. A brush is its stroke.

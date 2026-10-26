@@ -2211,6 +2211,7 @@ lighting	Light	Światło
 	Fidelity:	Wierność:
 	Fill new strokes	Wypełniaj nowe pociągnięcia
 	Alt key toggles to Smooth Tool	Klawisz Alt przełącza na narzędzie Wygładzanie
+	Live curve fitting	Dopasowywanie krzywej podczas rysowania
 	Keep selected	Zachowaj zaznaczenie
 	Merge only with selection	Scalaj tylko z zaznaczeniem
 	Consider Open Filled Paths as Closed	Traktuj otwarte wypełnione ścieżki jako zamknięte
