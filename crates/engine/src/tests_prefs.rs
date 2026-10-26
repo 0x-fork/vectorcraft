@@ -1454,6 +1454,25 @@ fn highlight_alternate_glyphs_preference_is_off_by_default() {
     assert!(!s.prefs.highlight_alternate_glyphs);
 }
 
+/// Preferences › Type › Highlight Substituted Fonts: on by default, listed in the Type category,
+/// and saved with the other preferences.
+/// <https://helpx.adobe.com/illustrator/desktop/design-with-text/fonts-and-scripts/edit-text-without-replacing-missing-fonts.html>
+#[test]
+fn highlight_substituted_fonts_preference_is_on_by_default_and_saved() {
+    let mut s = Session::new();
+    assert!(s.prefs.highlight_substituted_fonts, "on by default");
+    let spec = crate::cmd::prefscmds::PREF_SPECS.iter().find(|p| p.key == "highlightSubstitutedFonts").expect("listed");
+    assert_eq!((spec.category, spec.label), ("Type", "Highlight Substituted Fonts"));
+    assert_eq!(s.execute("prefs.get", &json!({"key": "highlightSubstitutedFonts"})).unwrap(), json!(true));
+    set_pref(&mut s, "highlightSubstitutedFonts", json!(false));
+    assert!(!s.prefs.highlight_substituted_fonts);
+    let saved: Prefs = serde_json::from_value(serde_json::to_value(&s.prefs).unwrap()).unwrap();
+    assert!(!saved.highlight_substituted_fonts);
+    // Preferences saved before the key existed read it as on.
+    let old: Prefs = serde_json::from_value(json!({"highlightAlternateGlyphs": true})).unwrap();
+    assert!(old.highlight_substituted_fonts);
+}
+
 /// Preferences › Performance › Real-time Drawing and Editing (#394): off, the document isn't
 /// previewed while dragging but the pending shape still shows as a canvas overlay until commit.
 #[test]

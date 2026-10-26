@@ -986,6 +986,9 @@ pub struct Prefs {
     pub recent_fonts_count: u32,
     pub missing_glyph_protection: bool,
     pub highlight_alternate_glyphs: bool,
+    /// Type › Highlight Substituted Fonts: on screen, text drawn in a substitute for a missing
+    /// font is highlighted, in every document (on by default).
+    pub highlight_substituted_fonts: bool,
     pub placeholder_text: bool,
     // Units
     pub units_general: String,
@@ -1243,6 +1246,7 @@ impl Default for Prefs {
             recent_fonts_count: 10,
             missing_glyph_protection: true,
             highlight_alternate_glyphs: false,
+            highlight_substituted_fonts: true,
             placeholder_text: true,
             units_general: s("points"),
             units_stroke: s("points"),

@@ -466,7 +466,7 @@ string is points). The `preferences` dialog's `unitsGeneral` starts as the activ
 
 Document Setup: File → Document Setup… (`file.documentSetup`, Cmd+Alt+P) opens the `documentSetup` dialog. Its fields
 are what `document.setup` reports (`units`, `bleed` [top, bottom, left, right] in pt, `outlineImages`,
-`highlightSubstitutedFonts`, `highlightSubstitutedGlyphs`, `gridSize`, `gridColors`, `simulatePaper`, `flattenerPreset`,
+`highlightSubstitutedGlyphs`, `gridSize`, `gridColors`, `simulatePaper`, `flattenerPreset`,
 `discardWhiteOverprint`, `language`, `quotes`, `typographersQuotes`, `superscript`, `subscript`, `smallCapsSize`,
 `exportText`, `backgroundContents`) plus `tab` (`General`, `Transparency` or `Type`) and `bleedLinked`.
 `ui.dialog.confirm` runs `document.setup` with them as one undo step; a bad value answers with an error and the dialog
