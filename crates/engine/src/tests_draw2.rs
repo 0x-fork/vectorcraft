@@ -725,6 +725,81 @@ fn eraser_removes_small_shape_entirely() {
     assert!(paths(&s).is_empty());
 }
 
+/// The Eraser's tip is an ellipse `size` across its long axis, at `angle` counter-clockwise from
+/// horizontal, with a short axis `roundness` percent as long: a vertical drag across a square
+/// removes a band as wide as the tip is across, and a press on a horizontal line removes the
+/// tip's horizontal chord through its center.
+#[test]
+fn the_eraser_tip_takes_its_angle_and_roundness() {
+    // The area of a 100 pt square left after a vertical drag through its middle, and the length
+    // of a 200 pt line left after a press on its middle, with a 20 pt tip.
+    let erase = |tip: serde_json::Value| {
+        let mut s = session();
+        rect(&mut s, 100.0, 100.0, 100.0, 100.0);
+        line(&mut s, 300.0, 150.0, 500.0, 150.0);
+        let mut stroke = json!({"points": [[150, 50], [150, 250]], "size": 20});
+        let mut press = json!({"points": [[400, 150]], "size": 20});
+        for p in [&mut stroke, &mut press] {
+            if let (Some(p), Some(tip)) = (p.as_object_mut(), tip.as_object()) {
+                p.extend(tip.clone());
+            }
+        }
+        // With nothing selected each time, so the Eraser erases every path it touches.
+        s.execute("select.none", &json!({})).unwrap();
+        s.execute("path.eraseRegion", &stroke).unwrap();
+        s.execute("select.none", &json!({})).unwrap();
+        s.execute("path.eraseRegion", &press).unwrap();
+        let ps = paths(&s);
+        let left: f64 = ps.iter().map(|p| &p.1).filter(|p| p.is_closed()).map(area).sum();
+        let len: f64 = ps.iter().map(|p| &p.1).filter(|p| !p.is_closed()).map(|p| p.length()).sum();
+        (left, len)
+    };
+    // `band`: how wide the drag cuts; `chord`: how much of the line the press removes.
+    let close = |(left, len): (f64, f64), band: f64, chord: f64| {
+        assert!((left - (10000.0 - 100.0 * band)).abs() < 2.0 * band + 2.0, "{band} pt band: {left} left of the square");
+        assert!((len - (200.0 - chord)).abs() < 0.03 * chord + 0.02, "{chord} pt chord: {len} left of the line");
+    };
+    // Round by default: 20 pt either way.
+    close(erase(json!({})), 20.0, 20.0);
+    // The long axis horizontal: 20 pt either way.
+    close(erase(json!({"angle": 0, "roundness": 25})), 20.0, 20.0);
+    // The long axis upright: 5 pt either way.
+    close(erase(json!({"angle": 90, "roundness": 25})), 5.0, 5.0);
+    // At 45°, half axes 10 and 2.5: the band is 2·√((10² + 2.5²) / 2), about 14.58 pt, and the
+    // chord 2 / √(0.5 / 10² + 0.5 / 2.5²), about 6.86 pt.
+    close(erase(json!({"angle": 45, "roundness": 25})), 2.0 * ((100.0f64 + 6.25) / 2.0).sqrt(), 2.0 / (0.5f64 / 100.0 + 0.5 / 6.25).sqrt());
+    // A roundness past 100 is kept to 100, and one below 1 to 1.
+    close(erase(json!({"angle": 90, "roundness": 400})), 20.0, 20.0);
+    close(erase(json!({"angle": 90, "roundness": 0})), 0.2, 0.2);
+}
+
+#[test]
+fn a_narrow_eraser_finds_a_long_line_between_its_samples() {
+    // A 200 pt line from x = 300 used to be tested every 200 / 24 pt (at 400 and 408.33 near
+    // here), so a tip or a Path Eraser band that fits between two of those points missed it.
+    let left_after = |command: &str, p: serde_json::Value| {
+        let mut s = session();
+        line(&mut s, 300.0, 150.0, 500.0, 150.0);
+        s.execute(command, &p).unwrap();
+        paths(&s).iter().map(|p| p.1.length()).sum::<f64>()
+    };
+    // A 20 pt tip upright at 25%: 5 pt across the line, from 401.5 to 406.5.
+    let len = left_after("path.eraseRegion", json!({"points": [[404, 150]], "size": 20, "angle": 90, "roundness": 25}));
+    assert!((len - 195.0).abs() < 0.2, "the narrow tip left {len} pt of the line");
+    // An 8 pt Path Eraser band across the line, from 400.2 to 408.2.
+    let len = left_after("path.eraseSegments", json!({"points": [[404.2, 100], [404.2, 200]], "width": 8}));
+    assert!((len - 192.0).abs() < 0.2, "the Path Eraser left {len} pt of the line");
+    // The same line drawn as a curve whose handles both sit on its start moves slowly there and
+    // fast near its end, three times as fast as its length suggests, so 80 even steps in t put
+    // samples at 492.59 and 500 and a 5 pt tip at 496.3 sits between them.
+    let mut s = session();
+    let anchors = json!([{"x": 300, "y": 150}, {"x": 500, "y": 150, "in": [300, 150]}]);
+    s.execute("path.create", &json!({ "anchors": anchors })).unwrap();
+    s.execute("path.eraseRegion", &json!({"points": [[496.3, 150]], "size": 5})).unwrap();
+    let len = paths(&s).iter().map(|p| p.1.length()).sum::<f64>();
+    assert!((len - 195.0).abs() < 0.2, "the tip left {len} pt of the curve");
+}
+
 #[test]
 fn path_eraser_splits_selected_path() {
     let mut s = session();
@@ -998,8 +1073,8 @@ fn drawing_commands_refuse_a_point_or_pressure_given_as_text() {
     s.execute("path.freehand", &pressed).unwrap();
 }
 
-/// The Eraser, Path Eraser, Smooth, Join and Blob Brush commands refuse a size, width, radius,
-/// fidelity or tolerance given as text or as another value that is not a number, and change
+/// The Eraser, Path Eraser, Smooth, Join and Blob Brush commands refuse a size, angle, roundness,
+/// width, radius, fidelity or tolerance given as text or as another value that is not a number, and change
 /// nothing; null is read as the key left out.
 #[test]
 fn drawing_commands_refuse_a_size_given_as_text() {
@@ -1009,6 +1084,8 @@ fn drawing_commands_refuse_a_size_given_as_text() {
     let stroke = json!({"points": [[90, 150], [150, 150], [210, 150]]});
     for (cmd, key) in [
         ("path.eraseRegion", "size"),
+        ("path.eraseRegion", "angle"),
+        ("path.eraseRegion", "roundness"),
         ("path.eraseSegments", "width"),
         ("path.smoothRegion", "radius"),
         ("path.smoothRegion", "fidelity"),

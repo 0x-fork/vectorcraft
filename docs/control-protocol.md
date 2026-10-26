@@ -786,7 +786,8 @@ keeps: `fidelity` (pt; Pencil, Paintbrush, Smooth), `fill` (Pencil, Paintbrush),
 Blob Brush; on by default for the Pencil and Paintbrush and off for the Blob Brush, and while it is off the path a
 stroke draws, continues or merges into is not selected afterwards), `mergeOnlySelection` (Blob Brush; off by default,
 and while it is on a stroke merges only with selected blobs), `closeWithin` and `editWithin` (screen pixels, 0 turns
-it off; Pencil, Paintbrush) and `size` (pt; Blob Brush, Eraser). `ui.dialog.confirm` runs
+it off; Pencil, Paintbrush), `size` (pt; Blob Brush, Eraser), and `angle` (°, −180 to 180; 0) and `roundness`
+(%, 1 to 100; 100) of the Eraser's tip (Eraser). `ui.dialog.confirm` runs
 `tool.setOption {tool, values}`.
 
 `ui.pointer` events also take `holdMs` (0..60000): the pointer then holds still that long, button down, before the

@@ -5,8 +5,8 @@
 //!
 //! Fields: `tool`; `fidelity` (points; Pencil, Paintbrush and Smooth), `fill` (Pencil and
 //! Paintbrush), `keepSelected` (Pencil, Paintbrush and Blob Brush), `mergeOnlySelection` (Blob
-//! Brush), `closeWithin` and `editWithin` (screen pixels, 0 turns it off; Pencil and Paintbrush) and
-//! `size` (points; Blob Brush and Eraser).
+//! Brush), `closeWithin` and `editWithin` (screen pixels, 0 turns it off; Pencil and Paintbrush),
+//! `angle` (degrees) and `roundness` (percent; Eraser) and `size` (points; Blob Brush and Eraser).
 
 use serde_json::{Map, Value, json};
 
@@ -25,7 +25,8 @@ pub(super) const SPEC: DialogSpec = DialogSpec { heading, body, confirm, min_wid
 pub const TOOLS: [&str; 5] = ["pencil", "paintbrush", "smooth", "blobBrush", "eraser"];
 
 /// The options the dialog edits, in the order it shows them (a tool has those it reports).
-const KEYS: [&str; 9] = ["fidelity", "size", "fill", "altSmooth", "keepSelected", "mergeOnlySelection", "closeWithin", "editWithin", "liveFit"];
+const KEYS: [&str; 11] =
+    ["fidelity", "angle", "roundness", "size", "fill", "altSmooth", "keepSelected", "mergeOnlySelection", "closeWithin", "editWithin", "liveFit"];
 
 /// Width of the label column: wide enough for the tolerances' labels when there are any.
 fn label_w(d: &Dialog) -> f32 {
@@ -95,6 +96,12 @@ fn body(_app: &mut VectorcraftApp, ui: &mut egui::Ui, d: &mut Dialog) -> bool {
     if d.fields.contains_key("fidelity") {
         fidelity(ui, d);
         ui.add_space(10.0);
+    }
+    if d.fields.contains_key("angle") {
+        number(ui, d, ("angle", tl!("Angle:")), "°", 0, (-180.0, 180.0));
+    }
+    if d.fields.contains_key("roundness") {
+        number(ui, d, ("roundness", tl!("Roundness:")), "%", 0, (1.0, 100.0));
     }
     if d.fields.contains_key("size") {
         number(ui, d, ("size", tl!("Size:")), "pt", 1, (0.1, 1000.0));
@@ -208,6 +215,8 @@ mod tests {
             // The Blob Brush also has Keep selected and Merge only with selection.
             let blob = tool == "blobBrush";
             assert_eq!((text.contains("Keep selected"), text.contains("Merge only with selection")), (blob, blob), "{tool}: {text}");
+            // The Eraser also has Angle and Roundness.
+            assert_eq!((text.contains("Angle:"), text.contains("Roundness:")), (!blob, !blob), "{tool}: {text}");
             app.ui.dialog.as_mut().unwrap().fields.insert("size".into(), json!(24));
             super::super::confirm(&mut app).unwrap();
             assert_eq!(app.session.tool_options_of(tool)["size"].as_f64(), Some(24.0), "{tool}");
@@ -364,6 +373,52 @@ mod tests {
         app.run("select.set", json!({"ids": [b.0]})).unwrap();
         assert_eq!(stroke(&mut app), vec![b]);
         assert_eq!(ids(&app), vec![a, b], "merged into b only");
+    }
+
+    /// Eraser Tool Options' Angle and Roundness shape the tip the next Eraser drag erases with,
+    /// and the tool keeps them while another tool is chosen.
+    #[test]
+    fn the_eraser_options_set_the_tips_angle_and_roundness() {
+        let mut app = app();
+        // The width of the gap a vertical Eraser drag cuts through the middle of a 100 pt square.
+        let erase = |app: &mut VectorcraftApp| {
+            app.run("select.set", json!({"ids": []})).unwrap();
+            let r = app.run("shape.rectangle", json!({"x": 100, "y": 100, "width": 100, "height": 100})).unwrap();
+            let id = r["id"].as_u64().unwrap();
+            app.run("select.set", json!({"ids": [id]})).unwrap();
+            app.select_tool("eraser");
+            let view = app.view_info();
+            let pointer = |kind, y| vectorcraft_tools::PointerEvent::new(kind, 150.0, y);
+            crate::canvas::dispatch(app, &pointer(vectorcraft_tools::PointerKind::Down, 50.0), view);
+            for y in [100.0, 150.0, 200.0] {
+                crate::canvas::dispatch(app, &pointer(vectorcraft_tools::PointerKind::Drag, y), view);
+            }
+            crate::canvas::dispatch(app, &pointer(vectorcraft_tools::PointerKind::Up, 250.0), view);
+            let st = app.session.doc().unwrap();
+            let bounds: Vec<_> = st.selection.objects.iter().filter_map(|id| st.doc.node(*id)?.path_data()?.control_bounds()).collect();
+            let [a, b] = bounds[..] else { panic!("two halves: {bounds:?}") };
+            let (l, r) = if a.x0 < b.x0 { (a, b) } else { (b, a) };
+            r.x0 - l.x1
+        };
+        app.run("tool.options", json!({"tool": "eraser"})).unwrap();
+        let d = app.ui.dialog.as_mut().unwrap();
+        // A round tip by default.
+        assert_eq!((d.f64("angle", -1.0), d.f64("roundness", -1.0)), (0.0, 100.0));
+        d.fields.insert("size".into(), json!(20));
+        super::super::confirm(&mut app).unwrap();
+        let round = erase(&mut app);
+        assert!((round - 20.0).abs() < 0.2, "a 20 pt round tip cuts {round} pt");
+        // Upright and a quarter as wide: the band it erases is 5 pt wide.
+        app.run("tool.options", json!({"tool": "eraser"})).unwrap();
+        let d = app.ui.dialog.as_mut().unwrap();
+        d.fields.insert("angle".into(), json!(90));
+        d.fields.insert("roundness".into(), json!(25));
+        super::super::confirm(&mut app).unwrap();
+        app.select_tool("selection");
+        let o = app.session.tool_options_of("eraser");
+        assert_eq!((o["angle"].as_f64(), o["roundness"].as_f64(), o["size"].as_f64()), (Some(90.0), Some(25.0), Some(20.0)));
+        let narrow = erase(&mut app);
+        assert!((narrow - 5.0).abs() < 0.2, "a 20 by 5 pt upright tip cuts {narrow} pt");
     }
 
     #[test]
