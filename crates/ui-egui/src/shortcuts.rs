@@ -124,6 +124,22 @@ fn runs_a_command(i: &egui::InputState, key: Key, cmd_only: bool) -> bool {
     !presses.is_empty() && presses.iter().all(bound)
 }
 
+/// Whether a key press runs a shortcut of the keymap in effect, the user's own included. The web
+/// build asks this of every Cmd and Ctrl press, before egui sees it, to cancel what the browser
+/// would also do with it (zoom the page on `Cmd+=`, undo on `Cmd+Z`, go back on `Cmd+[`).
+/// `key` and `code` are the browser's names for the character typed and the key's position, which
+/// egui reads with [`Key::from_name`]; `modifiers` as egui reports them. The press is matched as
+/// the dispatcher matches it ([`dispatch`]) on a layout about which nothing is known: what typing
+/// has shown of the layout is left out, and so are double presses.
+pub fn runs_a_shortcut(key: &str, code: &str, modifiers: Modifiers) -> bool {
+    let physical_key = Key::from_name(code);
+    let Some(key) = Key::from_name(key).or(physical_key) else { return false };
+    let press = egui::Event::Key { key, physical_key, pressed: true, repeat: false, modifiers };
+    let Some(input) = craft_keymap::KeyInput::from_egui(&press, crate::keymap::platform()) else { return false };
+    let mirror = crate::shortcut_editor::current();
+    craft_keymap::Layout::default().candidates(&input).iter().any(|c| mirror.keymap.lookup(c, false, &Active::NONE) != craft_keymap::Lookup::None)
+}
+
 /// Give a copy or cut chord held with more modifiers its key back when it has a shortcut of its own:
 /// egui reports every Cmd+C and Cmd+X chord as Copy or Cut, Shift and Alt held too, so Cmd+Shift+C
 /// (Align center) copied instead (#1940).
@@ -1262,6 +1278,55 @@ mod tests {
         frame(&mut app, typed);
         assert!(new_layer_options(&app), "Selection tool: Ctrl+Alt+L runs New Layer Options… as before");
         assert_eq!(text_and_layers(&mut app, id), ("Hi".into(), layers + 1), "no layer is added until OK");
+    }
+
+    /// Cmd as egui reports it on this platform: the Command key on macOS, Ctrl elsewhere.
+    fn cmd() -> Modifiers {
+        if crate::keymap::platform().is_mac() { Modifiers::MAC_CMD | Modifiers::COMMAND } else { Modifiers::CTRL | Modifiers::COMMAND }
+    }
+
+    /// The web build keeps from the browser the presses the keymap binds: the View menu's zoom
+    /// chords, Undo and Redo, whatever the browser reports as the key typed and its position.
+    #[test]
+    fn presses_the_keymap_binds_run_a_shortcut() {
+        crate::shortcut_editor::sync(&crate::state::UiState::default());
+        let (cmd, shift, alt) = (cmd(), Modifiers::SHIFT, Modifiers::ALT);
+        for (key, code, mods) in [
+            ("=", "Equal", cmd),
+            ("+", "Equal", cmd | shift),
+            ("+", "NumpadAdd", cmd),
+            ("-", "Minus", cmd),
+            ("0", "Digit0", cmd),
+            ("º", "Digit0", cmd | alt),
+            ("z", "KeyZ", cmd),
+            ("Z", "KeyZ", cmd | shift),
+            ("[", "BracketLeft", cmd),
+            // German's `+` key, where US has `]`: the character decides.
+            ("+", "BracketRight", cmd),
+        ] {
+            assert!(runs_a_shortcut(key, code, mods), "{key} ({code}) {mods:?}");
+        }
+        // Keys the browser has no name egui knows for are matched by their position.
+        assert!(runs_a_shortcut("Dead", "KeyZ", cmd), "a dead key at Z");
+        for (key, code, mods) in [("Insert", "Numpad0", cmd), ("F13", "F13", cmd), ("Unidentified", "", cmd)] {
+            assert!(!runs_a_shortcut(key, code, mods), "{key} ({code}) runs nothing");
+        }
+    }
+
+    /// The user's shortcuts decide: a chord given to another command runs that one, and a chord
+    /// taken from its command runs nothing.
+    #[test]
+    fn presses_follow_the_users_shortcuts() {
+        let mut ui = crate::state::UiState::default();
+        crate::keymap::set_override(&mut ui.shortcut_overrides, "view.zoomIn", "");
+        crate::keymap::set_override(&mut ui.shortcut_overrides, "view.grid", "Cmd+Alt+Shift+F9");
+        crate::shortcut_editor::sync(&ui);
+        let zoom_in = runs_a_shortcut("=", "Equal", cmd());
+        let grid = runs_a_shortcut("F9", "F9", cmd() | Modifiers::ALT | Modifiers::SHIFT);
+        crate::shortcut_editor::sync(&crate::state::UiState::default());
+        assert!(!zoom_in, "Zoom In has no shortcut");
+        assert!(grid, "Show Grid's own chord");
+        assert!(runs_a_shortcut("=", "Equal", cmd()), "the defaults again");
     }
 
     /// #2094: Cmd+Shift+O is Type › Create Outlines (not File › Open's Cmd+O, not the Artboard
