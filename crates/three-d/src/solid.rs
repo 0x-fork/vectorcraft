@@ -1606,9 +1606,7 @@ fn inflated(p: Puff, bounds: Rect, o: Inflate, view: View, reach: f64) -> Result
 }
 
 #[cfg(test)]
-#[path = "tests_solid.rs"]
 mod tests;
 
 #[cfg(test)]
-#[path = "tests_inflate_shading.rs"]
 mod tests_inflate_shading;
