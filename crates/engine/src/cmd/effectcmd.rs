@@ -713,7 +713,6 @@ fn expand_appearance(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 #[cfg(test)]
-#[path = "tests_lighting_presets.rs"]
 mod lighting_presets_tests;
 
 #[cfg(test)]
