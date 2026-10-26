@@ -4688,6 +4688,25 @@ to `object.setBounds`, which scales the other dimension by the same factor; agen
 {"name":"run_command","arguments":{"command":"object.setBounds","params":{"width":200,"proportional":true}}}
 ```
 
+## Transform panel menu
+
+The Transform panel menu's Transform Object Only, Transform Pattern Only and Transform Both are the
+`transformPanelPatterns` preference (`object`, `pattern`, `both`). Once one is chosen, the fields, flips and menu
+flips of the Transform panel and the Properties panel's Transform section send it as `objects` (false for `pattern`)
+and `patterns` (true for `pattern` and `both`) to `object.setBounds`, `object.rotate`, `object.shear` and
+`object.reflect`; agents pass those switches themselves. Until then (`default`, also after `prefs.reset`) they send
+neither, so pattern tiles follow `transformPatternTiles`, and the menu checks Transform Both while it is on and
+Transform Object Only while it is off. Use Registration Point for Symbol is the
+`useRegistrationPointForSymbol` preference: with it on and one symbol instance selected, those panels show and set X
+and Y at the symbol's registration point (`symbol.options` `registration`) where the instance's transform puts it
+(after a flip the art's top-left corner is the box's top-right one), give `reference` as the box's point nearest it
+and turn, shear and flip about it (`origin`).
+
+```json
+{"name":"run_command","arguments":{"command":"prefs.set","params":{"key":"transformPanelPatterns","value":"pattern"}}}
+{"name":"run_command","arguments":{"command":"object.setBounds","params":{"x":170,"reference":4,"objects":false,"patterns":true}}}
+```
+
 ## Plug-ins
 
 WebAssembly plug-ins ([plugins.md](plugins.md)) are reached through commands; the desktop app and an unconfined

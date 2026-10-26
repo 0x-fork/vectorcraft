@@ -367,6 +367,16 @@ pub const PREF_SPECS: &[PrefSpec] = &[
     // The W/H link of the Transform panel, the Properties panel and the Control bar
     p!("constrainProportions", "General", "Transform Panel", "Constrain Width and Height Proportions", bool),
     p!("singleCornerRadius", "General", "Transform Panel", "Single Corner Radius", bool),
+    // The Transform panel menu: what the panel transforms (`default`: as General › Transform
+    // Pattern Tiles, until a choice in the menu), and symbols' registration point
+    p!(
+        "transformPanelPatterns",
+        "General",
+        "Transform Panel",
+        "Transform",
+        choice(&[("default", "Default"), ("object", "Transform Object Only"), ("pattern", "Transform Pattern Only"), ("both", "Transform Both")])
+    ),
+    p!("useRegistrationPointForSymbol", "General", "Transform Panel", "Use Registration Point for Symbol", bool),
 ];
 
 pub fn spec(key: &str) -> Option<&'static PrefSpec> {

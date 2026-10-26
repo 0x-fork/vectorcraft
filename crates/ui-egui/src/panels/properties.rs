@@ -687,8 +687,10 @@ pub fn transform_section(app: &mut VectorcraftApp, ui: &mut Ui) {
         return;
     };
     let b = bx.rect;
-    let refi: usize = ui.data(|d| d.get_temp(egui::Id::unique("refpt"))).unwrap_or(4);
-    let rp = bx.reference_point(refi);
+    // The reference point, or a symbol instance's registration point: X/Y are read and set there
+    // and the rotation and flips turn and mirror the selection about it, as in the Transform panel.
+    let reference = super::transform::panel_reference(app, ui, &bx);
+    let (refi, rp) = (reference.index, reference.point);
     let copy = super::transform::alt_enter_copies(app, ui);
     section_header(ui, tl!("Transform"));
     let fw = super::field_width(ui);
@@ -701,20 +703,28 @@ pub fn transform_section(app: &mut VectorcraftApp, ui: &mut Ui) {
         egui::Grid::new("xf-grid").num_columns(4).spacing([4.0, 6.0]).min_col_width(0.0).show(ui, |ui| {
             dim_label(ui, "X:");
             if let Some(v) = widgets::num_field_named(ui, "tx", Some(crate::i18n::t("X:")), Some(rp.x - origin.x), units, fw) {
-                app.run("object.setBounds", json!({"x": v + origin.x, "reference": refi, "copy": copy})).ok();
+                super::transform::run_transform(
+                    app,
+                    "object.setBounds",
+                    json!({"x": reference.bounds_xy(v + origin.x, 0.0).0, "reference": refi, "copy": copy}),
+                );
             }
             dim_label(ui, "W:");
             if let Some(v) = widgets::size_field_named(ui, "tw", Some(tl!("W:")), Some(b.width()), units, fw) {
-                app.run("object.setBounds", json!({"width": v, "reference": refi, "proportional": link, "copy": copy})).ok();
+                super::transform::run_transform(app, "object.setBounds", json!({"width": v, "reference": refi, "proportional": link, "copy": copy}));
             }
             ui.end_row();
             dim_label(ui, "Y:");
             if let Some(v) = widgets::num_field_named(ui, "ty", Some(crate::i18n::t("Y:")), Some(rp.y - origin.y), units, fw) {
-                app.run("object.setBounds", json!({"y": v + origin.y, "reference": refi, "copy": copy})).ok();
+                super::transform::run_transform(
+                    app,
+                    "object.setBounds",
+                    json!({"y": reference.bounds_xy(0.0, v + origin.y).1, "reference": refi, "copy": copy}),
+                );
             }
             dim_label(ui, "H:");
             if let Some(v) = widgets::size_field_named(ui, "th", Some(tl!("H:")), Some(b.height()), units, fw) {
-                app.run("object.setBounds", json!({"height": v, "reference": refi, "proportional": link, "copy": copy})).ok();
+                super::transform::run_transform(app, "object.setBounds", json!({"height": v, "reference": refi, "proportional": link, "copy": copy}));
             }
             ui.end_row();
         });
@@ -726,17 +736,17 @@ pub fn transform_section(app: &mut VectorcraftApp, ui: &mut Ui) {
         crate::scrub::note_label(ui, icon.rect);
         // The bounding box's angle: a new value turns the selection to it.
         if let Some(a) = widgets::plain_field_named(ui, "rot", Some(tl!("Rotation")), bx.angle, "°", 2, fw) {
-            app.run("object.rotate", json!({"angle": a, "absolute": true, "copy": copy})).ok();
+            super::transform::run_transform(app, "object.rotate", json!({"angle": a, "absolute": true, "origin": reference.origin(), "copy": copy}));
         }
         ui.add_space(10.0);
         // Lucide's flip icons are named for their mirror line: flip-vertical-2 draws a vertical
         // line (the left-right flip), flip-horizontal-2 a horizontal one (top-bottom). The labels
         // are the reference app's Properties panel names for the same buttons (#1910).
         if widgets::icon_button(ui, "flip-vertical-2", tl!("Flip Along Horizontal Axis"), false, 24.0).clicked() {
-            app.run("object.reflect", json!({"axis": "vertical"})).ok();
+            super::transform::run_transform(app, "object.reflect", json!({"axis": "vertical", "origin": reference.origin()}));
         }
         if widgets::icon_button(ui, "flip-horizontal-2", tl!("Flip Along Vertical Axis"), false, 24.0).clicked() {
-            app.run("object.reflect", json!({"axis": "horizontal"})).ok();
+            super::transform::run_transform(app, "object.reflect", json!({"axis": "horizontal", "origin": reference.origin()}));
         }
         // More Options: the Transform panel's Scale Corners and Scale Strokes & Effects, open
         // while they are toggled.

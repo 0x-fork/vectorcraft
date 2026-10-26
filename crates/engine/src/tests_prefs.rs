@@ -1741,3 +1741,22 @@ fn a_straight_segment_dragged_by_direct_selection_lands_on_a_ruler_guide() {
         s.execute("edit.undo", &json!({})).unwrap();
     }
 }
+
+/// The Transform panel menu's choice starts as `default` (the panels follow General › Transform
+/// Pattern Tiles): in a new session, in a preferences file saved before the choice existed and
+/// after a reset; `prefs.set` takes it and the three menu choices, and nothing else.
+#[test]
+fn transform_panel_patterns_defaults_to_following_the_general_preference() {
+    assert_eq!(Prefs::default().transform_panel_patterns, "default");
+    let old: Prefs = serde_json::from_value(json!({"transformPatternTiles": true, "scaleStrokes": true})).unwrap();
+    assert_eq!((old.transform_panel_patterns.as_str(), old.transform_pattern_tiles), ("default", true));
+    let mut s = Session::new();
+    for v in ["object", "pattern", "both", "default"] {
+        s.execute("prefs.set", &json!({"key": "transformPanelPatterns", "value": v})).unwrap();
+        assert_eq!(s.prefs.transform_panel_patterns, v);
+    }
+    assert!(s.execute("prefs.set", &json!({"key": "transformPanelPatterns", "value": "tiles"})).is_err());
+    s.execute("prefs.set", &json!({"key": "transformPanelPatterns", "value": "both"})).unwrap();
+    s.execute("prefs.reset", &json!({"category": "General"})).unwrap();
+    assert_eq!(s.prefs.transform_panel_patterns, "default");
+}
