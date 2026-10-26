@@ -202,9 +202,10 @@ fn same_fill(a: Fill, b: Fill) -> bool {
 }
 
 /// How far the objects `laid` are from the drawn ones (`drawn`: their centres and fills): the
-/// farthest, each drawn object matched to a laid one within the tolerance (through a grid of
-/// cells the tolerance wide, so each finds its neighbours without looking at them all), when they
-/// are as many and each matches in place and fill; else `None`.
+/// farthest, each drawn object matched to a laid one of its own within the tolerance (each laid
+/// one matches one drawn one: the nearest still free; through a grid of cells the tolerance wide,
+/// so each finds its neighbours without looking at them all), when they are as many and each
+/// matches in place and fill; else `None` (also when that matching leaves one out).
 fn how_far(laid: &[Node], drawn: &[(Point, Fill)]) -> Option<f64> {
     if laid.len() != drawn.len() {
         return None;
@@ -215,17 +216,23 @@ fn how_far(laid: &[Node], drawn: &[(Point, Fill)]) -> Option<f64> {
     for (i, (p, _)) in laid.iter().enumerate() {
         grid.entry(cell(*p)).or_default().push(i);
     }
+    let mut used = vec![false; laid.len()];
     let mut worst: f64 = 0.0;
     for &(c, f) in drawn {
         let (cx, cy) = cell(c);
-        let near = (-1..=1)
-            .flat_map(|dx| (-1..=1).map(move |dy| (cx + dx, cy + dy)))
+        // Coordinates far out saturate the cells: the neighbours' keys saturate too.
+        let (i, near) = (-1i64..=1)
+            .flat_map(|dx| (-1i64..=1).map(move |dy| (cx.saturating_add(dx), cy.saturating_add(dy))))
             .filter_map(|k| grid.get(&k))
             .flatten()
-            .filter_map(|&i| laid.get(i))
-            .filter(|(p, lf)| (*p - c).hypot() <= PLACE_TOLERANCE && same_fill(*lf, f))
-            .map(|(p, _)| (*p - c).hypot())
-            .min_by(f64::total_cmp)?;
+            .filter(|&&i| !used.get(i).copied().unwrap_or(true))
+            .filter_map(|&i| laid.get(i).map(|l| (i, l)))
+            .filter(|(_, (p, lf))| (*p - c).hypot() <= PLACE_TOLERANCE && same_fill(*lf, f))
+            .map(|(i, (p, _))| (i, (*p - c).hypot()))
+            .min_by(|a, b| a.1.total_cmp(&b.1))?;
+        if let Some(u) = used.get_mut(i) {
+            *u = true;
+        }
         worst = worst.max(near);
     }
     Some(worst)
@@ -271,5 +278,22 @@ mod tests {
         let mut budget = 1;
         assert!(live_blend(&edit, &drawn, &["A".into(), "B".into()], &Roles::new(), &mut budget).is_none());
         assert_eq!(budget, 1);
+    }
+
+    /// Two drawn steps on one laid object don't both match it: each laid object matches one drawn
+    /// one, so a drawing the blend doesn't lay out isn't taken for it.
+    #[test]
+    fn each_laid_step_matches_one_drawn_step() {
+        let square = |x: f64| {
+            let path = vectorcraft_geom::shapes::rectangle(vectorcraft_geom::Rect::new(x, 0.0, x + 10.0, 10.0));
+            Node::path(NodeId(0), path, Default::default())
+        };
+        let laid = [square(0.0), square(50.0)];
+        let c = |x: f64| (Point::new(x + 5.0, 5.0), Fill::None);
+        assert!(how_far(&laid, &[c(0.0), c(50.0)]).is_some());
+        assert!(how_far(&laid, &[c(0.0), c(0.1)]).is_none(), "both drawn steps near the first laid one");
+        // Coordinates far out don't overflow the grid.
+        let far = [square(1e300), square(-1e300)];
+        let _ = how_far(&far, &[c(1e300), c(-1e300)]);
     }
 }

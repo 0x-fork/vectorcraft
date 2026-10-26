@@ -4336,6 +4336,9 @@ proptest! {
     fn ai_blend_never_panics(steps in 1usize..6, cut in 0usize..2_500, edits in prop::collection::vec((0usize..2_500, prop::sample::select(vec!['0', '9', '-', '.', ' ', '\n', '(', ')', '/', ':', ';', '%', '_', 'K', 'S', 'A', 'B', 'u', 'U', 'F', 'X'])), 0..12)) {
         let text = mutate_text(&blend_text(steps), cut, &edits);
         let private = ai_private(&text);
+        // Far-out coordinates: the check's grid saturates instead of overflowing.
+        let far = ai_private(&blend_text(steps).replace(" 40 m\n", " 1e300 m\n").replace(" 50 L\n", " -1e300 L\n"));
+        survive("a .ai blend far out", || Some(vectorcraft_eps::layered_ai(&far, Document::new(100.0, 100.0), vec![], false, true, 1.0).0))?;
         survive("mutated .ai blend", || Some(vectorcraft_eps::layered_ai(&private, Document::new(100.0, 100.0), vec![], false, true, 1.0).0))?;
     }
 }

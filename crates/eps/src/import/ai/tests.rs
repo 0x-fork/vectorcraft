@@ -1750,3 +1750,13 @@ fn moving_a_blends_key_moves_its_steps() {
     let after = middle(&keys);
     assert!((after - before - 20.0).abs() < 1.0, "the steps follow: {before} -> {after}");
 }
+
+/// A record line longer than the record says is read only as far as its length: the digits after
+/// it don't spoil it.
+#[test]
+fn a_blend_record_is_read_to_its_length() {
+    let record = blend_record(&['A', 'B']);
+    let longer = record.trim_end().to_string() + "DEADBEEF\n";
+    let (blend, warnings) = read_blend(&blend_file("%_10 50 m\n%_110 50 L\n", [Some("A"), Some("B")], &longer));
+    assert!(matches!(blend.kind, NodeKind::Blend { .. }), "{warnings:?}");
+}
