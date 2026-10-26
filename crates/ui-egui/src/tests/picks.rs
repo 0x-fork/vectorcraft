@@ -1003,7 +1003,7 @@ fn only_picks_shows_the_hosts_dialogs() {
     // Code after a test item is still read: lib.rs declares its test modules first, and the
     // shortcut editor's mirror macro has a test-only block.
     for (file, code) in [
-        ("lib.rs", "fnfile_dialog_open"),
+        ("app/files.rs", "fnfile_dialog_open"),
         ("shortcut_editor.rs", "fnimport_into_dialog"),
         ("ui_fonts.rs", "fnpainted_text"),
         ("place.rs", ".pick_open_multi.is_some()"),
