@@ -1476,5 +1476,4 @@ fn average(g: &Gradient) -> Color {
 }
 
 #[cfg(test)]
-#[path = "tests_legacy_ai.rs"]
 mod tests;
