@@ -2446,11 +2446,24 @@ pub(crate) fn waits_for_ime(app: &VectorcraftApp, id: &str) -> bool {
             || id.starts_with("edit.paste"))
 }
 
+/// Engine commands that take `ids` and otherwise act on the Appearance panel's subject (the
+/// targeted layer, group or object, else the selection). Without `ids` and without a subject they
+/// are off, as the panel's buttons are: in menus, in the command palette and on their keys.
+const SUBJECT_COMMANDS: [&str; 2] = ["appearance.addFill", "appearance.addStroke"];
+
+/// Is there an Appearance panel subject: a targeted layer, group or object, or a selected one?
+fn has_subject(app: &VectorcraftApp) -> bool {
+    app.session.active().is_some_and(|st| !st.selection.subjects().is_empty())
+}
+
 /// Can command `id` run now? An engine command asks the engine, a UI command the app's state;
 /// none that would act on text an input method is still composing.
 pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
     if waits_for_ime(app, id) {
         return false;
+    }
+    if SUBJECT_COMMANDS.contains(&id) {
+        return has_subject(app);
     }
     if let Some(c) = vectorcraft_engine::find_command(id) {
         // The system clipboard's contents can be pasted with an empty internal clipboard.
@@ -3680,6 +3693,9 @@ pub(crate) fn graph_dialog(app: &mut VectorcraftApp, id: &str) -> Result<Value, 
 
 pub fn invoke(app: &mut VectorcraftApp, id: &str, p: Value) {
     if waits_for_ime(app, id) {
+        return;
+    }
+    if SUBJECT_COMMANDS.contains(&id) && p.get("ids").is_none() && p.get("id").is_none() && !has_subject(app) {
         return;
     }
     // Params first: some dialogs' fields take a look through the session (Move's last move).
