@@ -37,7 +37,7 @@ use ink::Ink;
 use lru::FrameCache;
 
 pub use brush_fx::instance_art;
-pub use changed::{Changed, changed, view_pixels};
+pub use changed::{Changed, changed, placed_area, view_pixels};
 pub use effects::stroke::width_outline;
 pub use images::{IMAGE_CACHE_MAX, image_cache_bytes, newly_undecodable, set_image_cache_budget};
 pub use live::expand_live;
@@ -543,6 +543,9 @@ pub struct Renderer {
     fx_arts: FrameCache<usize, FxArtEntry>,
     /// Symbol art as instances and inline graphics draw it (see [`Self::placed_art`]).
     placed_arts: FrameCache<PlacedKey, PlacedEntry>,
+    /// The bitmap clock of [`placed_document`] when this frame first drew a placed document from
+    /// a bitmap: the bitmaps drawn since then are not dropped to make room for those it asks for.
+    placed_frame: Option<u64>,
     /// Layers open around the drawing point in the current context: a non-isolated group can copy
     /// its backdrop only when there are none (see [`Self::group`]).
     nested: u32,
@@ -692,6 +695,7 @@ impl Renderer {
             shape_of: 0,
             fx_arts: FrameCache::new(lru::FX_ART_BUDGET, 256),
             placed_arts: FrameCache::new(lru::PLACED_ART_BUDGET, 256),
+            placed_frame: None,
             nested: 0,
             backdrop: None,
             blends: PtrMap::default(),
@@ -792,6 +796,7 @@ impl Renderer {
         (self.offscreen_live, self.offscreen_budget) = (0, 0);
         self.symbol_nodes = 0;
         self.twice_drawn = 0;
+        self.placed_frame = None;
     }
 
     /// End a frame: drop cache entries not used for a few frames (every render, thumbnails too,

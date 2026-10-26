@@ -3633,11 +3633,12 @@ pub(crate) fn color_image(img: &vectorcraft_render::Rendered) -> egui::ColorImag
 }
 
 /// The pixels of the `w`×`h` frame through `view` to render again for `doc`, when only the document
-/// changed since the frame shown (its key `key` but for the revision, and its render options
-/// `opts`), which this thread rendered, and no frame is on its way from the worker: those it
-/// changed in (`Some(None)`: none), grown to whole eighths of the frame, as long as they are at
-/// most half of it. None: render the whole frame. Frames the worker renders stay
-/// whole: its renderer keeps the rasters of the art's effects, this thread's doesn't.
+/// changed, or placed documents' bitmaps were made, since the frame shown (its key `key` but for
+/// the revision and [`CacheKey::placed`], and its render options `opts`), which this thread
+/// rendered, and no frame is on its way from the worker: those it changed in, and those the
+/// objects showing those bitmaps' files cover (`Some(None)`: none), grown to whole eighths of the
+/// frame, as long as they are at most half of it. None: render the whole frame. Frames the worker
+/// renders stay whole: its renderer keeps the rasters of the art's effects, this thread's doesn't.
 fn changed_pixels(
     app: &VectorcraftApp,
     key: &CacheKey,
@@ -3652,11 +3653,18 @@ fn changed_pixels(
     if opts.mask_view.is_some() {
         return None;
     }
-    let same_view = app.canvas.key.as_ref().is_some_and(|k| *k == CacheKey { revision: k.revision, ..key.clone() });
+    let shown_key = app.canvas.key.as_ref()?;
+    let same_view = *shown_key == CacheKey { revision: shown_key.revision, placed: shown_key.placed, ..key.clone() };
     if !same_view || app.canvas.texture.is_none() || app.canvas.from_worker || app.canvas.worker.as_ref().is_some_and(|w| w.pending.is_some()) {
         return None;
     }
-    match vectorcraft_render::changed(shown, doc) {
+    // The placed documents' files whose bitmaps were made since the frame shown.
+    let placed = if shown_key.placed == key.placed {
+        vectorcraft_render::Changed::Nothing
+    } else {
+        vectorcraft_render::placed_area(doc, &vectorcraft_render::placed_document::made_between(shown_key.placed, key.placed)?)
+    };
+    match vectorcraft_render::changed(shown, doc).and(placed) {
         vectorcraft_render::Changed::Nothing => Some(None),
         vectorcraft_render::Changed::Area(area) => match vectorcraft_render::view_pixels(area, view, w, h) {
             None => Some(None),
@@ -5462,6 +5470,67 @@ mod tests {
         app.run("view.setZoom", json!({"zoom": 2})).unwrap();
         let (_, delta) = frame_output(&mut app, &ctx);
         assert!(canvas(&app, delta).is_some_and(|(pos, _)| pos.is_none()), "a new view renders all of it");
+    }
+
+    /// A placed document's bitmap made in the background renders the canvas again only where the
+    /// objects showing its file are: both copies of the file are in the part rendered again.
+    #[test]
+    fn a_ready_placed_document_bitmap_renders_only_its_part_of_the_canvas() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width":400,"height":300})).unwrap();
+        app.ui.task_bar = false;
+        app.ui.view.rulers = false;
+        app.canvas.worker_started = true; // every frame on this thread, however long it takes
+        // A document of one 60 × 30 artboard with a rectangle, placed linked twice.
+        let mut src = Session::new();
+        src.execute("file.new", &json!({"width": 60, "height": 30})).unwrap();
+        src.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 60, "height": 30})).unwrap();
+        let dir = std::env::temp_dir().join(format!("vectorcraft-placed-redraw-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("card.vectorcraft");
+        std::fs::write(&path, vectorcraft_format::save_file(&src.active().unwrap().doc)).unwrap();
+        let path = path.to_string_lossy().into_owned();
+        let ids: Vec<u64> = [[60, 50], [140, 50]]
+            .iter()
+            .map(|at| {
+                let r = app.session.execute("file.place", &json!({"path": path, "at": at})).unwrap();
+                assert_eq!(r["linked"], true, "{r}");
+                r["ids"][0].as_u64().unwrap()
+            })
+            .collect();
+        app.run("shape.rectangle", json!({"x":250,"y":200,"width":40,"height":30})).unwrap();
+        app.run("select.none", json!({})).unwrap();
+        let ctx = egui::Context::default();
+        // Where the canvas texture changed in a frame, and how much of it.
+        let canvas = |app: &VectorcraftApp, mut delta: egui::TexturesDelta| {
+            let tex = app.canvas.texture.as_ref().map(|t| t.id());
+            let set = delta.set.iter().find(|(t, _)| tex == Some(**t)).and_then(|(_, d)| d.last()).map(|d| (d.pos, d.image.size()));
+            delta.clear();
+            set
+        };
+        let (_, delta) = frame_output(&mut app, &ctx);
+        assert!(canvas(&app, delta).is_some_and(|(pos, _)| pos.is_none()), "the first frame renders all of it");
+        let t = std::time::Instant::now();
+        while vectorcraft_render::placed_document::busy() && t.elapsed().as_secs() < 20 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let (_, delta) = frame_output(&mut app, &ctx);
+        let (pos, size) = canvas(&app, delta).expect("the bitmap shows");
+        let [px, py] = pos.expect("a part of the canvas");
+        let key = app.canvas.key.clone().unwrap();
+        let view = Affine::translate((f64::from(key.w) / 2.0, f64::from(key.h) / 2.0))
+            * Affine::rotate(key.rot.to_radians())
+            * Affine::scale(key.zoom * f64::from(key.ppp))
+            * Affine::translate((-key.cx, -key.cy));
+        let doc = &app.session.active().unwrap().doc;
+        for id in ids {
+            let b = doc.node(vectorcraft_doc::NodeId(id)).unwrap().geometric_bounds().unwrap();
+            let [x0, y0, x1, y1] = vectorcraft_render::view_pixels(b, view, key.w, key.h).unwrap();
+            let inside = x0 as usize >= px && y0 as usize >= py && x1 as usize <= px + size[0] && y1 as usize <= py + size[1];
+            assert!(inside, "object {id} at {:?} in the part at {:?} of size {size:?}", [x0, y0, x1, y1], [px, py]);
+        }
+        assert!(size[0] * size[1] * 2 <= key.w as usize * key.h as usize, "a part of it: {size:?}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// While an opacity mask is viewed, an edit renders all of the canvas: the mask view shows the
