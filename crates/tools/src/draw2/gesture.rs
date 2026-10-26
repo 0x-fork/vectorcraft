@@ -15,7 +15,7 @@
 //! vertical line through the press point.
 
 use serde_json::{Value, json};
-use vectorcraft_doc::NodeId;
+use vectorcraft_doc::{NodeId, NodeKind};
 use vectorcraft_geom::Point;
 
 use super::{FEEDBACK, eraser_area, points_json, polyline};
@@ -86,6 +86,17 @@ pub struct GestureTool {
     pub close_within: f64,
     /// Smart Guides for the Pencil's ends.
     snap: DrawSnap,
+}
+
+/// The paths a stroke can redraw for selected object `id`: the path itself, or a compound path's
+/// member paths.
+fn redraw_targets(cx: &ToolContext, id: NodeId) -> Vec<NodeId> {
+    let Some(n) = cx.doc.node(id) else { return vec![] };
+    match &n.kind {
+        NodeKind::Path { .. } => vec![id],
+        NodeKind::Compound { children, .. } => children.iter().filter(|c| c.path_data().is_some()).map(|c| c.id).collect(),
+        _ => vec![],
+    }
 }
 
 impl GestureTool {
@@ -269,9 +280,16 @@ impl GestureTool {
         if self.edit_within <= 0.0 || !tol.is_finite() {
             return None;
         }
+        // A selected compound path (a shape with a hole) redraws the member path the stroke starts
+        // on, the nearest of them: a compound path has no path of its own.
         cx.selection.objects.iter().find_map(|id| {
-            let pd = cx.doc.node(*id).and_then(|n| n.path_data()).filter(|_| cx.doc.is_editable(*id))?;
-            pd.nearest(p).filter(|n| n.4 <= tol).map(|_| (*id, tol))
+            redraw_targets(cx, *id)
+                .into_iter()
+                .filter(|m| cx.doc.is_editable(*m))
+                .filter_map(|m| Some((m, cx.doc.node(m)?.path_data()?.nearest(p)?.4)))
+                .filter(|(_, d)| *d <= tol)
+                .min_by(|a, b| a.1.total_cmp(&b.1))
+                .map(|(m, _)| (m, tol))
         })
     }
 
