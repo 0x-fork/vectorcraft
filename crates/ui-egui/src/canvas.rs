@@ -878,7 +878,8 @@ fn cursor_icon(c: Cursor) -> egui::CursorIcon {
         | Cursor::GroupSelection
         | Cursor::CornerRadius
         | Cursor::PathBracket
-        | Cursor::TypeWidget => C::Default,
+        | Cursor::TypeWidget
+        | Cursor::LoadedText => C::Default,
         Cursor::SelectionCopy => C::Copy,
         Cursor::Move => C::Move,
         Cursor::Crosshair => C::Crosshair,
@@ -942,8 +943,7 @@ fn cursor_icon(c: Cursor) -> egui::CursorIcon {
         | Cursor::Scissors
         | Cursor::ScissorsNotAllowed
         | Cursor::MeshAdd
-        | Cursor::PuppetPin
-        | Cursor::LoadedText => cursor_icon(c.stand_in().unwrap_or(Cursor::Crosshair)),
+        | Cursor::PuppetPin => cursor_icon(c.stand_in().unwrap_or(Cursor::Crosshair)),
     }
 }
 

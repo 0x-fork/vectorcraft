@@ -741,7 +741,7 @@ impl Cursor {
     }
 
     /// The cursor this one borrows until it's drawn: the generic crosshair for the
-    /// tools, the I-beam for vertical type and loaded text, the Pen's add cursor for the Mesh tool and Puppet
+    /// tools, the I-beam for vertical type, the Pen's add cursor for the Mesh tool and Puppet
     /// Warp, not-allowed for the Scissors away from a path. `None` for a cursor with a look of
     /// its own.
     pub fn stand_in(self) -> Option<Self> {
@@ -770,7 +770,7 @@ impl Cursor {
             | Cursor::SymbolScreener
             | Cursor::SymbolStyler
             | Cursor::Scissors => Some(Cursor::Crosshair),
-            Cursor::TypeVertical | Cursor::LoadedText => Some(Cursor::Text),
+            Cursor::TypeVertical => Some(Cursor::Text),
             Cursor::MeshAdd | Cursor::PuppetPin => Some(Cursor::PenAdd),
             Cursor::ScissorsNotAllowed => Some(Cursor::NotAllowed),
             _ => None,

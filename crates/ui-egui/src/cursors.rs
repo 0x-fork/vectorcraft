@@ -294,6 +294,18 @@ fn type_widget(p: &mut Ink, o: Pos2) {
     line(p, b + vec2(4.0, 0.0), b + vec2(4.0, 9.0));
 }
 
+/// Overflow text the Selection tool carries after a click on the red out port: a small block of
+/// lines at the hotspot (where a new frame's top-left would go).
+fn loaded_text(p: &mut Ink, o: Pos2) {
+    let tl = o;
+    let br = o + vec2(14.0, 11.0);
+    let frame = vec![tl, pos2(br.x, tl.y), br, pos2(tl.x, br.y)];
+    poly(p, frame, HALO, INK);
+    for y in [3.0, 6.5, 10.0] {
+        line(p, tl + vec2(2.0, y), tl + vec2(12.0, y));
+    }
+}
+
 /// The gradient annotator's stop cursors: the arrow with a plus (add a stop) or minus (delete it)
 /// badge.
 fn stop_badge(p: &mut Ink, o: Pos2, add: bool) {
@@ -593,6 +605,7 @@ fn glyph(c: Cursor, p: Pos2) -> Option<Vec<Shape>> {
         Cursor::Blend | Cursor::BlendObject | Cursor::BlendAnchor => blend(ink, p, c),
         Cursor::PathBracket => path_bracket(ink, p),
         Cursor::TypeWidget => type_widget(ink, p),
+        Cursor::LoadedText => loaded_text(ink, p),
         Cursor::ShapeBuilder => shape_builder(ink, p, false),
         Cursor::ShapeBuilderErase => shape_builder(ink, p, true),
         Cursor::Hand => hand(ink, p, false),
@@ -823,6 +836,17 @@ mod tests {
             let Some(stand_in) = c.stand_in() else { continue };
             assert_eq!(rasterize(c, 2.0), rasterize(stand_in, 2.0), "{c:?} borrows {stand_in:?}");
         }
+    }
+
+    /// Loaded text after a click on the overflow out port is a text-block glyph, not the I-beam.
+    #[test]
+    fn loaded_text_cursor_is_not_the_text_i_beam() {
+        assert!(Cursor::LoadedText.stand_in().is_none());
+        let loaded = rasterize(Cursor::LoadedText, 2.0).expect("loaded text bitmap");
+        let ibeam = rasterize(Cursor::Text, 2.0).expect("text bitmap");
+        assert_ne!(loaded.rgba, ibeam.rgba);
+        let [hx, hy] = loaded.hotspot.map(usize::from);
+        assert!(pixel(&loaded, hx, hy)[3] > 200, "hotspot lies on the drawn frame");
     }
 
     #[test]
