@@ -993,11 +993,8 @@ fn handle_input(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response, rect: 
         {
             zoom_about(vm, rect, p, vm.zoom * factor);
         }
-        if scroll != egui::Vec2::ZERO
-            && let Some(vm) = app.view_mut()
-        {
-            let d = Xf { rect, zoom: vm.zoom, center: vm.center, rot: vm.rotation.to_radians() }.delta_to_doc(scroll);
-            vm.center -= d;
+        if scroll != egui::Vec2::ZERO {
+            scroll_view(app, ui, scroll);
         }
         if let Some(p) = hover
             && let Some(deg) = trackpad_turn(ui, app.session.prefs.trackpad_rotate_view)
@@ -1154,9 +1151,10 @@ fn handle_input(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response, rect: 
             ui.data_mut(|dd| dd.insert_temp(drag_pos_id(), p));
             match d {
                 Drag::Pan { start, center, .. } => {
-                    let d = xf.delta_to_doc(p - start);
+                    let ppp = ui.ctx().pixels_per_point();
                     if let Some(vm) = app.view_mut() {
-                        vm.center = center - d;
+                        vm.center = center;
+                        pan_pixels(vm, ppp, whole_pixels(p - start, ppp));
                     }
                 }
                 Drag::RotateView { start_angle, start_rot, snaps } => {
@@ -1405,6 +1403,53 @@ fn rotate_about(vm: &mut View, rect: egui::Rect, p: Pos2, degrees: f64) {
     vm.center += before - Xf::new(rect, vm).to_doc(p);
 }
 
+/// Move view `vm`'s content by `(dx, dy)` device pixels along the screen's axes, at `ppp` device
+/// pixels a point: the canvas's frame moves by exactly those pixels.
+fn pan_pixels(vm: &mut View, ppp: f32, (dx, dy): (f64, f64)) {
+    let (sn, cs) = vm.rotation.to_radians().sin_cos();
+    let k = vm.zoom * f64::from(ppp);
+    vm.center -= vectorcraft_geom::Vec2::new((dx * cs + dy * sn) / k, (-dx * sn + dy * cs) / k);
+}
+
+/// Screen points `d` in the nearest whole device pixels, at `ppp` device pixels a point.
+fn whole_pixels(d: egui::Vec2, ppp: f32) -> (f64, f64) {
+    ((f64::from(d.x) * f64::from(ppp)).round(), (f64::from(d.y) * f64::from(ppp)).round())
+}
+
+/// What the scrolls of the view have left to move ([`scroll_view`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct ScrollRest {
+    /// Device pixels along the screen's axes, at most half a pixel each.
+    x: f64,
+    y: f64,
+    /// The document, the view's center, zoom and rotation, and the device pixels a point that the
+    /// last scroll left.
+    after: Option<(u64, Point, f64, f64, f32)>,
+}
+
+/// Scroll the active view so that its content moves `by` screen points (the wheel, a trackpad, a
+/// touch screen, a scroll bar), in whole device pixels: the part of a pixel left over is added to
+/// the next scroll. It is dropped when the view changed in between (a zoom, a turn, Fit, a pan
+/// of another kind, another document) or the device pixels a point did.
+fn scroll_view(app: &mut VectorcraftApp, ui: &Ui, by: egui::Vec2) {
+    let ppp = ui.ctx().pixels_per_point();
+    let Some(doc) = app.session.active().map(|st| st.uid) else { return };
+    let Some(vm) = app.view_mut() else { return };
+    let id = egui::Id::unique("canvas-scroll-rest");
+    let rest = scroll_by(vm, doc, ppp, by, ui.data(|d| d.get_temp(id)).unwrap_or_default());
+    ui.data_mut(|d| d.insert_temp(id, rest));
+}
+
+/// [`scroll_view`] for view `vm` of document `doc` at `ppp` device pixels a point, after the
+/// scrolls that left `rest`: what this scroll leaves.
+fn scroll_by(vm: &mut View, doc: u64, ppp: f32, by: egui::Vec2, rest: ScrollRest) -> ScrollRest {
+    let (x, y) = if rest.after == Some((doc, vm.center, vm.zoom, vm.rotation, ppp)) { (rest.x, rest.y) } else { (0.0, 0.0) };
+    let (x, y) = (x + f64::from(by.x) * f64::from(ppp), y + f64::from(by.y) * f64::from(ppp));
+    let (dx, dy) = (x.round(), y.round());
+    pan_pixels(vm, ppp, (dx, dy));
+    ScrollRest { x: x - dx, y: y - dy, after: Some((doc, vm.center, vm.zoom, vm.rotation, ppp)) }
+}
+
 /// How far a trackpad rotation turns before it turns the view, in degrees.
 const ROTATE_DEAD_ZONE: f64 = 5.0;
 /// How long after its last rotation event a trackpad rotation ends, in seconds.
@@ -1515,7 +1560,8 @@ fn scroll_bars(app: &mut VectorcraftApp, ui: &Ui, rect: egui::Rect, outer: egui:
     let painter = ui.painter();
     painter.rect_filled(egui::Rect::from_min_max(outer.max - vec2(SCROLL_BAR, SCROLL_BAR), outer.max), 0.0, t.ruler);
     let hover = ui.input(|i| i.pointer.hover_pos());
-    // Screen points the view moves this frame, or the centre a dragged thumb puts it at.
+    // Screen points the view moves this frame, or the center a dragged thumb's drag began at and
+    // the screen points it has moved the view since.
     let mut moved = egui::Vec2::ZERO;
     let mut center = None;
     for (k, (track, span)) in scroll_tracks(rect, outer).into_iter().zip(scroll_spans(&xf, content)).enumerate() {
@@ -1541,7 +1587,7 @@ fn scroll_bars(app: &mut VectorcraftApp, ui: &Ui, rect: egui::Rect, outer: egui:
                 && let Some(p) = resp.interact_pointer_pos()
             {
                 let by = ((along(p) - d.from) * d.ratio).clamp(d.min, d.max);
-                center = Some(d.center + xf.delta_to_doc(axis * by));
+                center = Some((d.center, axis * by));
             }
             if !resp.dragged() || resp.drag_stopped() {
                 ui.data_mut(|dd| dd.remove::<ThumbDrag>(id));
@@ -1572,12 +1618,15 @@ fn scroll_bars(app: &mut VectorcraftApp, ui: &Ui, rect: egui::Rect, outer: egui:
         let hot = drag.is_some() || hover.is_some_and(|p| thumb.contains(p));
         painter.rect_filled(thumb, CornerRadius::same(3), if hot { t.text_dim } else { t.text_disabled });
     }
-    let Some(vm) = app.view_mut() else { return };
-    if let Some(c) = center {
+    let ppp = ui.ctx().pixels_per_point();
+    if let Some((c, by)) = center
+        && let Some(vm) = app.view_mut()
+    {
         vm.center = c;
+        pan_pixels(vm, ppp, whole_pixels(-by, ppp));
     }
     if moved != egui::Vec2::ZERO {
-        vm.center += xf.delta_to_doc(moved);
+        scroll_view(app, ui, -moved);
     }
 }
 
@@ -6962,17 +7011,149 @@ mod tests {
             assert_ne!(app.view().unwrap().center, before, "frame {k}: the wheel scrolls the view");
             assert_eq!(cursor(&app), Some(Cursor::Move), "frame {k}: the cursor stays while the view moves");
         }
-        // The wheel's smooth scrolling runs on for some frames; then the view rests.
+        // The wheel's smooth scrolling runs on for some frames; then the view rests. A frame of it
+        // that scrolls less than half a device pixel leaves the view where it is.
         for _ in 0..200 {
             let before = app.view().unwrap().center;
             outlines(&mut app, vec![], 0.016);
-            if app.view().unwrap().center == before {
+            if app.view().unwrap().center == before && !ctx.input(|i| i.is_scrolling()) {
                 break;
             }
         }
         assert_eq!(cursor(&app), Some(Cursor::Move), "the view has only just stopped");
         outlines(&mut app, vec![], HOVER_STILL_SECS + 0.01);
         assert_eq!(cursor(&app), Some(Cursor::Arrow), "still again: the pointer at {:?} is past the rectangle", app.hover_doc);
+    }
+
+    /// The wheel, a scroll bar and the Hand tool move the view by whole device pixels at 1.25
+    /// device pixels a point, in a zoomed and turned view: every frame's render view is the first
+    /// one's panned by whole pixels, which the renderer's cropped effect rasters need to be drawn
+    /// again, and the wheel's and the scroll bar's scrolls add up to what they were given within a
+    /// device pixel, as does the drag.
+    #[test]
+    fn scrolls_and_pans_move_the_view_by_whole_device_pixels() {
+        const PPP: f32 = 1.25;
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
+        app.session.execute("shape.rectangle", &json!({"x": 0, "y": 0, "width": 400, "height": 300})).unwrap();
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0));
+        let mut time = 0.0;
+        let mut frame = |app: &mut VectorcraftApp, events: Vec<egui::Event>| {
+            time += 0.016;
+            let mut input = egui::RawInput { time: Some(time), screen_rect: Some(screen), events, ..Default::default() };
+            input.viewports.get_mut(&egui::ViewportId::ROOT).unwrap().native_pixels_per_point = Some(PPP);
+            ctx.run_ui(input, |ui| show(app, ui)).textures_delta.clear();
+        };
+        frame(&mut app, vec![]);
+        {
+            let v = app.view_mut().unwrap();
+            v.zoom = 4.0;
+            v.rotation = 30.0;
+            v.center = Point::new(200.3, 150.7);
+        }
+        frame(&mut app, vec![]);
+        // The pan of the canvas's render view (the translation of the view it renders through, less
+        // the half of its size), in device pixels.
+        let pan = |app: &VectorcraftApp| {
+            let v = app.view().unwrap();
+            (Affine::rotate(v.rotation.to_radians()) * Affine::scale(v.zoom * f64::from(PPP)) * Affine::translate(-v.center.to_vec2())).translation()
+        };
+        let wheel = |d: egui::Vec2| egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: d,
+            phase: egui::TouchPhase::Move,
+            modifiers: Default::default(),
+            source: egui::MouseWheelSource::Unknown,
+        };
+        let whole = |by: vectorcraft_geom::Vec2| (by - vectorcraft_geom::Vec2::new(by.x.round(), by.y.round())).hypot() < 1e-6;
+        let rect = app.canvas_rect.unwrap();
+        let track = scroll_tracks(rect, screen)[0].center();
+        let deltas = [vec2(0.37, 11.13), vec2(-12.71, 0.0), vec2(0.0, 7.45), vec2(21.9, -3.83), vec2(0.21, 0.21)];
+        for (name, at) in [("the wheel", rect.center()), ("the horizontal scroll bar", track)] {
+            frame(&mut app, vec![egui::Event::PointerMoved(at)]);
+            let start = pan(&app);
+            let mut given = vectorcraft_geom::Vec2::ZERO;
+            for (k, d) in deltas.iter().enumerate() {
+                frame(&mut app, vec![wheel(*d)]);
+                // Over the scroll bar, the wheel scrolls along it.
+                given += if at == track {
+                    vectorcraft_geom::Vec2::new(f64::from(d.x + d.y), 0.0)
+                } else {
+                    vectorcraft_geom::Vec2::new(f64::from(d.x), f64::from(d.y))
+                };
+                let by = pan(&app) - start;
+                assert!(whole(by), "{name}, scroll {k}: the view moved {by:?} device pixels");
+            }
+            // The wheel's smooth scrolling runs on for some frames.
+            for k in 0..60 {
+                frame(&mut app, vec![]);
+                let by = pan(&app) - start;
+                assert!(whole(by), "{name}, frame {k} after the scrolls: the view moved {by:?} device pixels");
+            }
+            let by = pan(&app) - start;
+            let want = given * f64::from(PPP);
+            assert!(by.hypot() > 10.0, "{name}: the view moved {by:?} device pixels");
+            assert!((by.x - want.x).abs() <= 1.0 && (by.y - want.y).abs() <= 1.0, "{name}: moved {by:?} device pixels for {want:?}");
+        }
+        // The horizontal scroll bar's thumb dragged to points between device pixels: the view moves
+        // `ratio` points for each point the thumb moves, the other way.
+        let (_, span, from) = scroll_bar(&mut app, 0);
+        let ratio = f64::from(span.ratio(scroll_tracks(rect, screen)[0].width()));
+        assert!(ratio > 1.0, "at 400% the view moves further than the thumb: {ratio}");
+        frame(&mut app, vec![egui::Event::PointerMoved(from)]);
+        let start = pan(&app);
+        frame(&mut app, vec![primary(from, true)]);
+        for (k, dx) in [7.37_f32, 12.81, 3.33].into_iter().enumerate() {
+            frame(&mut app, vec![egui::Event::PointerMoved(from + vec2(dx, 0.0))]);
+            let by = pan(&app) - start;
+            assert!(whole(by), "thumb drag {k}: the view moved {by:?} device pixels");
+            let want = -f64::from(dx) * ratio * f64::from(PPP);
+            assert!((by.x - want).abs() <= 1.0 && by.y.abs() <= 1.0, "thumb drag {k}: moved {by:?} device pixels for {want}");
+        }
+        frame(&mut app, vec![primary(from + vec2(3.33, 0.0), false)]);
+        // A Hand tool drag to points between device pixels.
+        app.select_tool("hand");
+        let p0 = rect.center() + vec2(0.3, 0.1);
+        frame(&mut app, vec![egui::Event::PointerMoved(p0)]);
+        let start = pan(&app);
+        frame(&mut app, vec![primary(p0, true)]);
+        for (k, d) in [vec2(13.37, -7.61), vec2(40.19, 3.33), vec2(-5.55, 22.71)].into_iter().enumerate() {
+            frame(&mut app, vec![egui::Event::PointerMoved(p0 + d)]);
+            let by = pan(&app) - start;
+            assert!(whole(by), "drag {k}: the view moved {by:?} device pixels");
+            let want = vectorcraft_geom::Vec2::new(f64::from(d.x), f64::from(d.y)) * f64::from(PPP);
+            assert!((by.x - want.x).abs() <= 1.0 && (by.y - want.y).abs() <= 1.0, "drag {k}: moved {by:?} device pixels for {want:?}");
+        }
+        frame(&mut app, vec![primary(p0 + vec2(-5.55, 22.71), false)]);
+    }
+
+    /// The part of a device pixel a scroll leaves is added to the next scroll of the same view, and
+    /// dropped when the view was zoomed, turned or moved in between, when the next scroll is in
+    /// another document, or when the device pixels a point changed.
+    #[test]
+    fn a_scrolls_leftover_pixel_part_carries_only_to_the_same_view() {
+        let view = View { zoom: 1.0, center: Point::new(100.0, 100.0), fitted: true, rotation: 0.0, artboard: 0 };
+        let mut v = view;
+        let rest = scroll_by(&mut v, 1, 1.0, vec2(0.4, -0.3), ScrollRest::default());
+        assert_eq!(v.center, view.center, "less than half a pixel does not move the view");
+        assert!((rest.x - 0.4).abs() < 1e-6 && (rest.y + 0.3).abs() < 1e-6);
+        let mut again = v;
+        scroll_by(&mut again, 1, 1.0, vec2(0.4, -0.3), rest);
+        assert_eq!(again.center, Point::new(99.0, 101.0), "the second scroll adds the first's part");
+        let changed = [
+            ("zoomed", View { zoom: 2.0, ..v }, 1, 1.0),
+            ("turned", View { rotation: 90.0, ..v }, 1, 1.0),
+            ("fitted or moved", View { center: Point::new(150.0, 120.0), ..v }, 1, 1.0),
+            ("another document", v, 2, 1.0),
+            ("another display scale", v, 1, 1.25),
+        ];
+        for (name, before, doc, ppp) in changed {
+            let mut after = before;
+            let left = scroll_by(&mut after, doc, ppp, vec2(0.4 / ppp, -0.3 / ppp), rest);
+            assert_eq!(after.center, before.center, "{name}: the first scroll's part is dropped");
+            assert!((left.x - 0.4).abs() < 1e-6 && (left.y + 0.3).abs() < 1e-6, "{name}: {left:?}");
+        }
     }
 
     /// View › Snap to Glyph toggles through the View menu command (#3124).
