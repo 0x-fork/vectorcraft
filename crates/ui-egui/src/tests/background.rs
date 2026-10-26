@@ -12,17 +12,17 @@ use vectorcraft_geom::{Rect, shapes};
 use crate::control::ControlRequest;
 use crate::{Services, VectorcraftApp, background, io};
 
-pub(super) type Files = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
+pub(crate) type Files = Arc<Mutex<Vec<(String, Vec<u8>)>>>;
 
 /// Holds the background writer until opened.
 #[derive(Clone, Default)]
-pub(super) struct Gate(Arc<AtomicBool>);
+pub(crate) struct Gate(Arc<AtomicBool>);
 
 impl Gate {
-    pub(super) fn open(&self) {
+    pub(crate) fn open(&self) {
         self.0.store(true, Ordering::SeqCst);
     }
-    pub(super) fn wait(&self) {
+    pub(crate) fn wait(&self) {
         while !self.0.load(Ordering::SeqCst) {
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
@@ -57,7 +57,7 @@ fn paths(n: usize) -> Document {
     d
 }
 
-pub(super) fn written(files: &Files) -> Vec<String> {
+pub(crate) fn written(files: &Files) -> Vec<String> {
     files.lock().unwrap().iter().map(|(p, _)| p.clone()).collect()
 }
 

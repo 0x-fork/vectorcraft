@@ -9,7 +9,7 @@ use vectorcraft_plugins::wat as tpl;
 use crate::state::Dialog;
 use crate::{VectorcraftApp, dialogs, io, menus, theme};
 
-const DESATURATE: &[u8] = include_bytes!("../../plugins/tests/fixtures/desaturate.wasm");
+const DESATURATE: &[u8] = include_bytes!("../../../plugins/tests/fixtures/desaturate.wasm");
 const DESATURATE_ID: &str = "org.vectorcraft.example.desaturate";
 
 fn app() -> VectorcraftApp {

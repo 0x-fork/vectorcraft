@@ -143,7 +143,7 @@ fn text_and_image_paste_events_paste_once_as_text() {
 }
 
 /// A 4 × 2 px blue PNG.
-pub(super) fn blue_png() -> Vec<u8> {
+pub(crate) fn blue_png() -> Vec<u8> {
     let img = image::RgbaImage::from_pixel(4, 2, image::Rgba([0, 0, 255, 255]));
     let mut png = vec![];
     img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
