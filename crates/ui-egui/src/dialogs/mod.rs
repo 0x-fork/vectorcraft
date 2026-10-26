@@ -170,6 +170,9 @@ pub(crate) struct DialogSpec {
     pub ok: Option<&'static str>,
     /// An extra button left of Cancel that sets `discard: true` and confirms ("Don't Save").
     pub discard: Option<&'static str>,
+    /// A button left of Cancel, as (label, field), that sets `field: true` and confirms, as OK
+    /// does otherwise (Transform Each's Copy).
+    pub alternate: Option<(&'static str, &'static str)>,
     pub min_width: f32,
     pub max_width: Option<f32>,
     /// The body runs a live preview interaction that Cancel rolls back.
@@ -204,6 +207,7 @@ impl DialogSpec {
         },
         ok: Some("OK"),
         discard: None,
+        alternate: None,
         min_width: 320.0,
         max_width: None,
         preview: false,
@@ -374,6 +378,7 @@ pub fn button_labels() -> Vec<&'static str> {
     for spec in std::iter::once(&DialogSpec::FORM).chain(DialogKind::ALL.iter().map(|k| k.spec())) {
         v.extend(spec.ok);
         v.extend(spec.discard);
+        v.extend(spec.alternate.map(|(label, _)| label));
     }
     v.sort_unstable();
     v.dedup();
@@ -517,6 +522,7 @@ pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
     let mut ok_enabled = true;
     let mut cancel = false;
     let mut discard = false;
+    let mut alternate = false;
     // Opened as a save panel closed: the Enter that closed it isn't this dialog's, until it is let go.
     let after_panel = d.bool(AFTER_PANEL);
     if after_panel && !ctx.input(|i| i.key_down(egui::Key::Enter) || i.key_pressed(egui::Key::Enter)) {
@@ -578,6 +584,10 @@ pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
             if widgets::secondary_button(ui, if spec.ok.is_some() { "Cancel" } else { "Close" }).clicked() {
                 cancel = true;
             }
+            if let Some((label, _)) = spec.alternate {
+                ui.add_space(8.0);
+                alternate = widgets::secondary_button(ui, label).clicked() && ok_enabled;
+            }
             if let Some(label) = spec.discard {
                 ui.add_space(28.0);
                 discard = widgets::secondary_button(ui, label).clicked();
@@ -589,6 +599,10 @@ pub fn show(app: &mut VectorcraftApp, ctx: &egui::Context) {
     }
     if discard {
         d.fields.insert("discard".into(), json!(true));
+        ok = true;
+    }
+    if alternate && let Some((_, field)) = spec.alternate {
+        d.fields.insert(field.into(), json!(true));
         ok = true;
     }
     app.ui.dialog = Some(d);
