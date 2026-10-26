@@ -13,6 +13,11 @@ use vectorcraft_geom::{Affine, Point, Rect, Vec2};
 use crate::guides::{DrawSnap, Leave, square};
 use crate::{Action, Cursor, Mods, Overlay, PointerEvent, PointerKind, Tool, ToolContext, ToolKey};
 
+/// The largest corner radius the Rounded Rectangle tool draws, points: the range of General ›
+/// Corner Radius, which the tool's radius is (its `prefs.list` spec), so ↑ and a Tool Options
+/// value stop there too.
+pub const MAX_CORNER_RADIUS: f64 = 1296.0;
+
 pub struct ShapeTool {
     id: &'static str,
     start: Option<Point>,
@@ -279,7 +284,7 @@ impl Tool for ShapeTool {
                 true
             }
             ("roundedRectangle", ToolKey::Up) => {
-                self.corner_radius += 1.0;
+                self.corner_radius = (self.corner_radius + 1.0).min(MAX_CORNER_RADIUS);
                 true
             }
             ("roundedRectangle", ToolKey::Down) => {
@@ -351,7 +356,7 @@ impl Tool for ShapeTool {
         match key {
             "sides" => self.sides = v.as_u64().unwrap_or(6).clamp(3, 1000) as u32,
             "points" => self.points = v.as_u64().unwrap_or(5).clamp(3, 1000) as u32,
-            "cornerRadius" => self.corner_radius = v.as_f64().unwrap_or(12.0).max(0.0),
+            "cornerRadius" => self.corner_radius = finite.unwrap_or(12.0).clamp(0.0, MAX_CORNER_RADIUS),
             "starRatio" => self.star_ratio = v.as_f64().unwrap_or(0.5).clamp(0.01, 1.0),
             "length" => self.line_length = finite.map_or(self.line_length, |n| n.abs().min(1e6)),
             "angle" => self.line_angle = finite.map_or(self.line_angle, |n| n.rem_euclid(360.0)),
@@ -595,6 +600,29 @@ mod tests {
         t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 50.0, 10.0));
         let a = t.key(&cx, ToolKey::Up, Mods::default());
         assert!(matches!(&a[0], Action::Preview(_, v) if v["sides"] == 7));
+    }
+
+    /// The Rounded Rectangle radius stops at General › Corner Radius's range on both of its input
+    /// paths: a Tool Options value is clamped to it, and ↑ at the top stays there.
+    #[test]
+    fn rounded_rectangle_radius_is_clamped_to_its_range() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = ShapeTool::new("roundedRectangle");
+        t.set_option("cornerRadius", &json!(5000));
+        assert_eq!(t.options()["cornerRadius"], json!(MAX_CORNER_RADIUS));
+        t.set_option("cornerRadius", &json!(f64::INFINITY));
+        assert_eq!(t.options()["cornerRadius"], json!(12.0), "a non-finite value is the default");
+        t.set_option("cornerRadius", &json!(-3));
+        assert_eq!(t.options()["cornerRadius"], json!(0.0));
+        t.set_option("cornerRadius", &json!(MAX_CORNER_RADIUS));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 10.0, 10.0));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 50.0, 40.0));
+        let a = t.key(&cx, ToolKey::Up, Mods::default());
+        assert!(matches!(&a[0], Action::Preview(_, v) if v["radius"] == json!(MAX_CORNER_RADIUS)), "{a:?}");
+        assert_eq!(t.options()["cornerRadius"], json!(MAX_CORNER_RADIUS));
     }
 
     /// The start and the dragged corner land on another object's anchors (#506), hovering shows
