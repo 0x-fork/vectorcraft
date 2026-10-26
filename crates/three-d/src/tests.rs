@@ -1,4 +1,10 @@
 use super::*;
+
+mod lighting;
+mod multiple_lights;
+mod caps;
+mod smooth;
+
 #[test]
 fn light_orbits_and_handle_projection_match_the_shading_direction_on_both_sides() {
     for rotation in [-170.0f64, -45.0, 0.0, 83.0, 167.0] {

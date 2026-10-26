@@ -1,4 +1,4 @@
-use super::*;
+use crate::*;
 
 #[test]
 fn directional_lights_add_before_saturation_and_ambient_is_added_once() {

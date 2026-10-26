@@ -15,10 +15,6 @@ pub use shading::{LightGradient, RgbGradient, ShadeGradient};
 mod lights;
 pub use lights::{Light, Lights, MAX_LIGHTS};
 mod caps;
-#[cfg(test)]
-mod tests_lighting;
-#[cfg(test)]
-mod tests_multiple_lights;
 
 use vectorcraft_geom::{BezPath, ParamCurve, PathData, Point, Rect, Vec2, kurbo::ParamCurveDeriv};
 
@@ -595,10 +591,6 @@ pub fn revolve(path: &PathData, bounds: Rect, options: Revolve) -> Result<Vec<Fa
     Ok(faces)
 }
 
-#[cfg(test)]
-mod tests_caps;
-#[cfg(test)]
-mod tests_smooth;
 
 #[cfg(test)]
 mod tests;

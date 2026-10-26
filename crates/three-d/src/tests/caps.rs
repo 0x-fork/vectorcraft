@@ -1,4 +1,4 @@
-use super::*;
+use crate::*;
 
 fn cylinder() -> (PathData, Rect) {
     let mut path = BezPath::new();

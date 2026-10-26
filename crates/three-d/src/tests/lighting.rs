@@ -1,4 +1,4 @@
-use super::*;
+use crate::*;
 
 #[test]
 fn color_combines_with_neutral_ambient_before_channel_clamping() {

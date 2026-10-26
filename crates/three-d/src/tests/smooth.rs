@@ -1,4 +1,4 @@
-use super::*;
+use crate::*;
 
 fn path(d: &str) -> PathData {
     PathData::from_bezpath(&BezPath::from_svg(d).unwrap())
