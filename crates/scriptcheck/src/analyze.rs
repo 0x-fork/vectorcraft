@@ -34,7 +34,7 @@ mod sig;
 
 pub(crate) use declared::{Declared, declarations};
 use features::platform_name;
-use sig::*;
+use sig::{COMPOUND, LineBreaks, Read, Sig, ends_value, for_in, goes_on_after, goes_on_with, is, member_mark, word};
 
 /// An `#include` line: what it names, its line, and the folders `#includepath` named at that point
 /// (one list, shared by every line it applies to).

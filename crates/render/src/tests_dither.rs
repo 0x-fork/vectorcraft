@@ -1,7 +1,7 @@
 //! Dithered gradient fills: fine noise instead of bands, the same colours on average, the same
 //! pixels on every render, and nothing changed without dither or on strokes.
 
-use super::*;
+use super::{Affine, Document, Rect, RenderOptions, Rendered, Renderer, dither};
 use vectorcraft_color::{Color, Gradient, GradientKind, GradientPaint, GradientStop, Paint};
 use vectorcraft_doc::{Appearance, Node};
 use vectorcraft_geom::shapes;

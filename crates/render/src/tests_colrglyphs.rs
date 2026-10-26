@@ -7,7 +7,7 @@ use vectorcraft_doc::{Node, NodeKind};
 use vectorcraft_geom::Point;
 use vectorcraft_text::test_fonts::{COLOUR_CHAR, COLR_SWEEP_CHAR, colr_family, colr_font};
 
-use super::*;
+use super::{Affine, Document, RenderOptions, Rendered, Renderer};
 
 /// 100 pt `text` in the COLR test font (v1 or v0), filled magenta, its baseline at (20, 120)
 /// turned by `turn` about there, on a white 160×160 page.
