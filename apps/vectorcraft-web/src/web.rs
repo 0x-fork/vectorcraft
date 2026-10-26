@@ -82,6 +82,7 @@ pub fn start() {
             restarts: 0,
         };
         track_paste(&host.pasted);
+        crate::keys::keep_app_keys();
         run(host, canvas, None).await;
     });
 }
