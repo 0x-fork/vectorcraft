@@ -4565,7 +4565,8 @@ Every-line Composer, a paragraph that holds a tab is broken line by line, so a c
 can break at other places than its list paragraph did. The change is one undo step, and the reply gives the `ids` of
 the type it changed, how many paragraphs were `converted`, and the characters `inserted`, each with the type object's
 `id`, the byte `at` which they went in (counted in the text before the change) and their `length` in bytes. While the
-Type tool edits, `type.convertListToText` moves its anchor and caret past the characters inserted at or before them.
+Type tool edits, `text.convertListToText` ends its typing first and moves its anchor and caret past the characters
+inserted at or before them, whether the call comes from the menu, MCP or the control channel.
 In threaded type, when the caret's character moved to another frame, the Type tool edits that frame with the caret
 next to the same character, and that frame becomes the selection when it was not selected.
 

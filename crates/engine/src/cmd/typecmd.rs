@@ -1967,6 +1967,59 @@ mod area_tests {
         assert!(second.para_at(1).tabs.is_empty(), "no stop at the left indent: {:?}", second.para_at(1).tabs);
     }
 
+    /// `text.convertListToText` sent while the Type tool edits (as from MCP or the control channel)
+    /// moves the tool's anchor and caret past the characters it inserts at or before them, so that
+    /// neither lands inside a bullet. In threaded type, when the text before the caret moves to the
+    /// frame before, the caret goes with its character into that frame, which becomes the
+    /// selection.
+    #[test]
+    fn convert_to_text_moves_the_type_tools_selection() {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({"width": 600, "height": 300})).unwrap();
+        let plain = |s: &Session, id: u64| match &s.doc().unwrap().doc.node(NodeId(id)).unwrap().kind {
+            NodeKind::Text(t) => t.plain_text(),
+            _ => panic!("text"),
+        };
+        let selection = |s: &Session| {
+            let o = s.tool_options();
+            (o["editing"].as_u64(), o["anchor"].as_u64(), o["caret"].as_u64())
+        };
+        let id = s.execute("text.create", &json!({"x": 10, "y": 50, "text": "One\nTwo"})).unwrap()["id"].as_u64().unwrap();
+        s.execute("text.setFormat", &json!({"ids": [id], "list": "bullet"})).unwrap();
+        s.execute("select.set", &json!({"ids": [id]})).unwrap();
+        s.select_tool("type", Default::default()).unwrap();
+        // From after the O of One to after the T of Two.
+        s.set_tool_option("textSelection", &json!({"editing": id, "anchor": 1, "caret": 5}));
+        s.execute("text.convertListToText", &json!({})).unwrap();
+        let text = plain(&s, id);
+        assert_eq!(text, "\u{2022}\tOne\n\u{2022}\tTwo");
+        assert_eq!(selection(&s), (Some(id), Some(5), Some(13)), "the anchor after the O, the caret after the T");
+        assert!(text.is_char_boundary(5) && text.is_char_boundary(13));
+
+        let long = "The quick brown fox jumps over the lazy dog. ".repeat(4);
+        let a = s
+            .execute("text.create", &json!({"x": 10, "y": 10, "text": format!("One\nTwo\n{long}\nFour"), "area": {"width": 150, "height": 60}}))
+            .unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        let b = s.execute("shape.rectangle", &json!({"x": 200, "y": 10, "width": 150, "height": 200})).unwrap()["id"].as_u64().unwrap();
+        s.select_tool("selection", Default::default()).unwrap();
+        s.execute("select.set", &json!({"ids": [a, b]})).unwrap();
+        s.execute("text.thread.create", &json!({})).unwrap();
+        s.execute("text.setFormat", &json!({"ids": [a, b], "list": "number"})).unwrap();
+        assert!(plain(&s, b).starts_with("dog. "), "the second frame starts with the dog: {:?}", plain(&s, b));
+        s.execute("select.set", &json!({"ids": [b]})).unwrap();
+        s.select_tool("type", Default::default()).unwrap();
+        // The caret after the d of dog, at the start of the second frame.
+        s.set_tool_option("textSelection", &json!({"editing": b, "anchor": 1, "caret": 1}));
+        s.execute("text.convertListToText", &json!({"ids": [b]})).unwrap();
+        let first = plain(&s, a);
+        assert!(first.ends_with("lazy dog. "), "the dog moved to the first frame: {first:?}");
+        let after_d = (first.len() - "og. ".len()) as u64;
+        assert_eq!(selection(&s), (Some(a), Some(after_d), Some(after_d)), "the caret is after the d of dog in the first frame");
+        assert_eq!(s.active().unwrap().selection.objects, vec![NodeId(a)], "the first frame is selected");
+    }
+
     /// Type › Create Outlines makes a path of a list item's bullet as well as of its characters.
     #[test]
     fn create_outlines_makes_a_path_of_the_bullet() {

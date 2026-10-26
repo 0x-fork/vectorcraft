@@ -7,7 +7,7 @@
 use egui::{Ui, vec2};
 use serde_json::{Value, json};
 use vectorcraft_doc::{
-    Composer, HyphenationOptions, JustificationOptions, Justify, Kinsoku, Mojikumi, NodeId, NodeKind, ParaDirection, ParaStyle, SingleWordJustify,
+    Composer, HyphenationOptions, JustificationOptions, Justify, Kinsoku, Mojikumi, NodeKind, ParaDirection, ParaStyle, SingleWordJustify,
 };
 
 use super::character::{Metric, Shared, text_style};
@@ -358,83 +358,13 @@ pub(crate) fn apply_numbers(app: &mut VectorcraftApp, p: &Value) -> Result<Value
     run_on_paragraphs(app, "text.setFormat", params)
 }
 
-/// The frames of the story that type object `id` belongs to (its thread in thread order, else `id`
-/// alone), each with the length of its text in bytes.
-fn story_frames(app: &VectorcraftApp, id: NodeId) -> Vec<(NodeId, usize)> {
-    let Some(st) = app.session.active() else { return vec![] };
-    let d = &st.doc;
-    let frames = d.text_threads.iter().find(|thread| thread.contains(&id)).cloned().unwrap_or_else(|| vec![id]);
-    frames
-        .into_iter()
-        .filter_map(|f| match d.node(f).map(|n| &n.kind) {
-            Some(NodeKind::Text(t)) => Some((f, t.plain_text().len())),
-            _ => None,
-        })
-        .collect()
-}
-
 /// Type › Bullets and Numbering › Convert to Text (`type.convertListToText`): the markers of the
 /// list paragraphs of the selected type, or of those the Type tool's selection touches, become
-/// characters of the text and the lists are turned off (`text.convertListToText`). The Type
-/// tool's anchor and caret move past the characters inserted at or before them in the story. In
-/// threaded type the caret stays in the frame it was in while its place is still there, and else
-/// goes to the frame its character moved to, with the anchor in that frame; that frame becomes the
-/// selection when it was not selected.
+/// characters of the text and the lists are turned off (`text.convertListToText`, which also moves
+/// the Type tool's anchor and caret past the characters inserted at or before them).
 pub(crate) fn convert_list_to_text(app: &mut VectorcraftApp) -> Result<Value, String> {
     text_style(app).ok_or("select some type first")?;
-    let editing = super::character::text_editing(app).map(|(id, _, _)| id);
-    let options = app.session.tool_options();
-    let offset = |k: &str| options.get(k).and_then(Value::as_u64).map(|v| v as usize);
-    let (anchor, caret) = (offset("anchor"), offset("caret"));
-    let before = editing.map(|id| story_frames(app, id)).unwrap_or_default();
-    let reply = run_on_paragraphs(app, "text.convertListToText", json!({}))?;
-    let (Some(id), Some(anchor), Some(caret)) = (editing, anchor, caret) else { return Ok(reply) };
-    // Story positions: the bytes of the frames before a frame, then the byte in it.
-    let start_of = |frames: &[(NodeId, usize)], f: NodeId| frames.iter().take_while(|(g, _)| *g != f).map(|(_, n)| n).sum::<usize>();
-    let len_of = |frames: &[(NodeId, usize)], f: NodeId| frames.iter().find(|(g, _)| *g == f).map_or(0, |(_, n)| *n);
-    let inserted: Vec<(usize, usize)> = reply["inserted"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|i| {
-            let frame = NodeId(i["id"].as_u64()?);
-            before.iter().any(|(g, _)| *g == frame).then_some(())?;
-            Some((start_of(&before, frame) + usize::try_from(i["at"].as_u64()?).ok()?, usize::try_from(i["length"].as_u64()?).ok()?))
-        })
-        .collect();
-    let story = |at: usize| {
-        let at = start_of(&before, id) + at.min(len_of(&before, id));
-        at + inserted.iter().filter(|(b, _)| *b <= at).map(|(_, n)| n).sum::<usize>()
-    };
-    let (anchor, caret) = (story(anchor), story(caret));
-    let after = story_frames(app, id);
-    let fits = |f: NodeId| (start_of(&after, f)..=start_of(&after, f) + len_of(&after, f)).contains(&caret);
-    let frame = if fits(id) { Some(id) } else { after.iter().map(|(f, _)| *f).find(|f| fits(*f)) };
-    let Some(frame) = frame else { return Ok(reply) };
-    let (start, len) = (start_of(&after, frame), len_of(&after, frame));
-    let local = |at: usize| at.saturating_sub(start).min(len);
-    if frame == id {
-        app.session.set_tool_option("select", &json!({"start": local(anchor), "end": local(caret)}));
-    } else {
-        app.session.set_tool_option("textSelection", &json!({"editing": frame.0, "anchor": local(anchor), "caret": local(caret)}));
-        // The Type tool ends editing after a command when the frame it edits is not selected,
-        // itself or through a selected group, so that frame becomes the selection, as a click in it
-        // does.
-        let selected = app.session.active().is_some_and(|st| {
-            let mut cur = Some(frame);
-            while let Some(c) = cur {
-                if st.selection.contains(c) {
-                    return true;
-                }
-                cur = st.doc.parent_of(c);
-            }
-            false
-        });
-        if !selected {
-            app.run("select.set", json!({"ids": [frame.0]}))?;
-        }
-    }
-    Ok(reply)
+    run_on_paragraphs(app, "text.convertListToText", json!({}))
 }
 
 /// The Bullets button and the arrow beside it (Paragraph panel). The button makes the paragraphs
@@ -814,6 +744,7 @@ fn reset_panel(app: &mut VectorcraftApp) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vectorcraft_doc::NodeId;
     use vectorcraft_engine::Session;
 
     fn alignment_row(app: &mut VectorcraftApp, ui: &mut Ui, size: f32) -> egui::Rect {
