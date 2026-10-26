@@ -32,6 +32,11 @@ white beside a cream), at most six; scattered specks of a colour add none. Adobe
 its own palettes are chosen; this is VectorCraft's own method (see
 [image-trace-quality.md](image-trace-quality.md#auto-color-keeps-rare-colours)).
 
+**Document Library** traces with the library's colors as they are. Each pixel takes the library
+color nearest to it in lightness and hue, with a difference in hue or chroma counted three times
+as much as one in lightness, so a gray or a muted brown takes a black, white or other neutral
+library color rather than a saturated color of the same lightness.
+
 **Abutting and Overlapping.** Abutting is the default Method, and the Default, Auto Color, 3 Colors,
 6 Colors and 16 Colors presets use it. With Abutting, two neighboring colors share one exact edge. The
 canvas smooths the edges of each path on its own, so each of the two paths covers only part of the
@@ -43,7 +48,6 @@ pixels and 16,384 pixels on a side. A raster export shows the line as the canvas
 Type Optimized anti-aliasing, or when it uses Art Optimized and is larger than either limit.
 Overlapping stacks the colors instead: a lower color continues under the edge of the color above it,
 and no background shows along that edge.
-
 **Large images.** An image of more than 1500 pixels on a side is traced as any other, only more
 slowly, and the trace says so: `imageTrace.make` returns the note in `warnings` and the status bar
 shows it (the [results optimization](https://helpx.adobe.com/illustrator/using/image-trace-results-optimization.html)
