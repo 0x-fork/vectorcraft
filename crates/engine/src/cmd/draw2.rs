@@ -27,7 +27,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Pencil",
             [],
             None,
-            "{points: [[x,y]…] or [[x,y,pressure]…] (pen pressure 0..1: the stroke keeps it, for Calligraphic brushes with Pressure variation; a point without one presses fully), fidelity?: pt (1.5), fit?: bool (true; false: the points are joined by straight segments, as the Pencil previews a stroke with Live curve fitting off), closed?, style?: \"pencil\"|\"brush\", fill?: bool, keepSelected?: bool (true: the drawn or continued path is selected; false: it is not, and the rest of the selection stays), extend?: {id, end: \"start\"|\"end\"}, redraw?: {id, within?: pt (12)}} fit a freehand stroke → {id}. extend continues the path from that end; redraw (Edit Selected Paths) replaces the section of the path between where the stroke starts and ends, each within `within` of one subpath (the shorter way round a closed one), and draws a new path when the stroke doesn't end on it",
+            "{points: [[x,y]…] or [[x,y,pressure]…] (pen pressure 0..1: the stroke keeps it, for Calligraphic brushes with Pressure variation; a point without one presses fully), fidelity?: pt (1.5), fit?: bool (true; false: the points are joined by straight segments, as the Pencil previews a stroke with Live curve fitting off), closed?, style?: \"pencil\"|\"brush\", fill?: bool, keepSelected?: bool (true: the drawn or continued path is selected; false: it is not, and the rest of the selection stays), extend?: {id, end: \"start\"|\"end\"}, connect?: {id, end: \"start\"|\"end\"}, redraw?: {id, within?: pt (12)}} fit a freehand stroke → {id}. extend continues the path from that end; with connect, the stroke ends on that end of another path's last open subpath and joins it on, in one path with the extended path's appearance (the other path is removed when nothing of it is left); redraw (Edit Selected Paths) replaces the section of the path between where the stroke starts and ends, each within `within` of one subpath (the shorter way round a closed one), and draws a new path when the stroke doesn't end on it",
             has_doc,
             freehand
         ),
@@ -709,10 +709,39 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
         if pts.len() < 2 {
             return Ok(json!({ "id": id.0 }));
         }
+        // A stroke that ends on an open end of another path connects the two: (that path, its last
+        // open subpath, that subpath starting at the end the stroke ends on, it ends at its end).
+        let connect = match p.get("connect").filter(|v| !v.is_null()) {
+            Some(cn) => {
+                let other = id_param(cn, "id").ok_or_else(|| bad(C, "connect needs id"))?;
+                if other == id {
+                    return Err(bad(C, "connect needs a path other than the one extended"));
+                }
+                let (opd, _) = path_of(&s.doc()?.doc, other)?;
+                let osi =
+                    opd.subpaths.iter().rposition(|s| !s.closed && !s.anchors.is_empty()).ok_or_else(|| bad(C, "connect path has no open end"))?;
+                let mut y = opd.subpaths[osi].clone();
+                let at_end = match str_param(cn, "end") {
+                    Some("start") => false,
+                    Some("end") => true,
+                    _ => return Err(bad(C, "connect end must be \"start\" or \"end\"")),
+                };
+                if at_end {
+                    y.reverse();
+                }
+                Some((other, osi, y, at_end))
+            }
+            None => None,
+        };
         let close_tol = (tol * 4.0).max(6.0);
-        let closing = sp.anchors.len() >= 2 && pts.last().is_some_and(|p| p.distance(first) <= close_tol);
+        let closing = connect.is_none() && sp.anchors.len() >= 2 && pts.last().is_some_and(|p| p.distance(first) <= close_tol);
         if closing && let Some(l) = pts.last_mut() {
             *l = first;
+        }
+        if let Some((_, _, y, _)) = &connect
+            && let (Some(l), Some(y0)) = (pts.last_mut(), y.anchors.first())
+        {
+            *l = y0.p;
         }
         let fit = stroke_subpath(&pts, fit_tol, false);
         let mut add = fit.anchors;
@@ -734,12 +763,28 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
         for a in &mut sp.anchors {
             *a = Anchor::with_handles(a.p, a.h_in, a.h_out);
         }
-        // The path's pressure (in the direction it is continued in) followed by the stroke's.
-        let old_pressure = s.doc()?.doc.node(id).and_then(|n| n.appearance.stroke()).and_then(|st| st.pressure.clone());
-        let joined = (old_pressure.is_some() || pressure.is_some()).then(|| {
+        let drawn_len = subpath_len(&sp);
+        // The other path's anchors follow on from the one the stroke ends on, which takes its
+        // outgoing handle.
+        let mut other_len = 0.0;
+        if let Some((_, _, y, _)) = &connect
+            && let Some((y0, rest)) = y.anchors.split_first()
+        {
+            if let Some(last) = sp.anchors.last_mut() {
+                *last = Anchor::with_handles(y0.p, last.h_in + (y0.p - last.p), y0.h_out);
+            }
+            sp.anchors.extend_from_slice(rest);
+            other_len = subpath_len(y);
+        }
+        // The path's pressure (in the direction it is continued in) followed by the stroke's, and
+        // by the pressure of the path it connects to.
+        let pressure_of = |n: NodeId| s.doc().ok()?.doc.node(n).and_then(|n| n.appearance.stroke()).and_then(|st| st.pressure.clone());
+        let old_pressure = pressure_of(id);
+        let other_pressure = connect.as_ref().and_then(|(o, _, _, at_end)| pressure_of(*o).map(|p| if *at_end { p.reversed() } else { p }));
+        let joined = (old_pressure.is_some() || pressure.is_some() || other_pressure.is_some()).then(|| {
             let old = old_pressure.map(|p| if at_start { p.reversed() } else { p });
-            let total = subpath_len(&sp);
-            PressureProfile::extended(old.as_ref(), old_len, pressure.as_ref(), total - old_len)
+            let drawn = PressureProfile::extended(old.as_ref(), old_len, pressure.as_ref(), drawn_len - old_len);
+            if connect.is_some() { PressureProfile::extended(drawn.as_ref(), drawn_len, other_pressure.as_ref(), other_len) } else { drawn }
         });
         s.edit(if brush { "Paintbrush" } else { "Pencil" }, |d, sel| {
             let reverse = at_start && !sp.closed;
@@ -747,6 +792,31 @@ fn freehand(s: &mut Session, p: &Value) -> Result<Value> {
                 sp.reverse();
             }
             path_mut(d, id)?.subpaths[si] = sp;
+            if let Some((other, osi, ..)) = &connect {
+                let o = path_mut(d, *other)?;
+                if *osi < o.subpaths.len() {
+                    o.subpaths.remove(*osi);
+                }
+                if o.is_empty() {
+                    d.remove(*other)?;
+                    sel.remove(*other);
+                }
+                // Direct-selected anchors and segments of the subpaths after the one removed move
+                // down one; those of the one removed go, and a path left with no selected anchors
+                // is no longer selected.
+                let shift = |refs: &mut BTreeSet<(usize, usize)>| {
+                    *refs = refs.iter().filter(|r| r.0 != *osi).map(|&(sub, i)| if sub > *osi { (sub - 1, i) } else { (sub, i) }).collect();
+                };
+                if let Some(refs) = sel.anchors.get_mut(other) {
+                    shift(refs);
+                }
+                if let Some(refs) = sel.segments.get_mut(other) {
+                    shift(refs);
+                }
+                if sel.anchors.get(other).is_some_and(BTreeSet::is_empty) {
+                    sel.remove(*other);
+                }
+            }
             if let Some(joined) = joined
                 && let Some(st) = d.node_mut(id).and_then(|n| n.appearance.stroke_mut())
             {
