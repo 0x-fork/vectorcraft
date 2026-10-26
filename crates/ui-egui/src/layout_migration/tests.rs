@@ -8,7 +8,7 @@ use serde_json::json;
 /// column 1; Libraries docked on the icon column; Symbols moved beside Swatches, then closed
 /// (0.16 then showed it in the icon column again);
 /// Swatches collapsed to its tab; the dock widened to 380; saved as workspace "Migration Test".
-const SAVED_BY_0_16: &str = include_str!("../tests/fixtures/ui-before-canvas-layout.json");
+const SAVED_BY_0_16: &str = include_str!("../../tests/fixtures/ui-before-canvas-layout.json");
 
 fn read(saved: &Value) -> ReadPreferences {
     UiState::read_preferences(&serde_json::to_vec(saved).unwrap()).unwrap()
