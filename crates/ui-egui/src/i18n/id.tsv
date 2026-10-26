@@ -5498,5 +5498,6 @@ axis	Y Axis	Sumbu Y
 	Rectangular Grid Tool Options	Opsi alat kisi persegi panjang
 	Polar Grid Tool Options	Opsi alat kisi polar
 	Fill Line	Isi garis
+@msg	no empty artboards to delete	tidak ada artboard kosong untuk dihapus
 	Scale Presets	Preset skala
 	Live preview	Pratinjau langsung

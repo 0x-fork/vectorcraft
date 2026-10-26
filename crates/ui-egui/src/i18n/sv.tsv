@@ -5582,6 +5582,7 @@ axis	Y Axis	Y-axel
 	Rectangular Grid Tool Options	Alternativ för verktyget för rektangulärt rutnät
 	Polar Grid Tool Options	Alternativ för verktyget för polärt rutnät
 	Fill Line	Fyll linje
+@msg	no empty artboards to delete	inga tomma ritytor att radera
 	Scale Presets	Skalningsförval
 @msg	a {width}×{height} screenshot's byte count overflows	byteantalet för en skärmbild på {width}×{height} överstiger gränsen
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	fönstrets {what} ({points} punkter × {scale} DPI) kan inte bestämma en skärmbilds storlek

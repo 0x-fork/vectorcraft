@@ -5137,6 +5137,7 @@ axis	Y Axis	Y축
 	Rectangular Grid Tool Options	사각형 격자 도구 옵션
 	Polar Grid Tool Options	극좌표 격자 도구 옵션
 	Fill Line	선 채우기
+@msg	no empty artboards to delete	삭제할 빈 아트보드가 없습니다
 	Scale Presets	크기 조절 사전 설정
 @msg	a {width}×{height} screenshot's byte count overflows	{width}×{height} 스크린샷의 바이트 수가 넘칩니다
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	창의 {what}({points}포인트 × {scale} DPI)로는 스크린샷 크기를 정할 수 없습니다

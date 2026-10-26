@@ -5498,5 +5498,6 @@ axis	Y Axis	Y-akse
 	Rectangular Grid Tool Options	Indstillinger for rektangulært gitterværktøj
 	Polar Grid Tool Options	Indstillinger for polært gitterværktøj
 	Fill Line	Udfyld linje
+@msg	no empty artboards to delete	ingen tomme tegneflader at slette
 	Scale Presets	Skaleringsforudindstillinger
 	Live preview	Direkte forhåndsvisning

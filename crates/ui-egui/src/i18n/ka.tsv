@@ -5474,6 +5474,7 @@ axis	Y Axis	Y ღერძი
 	Rectangular Grid Tool Options	მართკუთხა ბადის ხელსაწყოს პარამეტრები
 	Polar Grid Tool Options	პოლარული ბადის ხელსაწყოს პარამეტრები
 	Fill Line	ხაზის შევსება
+@msg	no empty artboards to delete	წასაშლელი ცარიელი სამუშაო დაფები არ არის
 	Scale Presets	მასშტაბის წინასწარ დაყენებული მნიშვნელობები
 @msg	a {width}×{height} screenshot's byte count overflows	{width}×{height} ეკრანის სურათის ბაიტების რაოდენობა გადაივსო
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	ფანჯრის {what} ({points} პუნქტი × {scale} DPI) ეკრანის სურათის ზომას ვერ განსაზღვრავს

@@ -5154,6 +5154,7 @@ axis	Y Axis	Trục Y
 	Rectangular Grid Tool Options	Tùy chọn công cụ Lưới chữ nhật
 	Polar Grid Tool Options	Tùy chọn công cụ Lưới cực
 	Fill Line	Tô đoạn thẳng
+@msg	no empty artboards to delete	không có bảng vẽ trống nào để xóa
 	Scale Presets	Cài đặt sẵn tỉ lệ
 @msg	a {width}×{height} screenshot's byte count overflows	số byte của ảnh chụp {width}×{height} bị tràn
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	{what} của cửa sổ ({points} điểm × {scale} DPI) không thể định cỡ ảnh chụp

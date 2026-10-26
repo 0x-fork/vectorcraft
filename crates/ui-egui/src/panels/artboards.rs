@@ -277,6 +277,18 @@ pub(crate) fn delete_selected(app: &mut VectorcraftApp) {
     }
 }
 
+/// Artboards panel › Delete Empty Artboards: delete the artboards with no artwork, then make the
+/// active artboard, where it is now, active again, or else the nearest one before it that is left.
+pub(crate) fn delete_empty(app: &mut VectorcraftApp) {
+    let n = app.session.active().map_or(0, |d| d.doc.artboards.len());
+    let active = selected(app, n);
+    let Ok(r) = app.run("artboard.deleteEmpty", json!({})) else { return };
+    let deleted: Vec<usize> = r["deleted"].as_array().into_iter().flatten().filter_map(Value::as_u64).map(|i| i as usize).collect();
+    // The last artboard up to the active one that is left, numbered as it is now.
+    let kept = (0..=active).rev().find(|i| !deleted.contains(i)).unwrap_or(0);
+    select(app, kept.saturating_sub(deleted.iter().filter(|d| **d < kept).count()));
+}
+
 /// Shift-click on artboard `i`'s row while the Artboard tool is in use: the tool selects the
 /// artboards from `anchor` to `i`, and `i` becomes the active one. `anchor` is the last row clicked
 /// without Shift or where the last range started; when its artboard is no longer selected, the
@@ -563,7 +575,9 @@ pub fn menu(app: &mut VectorcraftApp, ui: &mut Ui) {
         let all = picked(app, n);
         start_rename(ui.ctx(), app, if all.contains(&sel) { sel } else { all.first().copied().unwrap_or(sel) });
     }
-    menu_item(ui, tl!("Delete Empty Artboards"), false, false);
+    if menu_item(ui, tl!("Delete Empty Artboards"), crate::menus::enabled(app, "artboard.deleteEmpty"), false) {
+        delete_empty(app);
+    }
     ui.separator();
     if menu_item(ui, tl!("Convert to Artboards"), crate::menus::enabled(app, "artboard.convertToArtboards"), false) {
         crate::menus::invoke(app, "artboard.convertToArtboards", json!({}));
@@ -583,6 +597,7 @@ pub fn menu(app: &mut VectorcraftApp, ui: &mut Ui) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::widgets::accessibility_tests::{named, tree};
     use vectorcraft_engine::Session;
 
     /// Clicking a row makes its artboard the active one (the navigator's, Fit Artboard in Window's).
@@ -1745,6 +1760,49 @@ mod tests {
         assert_eq!(names, ["Artboard 1", "Artboard 2"]);
         assert_eq!((selected(&app, 2), app.session.tool_options()["active"].clone()), (1, json!(1)));
     }
+
+    /// The panel menu's Delete Empty Artboards is disabled while every artboard has art, and
+    /// enabled otherwise; a click deletes the empty ones in one undo step and makes the artboard
+    /// left active.
+    #[test]
+    fn delete_empty_artboards_deletes_the_empty_ones_and_selects_one_left() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
+        for x in [400, 800] {
+            app.run("artboard.new", json!({"x": x, "y": 0, "width": 200, "height": 150})).unwrap();
+        }
+        let rect =
+            |app: &mut VectorcraftApp, x: f64| app.run("shape.rectangle", json!({"x": x, "y": 10, "width": 20, "height": 20})).unwrap()["id"].clone();
+        let ids: Vec<Value> = [10.0, 450.0, 850.0].into_iter().map(|x| rect(&mut app, x)).collect();
+        let ctx = egui::Context::default();
+        let screen = Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(240.0, 400.0)));
+        let raw = |events| egui::RawInput { events, screen_rect: screen, ..Default::default() };
+        let item_of = |app: &mut VectorcraftApp| {
+            let mut out = ctx.run_ui(raw(vec![]), |ui| menu(app, ui));
+            out.textures_delta.clear();
+            out.shapes.iter().find_map(|c| match &c.shape {
+                egui::Shape::Text(t) if t.galley.text().trim_start() == "Delete Empty Artboards" => Some(t.visual_bounding_rect().center()),
+                _ => None,
+            })
+        };
+        // Menu rows pad their label where a check mark would go.
+        let label = "   Delete Empty Artboards";
+        assert!(named(&tree(|ui| menu(&mut app, ui)), label).is_disabled(), "every artboard has art");
+        app.run("select.set", json!({"ids": [ids[0], ids[2]]})).unwrap();
+        app.run("edit.clear", json!({})).unwrap();
+        select(&mut app, 2);
+        assert!(!named(&tree(|ui| menu(&mut app, ui)), label).is_disabled(), "two artboards are empty");
+        let item = item_of(&mut app).unwrap();
+        let steps = app.session.active().unwrap().history.undo.len();
+        let button = |pressed| egui::Event::PointerButton { pos: item, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        ctx.run_ui(raw(vec![egui::Event::PointerMoved(item), button(true), button(false)]), |ui| menu(&mut app, ui)).textures_delta.clear();
+        let st = app.session.active().unwrap();
+        let names: Vec<String> = st.doc.artboards.iter().map(|a| a.name.clone()).collect();
+        assert_eq!(names, ["Artboard 2"]);
+        assert_eq!(st.history.undo.len(), steps + 1, "one undo step");
+        assert_eq!(selected(&app, 1), 0, "the artboard left is active");
+    }
+
     /// With the Artboard tool, the canvas context menu locks and unlocks artboards: Lock Selected
     /// locks the selected one (the others stay free), Unlock All frees every artboard.
     #[test]

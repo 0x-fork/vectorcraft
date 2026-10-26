@@ -5515,6 +5515,7 @@ axis	Y Axis	Y ekseni
 	Rectangular Grid Tool Options	Dikdörtgen Izgara Aracı Seçenekleri
 	Polar Grid Tool Options	Yuvarlak Izgara Aracı Seçenekleri
 	Fill Line	Çizgiyi doldur
+@msg	no empty artboards to delete	silinecek boş çalışma yüzeyi yok
 	Scale Presets	Ölçek ön ayarları
 @msg	a {width}×{height} screenshot's byte count overflows	{width}×{height} ekran görüntüsünün bayt sayısı taşıyor
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	pencerenin {what} ({points} nokta × {scale} DPI) bir ekran görüntüsünü boyutlandıramaz
