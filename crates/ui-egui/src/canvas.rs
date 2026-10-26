@@ -233,6 +233,15 @@ fn frame_moves(ui: &Ui, stylus: Option<&StylusFeed>) -> Vec<(Pos2, Option<f32>)>
     })
 }
 
+/// The moves of this frame ([`frame_moves`]) the active tool gets before the pointer's position:
+/// all of them for a tool that builds a stroke from them ([`vectorcraft_engine::Session::tool_wants_samples`]), none
+/// for the others, which get one drag a frame. The moves are read either way, so the host's feed
+/// pairs the next frame's with its own.
+fn tool_frame_moves(ui: &Ui, app: &VectorcraftApp) -> Vec<(Pos2, Option<f32>)> {
+    let moves = frame_moves(ui, app.services.stylus.as_ref());
+    if app.session.tool_wants_samples() { moves } else { vec![] }
+}
+
 pub fn mods(m: egui::Modifiers, space: bool) -> Mods {
     Mods { shift: m.shift, alt: m.alt, cmd: m.command, ctrl: m.ctrl, space }
 }
@@ -1187,13 +1196,16 @@ fn handle_input(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response, rect: 
                     ui.data_mut(|dd| dd.insert_temp(drag_id(), Drag::Art));
                 }
                 Drag::Tool => {
-                    if tool_drag_moved(ui, &xf, p, &pointer) {
-                        // Every position the pen or mouse passed this frame, not just the last: a
-                        // fast stroke keeps its curve (a pen or a mouse reports far more often than
-                        // frames come). Touch events (a pen on Windows or the web, a finger) and a
-                        // macOS pen's moves carry their own pressure; a mouse's, a pen's on X11
-                        // among them, take the host's latest.
-                        for (at, force) in frame_moves(ui, app.services.stylus.as_ref()) {
+                    // Every position the pen or mouse passed this frame, not just the last, for a
+                    // tool that builds a stroke from them: a fast stroke keeps its curve (a pen or a
+                    // mouse reports far more often than frames come). Touch events (a pen on Windows
+                    // or the web, a finger) and a macOS pen's moves carry their own pressure; a
+                    // mouse's, a pen's on X11 among them, take the host's latest. Other tools get
+                    // the last position only, so a costly drag preview runs once a frame.
+                    let moves = tool_frame_moves(ui, app);
+                    // A frame whose pointer ends where the last one did still moved in between.
+                    if tool_drag_moved(ui, &xf, p, &pointer) || !moves.is_empty() {
+                        for (at, force) in moves {
                             let pressure = force.unwrap_or_else(|| pen_pressure(ui, app, false));
                             dispatch(app, &PointerEvent { kind: PointerKind::Drag, pos: xf.to_doc(at), mods: mods(m, space), pressure }, view);
                         }
@@ -9572,7 +9584,59 @@ mod tests {
         let (cmd, p) = app.session.journal.last().unwrap().clone();
         assert_eq!(cmd, "path.freehand");
         let pts = p["points"].as_array().unwrap();
-        assert!(pts.len() >= 20, "the stroke keeps the frame's moves: {} points", pts.len());
+        let expected: Vec<_> = std::iter::once(start)
+            .chain(zigzag.iter().copied())
+            .map(|p| {
+                let p = xf.to_doc(p);
+                json!([p.x, p.y])
+            })
+            .collect();
+        assert_eq!(pts, expected.as_slice(), "the stroke keeps every move of the frame, in order");
+    }
+
+    /// A frame whose moves end where the last frame's did still reaches the Pencil: the stroke went
+    /// out and came back in between.
+    #[test]
+    fn a_mouse_stroke_keeps_a_frame_that_ends_where_it_started() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 800, "height": 600})).unwrap();
+        let ctx = egui::Context::default();
+        frame(&mut app, &ctx, vec![]);
+        app.select_tool("pencil");
+        let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
+        let at = |x: f64, y: f64| xf.to_screen(Point::new(x, y));
+        let button =
+            |p, pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+        let (start, a) = (at(100.0, 100.0), at(160.0, 100.0));
+        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start), button(start, true)]);
+        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(a)]);
+        // Out to a bump and back to `a`, all in one frame.
+        let bump = [at(170.0, 80.0), at(180.0, 70.0), at(170.0, 80.0), a];
+        frame(&mut app, &ctx, bump.iter().map(|p| egui::Event::PointerMoved(*p)).collect());
+        frame(&mut app, &ctx, vec![button(a, false)]);
+        let (_, p) = app.session.journal.last().unwrap().clone();
+        let n = p["points"].as_array().unwrap().len();
+        assert!(n >= 5, "the bump's moves are kept: {n} points");
+    }
+
+    /// Only a tool that builds a stroke from the drag's samples gets every move of a frame (#4227):
+    /// the Selection tool and the other tools get one drag a frame, at the pointer's position, so a
+    /// costly drag preview runs once.
+    #[test]
+    fn only_the_freehand_tools_get_every_move_of_a_frame() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 800, "height": 600})).unwrap();
+        let ctx = egui::Context::default();
+        let events: Vec<_> = (0..20).map(|i| egui::Event::PointerMoved(pos2(100.0 + i as f32 * 5.0, 100.0))).collect();
+        for (tool, every) in
+            [("pencil", true), ("paintbrush", true), ("blobBrush", true), ("selection", false), ("directSelection", false), ("width", false)]
+        {
+            app.select_tool(tool);
+            let mut moves = vec![];
+            let mut out = ctx.run_ui(egui::RawInput { events: events.clone(), ..Default::default() }, |ui| moves = tool_frame_moves(ui, &app));
+            out.textures_delta.clear();
+            assert_eq!(moves.len(), if every { 19 } else { 0 }, "{tool}");
+        }
     }
 
     /// #491: a pen tap whose press and lift come in one frame selects what it tapped, and the

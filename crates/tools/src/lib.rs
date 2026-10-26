@@ -923,6 +923,14 @@ pub trait Tool: Send {
     fn wants_ticks(&self) -> bool {
         false
     }
+    /// Does the tool build a stroke from the drag's samples (the Pencil and the other freehand
+    /// tools)? The host then hands it every position the pointer passed between two frames, not
+    /// only the last, so a fast stroke keeps its curve. Every other tool gets one drag a frame, so
+    /// one whose drag preview is costly (moving a large selection, Free Distort, the Width tool)
+    /// doesn't redo it for each sample.
+    fn wants_samples(&self) -> bool {
+        false
+    }
     /// Is the tool waiting for work it runs on another thread (the planar map of a large selection
     /// for the Shape Builder and the Live Paint Bucket)? It highlights no region under the pointer
     /// until the work is done. While this holds, the desktop app calls [`Tool::poll`] each frame,
