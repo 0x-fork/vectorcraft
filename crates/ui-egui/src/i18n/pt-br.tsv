@@ -5172,6 +5172,7 @@ mark-style	Japanese	Japonesas
 @msg	The shape is too complex for a 3D effect	A forma é complexa demais para um efeito 3D
 @msg	The 3D surface is too complex; simplify the shape	A superfície 3D é complexa demais; simplifique a forma
 @msg	an image of {w} × {h} pixels is too large to draw	uma imagem de {w} × {h} pixels é grande demais para ser desenhada
+@msg	an image of {w} × {h} pixels is shown at reduced size	uma imagem de {w} × {h} pixels é exibida em tamanho reduzido
 	Fill and Stroke Controls	Controles de Preenchimento e Traçado
 	Coloring Controls	Controles de Coloração
 	Draw Mode Controls	Controles de Modo de Desenho

@@ -4805,6 +4805,7 @@ lighting	Light	Licht
 @msg	unknown parameter `{key}`; the command takes: {keys}	unbekannter Parameter `{key}`; der Befehl akzeptiert: {keys}
 	Load EPS into Clipboard	EPS in die Zwischenablage laden
 @msg	an image of {w} × {h} pixels is too large to draw	ein Bild mit {w} × {h} Pixeln ist zu groß, um gezeichnet zu werden
+@msg	an image of {w} × {h} pixels is shown at reduced size	ein Bild mit {w} × {h} Pixeln wird verkleinert angezeigt
 @msg	the image can't be read as a texture	das Bild kann nicht als Struktur gelesen werden
 	Basic	Basis
 	Fill and Stroke Controls	Steuerelemente für Fläche und Kontur

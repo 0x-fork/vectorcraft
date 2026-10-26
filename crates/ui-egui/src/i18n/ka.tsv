@@ -4800,6 +4800,7 @@ imageTrace	Outline	კონტური
 @msg	{path}: not a file	{path}: ფაილი არ არის
 	Load EPS into Clipboard	EPS-ის ბუფერში ჩატვირთვა
 @msg	an image of {w} × {h} pixels is too large to draw	{w} × {h} პიქსელის გამოსახულება დასახატად ზედმეტად დიდია
+@msg	an image of {w} × {h} pixels is shown at reduced size	{w} × {h} პიქსელის გამოსახულება შემცირებული ზომით ჩანს
 	A later row takes this shortcut	ამ მალსახმობს ქვემოთა სტრიქონი იყენებს
 	Add to the Current Shortcuts	მიმდინარე მალსახმობებზე დამატება
 	Ambient Light	გარემოს სინათლე

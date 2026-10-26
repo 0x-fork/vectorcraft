@@ -5144,6 +5144,7 @@ mark-style	Japanese	Japanska
 theme	Appearance	Utseende
 	Load EPS into Clipboard	Läs in EPS till urklipp
 @msg	an image of {w} × {h} pixels is too large to draw	en bild på {w} × {h} pixlar är för stor för att ritas
+@msg	an image of {w} × {h} pixels is shown at reduced size	en bild på {w} × {h} pixlar visas i förminskad storlek
 	Fill and Stroke Controls	Kontroller för fyllning och kontur
 	Coloring Controls	Kontroller för färgläggning
 	Draw Mode Controls	Kontroller för ritläge

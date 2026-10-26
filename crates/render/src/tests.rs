@@ -930,7 +930,9 @@ fn tiff_header(w: u32, h: u32) -> Vec<u8> {
 
 /// The decode allowance (2 GB) counts an image's pixels as RGBA, read from its header (#1717): a
 /// 1-bit gray image whose 8-bit gray pixels are within it but whose RGBA is over it is not decoded
-/// and draws nothing, counted for an export to report; one a column narrower goes on to decoding.
+/// whole, and one a column narrower goes on to decoding. `decode_pixmap` reads the larger one at
+/// reduced size; this header has no rows to read, so it draws nothing, counted for an export to
+/// report.
 #[test]
 fn an_image_too_large_as_rgba_is_not_decoded() {
     let over = paint::decode_within_allowance(&png_header(23_171, 23_170));
@@ -1042,6 +1044,124 @@ fn a_gray_image_draws_its_gray_levels() {
     d.insert(Some(d.layers[0].id), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
     let r = Renderer::new().render(&d, 40, 20, Affine::IDENTITY, &RenderOptions { smooth_images: false, ..Default::default() });
     assert_eq!((r.pixel(5, 10), r.pixel(35, 10)), ([40, 40, 40, 255], [200, 200, 200, 255]));
+}
+
+/// Runs `f` with the decode allowance of one image on this thread set to `bytes`.
+fn with_allowance<T>(bytes: u64, f: impl FnOnce() -> T) -> T {
+    paint::TEST_ALLOWANCE.with(|c| c.set(Some(bytes)));
+    let out = f();
+    paint::TEST_ALLOWANCE.with(|c| c.set(None));
+    out
+}
+
+/// `img` encoded as `format`.
+fn encoded(img: image::DynamicImage, format: image::ImageFormat) -> Vec<u8> {
+    let mut out = vec![];
+    img.write_to(&mut std::io::Cursor::new(&mut out), format).unwrap();
+    out
+}
+
+/// A 16-bit PNG past the decode allowance is read a row at a time at the largest size within the
+/// allowance and draws its colors; the file's own size is kept.
+#[test]
+fn a_png_past_the_allowance_draws_at_reduced_size() {
+    use vectorcraft_doc::{ImageBlob, ImageObject, NodeKind};
+    let img = image::ImageBuffer::<image::Rgba<u16>, _>::from_fn(64, 48, |x, _| {
+        if x < 32 { image::Rgba([51400, 10280, 10280, 65535]) } else { image::Rgba([10280, 10280, 51400, 65535]) }
+    });
+    let png = encoded(image::DynamicImage::ImageRgba16(img), image::ImageFormat::Png);
+    // 64 × 48 is 12,288 bytes as RGBA; 36 × 27 is the largest within 4,096.
+    assert_eq!(with_allowance(4096, || paint::reduced_size(&png)), Some((36, 27)));
+    assert_eq!(paint::reduced_size(&png), None, "within the 2 GB allowance");
+    let mut d = Document::new(64.0, 48.0);
+    d.images.insert("over".into(), ImageBlob::new("image/png", png));
+    let id = d.alloc_id();
+    let im = ImageObject { key: "over".into(), width: 64, height: 48, xf: Affine::IDENTITY, link: None, placement: Default::default(), pixels: None };
+    d.insert(Some(d.layers[0].id), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
+    let failed = decode_failures();
+    // As on screen, where an image that can't be decoded draws as a crossed box.
+    let screen = RenderOptions { smooth_images: false, mark_undecoded_images: true, ..Default::default() };
+    let r = with_allowance(4096, || Renderer::new().render(&d, 64, 48, Affine::IDENTITY, &screen));
+    assert_eq!(decode_failures(), failed);
+    assert_eq!((r.pixel(8, 24), r.pixel(56, 24)), ([200, 40, 40, 255], [40, 40, 200, 255]));
+    // 16 × 16 at 16 bits a sample is 2,048 bytes decoded and 1,024 as RGBA: past 1,500 as decoded
+    // and within it as RGBA, it is read a row at a time at its own size.
+    let small = image::ImageBuffer::<image::Rgba<u16>, _>::from_pixel(16, 16, image::Rgba([51400, 10280, 10280, 65535]));
+    let small = encoded(image::DynamicImage::ImageRgba16(small), image::ImageFormat::Png);
+    assert_eq!(with_allowance(1500, || paint::reduced_size(&small)), Some((16, 16)));
+    let pm = with_allowance(1500, || paint::decode_pixmap(&small)).expect("read a row at a time");
+    let c = pm.sample(3, 3);
+    assert_eq!((pm.width(), pm.height(), [c.r, c.g, c.b, c.a]), (16, 16, [200, 40, 40, 255]));
+    // A row is read only while the reader's row buffers, 32 bytes a column, fit the allowance:
+    // 128 columns do within 4,096 bytes, and 129 columns are not decoded (their samples, 8 bytes a
+    // pixel, are past it too).
+    let wide = |w: u32| {
+        let img = image::ImageBuffer::<image::Rgba<u16>, _>::from_pixel(w, 6, image::Rgba([51400, 10280, 10280, 65535]));
+        encoded(image::DynamicImage::ImageRgba16(img), image::ImageFormat::Png)
+    };
+    assert_eq!(with_allowance(4096, || paint::reduced_size(&wide(128))), Some((128, 6)));
+    assert_eq!(with_allowance(4096, || paint::reduced_size(&wide(129))), None);
+    // An image of more pixels than the allowance has bytes is not read: 128 × 32 8-bit gray pixels
+    // are drawn at 64 × 16 within 4,096 bytes, and 128 × 33 are not.
+    let gray = |h: u32| encoded(image::DynamicImage::ImageLuma8(image::GrayImage::from_pixel(128, h, image::Luma([90]))), image::ImageFormat::Png);
+    assert_eq!(with_allowance(4096, || paint::reduced_size(&gray(32))), Some((64, 16)));
+    assert_eq!(with_allowance(4096, || paint::reduced_size(&gray(33))), None);
+}
+
+/// A JPEG whose RGB samples are within the allowance but whose RGBA is past it is decoded whole
+/// and shrunk to the largest size within the allowance; an image whose decoded samples are past it
+/// and can't be read a row at a time (a GIF, 4 bytes a pixel) is still not decoded, counted, and
+/// noted as undecodable.
+#[test]
+fn a_jpeg_past_the_allowance_as_rgba_is_shrunk_and_a_gif_past_it_is_not_decoded() {
+    let jpeg = encoded(image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(80, 60, image::Rgb([30, 120, 200]))), image::ImageFormat::Jpeg);
+    // 14,400 bytes of RGB, 19,200 as RGBA: 73 × 54 is the largest within 16,000.
+    let pm = with_allowance(16_000, || paint::decode_pixmap(&jpeg)).expect("decoded at reduced size");
+    assert_eq!((pm.width(), pm.height()), (73, 54));
+    let c = pm.sample(36, 27);
+    assert!(c.r.abs_diff(30) <= 4 && c.g.abs_diff(120) <= 4 && c.b.abs_diff(200) <= 4 && c.a == 255, "{c:?}");
+    // A placed document's preview asks for 20 × 15: decoded straight at that size.
+    let pm = with_allowance(16_000, || paint::decode_pixmap_fit(&jpeg, 20, 15)).expect("decoded at the size asked for");
+    assert_eq!((pm.width(), pm.height()), (20, 15));
+    let gif =
+        encoded(image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(80, 60, image::Rgba([30, 120, 200, 255]))), image::ImageFormat::Gif);
+    assert_eq!(with_allowance(16_000, || paint::reduced_size(&gif)), None);
+    let failed = decode_failures();
+    let why = with_allowance(16_000, || paint::decode_pixmap_or_why(&gif)).err();
+    assert_eq!(why, Some(paint::Undecoded::Unreadable), "noted as undecodable");
+    assert_eq!(decode_failures(), failed + 1);
+}
+
+/// An image past the allowance is decoded at reduced size only while the result and what reading
+/// it takes (the image decoded whole, or the PNG reader's row buffers) fit beside the images
+/// paints hold; when they don't, it isn't decoded and is not noted as undecodable, and it is
+/// decoded once there is room.
+#[test]
+fn a_reduced_decode_counts_what_reading_takes_beside_the_images_paints_hold() {
+    /// Runs `f` with room for `bytes` beside the images paints hold.
+    fn with_room<T>(bytes: u64, f: impl FnOnce() -> T) -> T {
+        paint::TEST_ROOM.with(|c| c.set(Some(bytes)));
+        let out = f();
+        paint::TEST_ROOM.with(|c| c.set(None));
+        out
+    }
+    // Decoded whole: 14,400 bytes of RGB and a 16-row band of 8,960 bytes, beside a 73 × 54 result
+    // of 15,768 bytes.
+    let jpeg = encoded(image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(80, 60, image::Rgb([30, 120, 200]))), image::ImageFormat::Jpeg);
+    // Read a row at a time: 64 columns of 32 bytes in the reader's row buffers, beside a 36 × 27
+    // result of 3,888 bytes.
+    let png = encoded(
+        image::DynamicImage::ImageRgba16(image::ImageBuffer::from_pixel(64, 48, image::Rgba([51400, 10280, 10280, 65535]))),
+        image::ImageFormat::Png,
+    );
+    for (bytes, allowance, room, size) in [(&jpeg, 16_000, 15_768 + 14_400 + 8_960, (73, 54)), (&png, 4_096, 3_888 + 2_048, (36, 27))] {
+        let failed = decode_failures();
+        let none = with_allowance(allowance, || with_room(room - 1, || paint::decode_pixmap_or_why(bytes)));
+        assert_eq!(none.err(), Some(paint::Undecoded::NoRoom), "not decoded with a byte too few, and tried again later");
+        assert_eq!(decode_failures(), failed + 1);
+        let pm = with_allowance(allowance, || with_room(room, || paint::decode_pixmap(bytes))).expect("decoded once there is room");
+        assert_eq!((pm.width(), pm.height()), size);
+    }
 }
 
 /// Art Optimized exports are supersampled (#983): two red shapes meeting along a diagonal leave no

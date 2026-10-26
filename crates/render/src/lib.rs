@@ -18,7 +18,7 @@ mod ink;
 mod live;
 mod lru;
 mod paint;
-pub use paint::decode_failures;
+pub use paint::{decode_failures, reduced_size};
 mod pattern;
 pub mod placed_document;
 pub mod proof;

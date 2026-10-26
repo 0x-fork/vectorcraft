@@ -5239,6 +5239,7 @@ mark-style	Japanese	Japonais
 theme	Appearance	Apparence
 	Load EPS into Clipboard	Charger un EPS dans le presse-papiers
 @msg	an image of {w} × {h} pixels is too large to draw	une image de {w} × {h} pixels est trop grande pour être dessinée
+@msg	an image of {w} × {h} pixels is shown at reduced size	une image de {w} × {h} pixels est affichée en taille réduite
 @msg	the image can't be read as a texture	l'image ne peut pas être lue comme texture
 	Fill and Stroke Controls	Commandes de fond et de contour
 	Coloring Controls	Commandes de couleur
