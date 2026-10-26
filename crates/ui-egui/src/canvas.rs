@@ -689,6 +689,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
         }
         selection_overlay(app, &painter, &xf, overlays.iter().any(|o| matches!(o, Overlay::CurvePoint { .. })));
         mirror_axis_overlay(app, &painter, &xf);
+        grid_repeat_overlay(app, &painter, &xf);
         if app.ui.view.text_threads {
             // Under the tools' overlays: a selected frame's own ports are drawn over its thread's.
             let mut threads = thread_overlays(app, xf.zoom);
@@ -2855,6 +2856,36 @@ fn mirror_axis_overlay(app: &VectorcraftApp, p: &egui::Painter, xf: &Xf) {
     let handle = egui::Rect::from_center_size(center, vec2(12.0, 12.0));
     p.rect_filled(handle, 2.0, t.selection);
     p.rect_stroke(handle, 2.0, Stroke::new(2.0, t.measure_bg), StrokeKind::Outside);
+}
+
+/// A selected grid repeat's row, column and corner handles and its spacing sliders (#2691), at
+/// the places the Selection tool's hit testing finds them.
+fn grid_repeat_overlay(app: &mut VectorcraftApp, p: &egui::Painter, xf: &Xf) {
+    use vectorcraft_tools::repeat_grid::{GridHandles, GridPart, HANDLE_RADIUS, SLIDER_HALF};
+    if app.session.tool_id() != "selection" || !app.ui.view.bounding_box {
+        return;
+    }
+    let frame = app.selection_box();
+    let Some(st) = app.session.active() else { return };
+    let Some(grid) = GridHandles::of(&st.doc, &st.selection, frame, xf.zoom) else { return };
+    let t = Tokens::get(p.ctx());
+    let half = f64::from(SLIDER_HALF) / xf.zoom;
+    for (part, at) in grid.parts() {
+        let c = xf.to_screen(at);
+        if !c.is_finite() {
+            continue;
+        }
+        if part.is_slider() {
+            // A bar across the gap's middle, square to the spacing it sets.
+            let along = if part == GridPart::HSpacing { vectorcraft_geom::Vec2::new(0.0, half) } else { vectorcraft_geom::Vec2::new(half, 0.0) };
+            let ends = [xf.to_screen(at - along), xf.to_screen(at + along)];
+            p.line_segment(ends, Stroke::new(6.0, t.measure_bg));
+            p.line_segment(ends, Stroke::new(2.5, t.selection));
+        } else {
+            p.circle_filled(c, HANDLE_RADIUS, t.measure_bg);
+            p.circle_stroke(c, HANDLE_RADIUS, Stroke::new(2.0, t.selection));
+        }
+    }
 }
 
 /// The radius of the Rotate View dial, in screen points.
@@ -6502,6 +6533,79 @@ mod tests {
             assert!(drawn.iter().any(|s| matches!(s, Shape::Circle(c)
                 if c.center.distance(xf.to_screen(end)) < 0.01 && c.radius == vectorcraft_tools::mirror::HANDLE_RADIUS)));
         }
+    }
+
+    /// A selected grid repeat draws its row handle below the grid and a slider between its first
+    /// two columns (none with the bounding box hidden). Dragging the row handle down two tiles in
+    /// a zoomed view makes five rows without scaling the source, as one undo step, and the slider
+    /// sets the horizontal spacing (#2691).
+    #[test]
+    fn grid_repeat_handles_set_rows_and_spacing_in_one_undo_step_each() {
+        use vectorcraft_tools::repeat_grid::{GridHandles, HANDLE_RADIUS};
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
+        app.run("shape.rectangle", json!({"x": 40, "y": 40, "width": 40, "height": 40})).unwrap();
+        app.run("object.repeat.grid", json!({"hSpacing": 10, "vSpacing": 10})).unwrap();
+        app.ui.task_bar = false;
+        app.ui.view.rulers = false;
+        let ctx = egui::Context::default();
+        // The first frame fits the artboard in the window; then zoom to 1.5 px a point.
+        frame(&mut app, &ctx, vec![]);
+        app.view_mut().unwrap().zoom = 1.5;
+        frame(&mut app, &ctx, vec![]);
+        assert_eq!(app.view().unwrap().zoom, 1.5);
+        // Rows, columns, horizontal spacing and the source's bounds.
+        let grid = |app: &VectorcraftApp| {
+            let st = app.session.active().unwrap();
+            let n = st.doc.node(st.selection.objects[0]).unwrap();
+            let vectorcraft_doc::NodeKind::Repeat(spec) = &n.kind else { panic!("a repeat") };
+            let vectorcraft_doc::RepeatKind::Grid { rows, cols, h_spacing, .. } = spec.kind else { panic!("a grid repeat") };
+            (rows, cols, h_spacing, spec.source_bounds().unwrap())
+        };
+        let handles = |app: &mut VectorcraftApp| {
+            let frame = app.selection_box();
+            let st = app.session.active().unwrap();
+            GridHandles::of(&st.doc, &st.selection, frame, app.view().unwrap().zoom).unwrap()
+        };
+        let before = grid(&app);
+        assert_eq!((before.0, before.1, before.2), (3, 3, 10.0));
+        let g = handles(&mut app);
+        let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
+        let drawn = shapes(&mut app, &ctx);
+        let circle_at = |drawn: &[Shape], at: Pos2| {
+            drawn.iter().any(|s| matches!(s, Shape::Circle(c) if c.center.distance(at) < 0.01 && c.radius == HANDLE_RADIUS))
+        };
+        assert!(circle_at(&drawn, xf.to_screen(g.rows_at)), "the row handle is drawn");
+        assert!(circle_at(&drawn, xf.to_screen(g.corner_at)), "the corner handle is drawn");
+        app.ui.view.bounding_box = false;
+        assert!(!circle_at(&shapes(&mut app, &ctx), xf.to_screen(g.rows_at)), "hidden with the bounding box");
+        app.ui.view.bounding_box = true;
+        frame(&mut app, &ctx, vec![]);
+        let button = |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() };
+        let drag = |app: &mut VectorcraftApp, from: Pos2, by: egui::Vec2| {
+            frame(app, &ctx, vec![egui::Event::PointerMoved(from), button(from, true)]);
+            for k in 1..=4 {
+                frame(app, &ctx, vec![egui::Event::PointerMoved(from + by * k as f32 / 4.0)]);
+            }
+            frame(app, &ctx, vec![button(from + by, false)]);
+        };
+        // Two tiles of 50 pt down, at 1.5 px a point.
+        drag(&mut app, xf.to_screen(g.rows_at), vec2(0.0, 150.0));
+        let after = grid(&app);
+        assert_eq!((after.0, after.1, after.2), (5, 3, 10.0));
+        assert_eq!(after.3, before.3, "the source keeps its size");
+        app.run("edit.undo", json!({})).unwrap();
+        assert_eq!(grid(&app).0, 3, "one undo step");
+        app.run("edit.redo", json!({})).unwrap();
+        assert_eq!(grid(&app).0, 5);
+        // The slider between the first two columns, 6 px (4 pt) right: it stays halfway across a
+        // gap 8 pt wider, 18 pt of spacing.
+        frame(&mut app, &ctx, vec![]);
+        let g = handles(&mut app);
+        drag(&mut app, xf.to_screen(g.h_slider.unwrap()), vec2(6.0, 0.0));
+        assert_eq!(grid(&app).2, 18.0);
+        app.run("edit.undo", json!({})).unwrap();
+        assert_eq!((grid(&app).0, grid(&app).2), (5, 10.0), "the spacing's own undo step");
     }
 
     #[test]

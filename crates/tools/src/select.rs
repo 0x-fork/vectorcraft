@@ -93,6 +93,8 @@ enum State {
     Pie(PieDrag),
     /// Move or rotate a live mirror axis.
     Mirror(crate::mirror::MirrorDrag),
+    /// Drag a grid repeat's row, column or corner handle or a spacing slider.
+    GridRepeat(crate::repeat_grid::GridDrag),
     /// Dragging a bracket of type on a path.
     Bracket(BracketDrag),
     /// Loaded with the text of area type or type on a path `from` by a click on its out port, or
@@ -560,6 +562,12 @@ impl Tool for SelectionTool {
         {
             return d.cancel();
         }
+        if key == ToolKey::Escape
+            && matches!(self.state, State::GridRepeat(_))
+            && let State::GridRepeat(d) = std::mem::take(&mut self.state)
+        {
+            return d.cancel();
+        }
         if key == ToolKey::Escape && matches!(self.state, State::Loaded { .. }) {
             self.state = State::Idle;
             return vec![];
@@ -570,7 +578,7 @@ impl Tool for SelectionTool {
     fn claims_key(&self, _cx: &ToolContext, key: ToolKey) -> bool {
         match self.state {
             State::Marquee { .. } => key == ToolKey::Letter('e'),
-            State::Loaded { .. } | State::Mirror(_) => key == ToolKey::Escape,
+            State::Loaded { .. } | State::Mirror(_) | State::GridRepeat(_) => key == ToolKey::Escape,
             _ => false,
         }
     }
@@ -593,6 +601,7 @@ impl Tool for SelectionTool {
             State::Pie(d) => d.adjusting(),
             State::Bracket(b) => b.adjusting(),
             State::Mirror(d) => d.adjusting(),
+            State::GridRepeat(d) => d.adjusting(),
             _ => false,
         }
     }
@@ -606,7 +615,8 @@ impl Tool for SelectionTool {
         {
             return out;
         }
-        // Mirror controls take precedence over art, bounding handles and ruler guides.
+        // Mirror and grid repeat controls take precedence over art and ruler guides; the mirror
+        // axis line and the grid's controls yield to the bounding-box handles they overlap.
         if let State::Mirror(mut d) = self.state.clone() {
             match ev.kind {
                 PointerKind::Drag | PointerKind::Up => {
@@ -622,11 +632,34 @@ impl Tool for SelectionTool {
                 _ => return vec![],
             }
         }
+        if let State::GridRepeat(mut d) = self.state.clone() {
+            match ev.kind {
+                PointerKind::Drag | PointerKind::Up => {
+                    let mut out = d.drag(ev.pos);
+                    if ev.kind == PointerKind::Up {
+                        out.extend(d.finish());
+                        self.state = State::Idle;
+                    } else {
+                        self.state = State::GridRepeat(d);
+                    }
+                    return out;
+                }
+                _ => return vec![],
+            }
+        }
         if matches!(self.state, State::Idle)
             && ev.kind == PointerKind::Down
             && let Some(d) = crate::mirror::MirrorDrag::hit(cx, ev.pos, ev.mods)
         {
             self.state = State::Mirror(d);
+            self.hover = None;
+            return vec![];
+        }
+        if matches!(self.state, State::Idle)
+            && ev.kind == PointerKind::Down
+            && let Some(d) = crate::repeat_grid::GridDrag::hit(cx, ev.pos, ev.mods)
+        {
+            self.state = State::GridRepeat(d);
             self.hover = None;
             return vec![];
         }
@@ -925,11 +958,14 @@ impl Tool for SelectionTool {
         if let State::Mirror(d) = &self.state {
             return d.cursor(cx, p);
         }
+        if let State::GridRepeat(d) = &self.state {
+            return d.cursor(cx);
+        }
         if matches!(self.state, State::Idle)
             && !m.cmd
             && !m.ctrl
             && !m.alt
-            && let Some(cursor) = crate::mirror::cursor(cx, p)
+            && let Some(cursor) = crate::mirror::cursor(cx, p).or_else(|| crate::repeat_grid::cursor(cx, p))
         {
             return cursor;
         }
@@ -1052,7 +1088,7 @@ pub(crate) fn release_guide_at(cx: &ToolContext, p: Point, m: Mods) -> Option<Ac
 /// The resize cursor for handle `h` of a box turned by `angle` (counter-clockwise degrees): the
 /// handle that sits where `h` appears on screen, in 45° steps. In a turned view, `angle` is the
 /// box's own angle less [`ToolContext::view_angle`].
-fn handle_cursor(h: Handle, angle: f64) -> Cursor {
+pub(crate) fn handle_cursor(h: Handle, angle: f64) -> Cursor {
     let steps = if angle.is_finite() { (angle / 45.0).round() as i64 } else { 0 };
     let h = Handle::ALL.get((h as i64 - steps).rem_euclid(8) as usize).copied().unwrap_or(h);
     match h {
