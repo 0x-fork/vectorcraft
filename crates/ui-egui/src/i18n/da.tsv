@@ -4879,6 +4879,7 @@ mark-style	Japanese	Japansk
 @msg	unknown parameter `{key}`; the command takes: {keys}	ukendt parameter `{key}`; kommandoen tager: {keys}
 	Load EPS into Clipboard	Indlæs EPS i udklipsholderen
 @msg	an image of {w} × {h} pixels is too large to draw	et billede på {w} × {h} pixels er for stort til at tegne
+@msg	an image of {w} × {h} pixels is shown at reduced size	et billede på {w} × {h} pixels vises i reduceret størrelse
 	Fill and Stroke Controls	Styring af fyld og streg
 	Coloring Controls	Styring af farvelægning
 	Draw Mode Controls	Styring af tegnetilstand

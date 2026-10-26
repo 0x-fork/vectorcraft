@@ -4950,6 +4950,7 @@ mark-style	Japanese	Japon
 theme	Appearance	Görünüm
 	Load EPS into Clipboard	EPS'yi Panoya Yükle
 @msg	an image of {w} × {h} pixels is too large to draw	{w} × {h} piksellik bir görüntü çizilemeyecek kadar büyük
+@msg	an image of {w} × {h} pixels is shown at reduced size	{w} × {h} piksellik bir görüntü küçültülmüş boyutta gösteriliyor
 @msg	the image can't be read as a texture	görüntü doku olarak okunamıyor
 	Fill and Stroke Controls	Dolgu ve Kontur Kontrolleri
 	Coloring Controls	Renklendirme Kontrolleri

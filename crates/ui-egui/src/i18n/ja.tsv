@@ -4886,6 +4886,7 @@ lighting	Light	ライト
 @msg	unknown parameter `{key}`; the command takes: {keys}	`{key}` は不明なパラメーターです。このコマンドで使えるパラメーター: {keys}
 	Load EPS into Clipboard	EPS をクリップボードに読み込む
 @msg	an image of {w} × {h} pixels is too large to draw	{w} × {h} ピクセルの画像は大きすぎて描画できません
+@msg	an image of {w} × {h} pixels is shown at reduced size	{w} × {h} ピクセルの画像は縮小して表示されます
 @msg	the image can't be read as a texture	この画像はテクスチャとして読み込めません
 	Basic	基本
 	Fill and Stroke Controls	塗りと線のコントロール

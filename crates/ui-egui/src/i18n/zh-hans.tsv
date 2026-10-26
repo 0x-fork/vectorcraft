@@ -5108,6 +5108,7 @@ lighting	Light	光源
 @msg	unknown parameter `{key}`; the command takes: {keys}	未知参数 `{key}`；该命令接受：{keys}
 	Load EPS into Clipboard	将 EPS 载入剪贴板
 @msg	an image of {w} × {h} pixels is too large to draw	{w} × {h} 像素的图像过大，无法绘制
+@msg	an image of {w} × {h} pixels is shown at reduced size	{w} × {h} 像素的图像以缩小的尺寸显示
 	Fill and Stroke Controls	填色和描边控件
 	Coloring Controls	颜色控件
 	Draw Mode Controls	绘图模式控件

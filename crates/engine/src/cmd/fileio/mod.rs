@@ -32,7 +32,7 @@ mod export;
 pub(crate) mod imagemap;
 mod legacy_ai;
 mod load;
-pub(crate) use load::{MAX_RASTER_ALLOC, too_large_note};
+pub(crate) use load::{MAX_RASTER_ALLOC, size_note};
 mod metafile;
 mod naming;
 mod native;
