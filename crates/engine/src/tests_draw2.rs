@@ -944,6 +944,21 @@ fn join_tool_joins_two_lines() {
     assert_eq!(p.subpaths[0].anchors[2].p, Point::new(300.0, 150.0));
 }
 
+/// #2899: a scrub from one open end toward the other joins them when the line passes near the
+/// endpoints, not only when it crosses them.
+#[test]
+fn join_tool_joins_endpoints_near_the_scrub_ends() {
+    let mut s = session();
+    let a = line(&mut s, 100.0, 100.0, 200.0, 100.0);
+    line(&mut s, 205.0, 100.0, 300.0, 150.0);
+    s.execute("select.none", &json!({})).unwrap();
+    drag(&mut s, "join", &[(198.0, 92.0), (207.0, 92.0)], Mods::default());
+    assert_eq!(paths(&s).len(), 1);
+    let p = path(&s, a);
+    assert_eq!(p.anchor_count(), 3);
+    assert_eq!(p.subpaths[0].anchors[1].p, Point::new(202.5, 100.0));
+}
+
 #[test]
 fn line_family_tools_draw_and_click_asks_dialog() {
     let mut s = session();
