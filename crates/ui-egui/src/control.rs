@@ -586,7 +586,7 @@ pub(crate) fn save_screenshot_with_limit(
     // A data-only reply has no second way to deliver the image, so refuse an oversized one before
     // allocating its working set. A request that named a path still writes that file: only the
     // inline copy is downgraded.
-    if data && path.is_none() && !screenshot_rgba_bytes(w, h).is_some_and(|bytes| bytes <= max_reply_bytes) {
+    if data && path.is_none() && screenshot_rgba_bytes(w, h).is_none_or(|bytes| bytes > max_reply_bytes) {
         return json!({"ok": false, "error": format!(
             "a PNG reply of this {w}×{h} screenshot would exceed the {max_reply_bytes}-byte reply-encoding limit; write it to a path instead"
         )});

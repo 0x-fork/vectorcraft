@@ -526,7 +526,7 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context) {
     if !crate::take_frame_once(&mut app.shortcuts_frames, frame) {
         return;
     }
-    if !ctx.input(|input| input.focused) && !(app.forwarded_frame && ctx.viewport_id() == egui::ViewportId::ROOT) {
+    if !(ctx.input(|input| input.focused) || app.forwarded_frame && ctx.viewport_id() == egui::ViewportId::ROOT) {
         crate::ime::controls_without_editor(app, ctx);
         return;
     }
