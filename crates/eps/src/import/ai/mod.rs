@@ -38,8 +38,10 @@ pub(crate) use read::{slot_frame, slot_of};
 #[cfg(test)]
 mod tests;
 
-/// Largest editing data read, decompressed (bytes).
-pub const MAX_DATA: u64 = 256 << 20;
+/// Largest editing data read, decompressed (bytes). Files with embedded rasters reach 340 MB (a
+/// 30 MB poker box template unpacks to 322 MiB), so 64-bit builds read twice the old 256 MiB; a
+/// 32-bit address space (wasm) keeps it.
+pub const MAX_DATA: u64 = if cfg!(target_pointer_width = "64") { 512 << 20 } else { 256 << 20 };
 /// Largest Zstandard window accepted (a frame asking for more is damaged data).
 const MAX_ZSTD_WINDOW: u64 = 64 << 20;
 /// Most Zstandard frames read (the app writes one).
