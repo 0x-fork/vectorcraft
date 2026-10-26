@@ -261,12 +261,12 @@ impl LibSymbol {
 pub(crate) struct SymbolLibraries;
 
 impl LibraryKind for SymbolLibraries {
-    const KIND: &'static str = "symbols";
-    const OPEN: &'static str = "window.symbolLibrary";
-    const LIST: &'static str = "symbol.libraries";
-    const LOAD: &'static str = "symbol.loadLibrary";
-    const MENU: &'static str = "Symbol Libraries Menu";
-    const ADD: &'static str = "Add to Symbols";
+    const KIND: &str = "symbols";
+    const OPEN: &str = "window.symbolLibrary";
+    const LIST: &str = "symbol.libraries";
+    const LOAD: &str = "symbol.loadLibrary";
+    const MENU: &str = "Symbol Libraries Menu";
+    const ADD: &str = "Add to Symbols";
     /// Symbols need room to show their art.
     const VIEW: super::swatches::View = super::swatches::View::LargeThumb;
     type Lib = Arc<Vec<LibSymbol>>;

@@ -347,7 +347,7 @@ impl FindFilter {
         [self.name.as_ref(), self.kind.as_ref(), self.text.as_ref()].iter().all(|f| f.is_none())
             && self.within.is_none()
             && self.intersects.is_none()
-            && self.ranges().iter().all(|r| r.is_empty())
+            && self.ranges().iter().all(FindRange::is_empty)
             && self.anchors.is_empty()
     }
 

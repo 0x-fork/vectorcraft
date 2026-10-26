@@ -86,7 +86,7 @@ impl StylusFeed {
     }
 
     fn lock(&self) -> MutexGuard<'_, Pen> {
-        self.0.pen.lock().unwrap_or_else(|e| e.into_inner())
+        self.0.pen.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// A pen turned to its tip moved with `pressure`, or `None`: another pointer moved
