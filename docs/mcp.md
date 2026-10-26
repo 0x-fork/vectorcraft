@@ -4531,10 +4531,15 @@ after Remove Threading or Release Selection, in a frame converted to point type,
 duplicated, copied in the Layers panel, or taken out of a symbol or a placed file). A symbol made of a thread keeps the
 numbers in the symbol's art.
 
-The canvas, EPS, PDF and Type › Create Outlines draw the marker; in PDF it is a path, not text. Live SVG text writes the
-marker's characters before the paragraph's text, except type on a path with a list, which it writes as outlines with a
-warning. DXF writes the marker as a TEXT entity of its own, its characters in the order they are drawn. Legacy `.ai`
-writes the paragraph's text without the marker and warns that bulleted and numbered lists are left out.
+The canvas, EPS, PDF and Type › Create Outlines draw the marker. PDF writes the marker as text of its own, where the
+canvas draws it, and a PDF viewer selects, copies and finds its characters. Each of its glyphs stands for the marker
+character that the glyph's font maps to that glyph in its character map. Glyphs that an OpenType feature such as
+oldstyle figures replaced stand for the characters left over, in order, when there are as many of those glyphs as
+characters left over. A marker glyph that stands for no character, such as the missing-glyph box when no font has a
+glyph for it, is drawn as a path. Live SVG text writes the marker's characters before the paragraph's text, except
+type on a path with a list, which it writes as outlines with a warning. DXF writes the marker as a TEXT entity of its
+own, its characters in the order they are drawn. Legacy `.ai` writes the paragraph's text without the marker and warns
+that bulleted and numbered lists are left out.
 
 Type › Bullets and Numbering › Apply Bullets and the canvas context menu's Bullets and Numbering › Apply Bullets run
 `type.applyBullets {bullet?}` on the selected type's paragraphs, or on those the Type tool's selection touches. Without
