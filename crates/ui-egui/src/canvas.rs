@@ -907,6 +907,7 @@ fn cursor_icon(c: Cursor) -> egui::CursorIcon {
         Cursor::SliceSelect => C::Default,
         Cursor::Width | Cursor::WidthAdd => C::Crosshair,
         Cursor::WidthPoint => C::Move,
+        Cursor::PencilNew => C::Crosshair,
         Cursor::Blend | Cursor::BlendObject | Cursor::BlendAnchor | Cursor::ShapeBuilder | Cursor::ShapeBuilderErase => C::Crosshair,
         Cursor::PencilClose | Cursor::PencilStraight | Cursor::PencilContinue | Cursor::PaintbrushClose => C::Crosshair,
         Cursor::TypeVertical => C::VerticalText,
@@ -3919,6 +3920,7 @@ mod tests {
             Cursor::BlendAnchor,
             Cursor::ShapeBuilder,
             Cursor::ShapeBuilderErase,
+            Cursor::PencilNew,
             Cursor::PencilStraight,
             Cursor::PencilContinue,
         ] {

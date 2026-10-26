@@ -417,7 +417,7 @@ fn use_precise_cursors_swaps_the_tools_own_pointers_for_a_crosshair() {
         ("paintbrush", Cursor::Paintbrush),
         ("blobBrush", Cursor::BlobBrush),
         ("shaper", Cursor::Shaper),
-        ("pencil", Cursor::Pencil),
+        ("pencil", Cursor::PencilNew),
         ("smooth", Cursor::Smooth),
         ("pathEraser", Cursor::PathEraser),
         ("join", Cursor::Join),

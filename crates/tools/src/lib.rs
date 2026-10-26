@@ -578,6 +578,9 @@ pub enum Cursor {
     MagicWand,
     /// The Pencil tool.
     Pencil,
+    /// The Pencil tool before a press that draws a new freehand path: the pointer is not over a
+    /// selected path that the press would continue or redraw. A crosshair with a small star.
+    PencilNew,
     /// The Pencil tool with Alt pressed after the drag starts and Alt key toggles to Smooth Tool off:
     /// releasing the mouse button with Alt still held closes the path. A drag started with Shift or
     /// Alt held draws an open straight line instead. Also while a freehand stroke is drawn back near
@@ -706,6 +709,7 @@ impl Cursor {
             | Cursor::Lasso
             | Cursor::MagicWand
             | Cursor::Pencil
+            | Cursor::PencilNew
             | Cursor::PencilClose
             | Cursor::PencilStraight
             | Cursor::PencilContinue
@@ -1198,7 +1202,6 @@ mod cursor_tests {
         for (id, c) in [
             ("lasso", Cursor::Lasso),
             ("magicWand", Cursor::MagicWand),
-            ("pencil", Cursor::Pencil),
             ("paintbrush", Cursor::Paintbrush),
             ("blobBrush", Cursor::BlobBrush),
             ("eraser", Cursor::Eraser),
@@ -1224,6 +1227,13 @@ mod cursor_tests {
             assert_eq!(c.precise(), Cursor::Crosshair, "{id}");
             assert_eq!(c.stand_in(), Some(if id == "mesh" { Cursor::PenAdd } else { Cursor::Crosshair }), "{id}");
         }
+        // Away from a selected path the Pencil shows its new-path cursor, drawn with a star; its
+        // own cursor, for drawing and for a selected path under the pointer, borrows the crosshair.
+        assert_eq!(cursor_at("pencil", &d, away), Cursor::PencilNew);
+        assert_eq!(Cursor::PencilNew.precise(), Cursor::Crosshair);
+        assert_eq!(Cursor::PencilNew.stand_in(), None);
+        assert_eq!(Cursor::Pencil.precise(), Cursor::Crosshair);
+        assert_eq!(Cursor::Pencil.stand_in(), Some(Cursor::Crosshair));
     }
 
     #[test]
