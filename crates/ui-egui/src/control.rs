@@ -785,16 +785,17 @@ mod tests {
             json!({"fields": [{"field": "copy", "value": true}, 7]}),
             json!({"fields": {"field": "copy"}}),
             json!({"field": "dx", "fields": [{"field": "copy", "value": true}]}),
+            json!({"fields": [{"field": "copy", "value": true}, {"field": "note"}]}),
         ] {
             let r = input_request(&mut app, "ui.dialog.set", params.clone());
             assert_eq!(r["ok"], false, "{params}: {r}");
             assert_eq!(fields(&app), before, "{params}: a refused list stores no field");
         }
-        let list = json!([{"field": "copy", "value": true}, {"field": "dx", "value": "3 pt"}, {"field": "dx", "value": "5 pt"}, {"field": "note"}]);
+        let list = json!([{"field": "copy", "value": true}, {"field": "dx", "value": "3 pt"}, {"field": "dx", "value": "5 pt"}, {"field": "dy"}]);
         let r = input_request(&mut app, "ui.dialog.set", json!({"fields": list}));
         assert_eq!(r["ok"], true, "{r}");
         let after = fields(&app).unwrap();
-        assert_eq!(after, json!({"copy": true, "dx": "5 pt", "dy": "0 pt", "note": null}));
+        assert_eq!(after, json!({"copy": true, "dx": "5 pt", "dy": null}));
         assert_eq!(r["result"]["fields"], after);
         let r = input_request(&mut app, "ui.dialog.set", json!({"field": "dy", "value": "2 pt"}));
         assert_eq!(r["ok"], true, "{r}");
@@ -808,14 +809,15 @@ mod tests {
     fn dialog_set_refuses_a_field_list_over_the_limit() {
         let mut app = VectorcraftApp::new(Session::new(), Services::default());
         app.ui.dialog = Some(crate::state::Dialog::new("move", json!({"dx": "0 pt"})));
-        let list = |n: usize| Value::Array((0..n).map(|i| json!({"field": format!("f{i}"), "value": i})).collect());
+        let list = |n: usize| Value::Array((0..n).map(|i| json!({"field": "dx", "value": format!("{i} pt")})).collect());
         let r = input_request(&mut app, "ui.dialog.set", json!({"fields": list(MAX_DIALOG_FIELDS + 1)}));
         assert_eq!(r["ok"], false, "{r}");
         assert_eq!(r["error"], format!("`fields` holds {} items; at most {MAX_DIALOG_FIELDS}", MAX_DIALOG_FIELDS + 1));
-        assert_eq!(app.ui.dialog.as_ref().map(|d| d.fields.len()), Some(1), "a refused list stores no field");
+        assert_eq!(app.ui.dialog.as_ref().map(|d| d.fields["dx"].clone()), Some(json!("0 pt")), "a refused list stores no field");
         let r = input_request(&mut app, "ui.dialog.set", json!({"fields": list(MAX_DIALOG_FIELDS)}));
         assert_eq!(r["ok"], true, "{r}");
-        assert_eq!(app.ui.dialog.as_ref().map(|d| d.fields.len()), Some(MAX_DIALOG_FIELDS + 1));
+        let last = format!("{} pt", MAX_DIALOG_FIELDS - 1);
+        assert_eq!(app.ui.dialog.as_ref().map(|d| d.fields["dx"].clone()), Some(json!(last)), "the whole list is stored, in order");
     }
 
     /// #1004: `ui.render` (the MCP `screenshot` of a connected app) renders the artboard asked
