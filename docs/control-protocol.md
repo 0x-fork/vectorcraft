@@ -1,6 +1,6 @@
 # Control protocol
 
-> **Last updated:** 2026-10-25 · **Change:** Transform Each opens on the values it was last confirmed with; its Copy button confirms with `copy: true` (#1732); previously: panel docking on craft-ui's layout: `ui.docking`, the parameters of `window.panel.float` and `window.panel.dock`; previously: `ui.screenshot`'s 64 MiB inline-PNG cap and its path-plus-data downgrade; symbol library panels (`window.symbolLibrary`, `window.symbolLibrary.other`, `ui.saveSymbolLibrary`); synthetic input budgets (#1709); bounded transport waits (#1726).
+> **Last updated:** 2026-10-25 · **Change:** brush library panels (`window.brushLibrary`, `window.brushLibrary.other`, `ui.saveBrushLibrary`); previously: Transform Each opens on the values it was last confirmed with; its Copy button confirms with `copy: true` (#1732); previously: panel docking on craft-ui's layout: `ui.docking`, the parameters of `window.panel.float` and `window.panel.dock`; previously: `ui.screenshot`'s 64 MiB inline-PNG cap and its path-plus-data downgrade; symbol library panels (`window.symbolLibrary`, `window.symbolLibrary.other`, `ui.saveSymbolLibrary`); synthetic input budgets (#1709); bounded transport waits (#1726).
 
 `vectorcraft --control <port>` listens on `127.0.0.1:<port>` (loopback only). The port must be a number
 from 1 to 65535 (`--control=<port>` works too), given once; otherwise the app prints an error and exits
@@ -285,6 +285,18 @@ Defined libraries are `window.userSymbolLibrary1`…`10` in Window → Symbol Li
 (Save Symbols…, the Symbols panel's Save Symbol Library…) opens the `saveSymbolLibrary` dialog (fields `name`, `user`:
 save to the user library folder, `selectedOnly` with `names`); `ui.dialog.confirm` runs `symbol.saveLibrary` (to a
 file it asks for a path and suggests `name` with `.vectorcraft`).
+
+Brush libraries open in the same panels: `window.brushLibrary {library}` (`library_panels` kind `brushes`; `library:
+null` closes them). Clicking a brush there runs `brush.addFromLibrary {library, name}`, adding it to the document's
+Brushes in one undo step, with `apply: true` when paths are selected (they take the brush in the same step; the step is
+Apply Brush when the document has the brush already and the click only applies it);
+Shift/Cmd-clicks select brushes for Add to Brushes. A brush dragged onto a path runs it with `apply: true` and that
+path as `ids`, and one dragged onto the Brushes panel runs it without. `window.brushLibrary.other {path?}` loads the
+brushes of any document VectorCraft opens (a saved brush library is a `.vectorcraft` document) and opens them there.
+The User Defined libraries are `window.userBrushLibrary1`…`10` in Window → Brush Libraries. `ui.saveBrushLibrary
+{names?}` (Save Brushes…, the Brushes panel's Save Brush Library…) opens the `saveBrushLibrary` dialog (fields
+`name`, `user`: save to the user library folder, `selectedOnly` with `names`); `ui.dialog.confirm` runs
+`brush.saveLibrary` (to a file it asks for a path and suggests `name` with `.vectorcraft`).
 
 Tile Edge Color: Object → Pattern → Tile Edge Color… (`ui.tileEdgeColor`) opens the `tileEdgeColor` dialog (field
 `color`: `#rrggbb` or a preset name such as "Light Blue"); `ui.dialog.confirm` sets the preference
@@ -931,6 +943,7 @@ hidden tab (whose frames the browser pauses) answers when it is shown again.
 | Date | Change | Summary |
 |---|---|---|
 | 2026-10-25 | minor | Panel docking on craft-ui's layout: `ui.docking`, the floating and dock parameters, native floating windows. |
+| 2026-10-24 | minor | Documented the brush library panel commands (`window.brushLibrary`, `.other`, `ui.saveBrushLibrary`, `window.userBrushLibrary1`…`10`). |
 | 2026-10-24 | minor | Documented `ui.screenshot`'s 64 MiB inline-PNG reply cap: with `path` the file is still written and `pngBase64` is omitted when over the cap; a path-less `data: true` request fails before encoding. |
 | 2026-10-25 | minor | Documented that Transform Each opens on the values it was last confirmed with and that its Copy button confirms with `copy: true` (#1732). |
 | 2026-10-23 | minor | Documented the symbol library panel commands (`window.symbolLibrary`, `.other`, `ui.saveSymbolLibrary`, `window.userSymbolLibrary1`…`10`). |

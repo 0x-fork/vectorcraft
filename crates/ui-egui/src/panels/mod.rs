@@ -29,6 +29,7 @@ pub mod libraries;
 pub mod library_panel;
 pub mod links;
 pub mod magic_wand;
+pub(crate) mod memo;
 pub mod navigator;
 pub mod opentype;
 pub mod paragraph;
@@ -603,6 +604,8 @@ mod tests_appearance;
 mod tests_asset_export;
 #[cfg(test)]
 mod tests_blend;
+#[cfg(test)]
+mod tests_brush_libraries;
 #[cfg(test)]
 mod tests_constrain;
 #[cfg(test)]

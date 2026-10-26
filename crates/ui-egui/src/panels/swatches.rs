@@ -609,14 +609,21 @@ pub(crate) fn drag_preview(app: &VectorcraftApp, ctx: &egui::Context) {
         },
         PanelDrag::GraphicStyle(name) => return pointer_chip(ctx, |ui, r| super::graphic_styles::paint_style(app, ui, r, name)),
         PanelDrag::Symbol(name) => match app.session.active() {
-            Some(st) => return pointer_chip(ctx, |ui, r| super::symbols::chip(ui, &st.doc, super::symbols::resources_key(&st.doc), r, name)),
+            Some(st) => return pointer_chip(ctx, |ui, r| super::symbols::chip(ui, &st.doc, &super::symbols::document_symbols(st), r, name)),
             None => return,
         },
         PanelDrag::LibrarySymbol { library, name } => match vectorcraft_engine::cmd::symbollib::library(&app.session, library) {
-            Some((_, lib)) => return pointer_chip(ctx, |ui, r| super::symbols::chip(ui, &lib.doc, super::symbols::resources_key(&lib.doc), r, name)),
+            Some((_, lib)) => return pointer_chip(ctx, |ui, r| super::symbols::chip(ui, &lib.doc, &super::symbols::library_symbols(&lib), r, name)),
             None => return,
         },
-        PanelDrag::Brush { def, .. } => return pointer_chip(ctx, |ui, r| super::brushes::chip(ui, r, def)),
+        PanelDrag::Brush { name, .. } => match app.session.active() {
+            Some(st) => return pointer_chip(ctx, |ui, r| super::brushes::document_chip(ui, r, st, name)),
+            None => return,
+        },
+        PanelDrag::LibraryBrush { library, name } => match vectorcraft_engine::cmd::brushlib::library(&app.session, library) {
+            Some((_, lib)) => return pointer_chip(ctx, |ui, r| super::brushes::library_chip(ui, r, &lib, name)),
+            None => return,
+        },
         PanelDrag::LibraryGraphic { library, item } => return pointer_chip(ctx, |ui, r| super::libraries::chip(app, ui, r, library, item)),
         PanelDrag::LibraryItem { .. } | PanelDrag::LibraryGroup { .. } => return,
     };
