@@ -5399,6 +5399,10 @@ mark-style	Japanese	Japonské
 	Snap to Perpendicular	Přichytávat ke kolmici
 @msg	unknown snap option `{key}` (use {options})	neznámá možnost přichytávání `{key}` (použijte {options})
 	Gap Length:	Délka mezery:
+@msg	`colorGroup` needs `library: "document"`	`colorGroup` vyžaduje `library: "document"`
+@msg	`colorGroup` needs `palette: "documentLibrary"`	`colorGroup` vyžaduje `palette: "documentLibrary"`
+@msg	`colorGroup` needs `mode: "color"`	`colorGroup` vyžaduje `mode: "color"`
+@msg	no color group `{name}` in the document (see swatch.list)	skupina barev `{name}` v dokumentu neexistuje (viz swatch.list)
 @msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Režim Ploché logo vektorizoval obraz v rozlišení {_1} × {_2} pixelů, zmenšený průměrováním z {_3} × {_4}.
 	Artboard {n} of {total}	Pracovní plocha {n} z {total}
 	File {n} of {total}	Soubor {n} z {total}

@@ -5385,6 +5385,10 @@ imageTrace	Outline	Körvonal
 	Snap to Perpendicular	Illesztés merőlegesre
 @msg	unknown snap option `{key}` (use {options})	ismeretlen illesztési beállítás: `{key}` (használható: {options})
 	Gap Length:	Rés hossza:
+@msg	`colorGroup` needs `library: "document"`	a `colorGroup` használatához `library: "document"` szükséges
+@msg	`colorGroup` needs `palette: "documentLibrary"`	a `colorGroup` használatához `palette: "documentLibrary"` szükséges
+@msg	`colorGroup` needs `mode: "color"`	a `colorGroup` használatához `mode: "color"` szükséges
+@msg	no color group `{name}` in the document (see swatch.list)	nincs ilyen színcsoport a dokumentumban: `{name}` (lásd: swatch.list)
 @msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Az Egyszínű logó mód {_1} × {_2} képponton vektorizálta a képet, {_3} × {_4} méretről átlagolással kicsinyítve.
 	Artboard {n} of {total}	Rajztábla: {n} / {total}
 	File {n} of {total}	Fájl: {n} / {total}

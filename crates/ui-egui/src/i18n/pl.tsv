@@ -5251,6 +5251,10 @@ mark-style	Japanese	Japońskie
 	Snap to Perpendicular	Przyciągaj do prostopadłych
 @msg	unknown snap option `{key}` (use {options})	nieznana opcja przyciągania `{key}` (użyj: {options})
 	Gap Length:	Długość przerwy:
+@msg	`colorGroup` needs `library: "document"`	`colorGroup` wymaga `library: "document"`
+@msg	`colorGroup` needs `palette: "documentLibrary"`	`colorGroup` wymaga `palette: "documentLibrary"`
+@msg	`colorGroup` needs `mode: "color"`	`colorGroup` wymaga `mode: "color"`
+@msg	no color group `{name}` in the document (see swatch.list)	brak grupy kolorów `{name}` w dokumencie (patrz swatch.list)
 @msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Tryb Płaskie logo obrysował obraz w rozdzielczości {_1} × {_2} pikseli, po zmniejszeniu przez uśrednienie z {_3} × {_4}.
 	Artboard {n} of {total}	Obszar kompozycji {n} z {total}
 	File {n} of {total}	Plik {n} z {total}

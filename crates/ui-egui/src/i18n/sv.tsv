@@ -5422,6 +5422,10 @@ swatch	Yellow Green	Gulgrön
 	Snap to Perpendicular	Fäst mot vinkelrät
 @msg	unknown snap option `{key}` (use {options})	okänt fästalternativ `{key}` (använd {options})
 	Gap Length:	Lucklängd:
+@msg	`colorGroup` needs `library: "document"`	`colorGroup` kräver `library: "document"`
+@msg	`colorGroup` needs `palette: "documentLibrary"`	`colorGroup` kräver `palette: "documentLibrary"`
+@msg	`colorGroup` needs `mode: "color"`	`colorGroup` kräver `mode: "color"`
+@msg	no color group `{name}` in the document (see swatch.list)	ingen färggrupp `{name}` i dokumentet (se swatch.list)
 @msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	Läget Platt logotyp vektoriserade bilden vid {_1} × {_2} pixlar, nedskalad genom medelvärdesbildning från {_3} × {_4}.
 	Artboard {n} of {total}	Rityta {n} av {total}
 	File {n} of {total}	Fil {n} av {total}

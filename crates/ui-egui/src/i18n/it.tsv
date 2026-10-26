@@ -5012,6 +5012,10 @@ lighting	Light	Luce
 	Snap to Perpendicular	Aggancia alla perpendicolare
 @msg	unknown snap option `{key}` (use {options})	opzione di aggancio sconosciuta `{key}` (usare {options})
 	Gap Length:	Lunghezza lacuna:
+@msg	`colorGroup` needs `library: "document"`	`colorGroup` richiede `library: "document"`
+@msg	`colorGroup` needs `palette: "documentLibrary"`	`colorGroup` richiede `palette: "documentLibrary"`
+@msg	`colorGroup` needs `mode: "color"`	`colorGroup` richiede `mode: "color"`
+@msg	no color group `{name}` in the document (see swatch.list)	nessun gruppo colori `{name}` nel documento (vedi swatch.list)
 @msg	Flat Logo traced the image at {_1} × {_2} pixels, averaged down from {_3} × {_4}.	La modalità Logo piatto ha vettorializzato l’immagine a {_1} × {_2} pixel, ridotta per media da {_3} × {_4}.
 	Artboard {n} of {total}	Tavola da disegno {n} di {total}
 	File {n} of {total}	File {n} di {total}
