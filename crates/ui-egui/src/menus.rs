@@ -205,6 +205,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "",
         "{} toggle General › Use Precise Cursors: the drawing tools' pointers become a crosshair → true when on",
     ),
+    (
+        "imageTrace.preview",
+        "Image Trace Preview",
+        "",
+        "{on?: bool} turn the Image Trace panel's Preview on (true), off (false) or toggle it (omitted), as its checkbox does: on, setting changes trace the selected Image Trace object at once; off, they wait for Trace; returns the new state",
+    ),
     ("view.textThreads", "Hide Text Threads", "Cmd+Shift+Y", "{} toggle the thread lines between threaded text frames"),
     ("view.gradientAnnotator", "Hide Gradient Annotator", "Cmd+Alt+G", "{} toggle the Gradient tool's annotator"),
     (
@@ -1576,6 +1582,11 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             json!(on)
         }),
         "window.toolbarAdvanced" => flag(&mut app.ui.toolbar_advanced),
+        "imageTrace.preview" => opt_bool(p, "on").map(|on| {
+            let on = on.unwrap_or(!app.ui.image_trace_preview);
+            app.ui.image_trace_preview = on;
+            json!(on)
+        }),
         "window.floatTools" => {
             let floating = match opt_bool(p, "floating") {
                 Ok(on) => on,

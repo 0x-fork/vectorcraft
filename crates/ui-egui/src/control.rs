@@ -399,7 +399,7 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
                 app.ui.control_bar = v;
             }
             if let Some(v) = p.get("imageTracePreview").and_then(Value::as_bool) {
-                app.ui.image_trace_preview = v;
+                r = app.run("imageTrace.preview", json!({"on": v}));
             }
             if p.get("closePanel").is_some() {
                 app.ui.open_panel = None;
@@ -600,6 +600,22 @@ mod tests {
             assert_eq!(r["ok"], true, "{r}");
             assert_eq!(app.ui.image_trace_preview, on);
         }
+    }
+
+    #[test]
+    fn the_image_trace_preview_is_a_command() {
+        let mut app = VectorcraftApp::new(Session::new(), Services::default());
+        assert!(crate::menus::UI_COMMANDS.iter().any(|c| c.0 == "imageTrace.preview"));
+        assert_eq!(app.run("imageTrace.preview", json!({})), Ok(json!(false)), "toggles");
+        assert!(!app.ui.image_trace_preview);
+        assert_eq!(app.run("imageTrace.preview", json!({"on": false})), Ok(json!(false)), "stays off");
+        assert_eq!(app.run("imageTrace.preview", json!({"on": true})), Ok(json!(true)));
+        assert!(app.ui.image_trace_preview);
+        assert!(app.run("imageTrace.preview", json!({"on": "yes"})).is_err());
+        assert!(app.ui.image_trace_preview, "a bad value leaves it");
+        let r = input_request(&mut app, "engine.execute", json!({"command": "imageTrace.preview", "params": {"on": false}}));
+        assert_eq!(r["ok"], true, "{r}");
+        assert!(!app.ui.image_trace_preview, "the control channel reaches it");
     }
 
     #[test]
