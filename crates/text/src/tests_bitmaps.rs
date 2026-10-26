@@ -7,7 +7,7 @@ use skrifa::instance::{LocationRef, Size};
 use vectorcraft_doc::CharStyle;
 
 use super::test_fonts::{COLOUR_CBDT_BEARINGS, COLOUR_CHAR, COLOUR_PPEM, colour_bitmap_family, colour_bitmap_font};
-use super::*;
+use super::{Affine, FontDb, PositionedGlyph, TextObject, layout, system_font_dirs};
 
 fn db(sbix: bool) -> FontDb {
     let db = FontDb::with_font_dirs(vec![]);

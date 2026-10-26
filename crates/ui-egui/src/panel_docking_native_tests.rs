@@ -11,7 +11,8 @@ use std::sync::Arc;
 use egui::{Event, Key, Pos2, Rect, ViewportCommand, ViewportId, pos2, vec2};
 use vectorcraft_engine::Session;
 
-use super::*;
+use super::{VectorcraftApp, area_id, floating_window, inspect, layout_of};
+use serde_json::{Value, json};
 
 const SCREEN: Rect = Rect::from_min_max(Pos2::ZERO, pos2(1600.0, 1000.0));
 /// Where the main window's content sits on the desktop.

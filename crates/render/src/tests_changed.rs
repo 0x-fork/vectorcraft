@@ -1,6 +1,6 @@
 //! Drawing again only what an edit changed gives the pixels of drawing it all again.
 
-use super::*;
+use super::{Affine, Arc, Changed, Document, Node, NodeId, NodeKind, Rect, RenderOptions, Rendered, Renderer, changed, kurbo, view_pixels};
 use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::Appearance;
 use vectorcraft_geom::{Point, shapes};

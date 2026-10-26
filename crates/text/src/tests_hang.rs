@@ -3,7 +3,7 @@
 //! paragraphs" › Hanging punctuation,
 //! <https://helpx.adobe.com/illustrator/using/formatting-paragraphs.html>).
 
-use super::*;
+use super::{FontDb, Point, PositionedGlyph, Rect, TextObject, layout};
 use kurbo::{Affine, Shape};
 use vectorcraft_doc::{CharStyle, Composer, Justify, TextKind};
 use vectorcraft_geom::PathData;
