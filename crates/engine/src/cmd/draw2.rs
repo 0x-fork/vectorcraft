@@ -12,6 +12,7 @@ use vectorcraft_geom::hit::fill_contains;
 use vectorcraft_geom::{Anchor, AnchorKind, BezPath, FillRule, PathData, Point, Rect, SubPath, Vec2};
 use vectorcraft_pathops as po;
 use vectorcraft_pathops::{BoolOp, Cap, Join, SimplifyOptions};
+use vectorcraft_tools::draw2::{eraser_area, eraser_tip};
 
 use super::create::{add_look, insert_look};
 use super::newart::NewArt;
@@ -107,7 +108,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Eraser",
             [],
             None,
-            "{points: [[x,y]…], size?: pt (10)} erase a round-brush stroke from paths (selected, or all) → {ids}",
+            "{points: [[x,y]…], size?: pt (10), angle?: ° (0), roundness?: % (100, kept within 1–100)} erase the stroke of an elliptical tip from paths (selected, or all) → {ids}. The tip is `size` across its long axis, which runs at `angle` counter-clockwise from horizontal; its short axis is `roundness` percent of the long one",
             has_doc,
             erase_region
         ),
@@ -410,18 +411,26 @@ pub(super) fn components(pd: &PathData) -> Vec<PathData> {
     groups.into_iter().map(PathData::new).collect()
 }
 
-/// The pieces of `sp` where `remove(point)` is false. `None` when nothing is removed.
-fn cut_subpath(sp: &SubPath, remove: &dyn Fn(Point) -> bool) -> Option<Vec<SubPath>> {
+/// The pieces of `sp` where `remove(point)` is false. `None` when nothing is removed. Each segment
+/// is sampled at least every `step` pt (and at least 24 times), so a removed stretch at least
+/// `step` long is found.
+fn cut_subpath(sp: &SubPath, step: f64, remove: &dyn Fn(Point) -> bool) -> Option<Vec<SubPath>> {
     let nseg = sp.segment_count();
     if nseg == 0 {
         return sp.anchors.first().filter(|a| remove(a.p)).map(|_| vec![]);
     }
     const K: usize = 24;
+    const MAX_SAMPLES: usize = 4096;
     let mut runs: Vec<Vec<(usize, f64, f64)>> = vec![];
     let mut cur: Vec<(usize, f64, f64)> = vec![];
     let mut any = false;
     for i in 0..nseg {
         let c = sp.segment(i);
+        // The curve moves at most 3 times its longest control-polygon edge per unit of t, so with
+        // n samples, neighboring samples are at most 3 · edge / n apart.
+        let edge = (c.p1 - c.p0).hypot().max((c.p2 - c.p1).hypot()).max((c.p3 - c.p2).hypot());
+        let wanted = (3.0 * edge / step).ceil();
+        let samples = if wanted.is_finite() && wanted > K as f64 { (wanted as usize).min(MAX_SAMPLES) } else { K };
         let mut prev_t = 0.0;
         let mut prev_rm = remove(c.eval(0.0));
         let mut start = if prev_rm { None } else { Some(0.0) };
@@ -431,8 +440,8 @@ fn cut_subpath(sp: &SubPath, remove: &dyn Fn(Point) -> bool) -> Option<Vec<SubPa
                 runs.push(std::mem::take(&mut cur));
             }
         }
-        for k in 1..=K {
-            let t = k as f64 / K as f64;
+        for k in 1..=samples {
+            let t = k as f64 / samples as f64;
             let rm = remove(c.eval(t));
             if rm != prev_rm {
                 let (mut lo, mut hi) = (prev_t, t);
@@ -500,13 +509,14 @@ fn cut_subpath(sp: &SubPath, remove: &dyn Fn(Point) -> bool) -> Option<Vec<SubPa
     Some(out)
 }
 
-/// Erase from an outline path (open or closed) where `remove` holds. Returns the new geometry per
-/// output object (one object per piece when the path had a single subpath), or None if unchanged.
-pub(super) fn erase_outline(pd: &PathData, remove: &dyn Fn(Point) -> bool) -> Option<Vec<PathData>> {
+/// Erase from an outline path (open or closed) where `remove` holds, sampling each segment at least
+/// every `step` pt (`f64::INFINITY` for the fixed sampling). Returns the new geometry per output
+/// object (one object per piece when the path had a single subpath), or None if unchanged.
+pub(super) fn erase_outline(pd: &PathData, step: f64, remove: &dyn Fn(Point) -> bool) -> Option<Vec<PathData>> {
     let mut changed = false;
     let mut subs = vec![];
     for sp in &pd.subpaths {
-        match cut_subpath(sp, remove) {
+        match cut_subpath(sp, step, remove) {
             Some(pieces) => {
                 changed = true;
                 subs.extend(pieces);
@@ -1159,9 +1169,17 @@ fn erase_region(s: &mut Session, p: &Value) -> Result<Value> {
     if !(size.is_finite() && size > 0.0) {
         return Err(bad(C, "size must be positive"));
     }
+    let angle = number_or(p, "angle", 0.0, C)?;
+    let roundness = number_or(p, "roundness", 100.0, C)?;
     let r = size / 2.0;
+    // The tip's short axis: an open path is sampled at least every half of it.
+    let short = size * roundness.clamp(1.0, 100.0) / 100.0;
     let st = s.doc()?;
-    let region = brush_region(&pts, size);
+    let region = eraser_area(&pts, size, angle, roundness);
+    // A point is under the tip when, with the tip squashed back into a circle, it is within the
+    // circle's radius of the squashed drag.
+    let squash = eraser_tip(angle, roundness).inverse();
+    let round: Vec<Point> = pts.iter().map(|q| squash * *q).collect();
     let mut plan: Vec<(NodeId, Vec<PathData>)> = vec![];
     for id in target_paths(&st.doc, &st.selection, poly_bounds(&pts, r)) {
         let (pd, rule) = path_of(&st.doc, id)?;
@@ -1170,7 +1188,7 @@ fn erase_region(s: &mut Session, p: &Value) -> Result<Value> {
                 continue;
             }
             plan.push((id, components(&po::boolean(&pd, rule, &region, FillRule::NonZero, BoolOp::Difference))));
-        } else if let Some(pieces) = erase_outline(&pd, &|q| dist_to_polyline(&pts, q) <= r) {
+        } else if let Some(pieces) = erase_outline(&pd, short / 2.0, &|q| dist_to_polyline(&round, squash * q) <= r) {
             plan.push((id, pieces));
         }
     }
@@ -1205,7 +1223,7 @@ fn erase_segments(s: &mut Session, p: &Value) -> Result<Value> {
     let mut plan = vec![];
     for id in target_paths(&st.doc, &st.selection, poly_bounds(&pts, w)) {
         let (pd, _) = path_of(&st.doc, id)?;
-        if let Some(pieces) = erase_outline(&pd, &|q| dist_to_polyline(&pts, q) <= w / 2.0) {
+        if let Some(pieces) = erase_outline(&pd, w / 2.0, &|q| dist_to_polyline(&pts, q) <= w / 2.0) {
             plan.push((id, pieces));
         }
     }

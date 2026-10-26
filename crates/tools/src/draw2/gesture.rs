@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use vectorcraft_doc::NodeId;
 use vectorcraft_geom::Point;
 
-use super::{FEEDBACK, points_json, polyline};
+use super::{FEEDBACK, eraser_area, points_json, polyline};
 use crate::guides::DrawSnap;
 use crate::{Action, Cursor, Mods, Overlay, PointerEvent, PointerKind, Tool, ToolContext, ToolKey};
 
@@ -41,8 +41,12 @@ pub struct GestureTool {
     redraw: Option<(NodeId, f64)>,
     /// Fit tolerance in points (Pencil/Paintbrush/Smooth "Fidelity").
     pub fidelity: f64,
-    /// Brush / eraser diameter in points.
+    /// Brush / eraser diameter in points (the Eraser's across its tip's long axis).
     pub size: f64,
+    /// The angle of the Eraser tip's long axis, in degrees counter-clockwise from horizontal.
+    pub angle: f64,
+    /// The Eraser tip's short axis in percent of its long one (100: round).
+    pub roundness: f64,
     /// Fill new pencil/brush strokes.
     pub fill: bool,
     /// "Keep selected": select the path a Pencil, Paintbrush or Blob Brush stroke draws, continues
@@ -106,6 +110,8 @@ impl GestureTool {
             redraw: None,
             fidelity,
             size: 10.0,
+            angle: 0.0,
+            roundness: 100.0,
             fill: false,
             keep_selected: id != "blobBrush",
             // Off, as Pencil Tool Options ships it: Alt keeps drawing a closed path until it is on.
@@ -321,7 +327,10 @@ impl GestureTool {
                     "mergeOnlySelection": self.merge_only_selection
                 }),
             )],
-            "eraser" => vec![Action::Exec("path.eraseRegion".into(), json!({"points": points_json(pts), "size": self.size}))],
+            "eraser" => vec![Action::Exec(
+                "path.eraseRegion".into(),
+                json!({"points": points_json(pts), "size": self.size, "angle": self.angle, "roundness": self.roundness}),
+            )],
             "knife" if pts.len() >= 2 => vec![Action::Exec("path.knife".into(), json!({"points": points_json(pts)}))],
             "smooth" if has_sel && pts.len() >= 2 => {
                 vec![Action::Exec("path.smoothRegion".into(), json!({"points": points_json(pts), "radius": tol, "fidelity": self.fidelity}))]
@@ -526,6 +535,12 @@ impl Tool for GestureTool {
             _ => 1.0,
         };
         let color = if self.id == "eraser" { [0x80, 0x80, 0x80] } else { FEEDBACK };
+        // A tip that is not round shows the outline of the area it covers.
+        if self.id == "eraser" && self.roundness < 100.0 {
+            let area = eraser_area(&self.points, self.size, self.angle, self.roundness);
+            o.push(Overlay::Path { path: area.to_bezpath(), color, width: 1.0, dashed: false });
+            return o;
+        }
         o.push(Overlay::Path { path: polyline(&self.points), color, width, dashed: self.id == "knife" });
         o
     }
@@ -586,7 +601,7 @@ impl Tool for GestureTool {
             }
             "smooth" => json!({"fidelity": self.fidelity}),
             "blobBrush" => json!({"size": self.size, "keepSelected": self.keep_selected, "mergeOnlySelection": self.merge_only_selection}),
-            "eraser" => json!({"size": self.size}),
+            "eraser" => json!({"size": self.size, "angle": self.angle, "roundness": self.roundness}),
             _ => Value::Null,
         }
     }
@@ -594,6 +609,8 @@ impl Tool for GestureTool {
         match key {
             "fidelity" => self.fidelity = v.as_f64().unwrap_or(self.fidelity).clamp(0.05, 100.0),
             "size" => self.size = v.as_f64().unwrap_or(self.size).clamp(0.1, 1000.0),
+            "angle" => self.angle = v.as_f64().unwrap_or(self.angle).clamp(-180.0, 180.0),
+            "roundness" => self.roundness = v.as_f64().unwrap_or(self.roundness).clamp(1.0, 100.0),
             "fill" => self.fill = v.as_bool().unwrap_or(self.fill),
             "altSmooth" => self.alt_smooth = v.as_bool().unwrap_or(self.alt_smooth),
             "liveFit" if self.id == "pencil" => self.live_fit = v.as_bool().unwrap_or(self.live_fit),
@@ -817,8 +834,8 @@ mod tests {
                 "{acts:?}"
             );
         }
-        // The Eraser keeps Size only.
-        assert_eq!(GestureTool::new("eraser").options(), json!({"size": 10.0}));
+        // The Eraser keeps Size, Angle and Roundness: a round tip by default.
+        assert_eq!(GestureTool::new("eraser").options(), json!({"size": 10.0, "angle": 0.0, "roundness": 100.0}));
     }
 
     /// Shift keeps a Blob Brush stroke on the horizontal or vertical line through the press point,
@@ -1378,6 +1395,47 @@ mod tests {
         assert_eq!(k.overlays(&cx).len(), 1);
         let a = k.pointer(&cx, &PointerEvent::new(PointerKind::Up, 250.0, 150.0));
         assert!(matches!(&a[0], Action::Exec(c, v) if c == "path.knife" && v["points"].as_array().unwrap().len() == 3));
+    }
+
+    /// The Eraser's Angle and Roundness (Eraser Tool Options) go with its stroke, kept within
+    /// −180–180° and 1–100%; while it drags, a tip that is not round shows the outline of the area
+    /// it covers, and a round one the drag as wide as the tip.
+    #[test]
+    fn the_eraser_sends_its_tip_and_shows_the_area_it_covers() {
+        let (d, _) = doc_with_rect();
+        let s = Selection::default();
+        let p = paint();
+        let cx = cx(&d, &s, &p);
+        let mut t = GestureTool::new("eraser");
+        t.set_option("size", &json!(20));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 50.0, 150.0));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 150.0, 150.0));
+        let round = t.overlays(&cx);
+        assert!(matches!(&round[..], [Overlay::Path { width, .. }] if *width == 20.0), "{round:?}");
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Up, 250.0, 150.0));
+        for (angle, roundness, sent) in [(90.0, 25.0, (90.0, 25.0)), (400.0, 0.0, (180.0, 1.0)), (-400.0, 250.0, (-180.0, 100.0))] {
+            t.set_option("angle", &json!(angle));
+            t.set_option("roundness", &json!(roundness));
+            assert_eq!((t.options()["angle"].as_f64(), t.options()["roundness"].as_f64()), (Some(sent.0), Some(sent.1)));
+            let acts = drag(&mut t, &cx, &[(50.0, 150.0), (250.0, 150.0)], Mods::default());
+            assert!(
+                matches!(&acts[2][0], Action::Exec(c, v) if c == "path.eraseRegion" && v["size"] == 20.0 && v["angle"] == sent.0 && v["roundness"] == sent.1),
+                "{acts:?}"
+            );
+        }
+        // A tip 20 pt long and 5 pt wide, standing upright: along a horizontal drag from x 50 to
+        // x 150 the outline reaches 2.5 pt either side of the drag and 10 pt above and below
+        // its ends.
+        t.set_option("angle", &json!(90));
+        t.set_option("roundness", &json!(25));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Down, 50.0, 150.0));
+        t.pointer(&cx, &PointerEvent::new(PointerKind::Drag, 150.0, 150.0));
+        let o = t.overlays(&cx);
+        let [Overlay::Path { path, width, .. }] = &o[..] else { panic!("{o:?}") };
+        assert_eq!(*width, 1.0);
+        let b = vectorcraft_geom::Shape::bounding_box(path);
+        assert!((b.x0 - 47.5).abs() < 0.1 && (b.x1 - 152.5).abs() < 0.1, "{b:?}");
+        assert!((b.y0 - 140.0).abs() < 0.1 && (b.y1 - 160.0).abs() < 0.1, "{b:?}");
     }
 
     #[test]
