@@ -3172,6 +3172,13 @@ selected artboards keeps its size.
 {"name":"run_command","arguments":{"command":"artboard.setProps","params":{"artboards":[{"index":0,"width":300},{"index":2,"width":300}],"scaleArt":true}}}
 ```
 
+Delete Empty Artboards: `artboard.deleteEmpty {}` deletes every artboard with no artwork on it, with its guides, in
+one undo step, and returns the indices it deleted (numbered as before) as `{deleted: [index…]}`. An artboard has
+artwork when an object (hidden, locked and template art included; guides not) has visual bounds that meet or touch
+it; a group counts by its members, a clip group or clipping layer by its members inside the clip. Locked artboards stay; when every artboard is empty and none is locked, artboard 1 stays (with a locked
+artboard left, artboard 1 can go). With
+nothing to delete the command is disabled and fails with `no empty artboards to delete`.
+
 Locked artboards: `artboard.setProps {index, locked: true}` locks an artboard and `{index, locked: false}` unlocks it,
 each in one undo step. The Artboards panel's lock column, left of a row's options icon, shows a lock on a locked
 artboard, and a click there runs this command. A locked artboard keeps its place and size. `artboard.setProps` with a

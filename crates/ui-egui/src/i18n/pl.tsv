@@ -5410,6 +5410,7 @@ axis	Y Axis	Oś Y
 	Rectangular Grid Tool Options	Opcje narzędzia Siatka prostokątna
 	Polar Grid Tool Options	Opcje narzędzia Siatka biegunowa
 	Fill Line	Wypełnij odcinek
+@msg	no empty artboards to delete	brak pustych obszarów kompozycji do usunięcia
 	Scale Presets	Ustawienia wstępne skali
 @msg	a {width}×{height} screenshot's byte count overflows	liczba bajtów zrzutu ekranu {width}×{height} przekracza limit
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	{what} okna ({points} punktów × {scale} DPI) nie pozwala ustalić rozmiaru zrzutu ekranu

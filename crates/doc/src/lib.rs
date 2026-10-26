@@ -1843,6 +1843,40 @@ impl Document {
         }
         art
     }
+    /// Does any artwork lie on `rect` (an artboard)? Artwork is any object under the layers,
+    /// hidden and locked ones and those on template layers included, whose visual bounds (symbol
+    /// instances measured by their art) meet `rect`; touching its edge counts. A group (not a clip
+    /// group) counts by its members, so one whose members sit on two other artboards leaves the one
+    /// between them empty. A clip group or clipping layer counts by its members inside its clip (and
+    /// by its clipping path where that paints). Guides (paths made into guides too) aren't artwork
+    /// (Delete Empty Artboards).
+    pub fn artboard_has_art(&self, rect: Rect) -> bool {
+        // As in `art_on_artboard`: a millionth of a point covers rounding at the edges.
+        let rect = rect.inflate(1e-6, 1e-6);
+        fn meets(b: Option<Rect>, r: Rect) -> bool {
+            b.is_some_and(|b| b.x0 <= r.x1 && r.x0 <= b.x1 && b.y0 <= r.y1 && r.y0 <= b.y1)
+        }
+        fn has(c: &Node, s: &SymbolBoxes, rect: Rect) -> bool {
+            match &c.kind {
+                NodeKind::Group { children, clip: true } | NodeKind::Layer { children, clip: true, .. } => {
+                    let Some((clip, rest)) = children.split_first() else { return false };
+                    let paint = clip.clip_paint();
+                    if (paint.fill.is_some() || paint.stroke.is_some()) && meets(clip.visual_bounds_with(s), rect) {
+                        return true;
+                    }
+                    // The members show only inside the clip's box.
+                    let Some(b) = c.visual_bounds_with(s).filter(|b| meets(Some(*b), rect)) else { return false };
+                    let inside = Rect::new(b.x0.max(rect.x0), b.y0.max(rect.y0), b.x1.min(rect.x1), b.y1.min(rect.y1));
+                    rest.iter().any(|m| has(m, s, inside))
+                }
+                NodeKind::Layer { children, .. } | NodeKind::Group { children, .. } => children.iter().any(|m| has(m, s, rect)),
+                NodeKind::Path { guide: true, .. } => false,
+                _ => meets(c.visual_bounds_with(s), rect),
+            }
+        }
+        let symbols = self.symbol_boxes();
+        self.layers.iter().any(|l| has(l, &symbols, rect))
+    }
     /// The art that moves, scales or is cut with artboard `index`: [`Document::art_on_artboard`]
     /// without the objects on another locked artboard, which stay unless `locked_and_hidden`, as
     /// locked art does.

@@ -5397,6 +5397,7 @@ axis	Y Axis	Y 轴
 	Rectangular Grid Tool Options	矩形网格工具选项
 	Polar Grid Tool Options	极坐标网格工具选项
 	Fill Line	填充线段
+@msg	no empty artboards to delete	没有可删除的空白画板
 	Scale Presets	缩放预设
 @msg	a {width}×{height} screenshot's byte count overflows	{width}×{height} 截图的字节数溢出
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	窗口的{what}（{points} 点 × {scale} DPI）无法确定截图大小
