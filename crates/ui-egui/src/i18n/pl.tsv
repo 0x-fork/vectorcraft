@@ -4507,6 +4507,7 @@ imageTrace	Outline	Kontur
 @msg	{_1} is already used by {_2}	{_1} jest już używany przez {_2}
 @msg	{_1} is reserved by the system	Skrót {_1} jest zarezerwowany przez system
 @msg	{_1} linked file(s) can't be read here: their previews show	połączonych plików nie można tu odczytać ({_1}): wyświetlane są ich podglądy
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	nie udało się zdekodować obrazów ({undecoded}): są wyświetlane jako przekreślone ramki
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	połączone obrazy zmienione na dysku: {_1} — Aktualizuj łącza pokaże nowe wersje
 @msg	{_1}: not saved, so not closed	{_1}: nie zapisano, więc nie zamknięto
 @msg	{bpp}-bit bitmaps can't be read	nie można odczytać bitmap {bpp}-bitowych

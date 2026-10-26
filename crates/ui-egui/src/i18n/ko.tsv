@@ -4314,6 +4314,7 @@ theme	Appearance	외관
 @msg	no such layer or object	해당 레이어나 개체가 없습니다
 @msg	`{tool}` isn't a Liquify tool	`{tool}`은(는) 픽셀 유동화 도구가 아닙니다
 @msg	{_1} linked file(s) can't be read here: their previews show	링크된 파일 {_1}개를 여기서 읽을 수 없습니다: 미리 보기가 표시됩니다
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	이미지 {undecoded}개를 디코딩할 수 없습니다: X 표시가 된 상자로 표시됩니다
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	링크된 이미지 {_1}개가 디스크에서 바뀌었습니다: 링크 업데이트를 하면 새 버전이 표시됩니다
 @msg	Updated {_1} linked file(s) changed on disk	디스크에서 바뀐 링크된 파일 {_1}개를 업데이트했습니다
 @msg	pick a colour, gradient or pattern to save as a swatch	견본으로 저장할 색상, 그레이디언트 또는 패턴을 선택하세요

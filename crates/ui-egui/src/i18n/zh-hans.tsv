@@ -4111,6 +4111,7 @@ imageTrace	Outline	轮廓
 @msg	no such layer or object	没有此图层或对象
 @msg	`{tool}` isn't a Liquify tool	`{tool}` 不是液化工具
 @msg	{_1} linked file(s) can't be read here: their previews show	此处无法读取 {_1} 个链接文件：显示的是其预览
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	无法解码 {undecoded} 张图像：它们显示为打叉的方框
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	有 {_1} 个链接图像已在磁盘上更改：“更新链接”可显示新版本
 @msg	pick a colour, gradient or pattern to save as a swatch	请选取要保存为色板的颜色、渐变或图案
 @msg	Packaged {n} file(s) in {folder} {note}	已将 {n} 个文件打包到 {folder}{note}

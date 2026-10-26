@@ -5141,6 +5141,7 @@ imageTrace	Outline	Körvonal
 @msg	{_1} is already used by {_2}	már foglalt: {_1} (használja: {_2})
 @msg	{_1} is reserved by the system	A(z) {_1} a rendszer számára foglalt
 @msg	{_1} linked file(s) can't be read here: their previews show	Itt nem olvasható csatolt fájlok: {_1}; az előnézetük látszik
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	Nem dekódolható képek: {undecoded}; áthúzott keretként látszanak
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	A lemezen módosult csatolt képek: {_1}; a Csatolások frissítése az új változatokat mutatja
 @msg	{_1}: not saved, so not closed	{_1}: nincs mentve, ezért nem záródott be
 @msg	{bpp}-bit bitmaps can't be read	ilyen bitmélységű bitkép nem olvasható: {bpp}

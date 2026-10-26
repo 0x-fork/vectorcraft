@@ -3953,6 +3953,7 @@ axis	Both	Ambos
 @msg	{_1} is already used by {_2}	{_1} já é usado por {_2}
 @msg	{_1} is reserved by the system	{_1} é reservado pelo sistema
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} arquivo(s) vinculado(s) não podem ser lidos aqui: suas visualizações são exibidas
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	não foi possível decodificar {undecoded} imagem(ns): elas aparecem como caixas marcadas com um X
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} imagem(ns) vinculada(s) mudou(aram) no disco: Atualizar links mostra as novas versões
 @msg	{_1}: not saved, so not closed	{_1}: não salvo, portanto não fechado
 @msg	{bpp}-bit bitmaps can't be read	bitmaps de {bpp} bits não podem ser lidos

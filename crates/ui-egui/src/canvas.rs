@@ -521,6 +521,9 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             isolated: key.isolated.map(vectorcraft_doc::NodeId),
             // Images far smaller on screen than they are sample their mip levels (#1244).
             image_mips: true,
+            // An image whose pixels can't be decoded shows as a crossed box, and the status message
+            // below reports it.
+            mark_undecoded_images: true,
             // During a drag or a dialog's preview, objects that only moved draw their raster
             // effects from the cached rasters of an earlier frame (#1257).
             interacting: key.interacting,
@@ -570,6 +573,12 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                 app.canvas.from_worker = false;
             }
         }
+    }
+    // The status bar reports each image that a renderer (this thread's or the worker's) could not
+    // decode, once per image in the process.
+    let undecoded = vectorcraft_render::newly_undecodable(doc.images.values());
+    if undecoded > 0 {
+        app.status(format!("{undecoded} image(s) couldn't be decoded and show as crossed boxes"));
     }
     if let (Some(tex), Some(k)) = (&app.canvas.texture, &app.canvas.key)
         && k.doc == key.doc
@@ -5702,6 +5711,55 @@ mod tests {
         assert!(app.canvas.key.as_ref().is_some_and(|k| !k.highlight_substituted_fonts));
         app.session.execute("prefs.set", &json!({"key": "highlightSubstitutedFonts", "value": true})).unwrap();
         assert_eq!(pink(&mut app), Some(on), "on again, as before");
+    }
+
+    /// Images whose pixels can't be decoded draw as crossed boxes on the canvas, and the status
+    /// bar reports each of them once: two such images give one message, and later frames that
+    /// draw them again give none.
+    #[test]
+    fn undecodable_images_are_marked_and_reported_once() {
+        use vectorcraft_doc::{ImageBlob, ImageObject, NodeKind};
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
+        app.canvas.worker_started = true; // render on this thread
+        // PNGs of noisy pixels cut off halfway: their headers read, their pixels don't decode.
+        let cut = |w: u32| {
+            let img = image::RgbaImage::from_fn(w, 41, |x, y| image::Rgba([(x * 37 + y * 101) as u8, (x * y) as u8, (x ^ y) as u8, 255]));
+            let mut png = vec![];
+            img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+            png.truncate(png.len() / 2);
+            png
+        };
+        {
+            let st = app.session.doc_mut().unwrap();
+            let d = std::sync::Arc::make_mut(&mut st.doc);
+            for (i, w) in [53u32, 59].into_iter().enumerate() {
+                let key = format!("cut{i}");
+                d.images.insert(key.clone(), ImageBlob::new("image/png", cut(w)));
+                let im = ImageObject {
+                    key,
+                    width: w,
+                    height: 41,
+                    xf: Affine::translate((40.0 + 150.0 * i as f64, 100.0)),
+                    link: None,
+                    placement: Default::default(),
+                    pixels: None,
+                };
+                let (id, layer) = (d.alloc_id(), d.layers[0].id);
+                d.insert(Some(layer), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
+            }
+            st.revision += 1;
+        }
+        let ctx = egui::Context::default();
+        app.status("");
+        frame(&mut app, &ctx, vec![]);
+        assert!(app.canvas.shown.as_ref().is_some_and(|(_, o)| o.mark_undecoded_images), "the canvas marks them");
+        assert_eq!(app.ui.status, "2 image(s) couldn't be decoded and show as crossed boxes");
+        app.status("");
+        app.session.doc_mut().unwrap().revision += 1;
+        frame(&mut app, &ctx, vec![]);
+        frame(&mut app, &ctx, vec![]);
+        assert_eq!(app.ui.status, "", "said once");
     }
 
     /// A drag of an object with raster effects (#1257): the drag's frames render while
