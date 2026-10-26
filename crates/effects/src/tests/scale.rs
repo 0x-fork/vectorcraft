@@ -3,7 +3,7 @@
 use serde_json::json;
 use vectorcraft_doc::Effect;
 
-use super::*;
+use crate::*;
 
 #[test]
 fn every_distance_parameter_is_a_parameter() {

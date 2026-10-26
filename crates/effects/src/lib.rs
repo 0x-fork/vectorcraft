@@ -57,10 +57,6 @@ mod warp;
 
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod tests_scale;
-#[cfg(test)]
-mod tests_transformfx;
 
 use serde_json::{Map, Value, json};
 use vectorcraft_doc::{Appearance, AppearanceItem, Effect, Node, NodeKind, StrokeLayer};
