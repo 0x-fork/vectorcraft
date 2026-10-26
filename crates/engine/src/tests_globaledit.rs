@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 use vectorcraft_doc::{Node, NodeKind};
 use vectorcraft_geom::{Affine, PathData, Rect};
 
-use super::{EngineError, NodeId, Session};
+use super::*;
 
 fn session() -> Session {
     let mut s = Session::new();

@@ -20,7 +20,7 @@ use super::clipboard::Clipboard;
 use super::clipboard::resources::SwatchChoices;
 use super::swatch::str_list;
 use super::swatchlib::{FileData, LibraryFile, LibraryInfo, stem};
-use super::{CommandSpec, Result, Session, always, bad, bool_or, has_doc, number_or, str_param};
+use super::*;
 
 /// The extension of saved symbol libraries: native documents.
 pub const SYMBOLS_EXT: &str = vectorcraft_format::EXTENSION;

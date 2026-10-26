@@ -6,7 +6,7 @@
 use serde_json::{Value, json};
 use vectorcraft_doc::{NodeId, NodeKind, SymbolRegistration};
 
-use super::{Session, cmd};
+use super::*;
 
 fn session() -> Session {
     let mut s = Session::new();
