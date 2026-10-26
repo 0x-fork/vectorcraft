@@ -5136,6 +5136,10 @@ axis	Y Axis	Y축
 	Rectangular Grid Tool Options	사각형 격자 도구 옵션
 	Polar Grid Tool Options	극좌표 격자 도구 옵션
 	Fill Line	선 채우기
+	Pathfinder Options	패스파인더 옵션
+	Divide and Outline Will Remove Unpainted Artwork	나누기 및 윤곽선에서 칠하지 않은 아트워크 제거
+@msg	precision must be from 0.001 to 10 pt	precision는 0.001~10pt여야 합니다
+@msg	`pathfinder` must be an object	`pathfinder`는 개체여야 합니다
 	Add to Brushes	브러시에 추가
 	Brush Library	브러시 라이브러리
 	Save Brush Library	브러시 라이브러리 저장

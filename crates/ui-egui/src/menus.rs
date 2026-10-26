@@ -3792,6 +3792,11 @@ pub fn invoke(app: &mut VectorcraftApp, id: &str, p: Value) {
         crate::dialogs::variables::open(app, id, None);
         return;
     }
+    // Pathfinder Options: a dialog with the current options.
+    if id == "object.pathfinder.options" && p.as_object().is_none_or(|o| o.is_empty()) {
+        crate::dialogs::pathfinder_options::open(app);
+        return;
+    }
     // Repeat Options: a dialog with the selected repeat's current values.
     if id == "object.repeat.options"
         && p.as_object().is_none_or(|o| o.is_empty())

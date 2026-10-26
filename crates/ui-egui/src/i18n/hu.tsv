@@ -5543,6 +5543,10 @@ axis	Y Axis	Y tengely
 	Rectangular Grid Tool Options	Téglalaprács beállításai
 	Polar Grid Tool Options	Polárrács beállításai
 	Fill Line	Szakasz kitöltése
+	Pathfinder Options	Útvonalkezelő beállításai
+	Divide and Outline Will Remove Unpainted Artwork	A Felosztás és a Vázlat eltávolítja a festetlen grafikát
+@msg	precision must be from 0.001 to 10 pt	a precision értéke 0,001 és 10 pt között lehet
+@msg	`pathfinder` must be an object	`pathfinder`: objektum kell
 	Add to Brushes	Hozzáadás az ecsetekhez
 	Brush Library	Ecsetkönyvtár
 	Save Brush Library	Ecsetkönyvtár mentése

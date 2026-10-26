@@ -5153,6 +5153,10 @@ axis	Y Axis	Trục Y
 	Rectangular Grid Tool Options	Tùy chọn công cụ Lưới chữ nhật
 	Polar Grid Tool Options	Tùy chọn công cụ Lưới cực
 	Fill Line	Tô đoạn thẳng
+	Pathfinder Options	Tùy chọn Pathfinder
+	Divide and Outline Will Remove Unpainted Artwork	Chia và Đường bao sẽ xóa tác phẩm không tô màu
+@msg	precision must be from 0.001 to 10 pt	precision phải từ 0,001 đến 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` phải là một đối tượng
 	Add to Brushes	Thêm vào cọ
 	Brush Library	Thư viện cọ
 	Save Brush Library	Lưu thư viện cọ

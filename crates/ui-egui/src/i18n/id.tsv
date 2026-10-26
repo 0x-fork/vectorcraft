@@ -5497,6 +5497,10 @@ axis	Y Axis	Sumbu Y
 	Rectangular Grid Tool Options	Opsi alat kisi persegi panjang
 	Polar Grid Tool Options	Opsi alat kisi polar
 	Fill Line	Isi garis
+	Pathfinder Options	Opsi Pathfinder
+	Divide and Outline Will Remove Unpainted Artwork	Bagi dan Garis luar menghapus karya seni tanpa warna
+@msg	precision must be from 0.001 to 10 pt	precision harus dari 0,001 sampai 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` harus berupa objek
 	Add to Brushes	Tambahkan ke kuas
 	Brush Library	Pustaka kuas
 	Save Brush Library	Simpan pustaka kuas

@@ -25,7 +25,6 @@ use vectorcraft_doc::{Document, NodeId, NodeKind, Selection};
 use vectorcraft_geom::Affine;
 use vectorcraft_tools::{PaintDefaults, Tool};
 
-pub use cmd::EyedropperOptions;
 pub use cmd::clipboard::Clipboard;
 pub use cmd::create::constrain_click;
 pub use cmd::distortcmds::perspective_click;
@@ -33,6 +32,7 @@ pub use cmd::params::{check_keys, check_params};
 pub use cmd::pathops::auto_simplify_level;
 pub use cmd::rasterfx::{export_pdf, flatten_raster_effects};
 pub use cmd::{CommandInfo, CommandSpec, command_specs, find_command};
+pub use cmd::{EyedropperOptions, PathfinderOptions};
 pub use journal::Journal;
 pub use tooling::{UiRequest, ViewInfo};
 pub use vectorcraft_doc as doc;
@@ -1112,6 +1112,9 @@ pub struct Prefs {
     /// Eyedropper Options (`eyedropper.setOptions`; a preference group, see
     /// [`cmd::prefscmds::PREF_GROUPS`]).
     pub eyedropper: EyedropperOptions,
+    /// Pathfinder panel › Pathfinder Options (`object.pathfinder.options`; a preference group, see
+    /// [`cmd::prefscmds::PREF_GROUPS`]).
+    pub pathfinder: PathfinderOptions,
     /// Edit → Transparency Flattener Presets: the user's presets (the built-in ones aren't stored).
     /// Not a `prefs.set` key or group (resetting the preferences keeps them): `flattener.presets.*`
     /// edit it.
@@ -1337,6 +1340,7 @@ impl Default for Prefs {
                 Color::rgb8(r, g, b).to_hex()
             },
             eyedropper: Default::default(),
+            pathfinder: Default::default(),
             flattener_presets: vec![],
             width_profiles: vec![],
             japanese_crop_marks: false,

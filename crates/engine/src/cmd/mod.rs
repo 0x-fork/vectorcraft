@@ -566,6 +566,9 @@ pub use opacitymask::TransparencyInfo;
 /// Eyedropper Options (`Prefs::eyedropper`).
 pub use xform::{AppearanceAttrs, EyedropperAttrs, EyedropperOptions, FillAttrs, StrokeAttrs};
 
+/// Pathfinder Options (`Prefs::pathfinder`).
+pub use pathops::{PATHFINDER_PRECISION_RANGE, PathfinderOptions};
+
 /// The Attributes panel's state ([`Session::attributes_info`]).
 pub use overprint::AttributesInfo;
 

@@ -5556,6 +5556,10 @@ axis	Y Axis	Axe Y
 	Rectangular Grid Tool Options	Options de l’outil Grille rectangulaire
 	Polar Grid Tool Options	Options de l’outil Grille à coordonnées polaires
 	Fill Line	Remplir le trait
+	Pathfinder Options	Options Pathfinder
+	Divide and Outline Will Remove Unpainted Artwork	Division et Tracés suppriment l’illustration non peinte
+@msg	precision must be from 0.001 to 10 pt	precision doit être compris entre 0,001 et 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` doit être un objet
 	Add to Brushes	Ajouter aux formes
 	Brush Library	Bibliothèque de formes
 	Save Brush Library	Enregistrer la bibliothèque de formes

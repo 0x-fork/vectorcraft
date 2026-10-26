@@ -2051,6 +2051,20 @@ old name keeps it. A blank name gives "New Pattern N" in `object.pattern.make` a
 {"name":"run_command","arguments":{"command":"prefs.set","params":{"key":"patternTileEdgeColor","value":"#ff4f4f"}}}
 ```
 
+Pathfinder Options: `object.pathfinder.options {precision?, removeRedundantPoints?, removeUnpainted?}` (or
+`prefs.get`/`prefs.set` with key `pathfinder`) reads and sets the options every later Shape Mode and Pathfinder
+operation uses: `precision` (0.001–10 pt, default 0.01; a string with a unit also reads) is how closely results follow
+the paths (they are refit to within it and pieces thinner than it are dropped), `removeRedundantPoints` takes the
+anchors that don't change a result's shape off it, and `removeUnpainted` makes Divide and Outline leave out the pieces
+of objects with no fill (or only hidden fills). Both default to false; `{}` reads the options. Each Shape Mode and
+Pathfinder command (`object.pathfinder.unite` … `minusBack`) also takes `precision`, `removeRedundantPoints` and
+`removeUnpainted` for one run; the values it used join its journal entry, so a replay or an action gives the same art
+whatever the options are then.
+
+```json
+{"name":"run_command","arguments":{"command":"object.pathfinder.options","params":{"precision":0.1,"removeUnpainted":true}}}
+```
+
 The Eyedropper: `appearance.copyFrom {source}` copies what the Eyedropper Options pick up and apply from `source` to the
 selection (`ids`); `reverse: true` copies the selection's attributes onto `source` (Alt-click) and `append: true` adds
 the source's fills and strokes on top of each target's stack (Shift+Alt-click). The options live in the preferences:

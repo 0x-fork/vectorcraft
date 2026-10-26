@@ -5235,6 +5235,10 @@ axis	Y Axis	Y 軸
 	Rectangular Grid Tool Options	長方形グリッドツールオプション
 	Polar Grid Tool Options	同心円グリッドツールオプション
 	Fill Line	線を塗りつぶす
+	Pathfinder Options	パスファインダーオプション
+	Divide and Outline Will Remove Unpainted Artwork	分割およびアウトラインで塗りのないアートワークを削除
+@msg	precision must be from 0.001 to 10 pt	precision は 0.001～10 pt にしてください
+@msg	`pathfinder` must be an object	`pathfinder` にはオブジェクトを指定してください
 	Add to Brushes	ブラシに追加
 	Brush Library	ブラシライブラリ
 	Save Brush Library	ブラシライブラリを保存

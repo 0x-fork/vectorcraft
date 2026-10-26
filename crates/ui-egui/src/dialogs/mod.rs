@@ -64,6 +64,7 @@ pub mod new_swatch;
 pub mod office_export;
 pub mod package;
 pub(crate) mod path_ops;
+pub mod pathfinder_options;
 pub mod pdf_presets;
 pub mod perspective_grid;
 pub mod perspective_options;
@@ -369,6 +370,7 @@ registry! {
     PerspectivePlane: [perspective_plane::KIND] => perspective_plane::SPEC,
     LayerOptions: [layer_options::KIND] => layer_options::SPEC,
     LayersPanelOptions: [layers_panel_options::KIND] => layers_panel_options::SPEC,
+    PathfinderOptions: [pathfinder_options::KIND] => pathfinder_options::SPEC,
     RearrangeArtboards: [rearrange_artboards::KIND] => rearrange_artboards::SPEC,
     ShortcutImport: [shortcut_import::KIND] => DialogSpec::window(shortcut_import::show, shortcut_import::confirm),
 }

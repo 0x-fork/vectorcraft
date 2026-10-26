@@ -5409,6 +5409,10 @@ axis	Y Axis	Oś Y
 	Rectangular Grid Tool Options	Opcje narzędzia Siatka prostokątna
 	Polar Grid Tool Options	Opcje narzędzia Siatka biegunowa
 	Fill Line	Wypełnij odcinek
+	Pathfinder Options	Opcje odnajdywania ścieżek
+	Divide and Outline Will Remove Unpainted Artwork	Podziel i Kontur usuwają niepomalowaną grafikę
+@msg	precision must be from 0.001 to 10 pt	precision musi wynosić od 0,001 do 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` musi być obiektem
 	Add to Brushes	Dodaj do pędzli
 	Brush Library	Biblioteka pędzli
 	Save Brush Library	Zapisz bibliotekę pędzli

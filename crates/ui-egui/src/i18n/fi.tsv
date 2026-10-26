@@ -5588,6 +5588,10 @@ axis	Y Axis	Y-akseli
 	Rectangular Grid Tool Options	Suorakulmaisen ruudukon työkalun asetukset
 	Polar Grid Tool Options	Napakoordinaattiruudukon työkalun asetukset
 	Fill Line	Täytä viiva
+	Pathfinder Options	Polunetsimen asetukset
+	Divide and Outline Will Remove Unpainted Artwork	Jaa ja Ääriviiva poistavat maalaamattoman kuvituksen
+@msg	precision must be from 0.001 to 10 pt	precision-arvon on oltava 0,001–10 pt
+@msg	`pathfinder` must be an object	`pathfinder` on oltava objekti
 	Add to Brushes	Lisää siveltimiin
 	Brush Library	Sivellinkirjasto
 	Save Brush Library	Tallenna sivellinkirjasto

@@ -5474,6 +5474,10 @@ axis	Y Axis	Eixo Y
 	Rectangular Grid Tool Options	Opções da Ferramenta Grade Retangular
 	Polar Grid Tool Options	Opções da Ferramenta Grade Polar
 	Fill Line	Preencher linha
+	Pathfinder Options	Opções do Localizador de Caminhos
+	Divide and Outline Will Remove Unpainted Artwork	Dividir e Contorno removem a ilustração sem pintura
+@msg	precision must be from 0.001 to 10 pt	precision deve estar entre 0,001 e 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` deve ser um objeto
 	Add to Brushes	Adicionar aos Pincéis
 	Brush Library	Biblioteca de Pincéis
 	Save Brush Library	Salvar Biblioteca de Pincéis

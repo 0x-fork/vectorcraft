@@ -5173,6 +5173,10 @@ axis	Y Axis	Asse Y
 	Rectangular Grid Tool Options	Opzioni strumento Griglia rettangolare
 	Polar Grid Tool Options	Opzioni strumento Griglia polare
 	Fill Line	Riempi linea
+	Pathfinder Options	Opzioni elaborazione tracciati
+	Divide and Outline Will Remove Unpainted Artwork	Dividi e Contorno rimuovono la grafica senza colore
+@msg	precision must be from 0.001 to 10 pt	precision deve essere compreso tra 0,001 e 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` deve essere un oggetto
 	Add to Brushes	Aggiungi ai pennelli
 	Brush Library	Libreria pennelli
 	Save Brush Library	Salva libreria pennelli

@@ -5509,6 +5509,10 @@ axis	Y Axis	Άξονας Y
 	Rectangular Grid Tool Options	Επιλογές εργαλείου ορθογώνιου πλέγματος
 	Polar Grid Tool Options	Επιλογές εργαλείου πολικού πλέγματος
 	Fill Line	Γέμισμα γραμμής
+	Pathfinder Options	Επιλογές Pathfinder
+	Divide and Outline Will Remove Unpainted Artwork	Η Διαίρεση και το Περίγραμμα αφαιρούν τα γραφικά χωρίς χρώμα
+@msg	precision must be from 0.001 to 10 pt	το precision πρέπει να είναι από 0,001 έως 10 pt
+@msg	`pathfinder` must be an object	Το `pathfinder` πρέπει να είναι αντικείμενο
 	Add to Brushes	Προσθήκη στα πινέλα
 	Brush Library	Βιβλιοθήκη πινέλων
 	Save Brush Library	Αποθήκευση βιβλιοθήκης πινέλων
