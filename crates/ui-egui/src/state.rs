@@ -32,16 +32,20 @@ impl Default for View {
 impl View {
     /// The view a document opens at: the one it was saved with, else fitted on first display.
     pub fn of(st: &vectorcraft_engine::DocState) -> Self {
-        match &st.view {
-            Some(v) if v.zoom.is_finite() && v.zoom > 0.0 && v.center.x.is_finite() && v.center.y.is_finite() => Self {
-                zoom: v.zoom.clamp(0.0313, 640.0),
-                center: v.center,
-                fitted: true,
-                rotation: if v.rotation.is_finite() { v.rotation } else { 0.0 },
-                artboard: 0,
-            },
-            _ => Self::default(),
-        }
+        st.view.as_ref().and_then(Self::saved).unwrap_or_default()
+    }
+
+    /// The view `v` saved (the one a document was saved with, or a View → New View… one), within
+    /// the zoom range; `None` when the canvas can't show it (a zoom or centre that isn't finite, a
+    /// zoom of 0 or less).
+    pub fn saved(v: &vectorcraft_engine::doc::SavedView) -> Option<Self> {
+        v.is_usable().then(|| Self {
+            zoom: v.zoom.clamp(0.0313, 640.0),
+            center: v.center,
+            fitted: true,
+            rotation: if v.rotation.is_finite() { v.rotation } else { 0.0 },
+            artboard: 0,
+        })
     }
 }
 
