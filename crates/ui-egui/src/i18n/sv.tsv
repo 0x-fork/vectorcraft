@@ -5581,6 +5581,10 @@ axis	Y Axis	Y-axel
 	Rectangular Grid Tool Options	Alternativ för verktyget för rektangulärt rutnät
 	Polar Grid Tool Options	Alternativ för verktyget för polärt rutnät
 	Fill Line	Fyll linje
+	Pathfinder Options	Alternativ för banfinnare
+	Divide and Outline Will Remove Unpainted Artwork	Dela upp och Konturvy tar bort omålat bildmaterial
+@msg	precision must be from 0.001 to 10 pt	precision måste vara från 0,001 till 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` måste vara ett objekt
 	Add to Brushes	Lägg till i penslar
 	Brush Library	Penselbibliotek
 	Save Brush Library	Spara penselbibliotek

@@ -5541,6 +5541,10 @@ axis	Y Axis	Y-as
 	Rectangular Grid Tool Options	Opties rechthoekig-rastergereedschap
 	Polar Grid Tool Options	Opties polair-rastergereedschap
 	Fill Line	Lijn vullen
+	Pathfinder Options	Pathfinder-opties
+	Divide and Outline Will Remove Unpainted Artwork	Verdelen en Omtrek verwijderen ongeverfd artwork
+@msg	precision must be from 0.001 to 10 pt	precision moet tussen 0,001 en 10 pt liggen
+@msg	`pathfinder` must be an object	`pathfinder` moet een object zijn
 	Add to Brushes	Aan penselen toevoegen
 	Brush Library	Penseelbibliotheek
 	Save Brush Library	Penseelbibliotheek opslaan

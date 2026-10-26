@@ -5139,6 +5139,10 @@ axis	Y Axis	Y-Achse
 	Rectangular Grid Tool Options	Optionen für das Rechteckiges-Raster-Werkzeug
 	Polar Grid Tool Options	Optionen für das Radiales-Raster-Werkzeug
 	Fill Line	Linie füllen
+	Pathfinder Options	Pathfinder-Optionen
+	Divide and Outline Will Remove Unpainted Artwork	„Fläche aufteilen“ und „Pfadansicht“ entfernen ungefärbtes Bildmaterial
+@msg	precision must be from 0.001 to 10 pt	precision muss zwischen 0,001 und 10 pt liegen
+@msg	`pathfinder` must be an object	`pathfinder` muss ein Objekt sein
 	Add to Brushes	Zu Pinseln hinzufügen
 	Brush Library	Pinsel-Bibliothek
 	Save Brush Library	Pinsel-Bibliothek speichern

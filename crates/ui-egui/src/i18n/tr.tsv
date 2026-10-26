@@ -5514,6 +5514,10 @@ axis	Y Axis	Y ekseni
 	Rectangular Grid Tool Options	Dikdörtgen Izgara Aracı Seçenekleri
 	Polar Grid Tool Options	Yuvarlak Izgara Aracı Seçenekleri
 	Fill Line	Çizgiyi doldur
+	Pathfinder Options	Yol Bulucu Seçenekleri
+	Divide and Outline Will Remove Unpainted Artwork	Böl ve Taslak boyanmamış çizimi kaldırır
+@msg	precision must be from 0.001 to 10 pt	precision 0,001 ile 10 pt arasında olmalıdır
+@msg	`pathfinder` must be an object	`pathfinder` bir nesne olmalıdır
 	Add to Brushes	Fırçalara Ekle
 	Brush Library	Fırça Kitaplığı
 	Save Brush Library	Fırça Kitaplığını Kaydet

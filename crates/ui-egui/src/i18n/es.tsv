@@ -5499,6 +5499,10 @@ axis	Y Axis	Eje Y
 	Rectangular Grid Tool Options	Opciones de la herramienta Cuadrícula rectangular
 	Polar Grid Tool Options	Opciones de la herramienta Cuadrícula polar
 	Fill Line	Rellenar línea
+	Pathfinder Options	Opciones de Buscatrazos
+	Divide and Outline Will Remove Unpainted Artwork	Dividir y Contorno eliminarán la ilustración sin pintar
+@msg	precision must be from 0.001 to 10 pt	precision debe estar entre 0,001 y 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` debe ser un objeto
 	Add to Brushes	Agregar a pinceles
 	Brush Library	Biblioteca de pinceles
 	Save Brush Library	Guardar biblioteca de pinceles

@@ -5473,6 +5473,10 @@ axis	Y Axis	Y ღერძი
 	Rectangular Grid Tool Options	მართკუთხა ბადის ხელსაწყოს პარამეტრები
 	Polar Grid Tool Options	პოლარული ბადის ხელსაწყოს პარამეტრები
 	Fill Line	ხაზის შევსება
+	Pathfinder Options	ტრაექტორიების ოპერაციების პარამეტრები
+	Divide and Outline Will Remove Unpainted Artwork	დაყოფა და კონტურები წაშლის შეუღებავ ნახატს
+@msg	precision must be from 0.001 to 10 pt	precision უნდა იყოს 0,001-დან 10 pt-მდე
+@msg	`pathfinder` must be an object	`pathfinder` უნდა იყოს ობიექტი
 	Add to Brushes	ფუნჯებში დამატება
 	Brush Library	ფუნჯების ბიბლიოთეკა
 	Save Brush Library	ფუნჯების ბიბლიოთეკის შენახვა

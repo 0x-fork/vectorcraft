@@ -5557,6 +5557,10 @@ axis	Y Axis	osa Y
 	Rectangular Grid Tool Options	Možnosti nástroje Obdélníková mřížka
 	Polar Grid Tool Options	Možnosti nástroje Polární mřížka
 	Fill Line	Výplň úsečky
+	Pathfinder Options	Možnosti operací s cestami
+	Divide and Outline Will Remove Unpainted Artwork	Rozdělit a Obrys odstraní nenatřenou kresbu
+@msg	precision must be from 0.001 to 10 pt	precision musí být od 0,001 do 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` musí být objekt
 	Add to Brushes	Přidat do štětců
 	Brush Library	Knihovna štětců
 	Save Brush Library	Uložit knihovnu štětců

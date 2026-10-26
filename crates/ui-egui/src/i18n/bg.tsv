@@ -5481,6 +5481,10 @@ axis	Y Axis	Y ос
 	Rectangular Grid Tool Options	Опции на инструмента „Правоъгълна мрежа“
 	Polar Grid Tool Options	Опции на инструмента „Полярна мрежа“
 	Fill Line	Запълване на линия
+	Pathfinder Options	Опции за търсач на пътища
+	Divide and Outline Will Remove Unpainted Artwork	„Разделяне“ и „Контур“ премахват небоядисаната графика
+@msg	precision must be from 0.001 to 10 pt	precision трябва да е от 0,001 до 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` трябва да бъде обект
 	Add to Brushes	Добавяне към четки
 	Brush Library	Библиотека с четки
 	Save Brush Library	Запази библиотека с четки

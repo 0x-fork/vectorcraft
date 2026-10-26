@@ -5497,6 +5497,10 @@ axis	Y Axis	Y-akse
 	Rectangular Grid Tool Options	Indstillinger for rektangulært gitterværktøj
 	Polar Grid Tool Options	Indstillinger for polært gitterværktøj
 	Fill Line	Udfyld linje
+	Pathfinder Options	Pathfinder-indstillinger
+	Divide and Outline Will Remove Unpainted Artwork	Opdel og Kontur fjerner grafik uden maling
+@msg	precision must be from 0.001 to 10 pt	precision skal være fra 0,001 til 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` skal være et objekt
 	Add to Brushes	Føj til pensler
 	Brush Library	Penselbibliotek
 	Save Brush Library	Gem penselbibliotek

@@ -5169,6 +5169,10 @@ axis	Y Axis	Ось Y
 	Rectangular Grid Tool Options	Параметры инструмента «Прямоугольная сетка»
 	Polar Grid Tool Options	Параметры инструмента «Полярная сетка»
 	Fill Line	Заливка отрезка
+	Pathfinder Options	Параметры обработки контуров
+	Divide and Outline Will Remove Unpainted Artwork	«Разделить» и «Контур» удаляют неокрашенную графику
+@msg	precision must be from 0.001 to 10 pt	precision должно быть от 0,001 до 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` должно быть объектом
 	Add to Brushes	Добавить в кисти
 	Brush Library	Библиотека кистей
 	Save Brush Library	Сохранить библиотеку кистей

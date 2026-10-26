@@ -465,7 +465,7 @@ fn find(parent: &mut [usize], mut v: usize) -> usize {
 /// wherever they meet another path, keyed by the input they came from (the front-most where
 /// inputs share one). Empty when the paths can't be swept (non-finite or too degenerate).
 pub fn live_paint(shapes: &[Shape]) -> (Vec<Region>, Vec<Shape>) {
-    build(shapes).unwrap_or_default()
+    build(shapes, DEFAULT_PRECISION).unwrap_or_default()
 }
 
 /// [`live_paint`] with Gap Detection: the faces are those of `shapes` with a line across each gap
@@ -809,22 +809,27 @@ pub(crate) fn gap_inputs(shapes: &[Shape], gap: f64) -> Vec<Shape> {
 /// found. A `gap` of 0 is [`shape_builder`]. The bridges are in no region's sources and in no piece
 /// of `lines` or `edges`.
 pub fn shape_builder_with_gap(shapes: &[Shape], edges: bool, gap: f64) -> BuilderArrangement {
+    builder(shapes, edges, gap, DEFAULT_PRECISION)
+}
+
+/// [`shape_builder_with_gap`] refitting its results to `precision` (Pathfinder Options › Precision).
+pub(crate) fn builder(shapes: &[Shape], edges: bool, gap: f64, precision: f64) -> BuilderArrangement {
     let has_open = has_open_path(shapes);
     let segments: usize = shapes.iter().flat_map(|s| &s.path.subpaths).map(|sp| sp.segment_count()).sum();
     let planar = (segments <= SHAPE_BUILDER_MAX_SEGMENTS)
         .then(|| {
             let keyed: Vec<Shape> = shapes.iter().enumerate().map(|(i, s)| Shape::new(s.path.clone(), s.rule, i as u64)).collect();
             if has_open && gap.is_finite() && gap > 0.0 {
-                let (faces, pieces) = live_paint(&gap_inputs(&keyed, gap));
+                let (faces, pieces) = build(&gap_inputs(&keyed, gap), precision).unwrap_or_default();
                 // Gap targets split original outlines too, but the bridges themselves aren't art.
                 (faces, pieces.into_iter().filter(|p| p.key < shapes.len() as u64).collect())
             } else {
-                live_paint(&keyed)
+                build(&keyed, precision).unwrap_or_default()
             }
         })
         .filter(|(faces, pieces)| !faces.is_empty() || !pieces.is_empty());
     let Some((faces, pieces)) = planar else {
-        return BuilderArrangement { regions: filled_regions(shapes), ..Default::default() };
+        return BuilderArrangement { regions: filled_regions(shapes, precision), ..Default::default() };
     };
     let is_line = |i: u64| shapes.get(i as usize).is_some_and(|s| !s.path.subpaths.iter().any(|sp| sp.closed));
     let (lines, outline): (Vec<Shape>, Vec<Shape>) = pieces.into_iter().partition(|e| is_line(e.key));
@@ -832,7 +837,7 @@ pub fn shape_builder_with_gap(shapes: &[Shape], edges: bool, gap: f64) -> Builde
         faces
     } else {
         // The filled areas from their arrangement, whose faces merge exactly, then the gaps.
-        let mut regions = crate::regions(shapes);
+        let mut regions = crate::pathfinder::regions_with(shapes, precision);
         regions.extend(faces.into_iter().filter(|f| f.sources.is_empty()));
         regions
     };
@@ -842,14 +847,14 @@ pub fn shape_builder_with_gap(shapes: &[Shape], edges: bool, gap: f64) -> Builde
 /// The regions of the shapes' filled areas. A shape that fills nothing (open paths that enclose no
 /// area, such as cutting lines) is left out, so a flood of them cannot push the arrangement past its
 /// size budget and take the filled shapes down with it; the regions keep the original indices.
-fn filled_regions(shapes: &[Shape]) -> Vec<crate::Region> {
+fn filled_regions(shapes: &[Shape], precision: f64) -> Vec<crate::Region> {
     let fills = |s: &Shape| s.path.subpaths.iter().any(|sp| sp.closed || encloses_area(sp));
     let keep: Vec<usize> = (0..shapes.len()).filter(|&i| shapes.get(i).is_some_and(fills)).collect();
     if keep.len() == shapes.len() {
-        return crate::regions(shapes);
+        return crate::pathfinder::regions_with(shapes, precision);
     }
     let kept: Vec<Shape> = keep.iter().filter_map(|&i| shapes.get(i).cloned()).collect();
-    crate::regions(&kept)
+    crate::pathfinder::regions_with(&kept, precision)
         .into_iter()
         .map(|mut r| {
             r.sources = r.sources.iter().filter_map(|&s| keep.get(s).copied()).collect();
@@ -1080,6 +1085,11 @@ pub(crate) struct Map {
 /// With `cover`, also finds which inputs cover each sliver, which only [`Map::merge`] reads;
 /// without it the slivers' lists of inputs stay empty.
 pub(crate) fn map(shapes: &[Shape], cover: bool) -> Option<Map> {
+    map_with(shapes, cover, DEFAULT_PRECISION)
+}
+
+/// [`map`] whose faces and pieces are refit to `precision`, and whose slivers thinner than it are dropped.
+fn map_with(shapes: &[Shape], cover: bool, precision: f64) -> Option<Map> {
     let mut inputs: Vec<(BezPath, usize)> = Vec::new();
     for (i, s) in shapes.iter().enumerate() {
         let mut bp = BezPath::new();
@@ -1110,7 +1120,7 @@ pub(crate) fn map(shapes: &[Shape], cover: bool) -> Option<Map> {
     let sweep =
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| Topology::<Crossings>::from_paths(inputs.iter().map(|(p, i)| (p, *i)), eps)));
     let top = sweep.ok()?.ok()?;
-    let tidy = Tidy::keeping(DEFAULT_PRECISION, inputs.iter().map(|p| &p.0));
+    let tidy = Tidy::keeping(precision, inputs.iter().map(|p| &p.0));
 
     // The planar graph: vertices are the sweep's points, edges its segments. Points closer than
     // the sweep's tolerance are one vertex (it can put a corner that lies on another path's edge
@@ -1229,7 +1239,7 @@ pub(crate) fn map(shapes: &[Shape], cover: bool) -> Option<Map> {
         let twin_of = between.get(&key).and_then(|v| {
             v.iter().copied().find(|&e| {
                 let other = edges.get(e).and_then(|e| mid(&e.segs));
-                matches!((here, other), (Some(a), Some(b)) if a.distance(b) < DEFAULT_PRECISION)
+                matches!((here, other), (Some(a), Some(b)) if a.distance(b) < precision)
             })
         });
         if let Some(e) = twin_of {
@@ -1448,8 +1458,8 @@ impl Map {
     }
 }
 
-fn build(shapes: &[Shape]) -> Option<(Vec<Region>, Vec<Shape>)> {
-    let m = map(shapes, false)?;
+fn build(shapes: &[Shape], precision: f64) -> Option<(Vec<Region>, Vec<Shape>)> {
+    let m = map_with(shapes, false, precision)?;
     let Map { edges, around, faces, holes, face_holes, tidy, anchors, snap, .. } = &m;
     let snap = *snap;
     let fills: Vec<Fill> = shapes.iter().map(Fill::new).collect();
@@ -1465,7 +1475,11 @@ fn build(shapes: &[Shape]) -> Option<(Vec<Region>, Vec<Shape>)> {
             subpaths.extend(hs.iter().filter_map(|&k| holes.get(k)).filter_map(|(c, _)| subpath(c)));
             let path = unshear(PathData::new(subpaths), anchors, snap);
             let sources =
-                interior_point(&path).map(|p| fills.iter().enumerate().filter(|(_, f)| f.contains(p)).map(|(i, _)| i).collect()).unwrap_or_default();
+                // A face finer than the default precision can need a finer outline to find a point in.
+                interior_point(&path)
+                    .or_else(|| (precision < DEFAULT_PRECISION).then(|| interior_point_within(&path, precision / 4.0)).flatten())
+                    .map(|p| fills.iter().enumerate().filter(|(_, f)| f.contains(p)).map(|(i, _)| i).collect())
+                    .unwrap_or_default();
             Some(Region { path, sources })
         })
         .collect();
@@ -1531,10 +1545,16 @@ fn build(shapes: &[Shape]) -> Option<(Vec<Region>, Vec<Shape>)> {
 /// a Live Paint face after a rebuild).
 pub fn interior_point(path: &PathData) -> Option<Point> {
     let bb = path.bounds()?;
+    interior_point_within(path, (bb.width().max(bb.height()) * 1e-3).max(1e-4))
+}
+
+/// [`interior_point`] with the path's curves flattened to within `tolerance`.
+fn interior_point_within(path: &PathData, tolerance: f64) -> Option<Point> {
+    let bb = path.bounds()?;
     let bp = path.to_bezpath();
     let mut edges: Vec<(Point, Point)> = vec![];
     let (mut first, mut last) = (Point::ZERO, Point::ZERO);
-    kurbo::flatten(bp.iter(), (bb.width().max(bb.height()) * 1e-3).max(1e-4), |el| match el {
+    kurbo::flatten(bp.iter(), tolerance, |el| match el {
         kurbo::PathEl::MoveTo(p) => {
             if last != first {
                 edges.push((last, first));
