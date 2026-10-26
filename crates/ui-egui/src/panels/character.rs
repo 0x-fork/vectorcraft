@@ -695,8 +695,8 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     }
     ui.add_space(4.0);
     ui.horizontal(|ui| {
-        let small = s.small_caps.is_some();
-        let position = s.position.id();
+        let small = shared(app, |s| s.small_caps.is_some()) == Some(true);
+        let position = shared(app, |s| s.position).map(|p| p.id()).unwrap_or("");
         for (kind, tip, on, change) in [
             (Glyph::AllCaps, tl!("All Caps"), s.all_caps, json!({"allCaps": !s.all_caps})),
             (Glyph::SmallCaps, tl!("Small Caps"), small, json!({"smallCaps": !small})),
@@ -810,8 +810,8 @@ pub fn menu(app: &mut VectorcraftApp, ui: &mut Ui) {
             format(app, json!({key: !on}));
         }
     }
-    let small = s.as_ref().is_some_and(|s| s.small_caps.is_some());
-    let position = s.as_ref().map_or("normal", |s| s.position.id());
+    let small = shared(app, |s| s.small_caps.is_some()) == Some(true);
+    let position = shared(app, |s| s.position).map(|p| p.id()).unwrap_or("");
     for (label, on, change) in [
         (tl!("Small Caps"), small, json!({"smallCaps": !small})),
         (tl!("Superscript"), position == "superscript", position_toggle(position, "superscript")),
@@ -1437,6 +1437,27 @@ mod tests {
         assert_eq!(checked(&mut app), ["Left to Right"]);
         app.session.set_tool_option("select", &json!({"start": 0, "end": 8}));
         assert_eq!(checked(&mut app), ["Default"]);
+    }
+
+    /// Small Caps, Superscript and Subscript buttons and menu items stay off when the selection mixes them.
+    #[test]
+    fn character_mixed_small_caps_and_position_show_off() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.run("file.new", json!({"width": 300, "height": 200})).unwrap();
+        let a = app.run("text.create", json!({"x": 20, "y": 50, "text": "A"})).unwrap()["id"].clone();
+        let b = app.run("text.create", json!({"x": 20, "y": 90, "text": "B"})).unwrap()["id"].clone();
+        app.run("text.setRangeStyle", json!({"id": a, "start": 0, "end": 1, "smallCaps": true, "position": "superscript"})).unwrap();
+        app.run("text.setRangeStyle", json!({"id": b, "start": 0, "end": 1, "smallCaps": false, "position": "subscript"})).unwrap();
+        app.run("select.set", json!({"ids": [a, b]})).unwrap();
+        assert_eq!(shared(&app, |s| s.small_caps.is_some()), None);
+        assert_eq!(shared(&app, |s| s.position), None);
+        let ctx = egui::Context::default();
+        assert_eq!(script_buttons(&ctx, &mut app).1, [false, false, false]);
+        let checked = |app: &mut VectorcraftApp| {
+            let texts = super::super::tests_appearance::frame_events(&ctx, app, vec![], menu);
+            ["Small Caps", "Superscript", "Subscript"].map(|l| texts.iter().any(|(t, _)| *t == format!("✓ {l}")))
+        };
+        assert_eq!(checked(&mut app), [false, false, false]);
     }
 
     /// At a caret in text the Type tool edits, with no characters selected, the Character
