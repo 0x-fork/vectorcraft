@@ -533,6 +533,11 @@ impl Tool for GestureTool {
             _ => vec![],
         }
     }
+    /// The freehand tools build their stroke from every position the pointer passed; the Join tool
+    /// only needs where its scribble crosses the ends.
+    fn wants_samples(&self) -> bool {
+        matches!(self.id, "pencil" | "paintbrush" | "blobBrush" | "eraser" | "knife" | "smooth" | "pathEraser")
+    }
     /// `[` and `]` are the Blob Brush's and the Eraser's: their size (#1661).
     fn claims_key(&self, _cx: &ToolContext, key: ToolKey) -> bool {
         matches!(key, ToolKey::BracketLeft | ToolKey::BracketRight) && matches!(self.id, "blobBrush" | "eraser")
@@ -874,6 +879,16 @@ mod tests {
     /// Holding Alt shows the Paintbrush's closing cursor before the press, and the Pencil's and the
     /// Paintbrush's while drawing (before a press, Alt gives the Pencil its straight-line cursor); a release
     /// with Alt still held closes the path, and Alt let go before the release leaves it open.
+    /// The freehand tools take every position the pointer passed (`wants_samples`); the Join tool
+    /// doesn't need them.
+    #[test]
+    fn the_freehand_tools_want_every_sample() {
+        for id in ["pencil", "paintbrush", "blobBrush", "eraser", "knife", "smooth", "pathEraser"] {
+            assert!(GestureTool::new(id).wants_samples(), "{id}");
+        }
+        assert!(!GestureTool::new("join").wants_samples());
+    }
+
     #[test]
     fn alt_shows_the_closing_cursor_and_a_release_with_alt_closes() {
         let (d, _) = doc_with_rect();
