@@ -5477,3 +5477,4 @@ axis	Y Axis	Y ღერძი
 	Scale Presets	მასშტაბის წინასწარ დაყენებული მნიშვნელობები
 @msg	a {width}×{height} screenshot's byte count overflows	{width}×{height} ეკრანის სურათის ბაიტების რაოდენობა გადაივსო
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	ფანჯრის {what} ({points} პუნქტი × {scale} DPI) ეკრანის სურათის ზომას ვერ განსაზღვრავს
+	Live preview	ცოცხალი წინასწარი ნახვა

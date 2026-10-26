@@ -5561,3 +5561,4 @@ axis	Y Axis	osa Y
 	Scale Presets	Přednastavení měřítka
 @msg	a {width}×{height} screenshot's byte count overflows	počet bajtů snímku {width}×{height} přeteče
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	okno {what} ({points} bodů × {scale} DPI) nemůže určit velikost snímku
+	Live preview	Živý náhled

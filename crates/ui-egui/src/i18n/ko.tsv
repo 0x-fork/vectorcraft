@@ -5140,3 +5140,4 @@ axis	Y Axis	Y축
 	Scale Presets	크기 조절 사전 설정
 @msg	a {width}×{height} screenshot's byte count overflows	{width}×{height} 스크린샷의 바이트 수가 넘칩니다
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	창의 {what}({points}포인트 × {scale} DPI)로는 스크린샷 크기를 정할 수 없습니다
+	Live preview	실시간 미리 보기

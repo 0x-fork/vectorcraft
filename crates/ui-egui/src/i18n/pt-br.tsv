@@ -5478,3 +5478,4 @@ axis	Y Axis	Eixo Y
 	Scale Presets	Predefinições de escala
 @msg	a {width}×{height} screenshot's byte count overflows	a contagem de bytes de uma captura {width}×{height} transborda
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	o {what} da janela ({points} pontos × {scale} DPI) não pode dimensionar uma captura
+	Live preview	Visualização ao vivo

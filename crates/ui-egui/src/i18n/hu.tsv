@@ -5547,3 +5547,4 @@ axis	Y Axis	Y tengely
 	Scale Presets	Méretezési beállítások
 @msg	a {width}×{height} screenshot's byte count overflows	a(z) {width}×{height} képernyőkép bájtszáma túlcsordul
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	az ablak {what} ({points} pont × {scale} DPI) nem tud képernyőkép-méretet adni
+	Live preview	Élő előnézet

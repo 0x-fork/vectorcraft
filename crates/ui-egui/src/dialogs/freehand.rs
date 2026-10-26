@@ -6,7 +6,9 @@
 //! Fields: `tool`; `fidelity` (points; Pencil, Paintbrush and Smooth), `fill` (Pencil and
 //! Paintbrush), `keepSelected` (Pencil, Paintbrush and Blob Brush), `mergeOnlySelection` (Blob
 //! Brush), `closeWithin` and `editWithin` (screen pixels, 0 turns it off; Pencil and Paintbrush),
-//! `angle` (degrees) and `roundness` (percent; Eraser) and `size` (points; Blob Brush and Eraser).
+//! `angle` (degrees) and `roundness` (percent; Eraser), `livePreview` (Pencil: the stroke shows
+//! with its fill and stroke while it is drawn, or as a thin line until the release) and `size`
+//! (points; Blob Brush and Eraser).
 
 use serde_json::{Map, Value, json};
 
@@ -25,8 +27,20 @@ pub(super) const SPEC: DialogSpec = DialogSpec { heading, body, confirm, min_wid
 pub const TOOLS: [&str; 5] = ["pencil", "paintbrush", "smooth", "blobBrush", "eraser"];
 
 /// The options the dialog edits, in the order it shows them (a tool has those it reports).
-const KEYS: [&str; 11] =
-    ["fidelity", "angle", "roundness", "size", "fill", "altSmooth", "keepSelected", "mergeOnlySelection", "closeWithin", "editWithin", "liveFit"];
+const KEYS: [&str; 12] = [
+    "fidelity",
+    "angle",
+    "roundness",
+    "size",
+    "fill",
+    "altSmooth",
+    "keepSelected",
+    "mergeOnlySelection",
+    "closeWithin",
+    "editWithin",
+    "livePreview",
+    "liveFit",
+];
 
 /// Width of the dialog's rows: every number field ends at its right edge.
 const CONTENT_W: f32 = 330.0;
@@ -190,8 +204,14 @@ fn body(_app: &mut VectorcraftApp, ui: &mut egui::Ui, d: &mut Dialog) -> bool {
     if d.fields.contains_key("editWithin") {
         number(ui, d, ("editWithin", tl!("Edit selected paths within:")), "px", 0, (0.0, 100.0));
     }
-    if d.fields.contains_key("liveFit") {
+    if d.fields.contains_key("livePreview") {
         ui.add_space(6.0);
+        check(ui, d, "livePreview", tl!("Live preview"));
+    }
+    if d.fields.contains_key("liveFit") {
+        if !d.fields.contains_key("livePreview") {
+            ui.add_space(6.0);
+        }
         check(ui, d, "liveFit", tl!("Live curve fitting"));
     }
     false
@@ -283,6 +303,7 @@ mod tests {
             "Alt key toggles to Smooth Tool",
             "Close paths when ends are within:",
             "Edit selected paths within:",
+            "Live preview",
         ] {
             assert!(text.contains(label), "{label} in {text}");
         }
@@ -310,7 +331,7 @@ mod tests {
         assert_eq!((d.f64("fidelity", 0.0), d.bool("fill")), (1.5, false));
         let pb_text = painted(&mut app);
         assert!(pb_text.contains("Paintbrush Tool Options"));
-        assert!(!pb_text.contains("Alt key toggles to Smooth Tool"));
+        assert!(!pb_text.contains("Alt key toggles to Smooth Tool") && !pb_text.contains("Live preview"), "{pb_text}");
         // Smooth has Fidelity only, the Eraser Size only, and the Blob Brush Size, Keep selected and Merge only with selection.
         app.run("tool.options", json!({"tool": "smooth"})).unwrap();
         let text = painted(&mut app);

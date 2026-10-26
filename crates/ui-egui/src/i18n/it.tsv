@@ -5177,3 +5177,4 @@ axis	Y Axis	Asse Y
 	Scale Presets	Preimpostazioni di scala
 @msg	a {width}×{height} screenshot's byte count overflows	il numero di byte di uno screenshot {width}×{height} va in overflow
 @msg	the window's {what} ({points} points × {scale} DPI) cannot size a screenshot	la {what} della finestra ({points} punti × {scale} DPI) non può dimensionare uno screenshot
+	Live preview	Anteprima dal vivo
