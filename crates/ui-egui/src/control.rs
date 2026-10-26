@@ -15,8 +15,9 @@
 //! - `ui.move {x, y}` / `ui.click {x, y, button?, count?, shift?…}` / `ui.drag {x, y, toX, toY, steps?}`:
 //!   real egui pointer input in screen points (reaches every widget: panels, flyouts, dialogs)
 //! - `ui.set {brightness?, panel?, dockTab?, rulers?, outline?, …}`
-//! - `ui.dialog.set {field, value}` / `ui.dialog.confirm` / `ui.dialog.cancel` (setting a field the
-//!   dialog does not read is an error that lists its fields: [`crate::dialogs::accepts_field`])
+//! - `ui.dialog.set {field, value}` or `{fields: [{field, value}…]}` (all or none; setting a field
+//!   the dialog does not read is an error that lists its fields: [`crate::dialogs::accepts_field`]) /
+//!   `ui.dialog.confirm` / `ui.dialog.cancel`
 //! - `ui.resize {width, height}`, `ui.focus`, `ui.screenshot {path?, data?}` (`data: true`: the PNG
 //!   comes back as `pngBase64` as well)
 //! - `ui.render {path?, scale?, artboard?, data?, traceViews?}`: render an artboard headlessly
@@ -47,6 +48,8 @@ pub(crate) const MAX_DRAG_STEPS: u64 = 256;
 pub(crate) const MAX_CLICK_COUNT: u64 = 16;
 pub(crate) const MAX_SYNTHETIC_EVENTS: usize = 1024;
 pub(crate) const MAX_CONTROL_REQUESTS_PER_FRAME: usize = 64;
+/// Most items one `ui.dialog.set {fields}` may store, as MCP `answer_dialog` allows.
+pub(crate) const MAX_DIALOG_FIELDS: usize = 256;
 
 fn input_count(p: &Value, key: &str, default: u64, max: u64) -> Result<usize, String> {
     let n = match p.get(key) {
@@ -58,6 +61,29 @@ fn input_count(p: &Value, key: &str, default: u64, max: u64) -> Result<usize, St
     }
     // Preserve legacy zero behaviour: both a zero count and zero steps still perform once.
     usize::try_from(n.max(1)).map_err(|_| format!("`{key}` is out of range"))
+}
+
+/// The fields one `ui.dialog.set` stores, in order: `{field, value?}`, or `{fields: [{field, value?}…]}`.
+/// Every item is checked before any is stored, so a refused item leaves the dialog as it was.
+fn dialog_fields(p: &Value) -> Result<Vec<(String, Value)>, String> {
+    let Some(list) = p.get("fields") else {
+        let f = p.get("field").and_then(Value::as_str).ok_or("missing `field`")?;
+        return Ok(vec![(f.to_string(), p.get("value").cloned().unwrap_or(Value::Null))]);
+    };
+    if p.get("field").is_some() {
+        return Err("give `field` or `fields`, not both".into());
+    }
+    let list = list.as_array().ok_or("`fields` must be a list of {field, value?}")?;
+    if list.len() > MAX_DIALOG_FIELDS {
+        return Err(format!("`fields` holds {} items; at most {MAX_DIALOG_FIELDS}", list.len()));
+    }
+    list.iter()
+        .enumerate()
+        .map(|(i, item)| {
+            let f = item.get("field").and_then(Value::as_str).ok_or_else(|| format!("fields {i}: missing string `field`"))?;
+            Ok((f.to_string(), item.get("value").cloned().unwrap_or(Value::Null)))
+        })
+        .collect()
 }
 
 fn reserve_synthetic(app: &mut VectorcraftApp, additional: usize) -> Result<(), String> {
@@ -410,12 +436,18 @@ pub fn handle(app: &mut VectorcraftApp, ctx: &egui::Context, req: &ControlReques
         }
         "ui.dialog.set" => match app.ui.dialog.as_mut() {
             Some(d) => {
-                let Some(f) = s("field") else { return err("missing `field`") };
-                if !crate::dialogs::accepts_field(d, f) {
+                let fields = match dialog_fields(p) {
+                    Ok(fields) => fields,
+                    Err(e) => return err(e),
+                };
+                // Every field is checked before any is set, so a request sets all of them or none.
+                if let Some((f, _)) = fields.iter().find(|(f, _)| !crate::dialogs::accepts_field(d, f)) {
                     let names = crate::dialogs::field_names(d).join(", ");
                     return err(format!("the `{}` dialog has no field `{f}`; its fields: {names}", d.kind));
                 }
-                d.fields.insert(f.to_string(), p.get("value").cloned().unwrap_or(Value::Null));
+                for (f, value) in fields {
+                    d.fields.insert(f, value);
+                }
                 ok(serde_json::to_value(&*d).unwrap_or_default())
             }
             None => err("no dialog open"),
@@ -590,7 +622,7 @@ mod tests {
     use serde_json::{Value, json};
     use vectorcraft_engine::Session;
 
-    use super::{ControlRequest, Outcome, handle};
+    use super::{ControlRequest, MAX_DIALOG_FIELDS, Outcome, handle};
     use crate::state::Dialog;
     use crate::{Services, VectorcraftApp};
 
@@ -739,6 +771,53 @@ mod tests {
             app.synthetic.clear();
             assert_eq!(input_request(&mut app, method, json!({"key": "Enter", "steps": 1}))["ok"], true, "queue space becomes usable after draining");
         }
+    }
+
+    /// `ui.dialog.set {fields}` stores the whole list in order, or nothing when an item is refused.
+    #[test]
+    fn dialog_set_stores_a_field_list_whole_or_not_at_all() {
+        let mut app = VectorcraftApp::new(Session::new(), Services::default());
+        app.ui.dialog = Some(crate::state::Dialog::new("move", json!({"dx": "0 pt", "dy": "0 pt"})));
+        let fields = |app: &VectorcraftApp| app.ui.dialog.as_ref().map(|d| serde_json::to_value(&d.fields).unwrap());
+        let before = fields(&app);
+        for params in [
+            json!({"fields": [{"field": "copy", "value": true}, {"value": 1}]}),
+            json!({"fields": [{"field": "copy", "value": true}, 7]}),
+            json!({"fields": {"field": "copy"}}),
+            json!({"field": "dx", "fields": [{"field": "copy", "value": true}]}),
+            json!({"fields": [{"field": "copy", "value": true}, {"field": "note"}]}),
+        ] {
+            let r = input_request(&mut app, "ui.dialog.set", params.clone());
+            assert_eq!(r["ok"], false, "{params}: {r}");
+            assert_eq!(fields(&app), before, "{params}: a refused list stores no field");
+        }
+        let list = json!([{"field": "copy", "value": true}, {"field": "dx", "value": "3 pt"}, {"field": "dx", "value": "5 pt"}, {"field": "dy"}]);
+        let r = input_request(&mut app, "ui.dialog.set", json!({"fields": list}));
+        assert_eq!(r["ok"], true, "{r}");
+        let after = fields(&app).unwrap();
+        assert_eq!(after, json!({"copy": true, "dx": "5 pt", "dy": null}));
+        assert_eq!(r["result"]["fields"], after);
+        let r = input_request(&mut app, "ui.dialog.set", json!({"field": "dy", "value": "2 pt"}));
+        assert_eq!(r["ok"], true, "{r}");
+        assert_eq!(fields(&app).unwrap()["dy"], "2 pt");
+        app.ui.dialog = None;
+        assert_eq!(input_request(&mut app, "ui.dialog.set", json!({"fields": []}))["error"], "no dialog open");
+    }
+
+    /// `ui.dialog.set {fields}` stores at most `MAX_DIALOG_FIELDS` items; a longer list stores none.
+    #[test]
+    fn dialog_set_refuses_a_field_list_over_the_limit() {
+        let mut app = VectorcraftApp::new(Session::new(), Services::default());
+        app.ui.dialog = Some(crate::state::Dialog::new("move", json!({"dx": "0 pt"})));
+        let list = |n: usize| Value::Array((0..n).map(|i| json!({"field": "dx", "value": format!("{i} pt")})).collect());
+        let r = input_request(&mut app, "ui.dialog.set", json!({"fields": list(MAX_DIALOG_FIELDS + 1)}));
+        assert_eq!(r["ok"], false, "{r}");
+        assert_eq!(r["error"], format!("`fields` holds {} items; at most {MAX_DIALOG_FIELDS}", MAX_DIALOG_FIELDS + 1));
+        assert_eq!(app.ui.dialog.as_ref().map(|d| d.fields["dx"].clone()), Some(json!("0 pt")), "a refused list stores no field");
+        let r = input_request(&mut app, "ui.dialog.set", json!({"fields": list(MAX_DIALOG_FIELDS)}));
+        assert_eq!(r["ok"], true, "{r}");
+        let last = format!("{} pt", MAX_DIALOG_FIELDS - 1);
+        assert_eq!(app.ui.dialog.as_ref().map(|d| d.fields["dx"].clone()), Some(json!(last)), "the whole list is stored, in order");
     }
 
     /// #1004: `ui.render` (the MCP `screenshot` of a connected app) renders the artboard asked
