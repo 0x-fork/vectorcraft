@@ -827,8 +827,7 @@ mod tests {
 
     #[test]
     fn hostile_stroke_paint_flags_ignore_short_operands() {
-        let mut f = Filter::default();
-        f.paints = (true, true);
+        let mut f = Filter { paints: (true, true), ..Filter::default() };
         paint_op(&mut f, "Xd", &[V::Num(1.0)]);
         assert_eq!(f.paints, (true, true));
         paint_op(&mut f, "Xd", &[V::Num(0.0), V::Num(1.0)]);
