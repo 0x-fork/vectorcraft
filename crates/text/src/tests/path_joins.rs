@@ -2,7 +2,7 @@
 //! between one glyph's edge and the next one's, at the baseline and at the height of the joining
 //! stroke, is the measure. Fonts are installed ones (none is kept in the repository): the tests
 //! that need an Arabic font say so and stop without one.
-use super::*;
+use crate::*;
 use kurbo::{Affine, BezPath, Point, Shape};
 use std::sync::Arc;
 use vectorcraft_doc::{CharStyle, TextKind};

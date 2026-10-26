@@ -1,5 +1,5 @@
 //! Direction, source-cluster and editing regressions; no RTL font assets required.
-use super::*;
+use crate::*;
 use kurbo::{Affine, BezPath, Point, Rect, Shape};
 use std::ops::Range;
 use std::sync::Arc;

@@ -1,7 +1,7 @@
 //! Typography tests: rich-text editing, caret navigation, selection, area flow, composer,
 //! hyphenation, OpenType features, area type options.
 
-use super::*;
+use crate::*;
 use kurbo::{Affine, Circle, Shape};
 use vectorcraft_doc::{CharStyle, Justify, TextKind, TextRun};
 use vectorcraft_geom::PathData;

@@ -3,7 +3,7 @@
 use kurbo::Shape;
 use vectorcraft_doc::{CharPosition, CharStyle, ScriptMetrics, TextObject};
 
-use super::*;
+use crate::*;
 
 fn layout_of(text: &str, st: CharStyle) -> TextLayout {
     layout(FontDb::global(), &TextObject::point(kurbo::Point::ZERO, text, st))

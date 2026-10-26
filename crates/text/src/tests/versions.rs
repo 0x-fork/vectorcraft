@@ -5,8 +5,8 @@
 use kurbo::Point;
 use vectorcraft_doc::CharStyle;
 
-use super::test_fonts::{TWIN_FAMILY as FAMILY, TWIN_VERSIONS as VERSIONS, twin_font};
-use super::*;
+use crate::test_fonts::{TWIN_FAMILY as FAMILY, TWIN_VERSIONS as VERSIONS, twin_font};
+use crate::*;
 
 /// A database of the bundled fonts, the newer version of the test family loaded first.
 fn db() -> FontDb {

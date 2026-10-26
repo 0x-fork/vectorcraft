@@ -4,7 +4,7 @@
 use skrifa::MetadataProvider;
 use skrifa::color::ColorGlyphFormat;
 
-use super::test_fonts::{COLOUR_CHAR, COLR_SWEEP_CHAR, colr_font};
+use crate::test_fonts::{COLOUR_CHAR, COLR_SWEEP_CHAR, colr_font};
 
 #[test]
 fn colr_fonts_build_and_read() {
@@ -24,8 +24,8 @@ use skrifa::instance::LocationRef;
 use vectorcraft_doc::color::{BlendMode, Color, GradientKind, Paint};
 use vectorcraft_doc::{Node, NodeKind};
 
-use super::colr::{ColourContent, colour_glyph};
-use super::test_fonts::{COLR_GREEN, COLR_RED};
+use crate::colr::{ColourContent, colour_glyph};
+use crate::test_fonts::{COLR_GREEN, COLR_RED};
 
 const FOREGROUND: Color = Color::Rgb { r: 0.25, g: 0.5, b: 0.75 };
 
@@ -120,7 +120,7 @@ fn a_colr_graph_that_paints_itself_is_no_colour_glyph() {
     let base = GlyphId16::new(u16::try_from(base).unwrap());
     let mut colr = Colr::new(0, None, None, 0);
     colr.base_glyph_list = Some(BaseGlyphList::new(1, vec![BaseGlyphPaint::new(base, Paint::colr_glyph(base))])).into();
-    let font = super::test_fonts::colr_font_with("Colrtest Loop", &colr).unwrap();
+    let font = crate::test_fonts::colr_font_with("Colrtest Loop", &colr).unwrap();
     assert!(content(&font, COLOUR_CHAR).is_none());
 }
 
@@ -136,7 +136,7 @@ fn a_colr_graph_nested_past_the_cap_is_no_colour_glyph() {
     }
     let mut colr = Colr::new(0, None, None, 0);
     colr.base_glyph_list = Some(BaseGlyphList::new(1, vec![BaseGlyphPaint::new(base, paint)])).into();
-    let font = super::test_fonts::colr_font_with("Colrtest Deep", &colr).unwrap();
+    let font = crate::test_fonts::colr_font_with("Colrtest Deep", &colr).unwrap();
     assert!(content(&font, COLOUR_CHAR).is_none());
 }
 
@@ -145,8 +145,8 @@ fn a_colr_graph_nested_past_the_cap_is_no_colour_glyph() {
 use kurbo::Point as KPoint;
 use vectorcraft_doc::{CharStyle, TextObject};
 
-use super::test_fonts::colr_family;
-use super::{FontDb, layout};
+use crate::test_fonts::colr_family;
+use crate::{FontDb, layout};
 
 fn colr_db(v1: bool) -> FontDb {
     let db = FontDb::with_font_dirs(vec![]);
@@ -223,7 +223,7 @@ fn a_face_with_colr_and_sbix_draws_colr() {
     use write_fonts::FontBuilder;
     use write_fonts::types::Tag;
     let colr = colr_font(false).unwrap();
-    let sbix = super::test_fonts::colour_bitmap_font(true).unwrap();
+    let sbix = crate::test_fonts::colour_bitmap_font(true).unwrap();
     let sbix = skrifa::FontRef::new(&sbix).unwrap();
     let font = skrifa::FontRef::new(&colr).unwrap();
     let mut builder = FontBuilder::new();
@@ -251,7 +251,7 @@ fn v1_font(family: &str, base: char, paint: impl Fn(write_fonts::types::GlyphId1
     let mut colr = Colr::new(0, None, None, 0);
     colr.base_glyph_list = Some(BaseGlyphList::new(1, vec![BaseGlyphPaint::new(gid(base), paint(gid('O')))])).into();
     colr.layer_list = Some(LayerList::new(1, vec![solid(0)])).into();
-    super::test_fonts::colr_font_with(family, &colr).unwrap()
+    crate::test_fonts::colr_font_with(family, &colr).unwrap()
 }
 
 use write_fonts::tables::colr::Paint as ColrPaint;
@@ -312,7 +312,7 @@ fn a_collapsed_sweep_glyph_draws_nothing() {
     // A clip box, so the image is made.
     let clip = ClipBox::format_1(FWord::new(0), FWord::new(0), FWord::new(500), FWord::new(500));
     colr.clip_list = Some(ClipList::new(1, 1, vec![Clip::new(gid(COLOUR_CHAR), gid(COLOUR_CHAR), clip)])).into();
-    let font = super::test_fonts::colr_font_with("Colrtest Flat", &colr).unwrap();
+    let font = crate::test_fonts::colr_font_with("Colrtest Flat", &colr).unwrap();
     let Some(ColourContent::Image(image)) = content(&font, COLOUR_CHAR) else { panic!("an image") };
     assert!(image.blob.bytes.starts_with(b"\x89PNG"));
 }

@@ -1,6 +1,6 @@
 //! Vertical type (bundled fonts: `§` and `×` stand upright like CJK, letters lie on their side;
 //! Japanese text only with craft-fonts' faces, skipped without them).
-use super::*;
+use crate::*;
 use kurbo::Shape;
 use vectorcraft_doc::{CharStyle, Justify, TextKind, TextRun};
 use vectorcraft_geom::PathData;

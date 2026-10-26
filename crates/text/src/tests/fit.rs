@@ -1,6 +1,6 @@
 //! Area type fitting: Shrink Text to Fit.
 
-use super::*;
+use crate::*;
 use kurbo::Shape;
 use vectorcraft_doc::{AreaFit, CharStyle, TextKind};
 use vectorcraft_geom::PathData;

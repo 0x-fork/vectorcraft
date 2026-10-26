@@ -3,7 +3,7 @@
 //! (https://learn.microsoft.com/en-us/typography/script-development/devanagari) and the Unicode
 //! Standard's Devanagari section (https://www.unicode.org/versions/latest/core-spec/chapter-12/).
 //! No font is committed: the tests use an installed face and print SKIPPED when none is found.
-use super::*;
+use crate::*;
 use kurbo::{BezPath, Point};
 use std::sync::Arc;
 use vectorcraft_doc::{CharStyle, TextKind};

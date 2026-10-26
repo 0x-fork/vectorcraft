@@ -9,8 +9,8 @@ use skrifa::instance::{LocationRef, Size};
 use skrifa::raw::TableProvider;
 use vectorcraft_doc::CharStyle;
 
-use super::test_fonts::{TWO_AXIS_FAMILY as FAMILY, TWO_AXIS_NARROW, VARIABLE_CHARS, VARIABLE_WIDEN, two_axis_font};
-use super::*;
+use crate::test_fonts::{TWO_AXIS_FAMILY as FAMILY, TWO_AXIS_NARROW, VARIABLE_CHARS, VARIABLE_WIDEN, two_axis_font};
+use crate::*;
 
 /// A database of the bundled fonts and the two-axis test font.
 fn db() -> FontDb {

@@ -1,7 +1,7 @@
 //! Paragraph panel menu › Justification…: word spacing, letter spacing, glyph scaling, Single Word
 //! Justification and Auto Leading in layout.
 
-use super::*;
+use crate::*;
 use kurbo::{Affine, Shape};
 use vectorcraft_doc::text::Kashida;
 use vectorcraft_doc::{CharStyle, JustificationOptions, Justify, SingleWordJustify, TextKind};

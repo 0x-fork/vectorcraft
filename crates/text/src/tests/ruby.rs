@@ -1,7 +1,7 @@
 //! Ruby (furigana) tests: geometry over the base text in horizontal and vertical type, line
 //! growth, overhang/squeeze, splitting over a line break, and the byte ranges following edits.
 
-use super::*;
+use crate::*;
 use kurbo::{Affine, Point, Rect, Shape};
 use vectorcraft_doc::{CharStyle, RubyAlign, RubyPosition, RubySpan, TextKind};
 use vectorcraft_geom::PathData;

@@ -7,7 +7,7 @@
 //! https://learn.microsoft.com/en-us/typography/script-development/bengali).
 //! No font is committed: the tests use installed faces and print SKIPPED when none is found, except
 //! the check of the half-form test's face filter, which builds its faces in code.
-use super::*;
+use crate::*;
 use kurbo::Point;
 use std::sync::Arc;
 use vectorcraft_doc::CharStyle;

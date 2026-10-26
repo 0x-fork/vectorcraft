@@ -8,11 +8,11 @@ use vectorcraft_doc::color::{Color, Paint};
 use vectorcraft_doc::{Appearance, CharStyle, Node, NodeId, TextObject};
 use vectorcraft_geom::PathData;
 
-use super::test_fonts::{SVG_CHAR, source_sans_gid, svg_font};
+use crate::test_fonts::{SVG_CHAR, source_sans_gid, svg_font};
 
 /// The family of the SVG test fonts here (each database holds one).
 const FAMILY: &str = "Svgtest Glyphs";
-use super::{FontDb, layout, set_svg_glyph_reader};
+use crate::{FontDb, layout, set_svg_glyph_reader};
 
 /// Stands in for the SVG importer, which this crate can't use (it is a layer up): a square one em
 /// wide in the fill, stroked when there is a stroke, for a document that has the glyph's element.
@@ -88,7 +88,7 @@ fn colr_comes_before_svg() {
     use write_fonts::FontBuilder;
     use write_fonts::types::Tag;
     set_svg_glyph_reader(reader);
-    let colr = super::test_fonts::colr_font(false).unwrap();
+    let colr = crate::test_fonts::colr_font(false).unwrap();
     let colr = skrifa::FontRef::new(&colr).unwrap();
     let g = gid(SVG_CHAR);
     let svg = svg_font(FAMILY, &[(g, g, &document(""))]).unwrap();
@@ -103,7 +103,7 @@ fn colr_comes_before_svg() {
     }
     let db = FontDb::with_font_dirs(vec![]);
     assert_eq!(db.add_font(builder.build()), 1);
-    let st = CharStyle { font_family: super::test_fonts::colr_family(false).into(), size: 100.0, ..CharStyle::default() };
+    let st = CharStyle { font_family: crate::test_fonts::colr_family(false).into(), size: 100.0, ..CharStyle::default() };
     let l = layout(&db, &TextObject::point(Point::ZERO, &SVG_CHAR.to_string(), st));
     // The COLR glyph has two layers; the reader's art one path.
     let colour = l.glyphs[0].colour.clone().unwrap();
@@ -122,7 +122,7 @@ fn a_glyph_whose_colr_layers_dont_read_keeps_its_outline() {
     let g = gid(SVG_CHAR);
     let mut colr = Colr::new(0, None, None, 0);
     colr.base_glyph_list = Some(BaseGlyphList::new(1, vec![BaseGlyphPaint::new(GlyphId16::new(g), Paint::colr_glyph(GlyphId16::new(g)))])).into();
-    let looped = super::test_fonts::colr_font_with(FAMILY, &colr).unwrap();
+    let looped = crate::test_fonts::colr_font_with(FAMILY, &colr).unwrap();
     let looped = skrifa::FontRef::new(&looped).unwrap();
     let svg = svg_font(FAMILY, &[(g, g, &document(""))]).unwrap();
     let svg = skrifa::FontRef::new(&svg).unwrap();

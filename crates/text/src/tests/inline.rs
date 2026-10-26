@@ -1,6 +1,6 @@
 //! Inline graphics in text: a symbol's art laid out like a glyph.
 
-use super::*;
+use crate::*;
 use kurbo::{Affine, Shape};
 use vectorcraft_doc::text::INLINE_CHAR;
 use vectorcraft_doc::{CharStyle, InlineArt, Justify, TextKind, TextRun};

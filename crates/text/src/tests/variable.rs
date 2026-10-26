@@ -7,8 +7,8 @@ use skrifa::instance::{LocationRef, Size};
 use skrifa::raw::TableProvider;
 use vectorcraft_doc::CharStyle;
 
-use super::test_fonts::{VARIABLE_CHARS, VARIABLE_FAMILY as FAMILY, VARIABLE_WIDEN, name_table, variable_font};
-use super::*;
+use crate::test_fonts::{VARIABLE_CHARS, VARIABLE_FAMILY as FAMILY, VARIABLE_WIDEN, name_table, variable_font};
+use crate::*;
 
 fn font() -> Vec<u8> {
     variable_font().expect("the test font builds")

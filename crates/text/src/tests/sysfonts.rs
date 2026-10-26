@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::*;
+use crate::*;
 use crate::fontdb::fonts_outside;
 
 const FAMILY: &str = "Sysfont Sans3";

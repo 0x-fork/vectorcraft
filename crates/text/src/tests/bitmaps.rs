@@ -6,8 +6,8 @@ use skrifa::MetadataProvider;
 use skrifa::instance::{LocationRef, Size};
 use vectorcraft_doc::CharStyle;
 
-use super::test_fonts::{COLOUR_CBDT_BEARINGS, COLOUR_CHAR, COLOUR_PPEM, colour_bitmap_family, colour_bitmap_font};
-use super::*;
+use crate::test_fonts::{COLOUR_CBDT_BEARINGS, COLOUR_CHAR, COLOUR_PPEM, colour_bitmap_family, colour_bitmap_font};
+use crate::*;
 
 fn db(sbix: bool) -> FontDb {
     let db = FontDb::with_font_dirs(vec![]);
@@ -32,7 +32,7 @@ fn assert_near(a: Rect, b: Rect) {
 
 /// The left side bearing of [`COLOUR_CHAR`] in the bundled Source Sans 3 (font units of 1000).
 fn lsb() -> f64 {
-    let font = skrifa::FontRef::new(include_bytes!("../../../assets/fonts/SourceSans3-Regular.ttf")).unwrap();
+    let font = skrifa::FontRef::new(include_bytes!("../../../../assets/fonts/SourceSans3-Regular.ttf")).unwrap();
     let gid = font.charmap().map(COLOUR_CHAR).unwrap();
     f64::from(font.glyph_metrics(Size::unscaled(), LocationRef::default()).left_side_bearing(gid).unwrap())
 }
@@ -95,8 +95,8 @@ fn other_glyphs_of_a_colour_font_keep_their_outlines() {
 /// decoded (a font is untrusted input).
 #[test]
 fn a_bitmap_past_the_caps_or_without_a_header_is_no_image() {
-    use super::bitmap::{MAX_PNG_BYTES, MAX_SIDE};
-    use super::test_fonts::{COLOUR_LARGE, colour_bitmap_font_with, solid_png};
+    use crate::bitmap::{MAX_PNG_BYTES, MAX_SIDE};
+    use crate::test_fonts::{COLOUR_LARGE, colour_bitmap_font_with, solid_png};
     let good = solid_png(COLOUR_PPEM.into(), COLOUR_LARGE);
     // A header claiming a side past the cap (the IHDR width).
     let mut wide = good.clone();

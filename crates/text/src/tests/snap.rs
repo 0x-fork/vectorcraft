@@ -3,7 +3,7 @@
 use kurbo::{Affine, Shape};
 use vectorcraft_doc::CharStyle;
 
-use super::*;
+use crate::*;
 
 fn text_at(x: f64, y: f64) -> TextObject {
     TextObject::point(Point::new(x, y), "Hill", CharStyle { size: 9.0, ..CharStyle::default() })

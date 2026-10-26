@@ -3,7 +3,7 @@
 //! per-paragraph attributes and inline graphics. Each feature has its own tests; these check that
 //! one doesn't undo or skip another (as vertical alignment once left inline art behind).
 
-use super::*;
+use crate::*;
 use kurbo::Shape;
 use vectorcraft_doc::{AreaFit, CharStyle, Composer, InlineArt, Justify, TextKind, TextRun, VerticalAlign};
 use vectorcraft_geom::PathData;
