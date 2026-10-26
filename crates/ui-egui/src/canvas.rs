@@ -196,9 +196,9 @@ fn pen_pressure(ui: &Ui, app: &VectorcraftApp, pressed: bool) -> f32 {
 
 /// The positions this frame's pointer moves passed through before its last one, each with the
 /// pen force a touch event gave just before it, or the pressure the host's feed kept for that move
-/// ([`StylusFeed::take_moves`], macOS), if any. The last move is the pointer's position. Only for
-/// pens and fingers (frames with touch events or with the feed's moves): a mouse's moves are left
-/// as they were.
+/// ([`StylusFeed::take_moves`], macOS), if any. The last move is the pointer's position. A mouse's
+/// moves count too, with no pressure: a fast mouse stroke otherwise keeps one position a frame, a
+/// sample every few pixels, too few for a low Fidelity to follow the hand (#3328).
 fn frame_moves(ui: &Ui, stylus: Option<&StylusFeed>) -> Vec<(Pos2, Option<f32>)> {
     let pressures = stylus.map(StylusFeed::take_moves).unwrap_or_default();
     ui.input(|i| {
@@ -219,6 +219,8 @@ fn frame_moves(ui: &Ui, stylus: Option<&StylusFeed>) -> Vec<(Pos2, Option<f32>)>
             let forces = pressures.iter().rev().map(|f| (*f > 0.0).then_some(*f)).chain(std::iter::repeat(None));
             moves = points.into_iter().rev().zip(forces).collect();
             moves.reverse();
+        } else {
+            moves = i.events.iter().filter_map(|e| if let egui::Event::PointerMoved(p) = e { Some((*p, None)) } else { None }).collect();
         }
         moves.pop();
         // A burst of events (a stalled frame) is thinned to a bounded count.
@@ -1186,11 +1188,11 @@ fn handle_input(app: &mut VectorcraftApp, ui: &Ui, resp: &egui::Response, rect: 
                 }
                 Drag::Tool => {
                     if tool_drag_moved(ui, &xf, p, &pointer) {
-                        // In a frame with touch events (a pen on Windows or the web, a finger) or a
-                        // macOS pen's moves, every position the pen passed, not just the last: a fast
-                        // stroke keeps its curve (a pen reports far more often than frames come).
-                        // Mouse events, a pen's on X11 among them, give the last position only, with
-                        // the host's latest pressure.
+                        // Every position the pen or mouse passed this frame, not just the last: a
+                        // fast stroke keeps its curve (a pen or a mouse reports far more often than
+                        // frames come). Touch events (a pen on Windows or the web, a finger) and a
+                        // macOS pen's moves carry their own pressure; a mouse's, a pen's on X11
+                        // among them, take the host's latest.
                         for (at, force) in frame_moves(ui, app.services.stylus.as_ref()) {
                             let pressure = force.unwrap_or_else(|| pen_pressure(ui, app, false));
                             dispatch(app, &PointerEvent { kind: PointerKind::Drag, pos: xf.to_doc(at), mods: mods(m, space), pressure }, view);
@@ -9127,7 +9129,7 @@ mod tests {
     }
 
     #[test]
-    fn frame_moves_keeps_touch_samples_and_pressure_but_leaves_mouse_unchanged() {
+    fn frame_moves_keeps_touch_feed_and_mouse_samples_with_their_pressure() {
         let ctx = egui::Context::default();
         let a = pos2(10.0, 20.0);
         let b = pos2(20.0, 30.0);
@@ -9136,7 +9138,8 @@ mod tests {
         let mut mouse = vec![];
         let mut out = ctx.run_ui(egui::RawInput { events: events.clone(), ..Default::default() }, |ui| mouse = frame_moves(ui, None));
         out.textures_delta.clear();
-        assert!(mouse.is_empty());
+        // A mouse keeps its moves too, without a pressure.
+        assert_eq!(mouse, [(a, None), (b, None)], "the last move follows the normal pointer path");
         // A macOS pen: the feed kept a pressure for each move, the last for the last.
         let feed = StylusFeed::default();
         for p in [0.9, 0.3, 0.0, 0.5] {
@@ -9148,7 +9151,7 @@ mod tests {
         assert_eq!(samples, [(a, Some(0.3)), (b, None)], "paired from the end; a lift's 0 is no pressure");
         let mut out = ctx.run_ui(egui::RawInput { events, ..Default::default() }, |ui| samples = frame_moves(ui, Some(&feed)));
         out.textures_delta.clear();
-        assert!(samples.is_empty(), "the moves were taken: a mouse's moves again");
+        assert_eq!(samples, [(a, None), (b, None)], "the moves were taken: a mouse's moves again");
         let events = [pen(egui::TouchPhase::Move, a, 0.2), pen(egui::TouchPhase::Move, b, 0.8), pen(egui::TouchPhase::Move, c, 0.6)].concat();
         let mut samples = vec![];
         let mut out = ctx.run_ui(egui::RawInput { events, ..Default::default() }, |ui| samples = frame_moves(ui, None));
@@ -9544,6 +9547,32 @@ mod tests {
         frame(&mut app, &ctx, vec![]);
         assert_eq!(app.session.tool_id(), "perspectiveGrid");
         assert!(!visible(&app), "the grid stays hidden");
+    }
+
+    /// #3328: every position a mouse reports within one frame reaches the Pencil, not only the
+    /// frame's last one, so a fast stroke keeps the hand's movement.
+    #[test]
+    fn a_mouse_stroke_keeps_every_move_of_a_frame() {
+        let mut app = VectorcraftApp::new(Session::new(), Default::default());
+        app.session.execute("file.new", &json!({"width": 800, "height": 600})).unwrap();
+        let ctx = egui::Context::default();
+        frame(&mut app, &ctx, vec![]);
+        app.select_tool("pencil");
+        let xf = Xf::new(app.canvas_rect.unwrap(), app.view().unwrap());
+        let at = |x: f64, y: f64| xf.to_screen(Point::new(x, y));
+        let button =
+            |p, pressed| egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+        let start = at(100.0, 100.0);
+        frame(&mut app, &ctx, vec![egui::Event::PointerMoved(start), button(start, true)]);
+        // One frame of a fast stroke: a zigzag of 20 moves, 6 pt apart.
+        let zigzag: Vec<_> = (1..=20).map(|i| at(100.0 + 6.0 * f64::from(i), if i % 2 == 0 { 100.0 } else { 112.0 })).collect();
+        frame(&mut app, &ctx, zigzag.iter().map(|p| egui::Event::PointerMoved(*p)).collect());
+        let end = *zigzag.last().unwrap();
+        frame(&mut app, &ctx, vec![button(end, false)]);
+        let (cmd, p) = app.session.journal.last().unwrap().clone();
+        assert_eq!(cmd, "path.freehand");
+        let pts = p["points"].as_array().unwrap();
+        assert!(pts.len() >= 20, "the stroke keeps the frame's moves: {} points", pts.len());
     }
 
     /// #491: a pen tap whose press and lift come in one frame selects what it tapped, and the
