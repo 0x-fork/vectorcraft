@@ -4682,6 +4682,7 @@ imageTrace	Outline	Obrys
 @msg	{_1} is already used by {_2}	{_1} už používá {_2}
 @msg	{_1} is reserved by the system	Zkratku {_1} si vyhrazuje systém
 @msg	{_1} linked file(s) can't be read here: their previews show	propojené soubory ({_1}) zde nelze přečíst: zobrazují se jejich náhledy
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	obrázky ({undecoded}) nelze dekódovat: zobrazují se jako přeškrtnuté rámečky
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	propojené obrázky ({_1}) se na disku změnily: nové verze zobrazí Aktualizovat propojení
 @msg	{_1}: not saved, so not closed	{_1}: neuloženo, proto nezavřeno
 @msg	{bpp}-bit bitmaps can't be read	{bpp}bitové bitmapy nelze přečíst

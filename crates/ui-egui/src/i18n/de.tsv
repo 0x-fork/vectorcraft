@@ -4305,6 +4305,7 @@ theme	Appearance	Erscheinungsbild
 @msg	{_1} is already used by {_2}	{_1} wird bereits von {_2} verwendet
 @msg	{_1} is reserved by the system	{_1} ist vom System reserviert
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} verknüpfte Datei(en) können hier nicht gelesen werden: Ihre Vorschauen werden angezeigt
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	{undecoded} Bild(er) konnten nicht dekodiert werden und werden als durchgekreuzte Rahmen angezeigt
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} verknüpfte(s) Bild(er) wurde(n) auf dem Datenträger geändert: „Verknüpfungen aktualisieren“ zeigt die neuen Versionen
 @msg	{_1}: not saved, so not closed	{_1}: nicht gespeichert, daher nicht geschlossen
 @msg	{bpp}-bit bitmaps can't be read	{bpp}-Bit-Bitmaps können nicht gelesen werden

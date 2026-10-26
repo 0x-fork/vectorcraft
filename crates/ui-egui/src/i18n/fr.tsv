@@ -4377,6 +4377,7 @@ axis	Both	Les deux
 @msg	{_1} is already used by {_2}	{_1} est déjà utilisé par {_2}
 @msg	{_1} is reserved by the system	{_1} est réservé par le système
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} fichier(s) lié(s) illisible(s) ici : leurs aperçus sont affichés
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	{undecoded} image(s) impossible(s) à décoder, affichée(s) sous forme de cadres barrés d’une croix
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} image(s) liée(s) modifiée(s) sur le disque : Mettre à jour les liens affiche les nouvelles versions
 @msg	Updated {_1} linked file(s) changed on disk	{_1} fichier(s) lié(s) modifié(s) sur le disque mis à jour
 @msg	{_1}: not saved, so not closed	{_1} : non enregistré, donc non fermé

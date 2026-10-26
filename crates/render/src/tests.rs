@@ -946,6 +946,87 @@ fn an_image_too_large_as_rgba_is_not_decoded() {
     assert!(matches!(huge, Err(image::ImageError::Limits(_))), "{huge:?}");
 }
 
+/// A PNG of `w` × `h` noisy pixels cut off halfway through its bytes: its header reads, and its
+/// pixels can't be decoded.
+fn truncated_png(w: u32, h: u32) -> Vec<u8> {
+    let img = image::RgbaImage::from_fn(w, h, |x, y| {
+        let v = (x * 7919 + y * 104_729).wrapping_mul(2_654_435_761).to_le_bytes();
+        image::Rgba([v[0], v[1], v[2], 255])
+    });
+    let mut png = vec![];
+    img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    png.truncate(png.len() / 2);
+    png
+}
+
+/// An image whose pixels can't be decoded is tried once: later renders find the store's note of it,
+/// and each render counts it in `decode_failures` for an export to report. On screen
+/// (`mark_undecoded_images`) it draws as a crossed gray box; an export draws nothing there.
+#[test]
+fn an_undecodable_image_is_tried_once_and_marked_on_screen() {
+    use vectorcraft_doc::{ImageBlob, ImageObject, NodeKind};
+    let png = truncated_png(61, 47);
+    assert_eq!(image::ImageReader::new(std::io::Cursor::new(&png)).with_guessed_format().unwrap().into_dimensions().unwrap(), (61, 47));
+    let mut d = Document::new(80.0, 60.0);
+    d.images.insert("cut".into(), ImageBlob::new("image/png", png));
+    let id = d.alloc_id();
+    let im = ImageObject {
+        key: "cut".into(),
+        width: 61,
+        height: 47,
+        xf: Affine::translate((10.0, 5.0)),
+        link: None,
+        placement: Default::default(),
+        pixels: None,
+    };
+    d.insert(Some(d.layers[0].id), 0, Node::new(id, NodeKind::Image(Box::new(im)))).unwrap();
+    // The alpha summed over the image's frame.
+    let alpha = |r: &Rendered| (10..71).flat_map(|x| (5..52).map(move |y| u64::from(r.pixel(x, y)[3]))).sum::<u64>();
+    let attempts = || paint::DECODE_ATTEMPTS.with(std::cell::Cell::get);
+    let (tried, failed) = (attempts(), decode_failures());
+    let screen = RenderOptions { mark_undecoded_images: true, ..Default::default() };
+    let mut r = Renderer::new();
+    for render in 1..=2 {
+        let shown = r.render(&d, 80, 60, Affine::IDENTITY, &screen);
+        assert!(alpha(&shown) > 0, "render {render}: the crossed box shows");
+        assert_eq!(decode_failures() - failed, render, "render {render}: counted");
+    }
+    assert_eq!(attempts() - tried, 1, "tried once");
+    let export = Renderer::new().render(&d, 80, 60, Affine::IDENTITY, &RenderOptions::default());
+    assert_eq!(alpha(&export), 0, "an export draws nothing there");
+    assert_eq!((attempts() - tried, decode_failures() - failed), (1, 3), "and counts it without decoding it again");
+}
+
+/// The rasters a renderer keeps of an object's raster effects are made again when
+/// `mark_undecoded_images` changes: a blurred image whose pixels can't be decoded shows its blurred
+/// mark only while the option is on.
+#[test]
+fn raster_effects_follow_the_undecoded_image_mark() {
+    use vectorcraft_doc::{Effect, ImageBlob, ImageObject, NodeKind};
+    let mut d = Document::new(80.0, 60.0);
+    d.images.insert("cut".into(), ImageBlob::new("image/png", truncated_png(43, 31)));
+    let id = d.alloc_id();
+    let im = ImageObject {
+        key: "cut".into(),
+        width: 43,
+        height: 31,
+        xf: Affine::translate((15.0, 12.0)),
+        link: None,
+        placement: Default::default(),
+        pixels: None,
+    };
+    let mut n = Node::new(id, NodeKind::Image(Box::new(im)));
+    n.appearance.effects.push(Effect { id: "blur.gaussian".into(), params: serde_json::json!({"radius": 2.0}), visible: true });
+    d.insert(Some(d.layers[0].id), 0, n).unwrap();
+    let alpha = |r: &Rendered| r.pixels.chunks(4).map(|p| u64::from(p[3])).sum::<u64>();
+    let mut r = Renderer::new();
+    for mark in [true, false, true] {
+        let opts = RenderOptions { mark_undecoded_images: mark, ..Default::default() };
+        let a = alpha(&r.render(&d, 80, 60, Affine::IDENTITY, &opts));
+        assert_eq!(a > 0, mark, "mark_undecoded_images {mark}: alpha {a}");
+    }
+}
+
 /// A gray image within the allowance draws its gray levels.
 #[test]
 fn a_gray_image_draws_its_gray_levels() {

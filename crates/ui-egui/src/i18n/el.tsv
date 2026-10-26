@@ -4338,6 +4338,7 @@ theme	Appearance	Εμφάνιση
 @msg	{_1} is already used by {_2}	το {_1} χρησιμοποιείται ήδη από το {_2}
 @msg	{_1} is reserved by the system	Το {_1} είναι δεσμευμένο από το σύστημα
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} συνδεδεμένα αρχεία δεν μπορούν να διαβαστούν εδώ: εμφανίζονται οι προεπισκοπήσεις τους
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	{undecoded} εικόνες δεν ήταν δυνατό να αποκωδικοποιηθούν: εμφανίζονται ως πλαίσια με σταυρό
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} συνδεδεμένες εικόνες άλλαξαν στον δίσκο: η Ενημέρωση συνδέσμων εμφανίζει τις νέες εκδόσεις
 @msg	Updated {_1} linked file(s) changed on disk	Ενημερώθηκαν {_1} συνδεδεμένα αρχεία που άλλαξαν στον δίσκο
 @msg	{_1}: not saved, so not closed	{_1}: δεν αποθηκεύτηκε και επομένως δεν έκλεισε

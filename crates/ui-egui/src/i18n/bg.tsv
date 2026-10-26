@@ -4274,6 +4274,7 @@ axis	Both	И двете
 @msg	{_1} is already used by {_2}	{_1} вече се използва от {_2}
 @msg	{_1} is reserved by the system	{_1} е запазено от системата
 @msg	{_1} linked file(s) can't be read here: their previews show	свързаните файлове {_1} не могат да бъдат прочетени тук: показват се техните прегледи
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	изображенията ({undecoded}) не могат да бъдат декодирани: показват се като зачеркнати рамки
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	свързаните изображения {_1} са променени на диска: „Обновяване на връзките“ показва новите версии
 @msg	Updated {_1} linked file(s) changed on disk	Обновени са свързани файлове {_1}, променени на диска
 @msg	{_1}: not saved, so not closed	{_1}: не е запазен, затова не е затворен

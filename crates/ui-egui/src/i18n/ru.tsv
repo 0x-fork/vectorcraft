@@ -4416,6 +4416,7 @@ axis	Both	Оба
 @msg	{_1} is already used by {_2}	{_1} уже используется {_2}
 @msg	{_1} is reserved by the system	Сочетание {_1} зарезервировано системой
 @msg	{_1} linked file(s) can't be read here: their previews show	здесь невозможно прочитать связанных файлов: {_1}: отображаются их предварительные просмотры
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	не удалось декодировать изображения ({undecoded}): они показаны как перечёркнутые рамки
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	связанных изображений ({_1}) изменились на диске: «Обновить связи» покажет новые версии
 @msg	Updated {_1} linked file(s) changed on disk	Обновлено связанных файлов, измененных на диске: {_1}
 @msg	{_1}: not saved, so not closed	{_1}: не сохранён, поэтому не закрыт

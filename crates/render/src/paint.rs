@@ -73,6 +73,23 @@ thread_local! {
     static DECODE_FAILURES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
+#[cfg(test)]
+thread_local! {
+    /// The images [`decode`] has tried to decode on this thread.
+    pub(crate) static DECODE_ATTEMPTS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Why an image has no pixels to draw ([`decode_pixmap_or_why`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Undecoded {
+    /// Its pixels can't be read, or are more than [`MAX_DECODE_ALLOC`] as RGBA: decoding them
+    /// again fails again.
+    Unreadable,
+    /// The images being painted leave no room for it within twice [`MAX_DECODE_ALLOC`]: it may
+    /// be decoded once they are done.
+    NoRoom,
+}
+
 /// How many images have failed to decode on this thread so far: an export compares the count
 /// before and after it draws to say it left images out. Images that other threads (another export,
 /// the canvas, thumbnails) fail to decode meanwhile are not counted.
@@ -80,20 +97,33 @@ pub fn decode_failures() -> u64 {
     DECODE_FAILURES.with(std::cell::Cell::get)
 }
 
-/// `bytes` decoded within [`MAX_DECODE_ALLOC`] ([`decode_within_allowance`]); a failure is counted
-/// in [`decode_failures`].
+/// `bytes` decoded within [`MAX_DECODE_ALLOC`] ([`decode_in_room`]); a failure is counted in
+/// [`decode_failures`].
 fn decode(bytes: &[u8]) -> Option<image::DynamicImage> {
-    let img = decode_within_allowance(bytes).ok();
-    if img.is_none() {
+    decode_or_why(bytes).ok()
+}
+
+/// [`decode`], or why it gave no image (counted in [`decode_failures`] either way).
+fn decode_or_why(bytes: &[u8]) -> Result<image::DynamicImage, Undecoded> {
+    #[cfg(test)]
+    DECODE_ATTEMPTS.with(|n| n.set(n.get() + 1));
+    decode_in_room(bytes).map_err(|(_, why)| {
         add_decode_failures(1);
-    }
-    img
+        why
+    })
+}
+
+/// [`decode_in_room`]'s image or error.
+#[cfg(test)]
+pub(crate) fn decode_within_allowance(bytes: &[u8]) -> image::ImageResult<image::DynamicImage> {
+    decode_in_room(bytes).map_err(|(e, _)| e)
 }
 
 /// `bytes` decoded within [`MAX_DECODE_ALLOC`], counted as RGBA: the image's size is read from its
 /// header first, and an image of more than that as RGBA gets a limit error before anything is
-/// decoded (#1717).
-pub(crate) fn decode_within_allowance(bytes: &[u8]) -> image::ImageResult<image::DynamicImage> {
+/// decoded (#1717). A failure comes with why the image gave no pixels ([`room_for`]).
+fn decode_in_room(bytes: &[u8]) -> Result<image::DynamicImage, (image::ImageError, Undecoded)> {
+    let unreadable = |e| (e, Undecoded::Unreadable);
     let reader = || -> image::ImageResult<_> {
         let mut r = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format()?;
         let mut limits = image::Limits::default();
@@ -101,15 +131,27 @@ pub(crate) fn decode_within_allowance(bytes: &[u8]) -> image::ImageResult<image:
         r.limits(limits);
         Ok(r)
     };
-    let (w, h) = reader()?.into_dimensions()?;
+    let (w, h) = reader().and_then(|r| r.into_dimensions()).map_err(unreadable)?;
     let bytes = (u64::from(w) * u64::from(h)).saturating_mul(4);
     // The images paints hold can't be evicted from the cache, so a document of many images held
     // them all at once: a new one is decoded only while those and it fit twice the allowance.
     let pinned = crate::images::store().pinned_bytes() as u64;
-    if bytes > MAX_DECODE_ALLOC || bytes.saturating_add(pinned) > 2 * MAX_DECODE_ALLOC {
-        return Err(image::ImageError::Limits(image::error::LimitError::from_kind(image::error::LimitErrorKind::InsufficientMemory)));
+    if let Err(why) = room_for(bytes, pinned) {
+        return Err((image::ImageError::Limits(image::error::LimitError::from_kind(image::error::LimitErrorKind::InsufficientMemory)), why));
     }
-    reader()?.decode()
+    reader().and_then(|r| r.decode()).map_err(unreadable)
+}
+
+/// Whether an image of `rgba` bytes may be decoded while the images being painted hold `pinned`
+/// bytes: within [`MAX_DECODE_ALLOC`] itself, and within twice that with them.
+fn room_for(rgba: u64, pinned: u64) -> Result<(), Undecoded> {
+    if rgba > MAX_DECODE_ALLOC {
+        Err(Undecoded::Unreadable)
+    } else if rgba.saturating_add(pinned) > 2 * MAX_DECODE_ALLOC {
+        Err(Undecoded::NoRoom)
+    } else {
+        Ok(())
+    }
 }
 
 /// `img` shrunk, keeping its proportions, to fit a pixmap's sides (at most `u16::MAX` pixels).
@@ -124,12 +166,19 @@ fn fit_pixmap(img: image::DynamicImage) -> image::DynamicImage {
     img.resize_exact(nw, nh, image::imageops::FilterType::Triangle)
 }
 
-/// Decode encoded image bytes into a premultiplied pixmap (shrunk to fit a pixmap's sides).
+/// [`decode_pixmap_or_why`]'s pixels.
+#[cfg(test)]
 pub fn decode_pixmap(bytes: &[u8]) -> Option<vello_cpu::Pixmap> {
-    pixmap_of(fit_pixmap(decode(bytes)?).to_rgba8())
+    decode_pixmap_or_why(bytes).ok()
 }
 
-/// [`decode_pixmap`] shrunk to `w`×`h` pixels when the image is larger (never enlarged).
+/// Decode encoded image bytes into a premultiplied pixmap (shrunk to fit a pixmap's sides), or say
+/// why there are no pixels.
+pub(crate) fn decode_pixmap_or_why(bytes: &[u8]) -> Result<vello_cpu::Pixmap, Undecoded> {
+    pixmap_of(fit_pixmap(decode_or_why(bytes)?).to_rgba8()).ok_or(Undecoded::Unreadable)
+}
+
+/// [`decode_pixmap_or_why`] shrunk to `w`×`h` pixels when the image is larger (never enlarged).
 pub fn decode_pixmap_fit(bytes: &[u8], w: u16, h: u16) -> Option<vello_cpu::Pixmap> {
     let img = decode(bytes)?;
     let img = if img.width() > w as u32 || img.height() > h as u32 {
@@ -162,4 +211,19 @@ fn pixmap_of(img: image::RgbaImage) -> Option<vello_cpu::Pixmap> {
         })
         .collect();
     Some(vello_cpu::Pixmap::from_parts(data, w as u16, h as u16))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An image over the allowance as RGBA never fits, so it is noted as undecodable; one that only
+    /// the images being painted leave no room for is not, and is tried again later.
+    #[test]
+    fn only_the_room_painted_images_take_is_tried_again() {
+        assert_eq!(room_for(MAX_DECODE_ALLOC + 1, 0), Err(Undecoded::Unreadable));
+        assert_eq!(room_for(MAX_DECODE_ALLOC + 1, 2 * MAX_DECODE_ALLOC), Err(Undecoded::Unreadable));
+        assert_eq!(room_for(MAX_DECODE_ALLOC, MAX_DECODE_ALLOC + 1), Err(Undecoded::NoRoom));
+        assert_eq!(room_for(MAX_DECODE_ALLOC, MAX_DECODE_ALLOC), Ok(()));
+    }
 }

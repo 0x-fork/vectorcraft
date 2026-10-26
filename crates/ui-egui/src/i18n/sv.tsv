@@ -4289,6 +4289,7 @@ axis	Both	Båda
 @msg	{_1} is already used by {_2}	{_1} används redan av {_2}
 @msg	{_1} is reserved by the system	{_1} är reserverat av systemet
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} länkade fil(er) kan inte läsas här: deras förhandsgranskningar visas
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	{undecoded} bild(er) kunde inte avkodas och visas som överkryssade rutor
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} länkade bild(er) har ändrats på disken: Uppdatera länkar visar de nya versionerna
 @msg	Updated {_1} linked file(s) changed on disk	Uppdaterade {_1} länkade fil(er) som ändrats på disken
 @msg	{_1}: not saved, so not closed	{_1}: inte sparat, så inte stängt

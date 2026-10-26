@@ -4589,6 +4589,7 @@ imageTrace	Outline	Ääriviiva
 @msg	{_1} is already used by {_2}	{_1} on jo käytössä kohteella {_2}
 @msg	{_1} is reserved by the system	{_1} on järjestelmän varaama
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} linkitettyä tiedostoa ei voi lukea täällä: niiden esikatselut näytetään
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	{undecoded} kuvaa ei voitu purkaa: ne näkyvät ristillä merkittyinä ruutuina
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} linkitettyä kuvaa muuttui levyllä: Päivitä linkit näyttää uudet versiot
 @msg	{_1}: not saved, so not closed	{_1}: ei tallennettu, joten ei suljettu
 @msg	{bpp}-bit bitmaps can't be read	{bpp}-bittisiä bittikarttoja ei voi lukea

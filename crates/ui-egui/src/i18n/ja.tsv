@@ -4382,6 +4382,7 @@ swatch	Bright Violet	ビビッドバイオレット
 @msg	no such layer or object	指定されたレイヤーまたはオブジェクトが見つかりません
 @msg	`{tool}` isn't a Liquify tool	`{tool}` はゆがみツールではありません
 @msg	{_1} linked file(s) can't be read here: their previews show	この環境では {_1} 個のリンクファイルを読み込めません: 代わりにプレビューを表示しています
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	{undecoded} 個の画像をデコードできませんでした: バツ印の付いた枠で表示しています
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} 個のリンク画像がディスク上で変更されました: 「リンクを更新」で新しいバージョンを表示できます
 @msg	Updated {_1} linked file(s) changed on disk	ディスク上で変更された {_1} 個のリンクファイルを更新しました
 @msg	pick a colour, gradient or pattern to save as a swatch	スウォッチとして保存するカラー、グラデーション、またはパターンを選択してください

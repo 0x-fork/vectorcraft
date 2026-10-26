@@ -4799,6 +4799,7 @@ theme	Appearance	Giao diện
 @msg	{_1} is already used by {_2}	{_1} đã được dùng bởi {_2}
 @msg	{_1} is reserved by the system	{_1} được hệ thống dành riêng
 @msg	{_1} linked file(s) can't be read here: their previews show	{_1} tệp liên kết không thể đọc ở đây: bản xem trước được hiển thị
+@msg	{undecoded} image(s) couldn't be decoded and show as crossed boxes	{undecoded} hình ảnh không thể giải mã: chúng hiển thị dưới dạng khung có dấu gạch chéo
 @msg	{_1} linked image(s) changed on disk: Update Links shows the new versions	{_1} ảnh liên kết đã thay đổi trên đĩa: Cập nhật liên kết hiển thị phiên bản mới
 @msg	{_1}: not saved, so not closed	{_1}: chưa lưu, nên không đóng
 @msg	{bpp}-bit bitmaps can't be read	bitmap {bpp}-bit không thể đọc được
