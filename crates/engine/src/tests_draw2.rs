@@ -2657,3 +2657,68 @@ fn open_anchor_delete_after_transform_keeps_mixed_selection_atomic() {
         assert_eq!(s.doc().unwrap().selection.objects, vec![id]);
     }
 }
+
+/// The anchors of a closed, slightly wobbly blob drawn at `fidelity`: samples half a point apart,
+/// with a small tremor on top of the outline.
+fn blob_anchors(s: &mut Session, fidelity: f64) -> usize {
+    let pts: Vec<_> = (0..1200)
+        .map(|i| {
+            let a = i as f64 / 1200.0 * std::f64::consts::TAU;
+            let r = 90.0 + 12.0 * (3.0 * a).sin() + 0.15 * (97.0 * a).sin();
+            json!([400.0 + r * a.cos(), 300.0 + r * a.sin()])
+        })
+        .collect();
+    let r = s.execute("path.freehand", &json!({"points": pts, "closed": true, "fidelity": fidelity, "keepSelected": false})).unwrap();
+    path(s, NodeId(r["id"].as_u64().unwrap())).subpaths.iter().map(|sp| sp.anchors.len()).sum()
+}
+
+/// Fidelity goes down to 0.01 pt (#3328), and a lower one never keeps fewer anchors.
+#[test]
+fn pencil_fidelity_goes_down_to_a_hundredth_and_lower_keeps_more() {
+    let mut s = session();
+    let counts: Vec<_> = [0.5, 0.1, 0.05, 0.02, 0.01].into_iter().map(|f| blob_anchors(&mut s, f)).collect();
+    assert!(counts.windows(2).all(|w| w[0] <= w[1]), "{counts:?}");
+    // Below the old floor of 0.05 the stroke keeps more of itself.
+    assert!(counts[4] > counts[2], "{counts:?}");
+    // Below 0.01 is read as 0.01.
+    assert_eq!(blob_anchors(&mut s, 0.001), counts[4]);
+    assert_eq!(blob_anchors(&mut s, 0.0), counts[4]);
+}
+
+/// At Fidelity 0.01 short, one-point and repeated-point strokes still draw or are refused, never
+/// crash, and what they draw has finite anchors.
+#[test]
+fn pencil_at_the_lowest_fidelity_takes_degenerate_strokes() {
+    let mut s = session();
+    for points in [
+        json!([[10, 10]]),
+        json!([[10, 10], [10, 10]]),
+        json!([[10, 10], [10, 10], [10, 10], [10, 10]]),
+        json!([[10, 10], [10.001, 10]]),
+        json!([[10, 10], [10.004, 10.003], [10.002, 10.001], [10.006, 10]]),
+        json!([[10, 10], [20, 10], [10, 10]]),
+        json!([[10, 10], [20, 10], [20, 10], [20, 10], [30, 10]]),
+    ] {
+        for closed in [false, true] {
+            let p = json!({"points": points, "closed": closed, "fidelity": 0.01, "keepSelected": false});
+            let Ok(r) = s.execute("path.freehand", &p) else { continue };
+            let Some(id) = r["id"].as_u64() else { continue };
+            let Some(pd) = s.doc().unwrap().doc.node(NodeId(id)).and_then(|n| n.path_data().cloned()) else { continue };
+            for a in pd.subpaths.iter().flat_map(|sp| &sp.anchors) {
+                assert!([a.p, a.h_in, a.h_out].iter().all(|q| q.x.is_finite() && q.y.is_finite()), "{points} closed {closed}");
+            }
+        }
+    }
+}
+
+/// The Pencil's Fidelity option takes 0.01, and the Smooth tool's stays at 0.05 or more.
+#[test]
+fn pencil_option_takes_a_hundredth_and_smooth_keeps_its_floor() {
+    let mut s = session();
+    for (tool, want) in [("pencil", 0.01), ("paintbrush", 0.01), ("smooth", 0.05)] {
+        s.set_tool_option_cmd(&json!({"tool": tool, "values": {"fidelity": 0.001}})).unwrap();
+        assert_eq!(s.tool_options_of(tool)["fidelity"].as_f64(), Some(want), "{tool}");
+        s.set_tool_option_cmd(&json!({"tool": tool, "values": {"fidelity": 0.02}})).unwrap();
+        assert_eq!(s.tool_options_of(tool)["fidelity"].as_f64(), Some(if tool == "smooth" { 0.05 } else { 0.02 }), "{tool}");
+    }
+}

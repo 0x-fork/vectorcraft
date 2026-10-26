@@ -24,6 +24,18 @@ pub use gesture::GestureTool;
 /// Colour of tool feedback (Illustrator's selection blue).
 pub const FEEDBACK: [u8; 3] = [0x4f, 0x9d, 0xff];
 
+/// The lowest Fidelity (points) the Pencil and Paintbrush take (#3328); the Smooth tool keeps
+/// [`SMOOTH_MIN_FIDELITY`].
+pub const MIN_FIDELITY: f64 = 0.01;
+
+/// The lowest Fidelity (points) the Smooth tool takes.
+pub const SMOOTH_MIN_FIDELITY: f64 = 0.05;
+
+/// The lowest Fidelity tool `id` takes.
+pub fn min_fidelity(id: &str) -> f64 {
+    if id == "smooth" { SMOOTH_MIN_FIDELITY } else { MIN_FIDELITY }
+}
+
 /// Create a drawing tool by id (None = not one of ours).
 pub fn create(id: &str) -> Option<Box<dyn Tool>> {
     Some(match id {
