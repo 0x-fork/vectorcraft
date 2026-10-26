@@ -61,6 +61,31 @@ fn library_list(app: &VectorcraftApp, ui: &mut Ui, current: &str) -> Option<Stri
     library_panel::library_items(ui, &swatches::colour_libraries(app), &|id| id == current).or(document)
 }
 
+/// Document Library's Colors choices with the document's swatches: All, then the document's color
+/// groups (`current` checked; `None` is All) → the choice, `Some(None)` for All.
+fn color_group_list(app: &VectorcraftApp, ui: &mut Ui, current: Option<&str>) -> Option<Option<String>> {
+    let mut chosen = menu_item(ui, "All", true, current.is_none()).then_some(None);
+    let groups: Vec<String> = app.session.active().map(|d| d.doc.swatch_groups.iter().map(|g| g.name.clone()).collect()).unwrap_or_default();
+    if !groups.is_empty() {
+        ui.separator();
+    }
+    for g in groups {
+        if widgets::menu_item_name(ui, &g, true, current == Some(g.as_str())) {
+            chosen = Some(Some(g));
+        }
+    }
+    chosen
+}
+
+/// `params`' color group when the active document has it, found as `imageTrace.make` finds it (so
+/// named exactly, else ignoring case); `None` is All. A group of another document, or a deleted
+/// one, is All.
+fn color_group<'a>(app: &VectorcraftApp, params: &'a Value) -> Option<&'a str> {
+    let name = params["colorGroup"].as_str().filter(|g| !g.is_empty())?;
+    let lower = name.to_lowercase();
+    app.session.active()?.doc.swatch_groups.iter().any(|g| g.name.to_lowercase() == lower).then_some(name)
+}
+
 /// Panel state: the preset name, the current parameters, the view and the last result's counts.
 #[derive(Clone, Default)]
 struct TraceUi {
@@ -258,6 +283,10 @@ pub fn control_bar(app: &mut VectorcraftApp, ui: &mut Ui) -> bool {
 }
 
 fn trace(app: &mut VectorcraftApp, st: &mut TraceUi) {
+    // A group the active document does not have traces with All, as the panel shows.
+    if color_group(app, &st.params).is_none() && !st.params["colorGroup"].is_null() {
+        st.params["colorGroup"] = Value::Null;
+    }
     let preset = if st.preset == "Custom" { "Default" } else { st.preset.as_str() };
     match app.run("imageTrace.make", json!({ "preset": preset, "params": st.params, "view": st.view.id() })) {
         Ok(r) => {
@@ -378,6 +407,10 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
         let label = MODES.iter().find(|m| m.0 == mode).map_or("Black and White", |m| m.1);
         let labels: Vec<&str> = MODES.iter().map(|m| m.1).collect();
         if let Some(i) = widgets::dropdown(ui, "it-mode", label, &labels, 170.0) {
+            // Only Color mode uses a color group.
+            if MODES[i].0 != "color" {
+                st.params["colorGroup"] = Value::Null;
+            }
             st.params["mode"] = json!(MODES[i].0);
             st.preset = "Custom".into();
             retrace = true;
@@ -390,6 +423,10 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             widgets::dim_label(ui, tl!("Palette:"));
             let labels = PALETTES.map(palette_label);
             if let Some(p) = widgets::dropdown_names(ui, "it-palette", palette_label(&palette), &labels, 170.0).and_then(|i| PALETTES.get(i)) {
+                // Every other palette refuses a color group.
+                if *p != "documentLibrary" {
+                    st.params["colorGroup"] = Value::Null;
+                }
                 st.params["palette"] = json!(p);
                 st.preset = "Custom".into();
                 retrace = true;
@@ -400,11 +437,27 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                 widgets::dim_label(ui, tl!("Library:"));
                 let key = st.params["library"].as_str().unwrap_or(DOCUMENT_SWATCHES).to_string();
                 if let Some(k) = widgets::combo(ui, "it-library", &library_label(app, &key), 170.0, false, |ui| library_list(app, ui, &key)) {
+                    if k != DOCUMENT_SWATCHES {
+                        st.params["colorGroup"] = Value::Null;
+                    }
                     st.params["library"] = json!(k);
                     st.preset = "Custom".into();
                     retrace = true;
                 }
             });
+            // The document's swatches: every one, or one color group's.
+            if st.params["library"].as_str().unwrap_or(DOCUMENT_SWATCHES) == DOCUMENT_SWATCHES {
+                ui.horizontal(|ui| {
+                    widgets::dim_label(ui, tl!("Colors:"));
+                    let group = color_group(app, &st.params).map(str::to_string);
+                    let label = group.clone().unwrap_or_else(|| tl!("All").to_string());
+                    if let Some(g) = widgets::combo(ui, "it-color-group", &label, 170.0, false, |ui| color_group_list(app, ui, group.as_deref())) {
+                        st.params["colorGroup"] = json!(g);
+                        st.preset = "Custom".into();
+                        retrace = true;
+                    }
+                });
+            }
         }
     }
     // Full Tone and Automatic: how many colours (Less … More); else a count or the threshold.
@@ -1248,6 +1301,97 @@ mod tests {
         assert_eq!(palette(&app), Some(json!("fullTone")));
         let texts = frame(&mut app, &ctx, vec![]);
         assert!(has(&texts, "50") && !has(&texts, "Library:"), "{texts:?}");
+    }
+
+    #[test]
+    fn document_library_colors_lists_the_documents_color_groups() {
+        let mut app = traced_app();
+        app.run("swatch.newGroup", json!({"name": "Brand", "colors": ["#000000", "#ffffff"]})).unwrap();
+        app.run("imageTrace.make", json!({"preset": "6 Colors", "params": {"palette": "documentLibrary"}})).unwrap();
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        let has = |texts: &[(String, Rect)], s: &str| texts.iter().any(|(t, _)| t == s);
+        let stored = |app: &VectorcraftApp, key: &str| target(app).2.map(|t| t["params"][key].clone());
+        let texts = frame(&mut app, &ctx, vec![]);
+        assert!(has(&texts, "Colors:") && has(&texts, "All"), "{texts:?}");
+        // The list holds All and the document's groups; a group traces again with its colors.
+        click(&mut app, &ctx, "All");
+        assert!(has(&frame(&mut app, &ctx, vec![]), "   Brand"));
+        let steps = app.session.active().unwrap().history.undo.len();
+        click(&mut app, &ctx, "   Brand");
+        assert_eq!(stored(&app, "colorGroup"), Some(json!("Brand")));
+        assert_eq!(target(&app).2.unwrap()["preset"], "Custom");
+        assert_eq!(app.session.active().unwrap().history.undo.len(), steps + 1);
+        assert!(has(&frame(&mut app, &ctx, vec![]), "Brand"));
+        // All again.
+        click(&mut app, &ctx, "Brand");
+        click(&mut app, &ctx, "   All");
+        assert_eq!(stored(&app, "colorGroup"), Some(Value::Null));
+        // Another library clears the group, and the row goes.
+        click(&mut app, &ctx, "All");
+        click(&mut app, &ctx, "   Brand");
+        let lib = swatches::colour_libraries(&app).into_iter().find(|l| l.submenu.is_none()).unwrap();
+        click(&mut app, &ctx, "Document Swatches");
+        click(&mut app, &ctx, &format!("   {}", library_panel::library_name(&lib.id, &lib.name)));
+        assert_eq!((stored(&app, "library"), stored(&app, "colorGroup")), (Some(json!(lib.id)), Some(Value::Null)));
+        assert!(!has(&frame(&mut app, &ctx, vec![]), "Colors:"));
+        // Another palette clears the group too, and traces again (the object stores the settings of
+        // a trace that was made).
+        click(&mut app, &ctx, library_panel::library_name(&lib.id, &lib.name));
+        click(&mut app, &ctx, "   Document Swatches");
+        click(&mut app, &ctx, "All");
+        click(&mut app, &ctx, "   Brand");
+        assert_eq!(stored(&app, "colorGroup"), Some(json!("Brand")));
+        click(&mut app, &ctx, "Document Library");
+        click(&mut app, &ctx, "Limited");
+        assert_eq!((stored(&app, "palette"), stored(&app, "colorGroup")), (Some(json!("limited")), Some(Value::Null)));
+        // Another mode clears it too, and traces again.
+        click(&mut app, &ctx, "Limited");
+        click(&mut app, &ctx, "Document Library");
+        click(&mut app, &ctx, "All");
+        click(&mut app, &ctx, "   Brand");
+        assert_eq!(stored(&app, "colorGroup"), Some(json!("Brand")));
+        click(&mut app, &ctx, "Color");
+        click(&mut app, &ctx, "Grayscale");
+        assert_eq!((stored(&app, "mode"), stored(&app, "colorGroup")), (Some(json!("grayscale")), Some(Value::Null)));
+    }
+
+    #[test]
+    fn a_color_group_the_active_document_lacks_is_all() {
+        let mut app = traced_app();
+        app.run("swatch.newGroup", json!({"name": "Brand", "colors": ["#000000", "#ffffff"]})).unwrap();
+        app.run("imageTrace.make", json!({"preset": "6 Colors", "params": {"palette": "documentLibrary"}})).unwrap();
+        let ctx = egui::Context::default();
+        crate::theme::install_fonts(&ctx);
+        click(&mut app, &ctx, "All");
+        click(&mut app, &ctx, "   Brand");
+        assert_eq!(target(&app).2.map(|t| t["params"]["colorGroup"].clone()), Some(json!("Brand")));
+        let shows_brand = |app: &mut VectorcraftApp| frame(app, &ctx, vec![]).iter().any(|(t, _)| t == "Brand");
+        // Without the group the row shows All; undoing its removal shows it again.
+        app.run("swatch.ungroup", json!({"name": "Brand"})).unwrap();
+        assert!(!shows_brand(&mut app));
+        app.run("edit.undo", json!({})).unwrap();
+        assert!(shows_brand(&mut app));
+        // Another document without the group, with an image that is not traced yet.
+        app.session.execute("file.new", &json!({"width": 100, "height": 100})).unwrap();
+        let img = image::RgbaImage::from_fn(20, 20, |x, _| image::Rgba(if x < 10 { [0, 0, 0, 255] } else { [255, 255, 255, 255] }));
+        let mut png = vec![];
+        img.write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+        let data = vectorcraft_format::base64_encode(&png);
+        app.run("file.place", json!({"name": "half.png", "dataBase64": data, "link": false})).unwrap();
+        let texts = frame(&mut app, &ctx, vec![]);
+        let has = |s: &str| texts.iter().any(|(t, _)| t == s);
+        assert!(has("Colors:") && has("All") && !has("Brand"), "{texts:?}");
+        // Back in the first document, its Image Trace object shows its group again.
+        app.session.set_active(0);
+        assert!(shows_brand(&mut app));
+        app.session.set_active(1);
+        assert!(!shows_brand(&mut app));
+        // Trace uses every document swatch.
+        click(&mut app, &ctx, "Trace");
+        let stored = target(&app).2.unwrap_or_else(|| panic!("not traced: {}", app.ui.status));
+        assert!(stored["params"]["colorGroup"].as_str().is_none_or(str::is_empty), "{stored}");
+        assert_eq!(stored["params"]["palette"], "documentLibrary");
     }
 
     #[test]
