@@ -1427,3 +1427,32 @@ fn clicking_the_in_port_then_the_canvas_threads_a_new_frame_before_it() {
     let strokes = s.overlays(v).iter().filter(|o| matches!(o, vectorcraft_tools::Overlay::Line { .. })).count();
     assert_eq!(strokes, 6, "both frames selected: the first one's out port and the second one's in port show arrows");
 }
+
+/// Given a family without a style, text.create, text.createInPath and text.setStyle keep the style
+/// when the family has it, else take the family's closest one, as text.setRangeStyle does: a family
+/// whose styles are numbered has no Regular to store (#4128). A style given is kept as given.
+#[test]
+fn a_family_without_its_style_takes_its_closest_style() {
+    use vectorcraft_text::test_fonts::{NUMBERED_FAMILY as FAMILY, numbered_font};
+    let db = vectorcraft_text::FontDb::global();
+    db.add_font(numbered_font("W3").unwrap());
+    db.add_font(numbered_font("W6").unwrap());
+    let numbered = ["W3", "W6"];
+    let style = |s: &Session, id: NodeId| obj(s, id).runs[0].style.font_style.clone();
+    let create = |s: &mut Session, p: Value| NodeId(s.execute("text.create", &p).unwrap()["id"].as_u64().unwrap());
+    let mut s = session();
+    let created = create(&mut s, json!({"x": 10, "y": 50, "text": "a", "font": FAMILY}));
+    assert!(numbered.contains(&style(&s, created).as_str()), "text.create: {}", style(&s, created));
+    let pid = s.execute("path.create", &json!({"d": "M100 400 L400 100"})).unwrap()["id"].as_u64().unwrap();
+    let on_path = s.execute("text.createInPath", &json!({"path": pid, "mode": "onPath", "text": "a", "font": FAMILY})).unwrap();
+    let on_path = NodeId(on_path["id"].as_u64().unwrap());
+    assert!(numbered.contains(&style(&s, on_path).as_str()), "text.createInPath: {}", style(&s, on_path));
+    let given = create(&mut s, json!({"x": 10, "y": 90, "text": "a", "font": FAMILY, "style": "Medium"}));
+    assert_eq!(style(&s, given), "Medium", "a style given is kept");
+    let set = text(&mut s, "a");
+    s.execute("text.setStyle", &json!({"ids": [set.0], "font": FAMILY})).unwrap();
+    assert!(numbered.contains(&style(&s, set).as_str()), "text.setStyle: {}", style(&s, set));
+    s.execute("text.setStyle", &json!({"ids": [set.0], "style": "W6"})).unwrap();
+    s.execute("text.setStyle", &json!({"ids": [set.0], "font": FAMILY})).unwrap();
+    assert_eq!(style(&s, set), "W6", "a style the family has is kept");
+}
