@@ -343,6 +343,13 @@ pub(crate) fn typed_unit(ctx: &egui::Context, unit: Unit) -> Unit {
     if bare_points && unit == Unit::Picas { Unit::Points } else { unit }
 }
 
+/// `text` typed in a numeric field, with a decimal comma read as a point: `0,1 mm` is `0.1 mm`
+/// (#3837). Text with a point keeps its commas, so `1,000.5` is still refused rather than read
+/// with two decimal separators.
+fn decimal_point(text: &str) -> std::borrow::Cow<'_, str> {
+    if text.contains(',') && !text.contains('.') { text.replace(',', ".").into() } else { text.into() }
+}
+
 /// A recessed numeric field showing `value` (points) in `unit`. Returns the new value (points)
 /// when the user commits (Enter / focus loss / Shift+Enter, which keeps the focus outside dialogs).
 /// Supports unit suffixes and arithmetic; a number without a unit is in `unit` ([`typed_unit`]: in
@@ -387,14 +394,15 @@ fn unit_field(
     let (mut buf, commit, resp, rect) = recessed_text(ui, id, &shown, width, 1, label, name);
     select_all_on_focus(ui, &resp, &buf);
     // ↑/↓ and the wheel step in the field's unit; a drag on its label scrubs it.
-    let read = typed_unit(ui.ctx(), unit);
+    let typed = typed_unit(ui.ctx(), unit);
+    let read = |b: &str| typed.parse(&decimal_point(b));
     let bounds = unit.from_pt(*bounds.start())..=unit.from_pt(*bounds.end());
-    let stepped = step_value(ui, &resp, &mut buf, &bounds, (|b: &str| Some(unit.from_pt(read.parse(b)?)), |v| unit.format(unit.to_pt(v))), None);
+    let stepped = step_value(ui, &resp, &mut buf, &bounds, (|b: &str| Some(unit.from_pt(read(b)?)), |v| unit.format(unit.to_pt(v))), None);
     let scrubbed = scrub::field(ui, id, rect, &buf, value.map(|v| unit.from_pt(v)), STEP_DECIMALS, &bounds);
     let commit = commit && buf != shown;
     ui.data_mut(|d| d.insert_temp(id, buf.clone()));
     if commit {
-        read.parse(&buf).or_else(|| if share_of_value { share_of(&buf, value?) } else { None })
+        read(&buf).or_else(|| if share_of_value { share_of(&decimal_point(&buf), value?) } else { None })
     } else {
         stepped.or(scrubbed).map(|v| unit.to_pt(v))
     }
@@ -933,6 +941,7 @@ fn bounded_field(
     // The suffix (and %, °) may follow any operand: `45*2°`, `50% / 2`.
     let read = |buf: &str| {
         let suffix = suffix.trim();
+        let buf = decimal_point(buf);
         let bare = if suffix.is_empty() { buf.to_string() } else { buf.replace(suffix, "") };
         vectorcraft_doc::parse_number(&bare.replace(['%', '°'], ""))
     };
@@ -2589,7 +2598,14 @@ pub fn opt_field_named(ui: &mut Ui, id: impl std::hash::Hash, name: Option<&str>
     select_all_on_focus(ui, &resp, &buf);
     // ↑/↓ and the wheel step a value (an empty field stays empty); a drag on its label scrubs it.
     let lengths = 0.0..=f64::INFINITY;
-    let stepped = step_value(ui, &resp, &mut buf, &lengths, (|b: &str| Some(unit.from_pt(unit.parse(b)?)), |v| unit.number(unit.to_pt(v))), None);
+    let stepped = step_value(
+        ui,
+        &resp,
+        &mut buf,
+        &lengths,
+        (|b: &str| Some(unit.from_pt(unit.parse(&decimal_point(b))?)), |v| unit.number(unit.to_pt(v))),
+        None,
+    );
     let scrubbed = scrub::field(ui, id, framed.response.rect, &buf, value.map(|v| unit.from_pt(v)), STEP_DECIMALS, &lengths);
     let focused = ui.memory(|m| m.has_focus(id));
     ui.data_mut(|d| {
@@ -2598,7 +2614,7 @@ pub fn opt_field_named(ui: &mut Ui, id: impl std::hash::Hash, name: Option<&str>
     });
     if (resp.lost_focus() || kept) && buf != shown {
         let s = buf.trim();
-        if s.is_empty() { Some(None) } else { typed_unit(ui.ctx(), unit).parse(s).map(Some) }
+        if s.is_empty() { Some(None) } else { typed_unit(ui.ctx(), unit).parse(&decimal_point(s)).map(Some) }
     } else {
         stepped.or(scrubbed).map(|v| Some(unit.to_pt(v)))
     }
@@ -3221,6 +3237,25 @@ mod step_to_multiple_tests {
         assert!((step_to_multiple(0.3, 0.1, -1.0) - 0.2).abs() < 1e-9);
         assert!((step_to_multiple(5.000_000_1, 1.0, 1.0) - 6.0).abs() < 1e-9);
         assert!((step_to_multiple(4.999_999_9, 1.0, -1.0) - 4.0).abs() < 1e-9);
+    }
+}
+
+#[cfg(test)]
+mod decimal_point_tests {
+    use super::*;
+
+    /// A decimal comma reads as a point, in a length, with arithmetic and in a percentage; text
+    /// with a point keeps its commas and is refused as before (#3837).
+    #[test]
+    fn a_decimal_comma_reads_as_a_point() {
+        let mm = |s: &str| Unit::Millimeters.parse(&decimal_point(s)).map(|pt| Unit::Millimeters.from_pt(pt));
+        for (text, want) in [("0,1", 0.1), ("0,1 mm", 0.1), ("0,1mm", 0.1), ("-0,5", -0.5), ("1,5+0,25", 1.75), ("0.1", 0.1)] {
+            let got = mm(text).unwrap_or(f64::NAN);
+            assert!((got - want).abs() < 1e-9, "{text}: {got}");
+        }
+        assert_eq!(mm("1,000.5"), None, "a point and a comma");
+        assert_eq!(mm("1,2,3"), None, "two commas");
+        assert_eq!(share_of(&decimal_point("12,5%"), 200.0), Some(25.0));
     }
 }
 
