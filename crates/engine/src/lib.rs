@@ -2520,7 +2520,7 @@ impl Session {
     /// closes it. A scope that joined an open group leaves the group open; with `cancel`, it puts the
     /// document and its selection back as they were when the scope began and cuts the journal back to
     /// where the scope began (only while the group's step is still the newest one), and an undo step
-    /// that the scope's first edit recorded goes too.
+    /// that the scope's first edit recorded goes too. The open undo groups drop the cut entries.
     pub fn end_undo_scope(&mut self, scope: UndoScope, cancel: bool) {
         let Some((doc, selection, first)) = scope.joined else {
             self.end_document_undo_group(scope.uid, cancel);
@@ -2549,6 +2549,11 @@ impl Session {
         st.history.recost_last(&st.doc);
         st.revision += 1;
         self.journal.truncate(scope.journal);
+        // The next commands take the cut entries' numbers, so no open undo group keeps them.
+        for g in self.docs.iter_mut().filter_map(|st| st.undo_group.as_mut()) {
+            g.journal.retain(|&(n, _)| n < scope.journal);
+            g.steps.retain(|&(n, _)| n < scope.journal);
+        }
     }
 
     /// Commands with enablement (for menus, palette, MCP `list_commands`).

@@ -780,6 +780,34 @@ fn an_undo_scope_in_an_open_group_takes_back_only_its_own_edits() {
     assert_eq!(objects(&s), 0, "one undo takes back the group's edits");
 }
 
+/// A canceled undo scope that joined an open group forgets the journal entries it cut: when a command
+/// in another document takes the same entry number, a later cancel of the group keeps that entry, and
+/// the journal replays to the same documents.
+#[test]
+fn a_canceled_undo_scope_leaves_its_cut_entries_out_of_the_group() {
+    let mut s = Session::new();
+    let rect = json!({"x": 10, "y": 10, "width": 100, "height": 50});
+    s.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
+    s.execute("file.new", &json!({"width": 400, "height": 300})).unwrap();
+    s.execute("document.activate", &json!({"index": 0})).unwrap();
+    s.begin_undo_group();
+    s.execute("shape.rectangle", &rect).unwrap();
+    let scope = s.begin_undo_scope().unwrap();
+    s.execute("shape.rectangle", &rect).unwrap();
+    s.end_undo_scope(scope, true);
+    let journal = s.journal.len();
+    // The switch takes the entry number the scope's edit had, and the rectangle in the second document follows it.
+    s.execute("document.activate", &json!({"index": 1})).unwrap();
+    s.execute("shape.rectangle", &rect).unwrap();
+    s.end_undo_group(true);
+    let objects = s.documents().iter().map(|d| d.doc.layers[0].children().map_or(0, |c| c.len())).collect::<Vec<_>>();
+    assert_eq!(objects, [0, 1]);
+    assert_eq!(s.journal.len(), journal + 1, "only the group's own edit leaves the journal");
+    let r = replayed(&s);
+    assert_eq!(documents(&r), documents(&s));
+    assert_eq!(r.active_index(), s.active_index());
+}
+
 /// A move drag is named for what its last preview did: Alt pressed or released during the drag
 /// turns it into a copy or back (the Selection and Direct Selection tools).
 #[test]
