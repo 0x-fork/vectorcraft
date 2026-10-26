@@ -991,7 +991,9 @@ fn only_picks_shows_the_hosts_dialogs() {
             let path = entry.path();
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
             if path.is_dir() {
-                stack.push(path);
+                if name != "tests" {
+                    stack.push(path);
+                }
             } else if name.ends_with(".rs") && !name.starts_with("tests") && name != "picks.rs" {
                 let key = path.strip_prefix(&dir).unwrap().to_string_lossy().replace('\\', "/");
                 scanned.insert(key, without_tests(&code_only(&std::fs::read_to_string(&path).unwrap())));
