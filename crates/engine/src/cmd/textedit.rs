@@ -23,6 +23,15 @@ pub fn specs() -> Vec<CommandSpec> {
             edit_range
         ),
         cmd!(
+            "text.startList",
+            "Bullets and Numbering",
+            [],
+            None,
+            "{id, at?: byte (default: the end of the text)} start a list from typed characters, what the Type tool runs when a space is typed on its own: when the text from the start of the paragraph that `at` is in up to `at` is \"1. \" or \"1) \" (a numbered list in 1, 2, 3), \"A. \" or \"A) \" (a numbered list in A, B, C), or \"* \", \"# \", \"> \" or \"+ \" (a bulleted list with the filled dot), and the paragraph is in no list, those characters are removed and the paragraph joins that list as one undo step (left and first-line indents of 0 become 18 and -18, as text.setFormat sets them); otherwise nothing changes → {id, started: bool, caret: byte (the paragraph's start when started, else `at`)}",
+            has_doc,
+            start_list
+        ),
+        cmd!(
             "text.setRangeStyle",
             "Character",
             [],
@@ -218,6 +227,36 @@ fn edit_range(s: &mut Session, p: &Value) -> Result<Value> {
         Ok(caret)
     })?;
     Ok(json!({"id": id.0, "caret": caret}))
+}
+
+fn start_list(s: &mut Session, p: &Value) -> Result<Value> {
+    const C: &str = "text.startList";
+    let id = id_param(p, "id").ok_or_else(|| bad(C, "missing `id`"))?;
+    check_numbers(p, &["at"], C)?;
+    let t = text_ref(s, id)?;
+    let len = edit::runs_len(&t.runs);
+    let at = byte_param(p, "at").unwrap_or(len).min(len);
+    let Some((start, list)) = t.typed_list_at(at) else {
+        return Ok(json!({"id": id.0, "started": false, "caret": at}));
+    };
+    s.edit("Bullets and Numbering", |d, _| {
+        let t = text_mut(d, id).ok_or(EngineError::NoNode(id))?;
+        t.splice_paras(start, at, "");
+        edit::replace_range(&mut t.runs, start, at, "");
+        t.ruby_after_replace(start, at, 0);
+        let i = t.paragraphs_in(start, start).start;
+        t.edit_paras(Some(i..i + 1), |para| {
+            para.list = Some(list);
+            // A paragraph with no left or first-line indent gets the hanging indent.
+            if para.left_indent == 0.0 && para.first_line_indent == 0.0 {
+                para.left_indent = vectorcraft_doc::text::LIST_HANGING_INDENT;
+                para.first_line_indent = -vectorcraft_doc::text::LIST_HANGING_INDENT;
+            }
+        });
+        refresh_bounds(t);
+        Ok(())
+    })?;
+    Ok(json!({"id": id.0, "started": true, "caret": start}))
 }
 
 fn get_range(s: &mut Session, p: &Value) -> Result<Value> {

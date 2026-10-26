@@ -15,7 +15,8 @@
 //! Styling a selected range goes through `text.setRangeStyle` (the Character panel reads the
 //! selection from [`Tool::options`]); Alt+arrows step it by the Preferences › Type increments
 //! (`type.step`). New type starts with placeholder text, selected, when Fill New Type Objects With
-//! Placeholder Text is on.
+//! Placeholder Text is on. A space typed on its own after "1.", "1)", "A.", "A)", "*", "#", ">" or
+//! "+" at the start of a paragraph in no list makes that paragraph a list (`text.startList`).
 //!
 //! IME: the marked text of a composition is part of the typing session (so it lays out in place),
 //! underlined, until the IME commits it (it then goes through [`Tool::text_input`]) or clears it.
@@ -58,6 +59,18 @@ struct Preedit {
     range: Range<usize>,
     /// The clause being converted, in bytes relative to `range.start` (empty: the IME's cursor).
     active: Option<Range<usize>>,
+}
+
+/// A list that typed characters started ([`TypeTool::start_typed_list`]).
+struct TypedList {
+    /// The type object.
+    id: NodeId,
+    /// The bytes of the typed characters and the space: from the paragraph's start to the caret.
+    start: usize,
+    end: usize,
+    /// The plain text with the typed characters, before the list started.
+    text: String,
+    list: vectorcraft_doc::text::ParaList,
 }
 
 /// The edited text's layout, keyed by the font database's generation and the text.
@@ -118,6 +131,9 @@ pub struct TypeTool {
     clicks: (Option<Point>, u8),
     /// Styled copy of the last copied range (pasting the same plain text keeps its styles).
     clipboard: Vec<TextRun>,
+    /// The list typed characters last started (`text.startList`), so that after Undo puts them back
+    /// the caret goes on after them, and after Redo it goes back.
+    listed: Option<TypedList>,
     cache: Mutex<Option<CachedLayout>>,
 }
 
@@ -301,6 +317,7 @@ impl TypeTool {
         if !extend {
             self.anchor = byte;
         }
+        self.listed = None;
         out
     }
 
@@ -308,12 +325,51 @@ impl TypeTool {
         self.edit_session = next_edit_session();
         self.editing = Some(id);
         self.fresh = None;
+        self.listed = None;
         self.caret = caret;
         self.anchor = caret;
         self.goal_x = None;
         self.typing = None;
         self.preedit = None;
         self.typing_ended = false;
+    }
+
+    /// Typed list detection, after a space typed on its own at the caret: when the characters
+    /// from the start of the caret's paragraph up to it start a list ([`TextObject::typed_list_at`]),
+    /// the typing session ends as one undo step with those characters, and `text.startList`
+    /// removes them and makes the paragraph a list as the next one, so one Undo puts them back.
+    fn start_typed_list(&mut self, cx: &ToolContext) -> Vec<Action> {
+        let (Some(id), Some(ty)) = (self.editing, &self.typing) else { return vec![] };
+        let Some(mut t) = Self::text(cx, id).cloned() else { return vec![] };
+        // The document does not have the space yet (its preview is applied after this input).
+        t.runs = ty.cur.clone();
+        let at = self.caret;
+        let Some((start, list)) = t.typed_list_at(at) else { return vec![] };
+        let mut out = self.commit();
+        out.push(Action::Exec("text.startList".into(), json!({"id": id.0, "at": at})));
+        self.caret = start;
+        self.anchor = start;
+        self.listed = Some(TypedList { id, start, end: at, text: t.plain_text(), list });
+        out
+    }
+
+    /// After Undo of a list that typed characters started (and of what was typed after it), the
+    /// text is as it was typed: the caret goes on after the characters. After Redo the text is as
+    /// the list left it: the caret goes back to the paragraph's start.
+    fn after_typed_list(&mut self, cx: &ToolContext) {
+        let Some(l) = &self.listed else { return };
+        if self.editing != Some(l.id) || self.typing.is_some() || self.caret != self.anchor {
+            return;
+        }
+        let Some(t) = Self::text(cx, l.id) else { return };
+        let (text, list) = (t.plain_text(), t.para_at(t.paragraphs_in(l.start, l.start).start).list);
+        let listed_text = l.text.get(..l.start).zip(l.text.get(l.end..)).map(|(a, b)| format!("{a}{b}"));
+        if text == l.text && list.is_none() {
+            self.caret = l.end;
+        } else if self.caret == l.end && Some(&text) == listed_text.as_ref() && list == Some(l.list) {
+            self.caret = l.start;
+        }
+        self.anchor = self.caret;
     }
 
     /// Byte under `p` in the edited text if `p` is inside it (frame, path band or layout bounds).
@@ -904,6 +960,8 @@ impl Tool for TypeTool {
         }
         // An IME commit replaces its marked text (an empty commit just removes it).
         let committing = self.preedit.is_some();
+        // A space typed on its own at a caret may start a list.
+        let list_space = !committing && s == " " && self.caret == self.anchor;
         if committing && s.is_empty() {
             return self.ime_preedit(cx, "", None);
         }
@@ -919,7 +977,11 @@ impl Tool for TypeTool {
             let runs = self.clipboard.clone();
             return self.replace(cx, "", Some(runs));
         }
-        self.replace(cx, &s, None)
+        let mut out = self.replace(cx, &s, None);
+        if list_space {
+            out.extend(self.start_typed_list(cx));
+        }
+        out
     }
     /// Would [`Tool::text_input`] change `s` before inserting it? Control characters are dropped,
     /// `\r` becomes `\n`, Typographer's Quotes rewrites a straight quote, and copied text keeps
@@ -1237,8 +1299,11 @@ impl Tool for TypeTool {
         self.finish(cx)
     }
     /// Editing ends when a command takes the text out of the selection (Deselect, another object
-    /// picked in the Layers panel) or removes it.
+    /// picked in the Layers panel) or removes it. After an Undo that takes back a list typed
+    /// characters started, the caret goes on after the characters, and after its Redo the caret
+    /// goes before the paragraph's text.
     fn after_command(&mut self, cx: &ToolContext) -> Vec<Action> {
+        self.after_typed_list(cx);
         let Some(id) = self.editing else { return vec![] };
         let mut cur = Some(id).filter(|i| cx.doc.node(*i).is_some());
         while let Some(c) = cur {
