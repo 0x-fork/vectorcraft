@@ -12,7 +12,7 @@ use vectorcraft_engine::cmd::fileio::SaveMode;
 use crate::VectorcraftApp;
 use crate::io;
 use crate::panels::character::Face;
-use crate::state::{DockTab, next_zoom};
+use crate::state::next_zoom;
 use crate::theme::{Brightness, Tokens};
 use crate::widgets;
 
@@ -43,11 +43,6 @@ fn todos(label: &'static str, sc: &'static str) -> Item {
 fn sub(label: &'static str, items: Vec<Item>) -> Item {
     Item::Sub(label, items)
 }
-/// Window → … Libraries until the code-generated libraries land (disabled entries).
-fn library_placeholders() -> Vec<Item> {
-    vec![todo("Built-in Libraries"), todo("User Defined"), Sep, todo("Other Library…")]
-}
-
 use Item::Sep;
 
 /// UI-level commands: (id, label, shortcut, params doc).
@@ -204,6 +199,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "Precise Cursors",
         "",
         "{} toggle General › Use Precise Cursors: the drawing tools' pointers become a crosshair → true when on",
+    ),
+    (
+        "imageTrace.preview",
+        "Image Trace Preview",
+        "",
+        "{on?: bool} turn the Image Trace panel's Preview on (true), off (false) or toggle it (omitted), as its checkbox does: on, setting changes trace the selected Image Trace object at once; off, they wait for Trace; returns the new state",
     ),
     ("view.textThreads", "Hide Text Threads", "Cmd+Shift+Y", "{} toggle the thread lines between threaded text frames"),
     ("view.gradientAnnotator", "Hide Gradient Annotator", "Cmd+Alt+G", "{} toggle the Gradient tool's annotator"),
@@ -473,7 +474,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "window.panel.move",
         "Move Panel",
         "",
-        "{panel, anchor, zone?: tab|center|left|right|top|bottom, before?: panel} group, split or reorder a panel",
+        "{panel, anchor, zone?: tab|center|left|right|top|bottom|above|below, before?: panel, group?: bool, placement?} move a panel (with `group`, its whole group) into the group holding `anchor`: as a tab (before the `before` panel; null appends), a split beside it, or (`above` / `below`) a group of its own above or below it in its dock column or floating window; `placement` (a serialized Placement) replaces zone and before",
     ),
     ("window.panel.activate", "Activate Panel", "", "{panel} show and select a panel in its current group"),
     ("window.panel.close", "Close Panel", "", "{panel} hide a panel"),
@@ -481,25 +482,25 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "window.panel.collapse",
         "Collapse Panel Group",
         "",
-        "{panel, collapsed?: bool} show the dock group holding a panel as its tabs only (or its panel again), as a double-click on its tab does; the panel becomes the group's shown one. Without `collapsed` it toggles. Floating groups collapse through window.panel.float {panel, collapsed}. Returns {panel, collapsed}",
+        "{panel, collapsed?: bool} minimize the group holding a panel to its tabs (in a floating window, the window to its title bar), or restore it, as a double-click on a tab or the drag bar does; the same as window.panel.minimize {panel, minimized}. Without `collapsed` it toggles. Returns {panel, collapsed, layout}",
     ),
     (
         "window.panel.float",
         "Float Panel",
         "",
-        "{panel: id or \"tools\", x?, y?, onto?: id, below?: id, above?: id, group?: bool, collapsed?: bool} float a panel out of the dock (or out of its floating group) as its own floating group with its top-left corner at x, y in window points (default: cascaded), as dragging its tab out of the dock does; `onto` stacks it as a tab with the floating group holding that panel instead; `below` / `above` puts its group in a set with that group, right below or above it, as dropping it on that group's lower or upper half does (the set's groups stack top to bottom and move together); `group` takes its whole group (its floating group, or the Properties | Layers | Libraries tabs left in the dock); a panel alone in its group is moved (out of its set, given x, y); `collapsed` shows its group's tabs only, as a double-click on a tab does; a docked group floats its dock column. \"tools\" floats the Tools panel. Returns {panel, floating, group, set, pos, collapsed, column}",
+        "{panel: id or \"tools\", x?, y?, width?, height?, group?: bool, column?: bool or n, onto?: id, above?: id, below?: id, collapsed?: bool} float a panel (with `group`, its whole group; with `column`, its whole dock column or floating window) as a floating window with its top-left corner at x, y in window points (default: inside the dock area, cascaded), as dragging its tab out does; a whole floating window keeps its rect unless given one. `onto` makes it a tab of the floating group holding that panel instead; `above` / `below` a group of its own above or below the group holding that panel, in its floating window or dock column. `collapsed` then minimizes (true) or restores (false) its window or group. A hidden panel shows first. \"tools\" floats the Tools panel at x, y. Returns {layout, closed, floating}",
     ),
     (
         "window.panel.dock",
         "Dock Panel",
         "",
-        "{panel: id or \"tools\", group?: bool, column?: true or n, anchor?: id, zone?: \"tab\" | \"top\" | \"bottom\" | \"left\" | \"right\" | \"center\", before?: id, icon?: bool} put a floating panel (with `group`, its whole group) back in the dock, as dropping it on the dock or its group's × does: Properties, Layers and Libraries in the tabbed group, the other panels in the icon column; with `anchor`, in the dock group holding that panel instead: `zone` \"tab\" (the default) as a tab of it (before the `before` panel's tab), as dropping it on that group's tabs does, \"top\" / \"bottom\" as a new group above / below it, as dropping it on that group's upper / lower half does (\"left\", \"right\" and \"center\" split or join it likewise); with `icon: true` (no `anchor`), as icons in the icon column, the tabbed group's panels too, as dropping it on the icon column does: it lives there from then on and pops out of its icon; with `column`, dock its group and the rest of its set as a dock column instead, as dropping it on the left edge of the icon column or of a dock column does: `true` at the dock's left, n at that place (1: next to the icon column, counting left); \"tools\" docks the Tools panel at the window's left edge. Returns {panel, floating, column}, or with `anchor` or `icon: true` (the shared layout) {panel, floating, layout} and no `column`",
+        "{panel: id or \"tools\", anchor?: id, zone?: tab|center|left|right|top|bottom|above|below, before?: id, group?: bool, column?: bool or n, side?: Start|End, onto?: id, above?: id, below?: id, icon?: bool, collapsed?: bool} dock a panel (with `group`, its whole group): with no destination a floating panel goes back where it floated from (else joins the first dock group) and a hidden one shows where it was; with `anchor` (or `onto`) in the group holding that panel, `zone` as for window.panel.move; with `side`, as a new innermost column of that dock (`column: true` then moves its whole dock column or floating window); `column: n` with no other destination docks its group, or the whole floating window it floats in, as a new dock column at that place (1: next to the icon column, counting inwards; `true`: innermost); `icon: true` puts it in a row of its own at the end of the icon column; `above` / `below` as a group of its own above or below the group holding that panel. `collapsed` then minimizes or restores its group. \"tools\" docks the Tools panel at the left edge of the window. Returns {layout, closed, floating}",
     ),
     (
         "window.collapseDock",
         "Collapse Panels to Icons",
         "",
-        "{collapsed?: bool} collapse the dock's Properties | Layers | Libraries group to icons (true), expand it (false) or toggle (omitted), as the double arrow at the top of the dock does; returns the new state",
+        "{collapsed?: bool} collapse every expanded dock column to icons (true), expand the outer dock column, Properties | Layers | Libraries (false), or toggle the outer column (omitted), as the double arrow at the top of the dock does; returns the new state",
     ),
     ("window.brightness", "UI Brightness", "", "{brightness: dark|mediumDark|mediumLight|light}"),
     (
@@ -554,6 +555,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "{} opens the Save PDF dialog; with params = document.exportPdf options written to path (asked when missing; viewAfterSaving opens the file) → {path, bytes, warnings}",
     ),
     ("help.about", "About VectorCraft", "", "{}"),
+    ("help.checkForUpdates", "Check for Updates…", "", "{}"),
     ("help.commandPalette", "Search Commands…", "Cmd+Shift+/", "{}"),
     ("app.quit", "Quit VectorCraft", "Cmd+Q", "{}"),
     (
@@ -614,7 +616,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "tool.options",
         "Tool Options…",
         "",
-        "{tool: id} what double-clicking a tool button opens: hand → fits the artboard in the window (view.fitArtboard), zoom → 100% (view.actualSize), rotate|scale|reflect|shear → that Object › Transform dialog (dialog `rotate`, `scale`, `reflect` or `shear`; error `nothing selected` without a selection), selection|directSelection|groupSelection → the Move dialog (dialog `move`; the same error), gradient|magicWand → the Gradient or Magic Wand panel (window.panel), artboard → Artboard Options of the active artboard (dialog `artboardOptions`, fields index, name, x, y, width, height, showCenterMark, showCrossHairs; OK runs artboard.setProps, and with other artboards selected with the Artboard tool a new width or height goes to each of them too, in its `artboards` list, each resized about the reference point the form used for that size, or about its top-left corner when the size was set in the fields directly), flare → Flare Tool Options (dialog `flareOptions`, fields diameter and pathLength (pt), opacity, brightness, growth, fuzziness, longest, rayFuzziness, largest (%), rays, rings, direction (°), raysOn, ringsOn; OK runs tool.setOption {tool: \"flare\", values}: the next flare dragged out uses them, and a Flare click's dialog, which also has x and y, draws one there with them), lineSegment|arc|rectangularGrid|polarGrid → that tool's Tool Options, its click dialog without x and y (dialog kind = the tool id, `__toolOptions: true`; lineSegment: length (pt), angle (°), fillLine; arc: lengthX, lengthY (pt), reference (0–8), arcType: open|closed, baseAlong: x|y, slope (−100…100), fillArc; rectangularGrid: width, height (pt, the Default Size), reference (0–8), rows, columns, rowSkew, columnSkew (%), frame, fill; polarGrid: the same with concentric, radial, concentricSkew, radialSkew and compound for rows, columns, the skews and frame; OK runs tool.setOption {tool, values} and draws nothing: the next drag uses them (Fill Line, the arc's type, base, slope and fill, the grids' dividers, skews and switches) and a click's dialog opens at them), columnGraph|stackedColumnGraph|barGraph|stackedBarGraph|lineGraph|areaGraph|scatterGraph|pieGraph|radarGraph → Graph Type for the selected graph (dialog `command` running graph.setType; an error without one), symbolSprayer|symbolShifter|symbolScruncher|symbolSizer|symbolSpinner|symbolStainer|symbolScreener|symbolStyler → Symbolism Tools Options (dialog `symbolismOptions`, fields tool, diameter (pt), intensity and density (1–10), shared by the eight tools; OK runs tool.setOption {tool, values}), blend → Blend Options, perspectiveGrid → Perspective Grid Options, eyedropper → Eyedropper Options (dialog `eyedropperOptions`, fields sampleSize, pickUp, apply; OK runs eyedropper.setOptions), printTiling → resets the print tiling (print.tiling.set {reset: true}), warp|twirl|pucker|bloat|scallop|crystallize|wrinkle → that tool's Tool Options (dialog `liquifyOptions`, fields tool, width, height, angle, intensity %, usePressure, detail, simplify, simplifyOn, rate, complexity, horizontal %, vertical %, affectAnchors, affectIn, affectOut, showBrush; OK runs tool.setOption {tool, values}), pencil|paintbrush|smooth|blobBrush|eraser → that tool's Tool Options (dialog `freehandOptions`, fields tool and the options the tool keeps: fidelity (pt), fill, keepSelected (on for pencil and paintbrush, off for blobBrush), mergeOnlySelection (off), closeWithin and editWithin (px, 0 is off), size (pt); OK runs tool.setOption {tool, values}), livePaintSelection → Live Paint Selection Tool Options (dialog `livePaintSelectionOptions`, fields selectFills and selectStrokes (both on), color (the highlight color, #rrggbb or a layer color's name; #ff2a2a), width (the highlight's width, 1–20 px; 4); OK runs tool.setOption {tool: \"livePaintSelection\", values}), shapeBuilder → Shape Builder Tool Options (dialog `shapeBuilderOptions`, fields gapDetection (off), gapLength (pt, 0–72; 3), openFilledAsClosed (on), clickStrokeSplitsPath (off), pickColorFrom: artwork|swatches (artwork), cursorSwatchPreview (off), selection: freeform|straightLine (freeform), highlightFill (on), highlightStroke (on), highlightColor (#rrggbb or a layer color's name; #ff4f4f); OK runs tool.setOption {tool: \"shapeBuilder\", values})",
+        "{tool: id} what double-clicking a tool button opens: hand → fits the artboard in the window (view.fitArtboard), zoom → 100% (view.actualSize), rotate|scale|reflect|shear → that Object › Transform dialog (dialog `rotate`, `scale`, `reflect` or `shear`; error `nothing selected` without a selection), selection|directSelection|groupSelection → the Move dialog (dialog `move`; the same error), gradient|magicWand → the Gradient or Magic Wand panel (window.panel), artboard → Artboard Options of the active artboard (dialog `artboardOptions`, fields index, name, x, y, width, height, showCenterMark, showCrossHairs; OK runs artboard.setProps, and with other artboards selected with the Artboard tool a new width or height goes to each of them too, in its `artboards` list, each resized about the reference point the form used for that size, or about its top-left corner when the size was set in the fields directly), flare → Flare Tool Options (dialog `flareOptions`, fields diameter and pathLength (pt), opacity, brightness, growth, fuzziness, longest, rayFuzziness, largest (%), rays, rings, direction (°), raysOn, ringsOn; OK runs tool.setOption {tool: \"flare\", values}: the next flare dragged out uses them, and a Flare click's dialog, which also has x and y, draws one there with them), lineSegment|arc|rectangularGrid|polarGrid → that tool's Tool Options, its click dialog without x and y (dialog kind = the tool id, `__toolOptions: true`; lineSegment: length (pt), angle (°), fillLine; arc: lengthX, lengthY (pt), reference (0–8), arcType: open|closed, baseAlong: x|y, slope (−100…100), fillArc; rectangularGrid: width, height (pt, the Default Size), reference (0–8), rows, columns, rowSkew, columnSkew (%), frame, fill; polarGrid: the same with concentric, radial, concentricSkew, radialSkew and compound for rows, columns, the skews and frame; OK runs tool.setOption {tool, values} and draws nothing: the next drag uses them (Fill Line, the arc's type, base, slope and fill, the grids' dividers, skews and switches) and a click's dialog opens at them), columnGraph|stackedColumnGraph|barGraph|stackedBarGraph|lineGraph|areaGraph|scatterGraph|pieGraph|radarGraph → Graph Type for the selected graph (dialog `command` running graph.setType; an error without one), typeOnPath|verticalTypeOnPath → Type on a Path Options for the selected type on a path (dialog `command` running type.pathOptions; error `nothing selected` without a selection, and the command's error when no type on a path is selected),symbolSprayer|symbolShifter|symbolScruncher|symbolSizer|symbolSpinner|symbolStainer|symbolScreener|symbolStyler → Symbolism Tools Options (dialog `symbolismOptions`, fields tool, diameter (pt), intensity and density (1–10), shared by the eight tools; OK runs tool.setOption {tool, values}), blend → Blend Options, perspectiveGrid → Perspective Grid Options, eyedropper → Eyedropper Options (dialog `eyedropperOptions`, fields sampleSize, pickUp, apply; OK runs eyedropper.setOptions), printTiling → resets the print tiling (print.tiling.set {reset: true}), warp|twirl|pucker|bloat|scallop|crystallize|wrinkle → that tool's Tool Options (dialog `liquifyOptions`, fields tool, width, height, angle, intensity %, usePressure, detail, simplify, simplifyOn, rate, complexity, horizontal %, vertical %, affectAnchors, affectIn, affectOut, showBrush; OK runs tool.setOption {tool, values}), pencil|paintbrush|smooth|blobBrush|eraser → that tool's Tool Options (dialog `freehandOptions`, fields tool and the options the tool keeps: fidelity (pt), fill, keepSelected (on for pencil and paintbrush, off for blobBrush), mergeOnlySelection (off), closeWithin and editWithin (px, 0 is off), livePreview (pencil, on: off draws a thin line while the stroke is drawn, and the path's fill and stroke on release), size (pt), angle (°, −180–180; 0) and roundness (%, 1–100; 100) of the eraser's tip; OK runs tool.setOption {tool, values}), livePaintSelection → Live Paint Selection Tool Options (dialog `livePaintSelectionOptions`, fields selectFills and selectStrokes (both on), color (the highlight color, #rrggbb or a layer color's name; #ff2a2a), width (the highlight's width, 1–20 px; 4); OK runs tool.setOption {tool: \"livePaintSelection\", values}), shapeBuilder → Shape Builder Tool Options (dialog `shapeBuilderOptions`, fields gapDetection (off), gapLength (pt, 0–72; 3), openFilledAsClosed (on), clickStrokeSplitsPath (off), pickColorFrom: artwork|swatches (artwork), cursorSwatchPreview (off), selection: freeform|straightLine (freeform), highlightFill (on), highlightStroke (on), highlightColor (#rrggbb or a layer color's name; #ff4f4f); OK runs tool.setOption {tool: \"shapeBuilder\", values})",
     ),
     (
         "ui.colorGuideOptions",
@@ -802,6 +804,34 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
     ("window.userSymbolLibrary9", "User Symbol Library 9", "", "{} open the 9. User Defined symbol library"),
     ("window.userSymbolLibrary10", "User Symbol Library 10", "", "{} open the 10. User Defined symbol library"),
     (
+        "window.brushLibrary",
+        "Brush Library",
+        "",
+        "{library: id or name (see brush.libraries) | null (close)} open a brush library in a library panel of its own (UI state `library_panels`, kind brushes); clicking a brush there runs brush.addFromLibrary (with apply when paths are selected), dragging one onto a path runs it with apply on that path, dragging one onto the Brushes panel adds it → {open, panel, name, count}",
+    ),
+    (
+        "window.brushLibrary.other",
+        "Other Library…",
+        "",
+        "{path?} (default: pick a file) load the brushes of another document or a saved brush library (engine: brush.loadLibrary), and open them in a library panel",
+    ),
+    (
+        "ui.saveBrushLibrary",
+        "Save Brushes…",
+        "",
+        "{names?: [the brushes selected in the Brushes panel]} open Save Brush Library (dialog `saveBrushLibrary`: name, user: save to the user library folder, selectedOnly); OK runs brush.saveLibrary",
+    ),
+    ("window.userBrushLibrary1", "User Brush Library 1", "", "{} open the 1. User Defined brush library (brush.libraries, category user)"),
+    ("window.userBrushLibrary2", "User Brush Library 2", "", "{} open the 2. User Defined brush library"),
+    ("window.userBrushLibrary3", "User Brush Library 3", "", "{} open the 3. User Defined brush library"),
+    ("window.userBrushLibrary4", "User Brush Library 4", "", "{} open the 4. User Defined brush library"),
+    ("window.userBrushLibrary5", "User Brush Library 5", "", "{} open the 5. User Defined brush library"),
+    ("window.userBrushLibrary6", "User Brush Library 6", "", "{} open the 6. User Defined brush library"),
+    ("window.userBrushLibrary7", "User Brush Library 7", "", "{} open the 7. User Defined brush library"),
+    ("window.userBrushLibrary8", "User Brush Library 8", "", "{} open the 8. User Defined brush library"),
+    ("window.userBrushLibrary9", "User Brush Library 9", "", "{} open the 9. User Defined brush library"),
+    ("window.userBrushLibrary10", "User Brush Library 10", "", "{} open the 10. User Defined brush library"),
+    (
         "ui.expandDialog",
         "Expand…",
         "",
@@ -829,7 +859,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, &str)] = &[
         "ui.menuDialog",
         "Menu Dialog",
         "",
-        "{command: object.move|object.rotate|object.scale|object.reflect|object.shear|object.transformEach|path.average|object.path.offsetPath|object.path.simplify|object.path.splitIntoGrid|object.vectorHalftone|artboard.rearrange|object.envelope.makeWithWarp|object.envelope.resetWithWarp|object.envelope.makeWithMesh|object.envelope.resetWithMesh|object.envelope.options} open the dialog that command's menu item opens (dialog kind: move, rotate, scale, reflect, shear, transformEach, …, vectorHalftone, rearrangeArtboards, envelopeWarp, envelopeMesh, envelopeOptions; Scale and Transform Each have `corners` and `strokes`, from the preferences, which OK updates; the envelope dialogs start from the selected envelope, Make opens as Reset (`reset: true`) while one is selected)",
+        "{command: object.move|object.rotate|object.scale|object.reflect|object.shear|object.transformEach|path.average|object.path.offsetPath|object.path.simplify|object.path.splitIntoGrid|object.vectorHalftone|artboard.rearrange|object.envelope.makeWithWarp|object.envelope.resetWithWarp|object.envelope.makeWithMesh|object.envelope.resetWithMesh|object.envelope.options} open the dialog that command's menu item opens (dialog kind: move, rotate, scale, reflect, shear, transformEach, …, vectorHalftone, rearrangeArtboards, envelopeWarp, envelopeMesh, envelopeOptions; Scale and Transform Each have `corners` and `strokes`, from the preferences, which OK updates; Transform Each opens on the values it was last confirmed with (not `copy`), and its Copy button confirms with `copy: true`; the envelope dialogs start from the selected envelope, Make opens as Reset (`reset: true`) while one is selected)",
     ),
     (
         "ui.widthPointEdit",
@@ -1287,7 +1317,6 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
     }
     if let Some(r) = crate::shortcut_editor::run_command(app, id, p)
         .or_else(|| crate::workspaces::run_command(app, id, p))
-        .or_else(|| crate::floating::command(app, id, p))
         .or_else(|| crate::edit_toolbar::command(app, id, p))
     {
         return Some(r);
@@ -1576,6 +1605,11 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             json!(on)
         }),
         "window.toolbarAdvanced" => flag(&mut app.ui.toolbar_advanced),
+        "imageTrace.preview" => opt_bool(p, "on").map(|on| {
+            let on = on.unwrap_or(!app.ui.image_trace_preview);
+            app.ui.image_trace_preview = on;
+            json!(on)
+        }),
         "window.floatTools" => {
             let floating = match opt_bool(p, "floating") {
                 Ok(on) => on,
@@ -1636,49 +1670,6 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             }
             Ok(json!(on))
         }
-        "window.collapseDock" => opt_bool(p, "collapsed").map(|collapsed| {
-            let collapsed = collapsed.unwrap_or(!app.ui.dock_collapsed);
-            crate::dock::set_collapsed(app, collapsed);
-            json!(collapsed)
-        }),
-        "window.panel" => {
-            let raw = s("panel").unwrap_or_default();
-            // Canonical id (case-insensitive; display labels work too), then the
-            // dock tab it names, if any.
-            let canonical = normalize_panel(&raw);
-            // A floating panel shows its tab in its group.
-            if let Some(p) = canonical
-                && let Some(g) = crate::floating::group_of(&app.ui, p).and_then(|i| app.ui.floating_panels.get_mut(i))
-            {
-                g.active = g.panels.iter().position(|q| q == p).unwrap_or(g.active);
-                g.collapsed = false;
-                let out = json!({ "floating": g.panels });
-                app.ui.dock = true;
-                return Some(Ok(out));
-            }
-            let tab = canonical.and_then(DockTab::from_id);
-            match (canonical, tab) {
-                // A collapsed dock pops the panel out of its icon, like the icon panels.
-                (Some(p), Some(tab)) if app.ui.dock_collapsed => {
-                    app.ui.dock_tab = tab;
-                    app.ui.open_panel = if app.ui.open_panel.as_deref() == Some(p) { None } else { Some(p.to_string()) };
-                    app.ui.dock = true;
-                    Ok(json!({"open": app.ui.open_panel}))
-                }
-                (Some(_), Some(tab)) => {
-                    app.ui.dock_tab = tab;
-                    Ok(Value::Null)
-                }
-                // A library panel isn't in the icon column: it floats.
-                (Some(p), None) if crate::panels::library_panel::parse(p).is_some() => crate::panels::library_panel::float(app, p),
-                (Some(p), None) => {
-                    app.ui.open_panel = if app.ui.open_panel.as_deref() == Some(p) { None } else { Some(p.to_string()) };
-                    app.ui.dock = true;
-                    Ok(json!({"open": app.ui.open_panel}))
-                }
-                (None, _) => Err(format!("unknown panel `{raw}`")),
-            }
-        }
         "window.brightness" => match s("brightness").as_deref().and_then(Brightness::parse) {
             Some(b) => {
                 app.ui.brightness = b;
@@ -1723,6 +1714,7 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
             app.ui.about = true;
             Ok(Value::Null)
         }
+        "help.checkForUpdates" => crate::updates_ui::check(app),
         "help.commandPalette" => {
             app.ui.palette_open = !app.ui.palette_open;
             app.ui.palette_query.clear();
@@ -1824,6 +1816,16 @@ pub fn run_ui_command(app: &mut VectorcraftApp, id: &str, p: &Value) -> Option<R
         }
         id if id.starts_with(crate::panels::symbols::USER_SLOT) => match crate::panels::symbols::user_library(app, id) {
             Some(l) => crate::panels::symbols::open_library(app, &json!({ "library": l.id })),
+            None => Err("no such user library".into()),
+        },
+        "window.brushLibrary" => crate::panels::brushes::open_library(app, p),
+        "window.brushLibrary.other" => crate::panels::brushes::other_library(app, s("path")),
+        "ui.saveBrushLibrary" => {
+            let names = p.get("names").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect());
+            crate::dialogs::save_brush_library::open(app, names.unwrap_or_default())
+        }
+        id if id.starts_with(crate::panels::brushes::USER_SLOT) => match crate::panels::brushes::user_library(app, id) {
+            Some(l) => crate::panels::brushes::open_library(app, &json!({ "library": l.id })),
             None => Err("no such user library".into()),
         },
         "ui.expandDialog" => crate::dialogs::expand::open(app),
@@ -2040,17 +2042,9 @@ pub fn checked(app: &VectorcraftApp, id: &str, p: &Value) -> Option<bool> {
         "window.taskBar.pin" => app.ui.task_bar_place.pinned,
         "window.panel" => {
             let panel = p.get("panel").and_then(Value::as_str).unwrap_or("");
-            let canonical = normalize_panel(panel);
-            match canonical.and_then(DockTab::from_id) {
-                _ if app.ui.docking.is_some() => canonical.is_some_and(|id| {
-                    app.ui.open_panel.as_deref() == Some(id) || app.ui.docking.as_ref().is_some_and(|layout| layout.contains(&id.to_string()))
-                }),
-                _ if canonical.is_some_and(|id| crate::floating::group_of(&app.ui, id).is_some()) => true,
-                Some(tab) if !app.ui.dock_collapsed => crate::floating::shown_tab(&app.ui) == Some(tab),
-                _ => canonical.is_some_and(|id| app.ui.open_panel.as_deref() == Some(id)),
-            }
+            normalize_panel(panel).is_some_and(|id| crate::panel_docking::showing(&app.ui, id))
         }
-        "window.collapseDock" => app.ui.dock_collapsed,
+        "window.collapseDock" => crate::panel_docking::dock_collapsed(&app.ui),
         "window.workspace" => p.get("name").and_then(Value::as_str) == Some(app.ui.workspace.as_str()),
         "window.brightness" => p.get("brightness").and_then(Value::as_str).and_then(Brightness::parse) == Some(app.ui.brightness),
         "view.slices.lock" => app.session.slices_locked(),
@@ -2149,6 +2143,9 @@ pub fn dynamic_label(app: &VectorcraftApp, id: &str, label: &str) -> String {
         id if id.starts_with(crate::panels::symbols::USER_SLOT) => {
             crate::panels::symbols::user_library(app, id).map_or_else(|| "—".into(), |l| l.name)
         }
+        id if id.starts_with(crate::panels::brushes::USER_SLOT) => {
+            crate::panels::brushes::user_library(app, id).map_or_else(|| "—".into(), |l| l.name)
+        }
         id if id.starts_with(crate::dialogs::perspective_presets::SLOT) => {
             crate::dialogs::perspective_presets::slot_preset(app, id).unwrap_or_else(|| "—".into())
         }
@@ -2164,13 +2161,14 @@ pub fn dynamic_label(app: &VectorcraftApp, id: &str, label: &str) -> String {
 /// plug-in? Such names are shown as they are, never translated (a workspace the user calls
 /// "Layers" stays "Layers").
 fn shows_a_name(id: &str, label: &str) -> bool {
-    const SLOTS: [&str; 7] = [
+    const SLOTS: [&str; 8] = [
         "file.openRecent",
         "view.goto",
         "type.recentFont",
         crate::panels::swatches::USER_SLOT,
         crate::panels::graphic_styles::USER_SLOT,
         crate::panels::symbols::USER_SLOT,
+        crate::panels::brushes::USER_SLOT,
         crate::dialogs::perspective_presets::SLOT,
     ];
     SLOTS.iter().any(|s| id.starts_with(s))
@@ -2257,6 +2255,7 @@ fn hidden_when_disabled(id: &str) -> bool {
         || id.starts_with(crate::panels::swatches::USER_SLOT)
         || id.starts_with(crate::panels::graphic_styles::USER_SLOT)
         || id.starts_with(crate::panels::symbols::USER_SLOT)
+        || id.starts_with(crate::panels::brushes::USER_SLOT)
         || id.starts_with(crate::dialogs::perspective_presets::SLOT)
 }
 
@@ -2496,11 +2495,24 @@ pub(crate) fn waits_for_ime(app: &VectorcraftApp, id: &str) -> bool {
             || id.starts_with("edit.paste"))
 }
 
+/// Engine commands that take `ids` and otherwise act on the Appearance panel's subject (the
+/// targeted layer, group or object, else the selection). Without `ids` and without a subject they
+/// are off, as the panel's buttons are: in menus, in the command palette and on their keys.
+const SUBJECT_COMMANDS: [&str; 2] = ["appearance.addFill", "appearance.addStroke"];
+
+/// Is there an Appearance panel subject: a targeted layer, group or object, or a selected one?
+fn has_subject(app: &VectorcraftApp) -> bool {
+    app.session.active().is_some_and(|st| !st.selection.subjects().is_empty())
+}
+
 /// Can command `id` run now? An engine command asks the engine, a UI command the app's state;
 /// none that would act on text an input method is still composing.
 pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
     if waits_for_ime(app, id) {
         return false;
+    }
+    if SUBJECT_COMMANDS.contains(&id) {
+        return has_subject(app);
     }
     if let Some(c) = vectorcraft_engine::find_command(id) {
         // The system clipboard's contents can be pasted with an empty internal clipboard.
@@ -2560,6 +2572,8 @@ pub fn enabled(app: &VectorcraftApp, id: &str) -> bool {
         id if id.starts_with(crate::panels::graphic_styles::USER_SLOT) => crate::panels::graphic_styles::user_library(app, id).is_some(),
         "ui.saveSymbolLibrary" => app.session.active().is_some_and(|d| !d.doc.symbols.is_empty()),
         id if id.starts_with(crate::panels::symbols::USER_SLOT) => crate::panels::symbols::user_library(app, id).is_some(),
+        "ui.saveBrushLibrary" => crate::panels::brushes::has_brushes(app),
+        id if id.starts_with(crate::panels::brushes::USER_SLOT) => crate::panels::brushes::user_library(app, id).is_some(),
         "ui.expandDialog" => app.session.active().is_some_and(|d| !d.selection.is_empty()),
         "ui.spotColors" => app.session.active().is_some(),
         "ui.menuDialog" => app.session.active().is_some_and(|d| !d.selection.is_empty()),
@@ -3258,7 +3272,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                 ),
                 panel("Variables", crate::panels::variables::ID),
                 Sep,
-                sub("Brush Libraries", library_placeholders()),
+                sub("Brush Libraries", crate::panels::brushes::window_menu()),
                 sub("Graphic Style Libraries", crate::panels::graphic_styles::window_menu()),
                 sub("Swatch Libraries", crate::panels::swatches::window_menu()),
                 sub("Symbol Libraries", crate::panels::symbols::window_menu()),
@@ -3275,6 +3289,7 @@ pub fn menu_tree_named(english_names: bool) -> Vec<(&'static str, Vec<Item>)> {
                 c("Search Commands…", "help.commandPalette"),
                 todos("VectorCraft Help…", "F1"),
                 Sep,
+                c("Check for Updates…", "help.checkForUpdates"),
                 c("About VectorCraft", "help.about"),
             ],
         ),
@@ -3321,6 +3336,29 @@ pub fn context_items(app: &VectorcraftApp) -> Vec<Item> {
     let mut v = vec![c("Undo", "edit.undo"), c("Redo", "edit.redo"), Sep];
     if st.isolation.is_some() {
         v.extend([c("Exit Isolation Mode", "object.exitIsolation"), Sep]);
+    }
+    // Managing artboards from the canvas: with the Artboard tool, the menu locks and unlocks them
+    // (`artboard.setProps` with `locked` for each artboard named; an entry with none to change is left out).
+    if app.session.tool_id() == "artboard" {
+        let n = st.doc.artboards.len();
+        let sel = crate::panels::artboards::picked(app, n);
+        let others: Vec<usize> = (0..n).filter(|i| !sel.contains(i)).collect();
+        let entry = |label, idx: Vec<usize>, locked: bool| {
+            let list: Vec<Value> = idx.iter().map(|i| json!({ "index": i, "locked": locked })).collect();
+            (!list.is_empty()).then(|| cp(label, "artboard.setProps", json!({ "artboards": list })))
+        };
+        let lock: Vec<Item> =
+            [entry("Lock Selected", sel.clone(), true), entry("Lock All Except Selected", others, true), entry("Lock All", (0..n).collect(), true)]
+                .into_iter()
+                .flatten()
+                .collect();
+        let unlock: Vec<Item> = [entry("Unlock Selected", sel, false), entry("Unlock All", (0..n).collect(), false)].into_iter().flatten().collect();
+        for (label, items) in [("Lock Artboards", lock), ("Unlock Artboards", unlock)] {
+            if !items.is_empty() {
+                v.push(sub(label, items));
+            }
+        }
+        v.push(Sep);
     }
     // The locked objects under the pointer at the right-click, each unlocked as the Layers panel's
     // lock column does. `unlock_item_label` shows each object's name.
@@ -3466,7 +3504,7 @@ pub fn menu_bar(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> f32 {
     // its text (#516), the frame after the click that chose them (that click takes the keyboard
     // from it again).
     type Field = (egui::Id, egui::text_edit::TextEditState);
-    let (field_key, chosen_key) = (egui::Id::new("menu-bar-field"), egui::Id::new("menu-bar-field-event"));
+    let (field_key, chosen_key) = (egui::Id::unique("menu-bar-field"), egui::Id::unique("menu-bar-field-event"));
     if let Some(((field, state), e)) = ctx.data(|d| d.get_temp::<(Field, egui::Event)>(chosen_key)) {
         ctx.data_mut(|d| d.remove::<(Field, egui::Event)>(chosen_key));
         state.store(&ctx, field);
@@ -3480,12 +3518,17 @@ pub fn menu_bar(app: &mut VectorcraftApp, ui: &mut egui::Ui) -> f32 {
     // No application menu in the window (as in Illustrator): the bar starts at File on every
     // platform. The VectorCraft menu stays in the tree: the native Mac bar takes it from there.
     let tree: Vec<(&str, Vec<Item>)> = tree.into_iter().filter(|(title, _)| *title != "VectorCraft").collect();
+    // A menu bar for its layout and menu-button style, but the titles use `Popup::menu` directly:
+    // egui 0.37's `MenuButton` opens the title under a resting pointer while another menu is open,
+    // and the app switches titles on movement only (`switch_on_hover`, the native behaviour).
     let (end, open) = egui::MenuBar::new()
         .ui(ui, |ui| {
             let mut titles = Vec::with_capacity(tree.len());
             for (title, items) in tree.iter() {
                 let text = egui::RichText::new(tl!(title)).size(13.0).color(t.text);
-                titles.push(ui.menu_button(text, |ui| menu_body(app, ui, items, &mut clicked)).response);
+                let resp = ui.add(egui::Button::new(text));
+                egui::Popup::menu(&resp).show(|ui| menu_body(app, ui, items, &mut clicked));
+                titles.push(resp);
             }
             (ui.cursor().min.x, switch_on_hover(ui.ctx(), &titles))
         })
@@ -3590,7 +3633,7 @@ fn render_row(app: &VectorcraftApp, ui: &mut egui::Ui, row: &Row, checks: bool, 
     let sampled = p.get("font").and_then(Value::as_str).filter(|_| id == "text.setStyle" && app.session.prefs.font_preview);
     let r = match sampled {
         Some(family) => {
-            let slot = ui.id().with(("font-sample", family));
+            let slot = egui::IdSalt::new(("font-sample", family));
             let button = egui::Button::new(text).right_text(egui::Atom::custom(slot, crate::font_menu::MENU_SAMPLE_SIZE));
             let out = ui.add_enabled_ui(row.enabled, |ui| button.atom_ui(ui)).inner;
             if let Some(rect) = out.rect(slot) {
@@ -3650,7 +3693,8 @@ fn menu_dialog(app: &VectorcraftApp, id: &str) -> Option<(&'static str, Value)> 
         "object.move" => ("move", crate::dialogs::transform::move_fields(app)),
         "object.rotate" => ("rotate", json!({"angle": 0})),
         "object.scale" => ("scale", json!({"sx": 100, "sy": 100, "uniform": true})),
-        "object.transformEach" => (crate::dialogs::transform_each::KIND, crate::dialogs::transform_each::fields()),
+        // Transform Each opens on the values it was last confirmed with (#1732).
+        "object.transformEach" => (crate::dialogs::transform_each::KIND, crate::dialogs::transform_each::open_fields(app)),
         "object.reflect" => ("reflect", json!({"axis": "vertical", "angle": 90})),
         "object.shear" => ("shear", json!({"angle": 0, "axis": "horizontal"})),
         "path.average" => ("average", json!({"axis": "both"})),
@@ -3726,6 +3770,9 @@ pub fn invoke(app: &mut VectorcraftApp, id: &str, p: Value) {
     if waits_for_ime(app, id) {
         return;
     }
+    if SUBJECT_COMMANDS.contains(&id) && p.get("ids").is_none() && p.get("id").is_none() && !has_subject(app) {
+        return;
+    }
     // Params first: some dialogs' fields take a look through the session (Move's last move).
     if p.as_object().is_none_or(|o| o.is_empty())
         && let Some((kind, fields)) = menu_dialog(app, id)
@@ -3743,6 +3790,11 @@ pub fn invoke(app: &mut VectorcraftApp, id: &str, p: Value) {
     // Variables (data merge): a name and a kind, a name and a row of values.
     if crate::dialogs::variables::opens(id) && p.as_object().is_none_or(|o| o.is_empty()) {
         crate::dialogs::variables::open(app, id, None);
+        return;
+    }
+    // Pathfinder Options: a dialog with the current options.
+    if id == "object.pathfinder.options" && p.as_object().is_none_or(|o| o.is_empty()) {
+        crate::dialogs::pathfinder_options::open(app);
         return;
     }
     // Repeat Options: a dialog with the selected repeat's current values.
@@ -4200,6 +4252,12 @@ pub fn item_shortcut(id: &str, p: &Value) -> Option<&'static str> {
 pub const CONTEXT_LABELS: &[&str] = &[
     "Isolate Selected Group",
     "Exit Isolation Mode",
+    "Lock Artboards",
+    "Lock Selected",
+    "Lock All Except Selected",
+    "Lock All",
+    "Unlock Artboards",
+    "Unlock Selected",
     "Unlock",
     "Make Clipping Mask",
     "Release Clipping Mask",
@@ -4457,10 +4515,10 @@ mod tests {
                 egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(300.0, 200.0))), ..Default::default() };
             let mut out = ctx.run_ui(raw, |ui| {
                 let ctx = ui.ctx().clone();
-                let covered = ui.interact(egui::Rect::from_center_size(p, egui::vec2(80.0, 24.0)), egui::Id::new("covered"), egui::Sense::click());
+                let covered = ui.interact(egui::Rect::from_center_size(p, egui::vec2(80.0, 24.0)), egui::Id::unique("covered"), egui::Sense::click());
                 let q = p + egui::vec2(0.0, 100.0);
-                let free = ui.interact(egui::Rect::from_center_size(q, egui::vec2(80.0, 24.0)), egui::Id::new("free"), egui::Sense::click());
-                egui::Area::new(egui::Id::new("popup")).order(egui::Order::Foreground).fixed_pos(p - egui::vec2(10.0, 10.0)).show(&ctx, |ui| {
+                let free = ui.interact(egui::Rect::from_center_size(q, egui::vec2(80.0, 24.0)), egui::Id::unique("free"), egui::Sense::click());
+                egui::Area::new(egui::Id::unique("popup")).order(egui::Order::Foreground).fixed_pos(p - egui::vec2(10.0, 10.0)).show(&ctx, |ui| {
                     ui.allocate_space(egui::vec2(20.0, 20.0));
                 });
                 reaches = (pointer_reaches_title(&ctx, &covered, p), pointer_reaches_title(&ctx, &free, q));
@@ -4929,7 +4987,7 @@ mod tests {
         let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 1000.0));
         let tree = menu_tree();
         let (_, file) = tree.iter().find(|(t, _)| *t == "File").unwrap();
-        let id = egui::Id::new("test-menu");
+        let id = egui::Id::unique("test-menu");
         for _ in 0..3 {
             let input = egui::RawInput { screen_rect: Some(screen), ..Default::default() };
             let mut out = ctx.run_ui(input, |ui| {
@@ -4953,7 +5011,7 @@ mod tests {
         crate::theme::install_fonts(&ctx);
         let tree = menu_tree();
         let (_, window) = tree.iter().find(|(t, _)| *t == "Window").unwrap();
-        let id = egui::Id::new("test-long-menu");
+        let id = egui::Id::unique("test-long-menu");
         let rect = |height: f32| {
             let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, height));
             for _ in 0..3 {

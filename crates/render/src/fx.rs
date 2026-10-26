@@ -35,8 +35,8 @@
 //!
 //! A cached raster is made again when something its content reads from outside the object
 //! changes ([`Inputs`]): the pattern definitions, symbols, images and brushes it uses, the
-//! document's raster resolution, color mode and substitution highlights, the knockout its object
-//! inherits, the color settings and fonts, the plug-ins its plug-in effects run, and the options
+//! document's raster resolution and color mode, the substitution highlights, the knockout its
+//! object inherits, the color settings and fonts, the plug-ins its plug-in effects run, and the options
 //! and layer settings it is drawn with.
 //!
 //! The same applies to one fill or stroke's own raster effects (around that item alone) and to
@@ -941,8 +941,8 @@ pub(crate) struct Reads {
     images: bool,
     /// Brushed strokes: the brush library.
     brushes: bool,
-    /// Type: the fonts, whether overprinting shows ([`crate::proof::overprints`]) and Document
-    /// Setup's substitution highlights.
+    /// Type: the fonts, whether overprinting shows ([`crate::proof::overprints`]) and the
+    /// substitution highlights.
     text: bool,
     /// Plug-in effects on its objects: the plug-ins installed. Those in the symbol and pattern art
     /// it shows are found with the document's inputs ([`DocInputs`]).
@@ -2136,8 +2136,12 @@ impl Renderer {
             self.brushes.library_key(f.doc, self.stamp).hash(&mut h);
         }
         if reads.text {
-            let setup = &f.doc.setup;
-            let highlights = f.opts.highlight_substitutions.then_some((setup.highlight_substituted_fonts, setup.highlight_substituted_glyphs));
+            let o = f.opts;
+            let highlights = o.highlight_substitutions.then_some((
+                o.highlight_substituted_fonts,
+                f.doc.setup.highlight_substituted_glyphs,
+                o.highlight_alternate_glyphs,
+            ));
             (vectorcraft_text::FontDb::global().generation(), crate::proof::overprints(f.opts), highlights).hash(&mut h);
         }
         if reads.plugins || (doc.plugins && (reads.symbols || reads.patterns)) {

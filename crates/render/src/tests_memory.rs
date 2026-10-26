@@ -1794,8 +1794,8 @@ fn missing_font_type(d: &mut Document, fx: vectorcraft_doc::Effect) -> Node {
 
 /// Raster effects are made again when a document or layer setting they read changes: the raster
 /// resolution under De-Interlace, Page Knockout Group around a blurred group of translucent
-/// objects, Document Setup's highlight of substituted fonts under a blur, and the layer's Dim
-/// Images under an image's blur.
+/// objects, the Highlight Substituted Fonts and Highlight Alternate Glyphs preferences under a
+/// blur, and the layer's Dim Images under an image's blur.
 #[test]
 fn rasters_draw_document_and_layer_setting_edits() {
     let _fonts = fonts_steady();
@@ -1823,14 +1823,29 @@ fn rasters_draw_document_and_layer_setting_edits() {
     edit_draws_as_new(with_art(d, vec![group]), |d| d.page_knockout = true);
     // Blurred type in a missing family, with the substitution highlights on screen.
     let mut d = Document::new(200.0, 100.0);
-    d.setup.highlight_substituted_fonts = false;
     let blurred = missing_font_type(&mut d, effect("blur.gaussian", serde_json::json!({"radius": 1.0})));
     let mut d = with_art(d, vec![blurred]);
     let highlights = RenderOptions { background: Some([255, 255, 255, 255]), highlight_substitutions: true, ..Default::default() };
+    let unhighlighted = RenderOptions { highlight_substituted_fonts: false, ..highlights.clone() };
     // The first lookup of the missing family catalogs the installed fonts, which changes the font
     // generation: a frame drawn first does that.
     Renderer::new().render(&d, 200, 100, Affine::IDENTITY, &highlights);
-    draws_as_new(&mut d, &highlights, &highlights, |d| d.setup.highlight_substituted_fonts = true);
+    // Preferences › Type › Highlight Substituted Fonts turned on between two frames.
+    draws_as_new(&mut d, &unhighlighted, &highlights, |_| {});
+    // Blurred type with a ligature, with Highlight Alternate Glyphs turned on between two frames.
+    let mut d = Document::new(200.0, 100.0);
+    let mut ligature = missing_font_type(&mut d, effect("blur.gaussian", serde_json::json!({"radius": 1.0})));
+    if let NodeKind::Text(t) = &mut ligature.kind {
+        **t = vectorcraft_doc::text::TextObject::point(
+            vectorcraft_geom::Point::new(10.0, 60.0),
+            "fi",
+            vectorcraft_doc::text::CharStyle { size: 48.0, font_family: "Source Serif 4".into(), ..Default::default() },
+        );
+    }
+    let mut d = with_art(d, vec![ligature]);
+    let alternates = RenderOptions { highlight_alternate_glyphs: true, ..highlights.clone() };
+    Renderer::new().render(&d, 200, 100, Affine::IDENTITY, &highlights);
+    draws_as_new(&mut d, &highlights, &alternates, |_| {});
     // The layer of a blurred image dims its images to 50%.
     edit_draws_as_new(blurred_image_doc("dimmed", 106), |d| {
         if let NodeKind::Layer { dim_images, .. } = &mut Arc::make_mut(&mut d.layers[0]).kind {

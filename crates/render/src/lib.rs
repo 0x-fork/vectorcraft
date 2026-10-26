@@ -145,8 +145,12 @@ pub struct RenderOptions {
     /// View Opacity Mask (Alt-click the mask thumbnail): instead of the artwork, show this object's
     /// opacity mask alone as its coverage in greyscale (white = opaque, black = transparent).
     pub mask_view: Option<NodeId>,
-    /// Screen view: highlight substituted fonts and glyphs as Document Setup asks.
+    /// Screen view: highlight substituted fonts and glyphs, as Preferences › Type and Document
+    /// Setup ask.
     pub highlight_substitutions: bool,
+    /// Screen view: Preferences › Type › Highlight Substituted Fonts. Pink behind text drawn in a
+    /// substitute for a missing font, in every document (on by default).
+    pub highlight_substituted_fonts: bool,
     /// Screen view: Preferences › Type › Highlight Alternate Glyphs. Pink behind glyphs OpenType
     /// features substituted (ligatures, contextual forms), not Document Setup's missing-glyph
     /// highlights.
@@ -266,6 +270,7 @@ impl Default for RenderOptions {
             guide: ([0x4a, 0xd8, 0xff], false),
             mask_view: None,
             highlight_substitutions: false,
+            highlight_substituted_fonts: true,
             highlight_alternate_glyphs: false,
             anti_alias: AntiAlias::Art,
             progressive_placed: false,
@@ -582,6 +587,10 @@ pub struct Renderer {
     /// The art the last frame drew with Overprint Preview or Separations Preview: the next frame
     /// draws it again for the objects that have not changed ([`proof::prepare`]).
     proof_art: Option<proof::Prepared>,
+    /// Width of [`Self::hairline`] in the pixels being drawn: 1, or the supersampling factor while
+    /// a supersampled render draws its larger frame, so outlines stay one output pixel wide. Type
+    /// outlines and dotted guides scale by it too.
+    hairline: f64,
 }
 
 /// How deep inline graphics nest (text in a symbol shown inline in text…) before they draw nothing.
@@ -697,6 +706,7 @@ impl Renderer {
             isolation: None,
             isolation_settled: false,
             proof_art: None,
+            hairline: 1.0,
         }
     }
 
@@ -713,7 +723,9 @@ impl Renderer {
             let (w, h) = (width.clamp(1, MAX_CONTEXT_SIDE), height.clamp(1, MAX_CONTEXT_SIDE));
             if let Some(k) = supersample_factor(w, h) {
                 let hard = RenderOptions { anti_alias: AntiAlias::None, supersample: false, ..opts.clone() };
+                let hairline = std::mem::replace(&mut self.hairline, f64::from(k));
                 let big = self.render_as(doc, w * k, h * k, Affine::scale(f64::from(k)) * view, &hard, inks);
+                self.hairline = hairline;
                 let pixels = downsample(&big.pixels, big.width as usize, big.height as usize, k as usize);
                 self.stats.micros = now().saturating_sub(start);
                 return Rendered { width: w, height: h, pixels };
@@ -1371,9 +1383,10 @@ impl Renderer {
                     // running far off screen (from a file) asked for millions of them. Past
                     // [`MAX_GUIDE_DASHES`] (by its control polygon, which is at least as long) it
                     // is drawn solid.
-                    if dots && polygon_length(&screen) / 4.0 <= MAX_GUIDE_DASHES {
+                    let h = self.hairline;
+                    if dots && polygon_length(&screen) / (4.0 * h) <= MAX_GUIDE_DASHES {
                         ctx.set_transform(Affine::IDENTITY);
-                        ctx.set_stroke(kurbo::Stroke::new(1.5).with_dashes(0.0, [1.5, 2.5]));
+                        ctx.set_stroke(kurbo::Stroke::new(1.5 * h).with_dashes(0.0, [1.5 * h, 2.5 * h]));
                         ctx.set_paint(f.ink.fixed([r, g, b, 255]));
                         ctx.stroke_path(&screen);
                     } else {
@@ -1570,7 +1583,7 @@ impl Renderer {
         ctx.set_transform(Affine::IDENTITY);
         let mut screen = bp.clone();
         screen.apply_affine(f.view);
-        ctx.set_stroke(kurbo::Stroke::new(1.0));
+        ctx.set_stroke(kurbo::Stroke::new(self.hairline));
         ctx.set_paint(f.ink.fixed(rgba));
         ctx.stroke_path(&screen);
     }
@@ -1931,7 +1944,7 @@ impl Renderer {
             let mut p = g.all.clone();
             p.apply_affine(xf);
             ctx.set_transform(Affine::IDENTITY);
-            ctx.set_stroke(kurbo::Stroke::new(1.0));
+            ctx.set_stroke(kurbo::Stroke::new(self.hairline));
             ctx.set_paint(peniko::Color::BLACK);
             ctx.stroke_path(&p);
             // Colour bitmap glyphs: their boxes, as images show in outline mode.
@@ -1968,10 +1981,9 @@ impl Renderer {
             self.draw_text_items(ctx, f, n, below, all, tb);
         }
         if f.opts.highlight_substitutions {
-            let setup = &f.doc.setup;
             for (on, path) in [
-                (setup.highlight_substituted_fonts, Some(&g.substituted_fonts)),
-                (setup.highlight_substituted_glyphs, Some(&g.substituted_glyphs)),
+                (f.opts.highlight_substituted_fonts, Some(&g.substituted_fonts)),
+                (f.doc.setup.highlight_substituted_glyphs, Some(&g.substituted_glyphs)),
                 // Measured only when shown: it lays the text out again.
                 (f.opts.highlight_alternate_glyphs, f.opts.highlight_alternate_glyphs.then(|| g.alternate_glyphs(t))),
             ] {
@@ -2527,7 +2539,8 @@ struct TextGeom {
     spans: Vec<(usize, usize, usize)>,
     bounds: Rect,
     /// The boxes of characters whose font is missing (drawn in a substitute), and of glyphs the
-    /// font lacks (drawn from a fallback font): Document Setup's substitution highlights.
+    /// font lacks (drawn from a fallback font): Highlight Substituted Fonts and Highlight
+    /// Substituted Glyphs.
     substituted_fonts: BezPath,
     substituted_glyphs: BezPath,
     /// Glyphs OpenType may have substituted (a ligature, or not the face's cmap glyph for their
@@ -2725,7 +2738,8 @@ fn text_geom_snapped(t: &TextObject, snap: Option<Affine>) -> TextGeom {
     }
 }
 
-/// Document Setup's and Preferences › Highlight Alternate Glyphs pink (screen only).
+/// The substitution highlights' pink: Preferences › Highlight Substituted Fonts and Highlight
+/// Alternate Glyphs, and Document Setup's Highlight Substituted Glyphs (screen only).
 const SUBSTITUTED: peniko::Color = peniko::Color::from_rgba8(255, 120, 190, 110);
 /// The pixel size of `region` rendered at `scale` pixels per point (at least 1×1).
 pub fn region_pixels(region: Rect, scale: f64) -> (u32, u32) {

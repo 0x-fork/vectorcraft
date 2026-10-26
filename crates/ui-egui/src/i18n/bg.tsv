@@ -329,7 +329,6 @@ font-technology	Variable	Променливи
 	Brush Affects:	Четката влияе върху:
 	Brush Definition	Дефиниция на четка
 	Brush Libraries	Библиотеки с четки
-	Brush Libraries (on the roadmap)	Библиотеки с четки (планирани)
 	Brush Options…	Опции за четката…
 	Brush Strokes	Щрихи с четка
 	Brushes	Четки
@@ -1089,6 +1088,7 @@ font-technology	Variable	Променливи
 	Fill and Stroke	Запълване и щрих
 	Fill new strokes	Запълване на нови щрихове
 	Alt key toggles to Smooth Tool	Клавишът Alt превключва към инструмент „Гладкост“
+	Live curve fitting	Напасване на кривата в реално време
 	Fill Color	Цвят на запълване
 	Fill New Type Objects With Placeholder Text	Запълване на нови текстови обекти с примесен текст
 	Fill Rule	Правило за запълване
@@ -2545,6 +2545,7 @@ font-technology	Variable	Променливи
 	Remove Plug-in	Премахване на добавка
 	Remove Selected Assets	Премахване на избраните активи
 	Remove Threading	Премахване на свързването
+	Break Thread	Прекъсване на свързването
 	Remove “{keyword}”	Премахване на „{keyword}“
 	Rename	Преименуване
 	Rename Asset	Преименуване на актива
@@ -3022,6 +3023,7 @@ font-technology	Variable	Променливи
 	Snap to Grid	Прилепване към мрежа
 	Snap to Pixel	Прилепване към пиксел
 	Precise Cursors	Прецизни курсори
+	Image Trace Preview	Преглед на трасирането на изображение
 	Snap to Point	Прилепване към точка
 	Snap to Unit	Прилепване към мерна единица
 	Snapping Tolerance	Толеранс на прилепване
@@ -3688,13 +3690,10 @@ axis	Horizontal	Хоризонтално
 axis	Vertical	Вертикално
 axis	Both	И двете
 	Drag to move	Плъзнете за преместване
-	Drag to move out of the set	Плъзнете, за да извадите от групата
 	Drag to float as a toolbar	Плъзнете, за да го направите плаваща лента с инструменти
 	Put back in the toolbar	Връщане в лентата с инструменти
 	Float Panel	Плаващ панел
 	Dock Panel	Закотвен панел
-	Drag to float the panel group	Плъзнете, за да направите групата от панели плаваща
-	Put back in the dock	Връщане в дока
 	Drag to float the toolbar	Плъзнете, за да направите лентата с инструменти плаваща
 	Drag to the window's left edge to dock	Плъзнете до левия ръб на прозореца за закотвяне
 	Float Tool Group	Плаваща група инструменти
@@ -4224,6 +4223,7 @@ axis	Both	И двете
 @msg	tool shortcuts must be a single key (optionally with Shift)	клавишните комбинации за инструменти трябва да са един клавиш (по избор със Shift)
 @msg	truncated	съкратено
 @msg	unknown command `{0}`	непозната команда `{0}`
+@msg	unknown command `{0}`; did you mean `{1}`?	непозната команда `{0}`; имахте ли предвид `{1}`?
 @msg	unknown effect `{id}`	непознат ефект `{id}`
 @msg	unknown format	непознат формат
 @msg	unknown format `{f}` (Save writes {_1})	непознат формат `{f}` (Запазването записва {_1})
@@ -4525,7 +4525,6 @@ effect	Soft	Меко
 @msg	before must name a panel	параметърът „преди“ трябва да указва панел
 @msg	docking action contains an unknown panel or an excessive split path	действието по закачане съдържа непознат панел или прекомерен път на разделяне
 @msg	group must be true or false	групата трябва да е истина или лъжа
-@msg	panel floats; collapse its group with window.panel.float {panel, collapsed}	панелът е плаващ; свийте групата му с window.panel.float {panel, collapsed}
 @msg	panel is not in a dock group	панелът не е в група на дока
 @msg	only a dock group above or below others collapses, not one beside another	свива се само група на дока над или под други, не и такава до друга
 @msg	icon must be true or false	icon трябва да е истина или лъжа
@@ -5403,6 +5402,12 @@ theme	Appearance	Външен вид
 	Shift:	Изместване:
 	Fresco…	Фреска…
 	Fresco	Фреска
+	Lock Artboards	Заключване на работни области
+	Unlock Artboards	Отключване на работни области
+	Lock Selected	Заключване на избраните
+	Lock All Except Selected	Заключване на всички без избраните
+	Lock All	Заключване на всички
+	Unlock Selected	Отключване на избраните
 	Effect Gallery…	Галерия с ефекти…
 	Effect Gallery Dialog	Диалог „Галерия с ефекти“
 	Arc Segment Tool Options	Опции на инструмента „Дъгов сегмент“
@@ -5477,3 +5482,32 @@ axis	Y Axis	Y ос
 	Rectangular Grid Tool Options	Опции на инструмента „Правоъгълна мрежа“
 	Polar Grid Tool Options	Опции на инструмента „Полярна мрежа“
 	Fill Line	Запълване на линия
+	Pathfinder Options	Опции за търсач на пътища
+	Divide and Outline Will Remove Unpainted Artwork	„Разделяне“ и „Контур“ премахват небоядисаната графика
+@msg	precision must be from 0.001 to 10 pt	precision трябва да е от 0,001 до 10 pt
+@msg	`pathfinder` must be an object	`pathfinder` трябва да бъде обект
+	Add to Brushes	Добавяне към четки
+	Brush Library	Библиотека с четки
+	Save Brush Library	Запази библиотека с четки
+	Save Brushes…	Запази четки…
+	Open Brush Library	Отваряне на библиотека с четки
+	Selected Brushes Only	Само избрани четки
+	Brush Libraries Menu	Меню с библиотеки с четки
+	User Brush Library 1	Потребителска библиотека с четки 1
+	User Brush Library 2	Потребителска библиотека с четки 2
+	User Brush Library 3	Потребителска библиотека с четки 3
+	User Brush Library 4	Потребителска библиотека с четки 4
+	User Brush Library 5	Потребителска библиотека с четки 5
+	User Brush Library 6	Потребителска библиотека с четки 6
+	User Brush Library 7	Потребителска библиотека с четки 7
+	User Brush Library 8	Потребителска библиотека с четки 8
+	User Brush Library 9	Потребителска библиотека с четки 9
+	User Brush Library 10	Потребителска библиотека с четки 10
+	Art Ribbons	Арт ленти
+	Calligraphic Nibs	Калиграфски писци
+	Pattern Borders	Бордюри с мостри
+	Scatter Shapes	Разсеяни фигури
+	Save Brush Library…	Запази библиотека с четки…
+@msg	no empty artboards to delete	няма празни работни области за изтриване
+	Scale Presets	Пресети за мащаб
+	Live preview	Преглед на живо
