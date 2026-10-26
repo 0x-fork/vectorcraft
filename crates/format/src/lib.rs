@@ -597,6 +597,8 @@ pub fn load_file(bytes: &[u8]) -> Result<NativeFile, FormatError> {
     doc.setup.keep_in_range();
     // Untrusted: capped, named and pointing at objects the file has.
     doc.tidy_saved_selections();
+    // Untrusted: capped, named and with a zoom and centre the canvas can show.
+    doc.tidy_views();
     doc.tidy_graph_designs();
     doc.raster_effects.add_around = doc.raster_effects.add_around.clamp(0.0, vectorcraft_doc::rastersettings::MAX_ADD_AROUND);
     let mut depth_notes = vec![];

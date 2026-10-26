@@ -621,6 +621,29 @@ pub struct SavedView {
     pub rotation: f64,
 }
 
+impl SavedView {
+    /// Most views a document keeps (the View menu lists every one).
+    pub const MAX: usize = 25;
+    /// Longest name, in characters.
+    pub const MAX_NAME: usize = 255;
+
+    /// `name` trimmed and cut to [`Self::MAX_NAME`] characters (`None` when blank).
+    pub fn clean_name(name: &str) -> Option<String> {
+        let name: String = name.trim().chars().take(Self::MAX_NAME).collect();
+        (!name.is_empty()).then_some(name)
+    }
+
+    /// The first "View N" none of `saved` is named.
+    pub fn default_name(saved: &[SavedView]) -> String {
+        (1..=saved.len() + 1).map(|i| format!("View {i}")).find(|n| !saved.iter().any(|x| &x.name == n)).unwrap_or_default()
+    }
+
+    /// Can the canvas show this view: a finite centre and a finite, positive zoom.
+    pub fn is_usable(&self) -> bool {
+        self.center.x.is_finite() && self.center.y.is_finite() && self.zoom.is_finite() && self.zoom > 0.0
+    }
+}
+
 /// A saved selection (Select → Save Selection…): the objects that were selected, listed by name at
 /// the bottom of the Select menu.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -851,7 +874,7 @@ pub struct Document {
     pub graph_designs: Vec<GraphDesign>,
     #[serde(default)]
     pub guides: Vec<Guide>,
-    /// View → New View… (up to 25, like Illustrator).
+    /// View → New View… (at most [`SavedView::MAX`]); saved with the document.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub views: Vec<SavedView>,
     /// Select → Save Selection… (at most [`SavedSelection::MAX`]); saved with the document.
@@ -2132,6 +2155,28 @@ impl Document {
             kept.push(SavedSelection { name, objects });
         }
         self.saved_selections = kept.into();
+    }
+
+    /// Saved views as a file gives them, made safe to list and go to: at most [`SavedView::MAX`],
+    /// each with a clean, unique name, a finite centre and a finite, positive zoom (a rotation
+    /// that isn't finite becomes 0°).
+    pub fn tidy_views(&mut self) {
+        if self.views.is_empty() {
+            return;
+        }
+        let mut kept: Vec<SavedView> = vec![];
+        for v in std::mem::take(&mut self.views) {
+            if kept.len() >= SavedView::MAX {
+                break;
+            }
+            let Some(name) = SavedView::clean_name(&v.name) else { continue };
+            if !v.is_usable() || kept.iter().any(|k| k.name == name) {
+                continue;
+            }
+            let rotation = if v.rotation.is_finite() { v.rotation } else { 0.0 };
+            kept.push(SavedView { name, rotation, ..v });
+        }
+        self.views = kept;
     }
 
     /// Leave opacity-mask editing: drop the temporary editing layer, a working copy of art the

@@ -24,6 +24,7 @@ mod document_setup;
 pub mod dxf_import;
 pub mod dxf_options;
 pub mod edit_selection;
+pub mod edit_views;
 mod effect;
 pub mod effect_gallery;
 pub mod envelope;
@@ -367,6 +368,7 @@ registry! {
     BrushOptions: [brush_options::KIND] => brush_options::SPEC,
     NewBrush: [new_brush::KIND] => new_brush::SPEC,
     EditSelection: [edit_selection::KIND] => edit_selection::SPEC,
+    EditViews: [edit_views::KIND] => edit_views::SPEC,
     PerspectivePlane: [perspective_plane::KIND] => perspective_plane::SPEC,
     LayerOptions: [layer_options::KIND] => layer_options::SPEC,
     LayersPanelOptions: [layers_panel_options::KIND] => layers_panel_options::SPEC,
