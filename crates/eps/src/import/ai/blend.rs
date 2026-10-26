@@ -33,6 +33,9 @@ pub(super) const MAX_RECORD: usize = 4096;
 const MAX_KEYS: usize = 64;
 /// The most steps between two keys (Blend Options' limit).
 const MAX_STEPS: usize = 1000;
+/// The most objects (keys and steps) one blend may lay out to be read live; more keep their
+/// drawn steps.
+pub(super) const MAX_BLEND_OBJECTS: usize = 5_000;
 /// How far (pt) a step laid out here may be from where the file draws it.
 const PLACE_TOLERANCE: f64 = 0.5;
 /// How far a step's colour (each channel, 0 to 1) may be from the drawn one.
@@ -79,7 +82,12 @@ pub(super) fn record_ids(bytes: &[u8]) -> Option<Vec<String>> {
 /// The blend `edit` (its key objects and spine, as their dictionaries name them in `roles`) and
 /// `drawn` (its steps as the file draws them) make, with the keys of the record `ids`: one live
 /// blend, or `None` when they don't agree or it doesn't come out as drawn.
-pub(super) fn live_blend(edit: &Node, drawn: &Node, ids: &[String], roles: &Roles) -> Option<NodeKind> {
+///
+/// `budget`: how many more objects blends may lay out in this import; a blend that would lay out
+/// more isn't made live (each blend is laid out twice, once per orientation, and checked against
+/// its drawn steps, so a file of huge blends mustn't stall the import). What it lays out is taken
+/// from it.
+pub(super) fn live_blend(edit: &Node, drawn: &Node, ids: &[String], roles: &Roles, budget: &mut usize) -> Option<NodeKind> {
     let parts = edit.children()?;
     let role = |n: &Arc<Node>| roles.get(&n.id);
     let keys: Vec<Arc<Node>> = parts.iter().filter(|n| role(n).is_some_and(|(t, _)| t == "K")).cloned().collect();
@@ -101,9 +109,17 @@ pub(super) fn live_blend(edit: &Node, drawn: &Node, ids: &[String], roles: &Role
     // The steps between two keys: the drawn objects that aren't keys, shared out.
     let drawn: Vec<&Arc<Node>> = drawn.children()?.iter().collect();
     let between = (drawn.len().checked_sub(keys.len())?).checked_div(keys.len() - 1)?;
-    if between == 0 || between > MAX_STEPS || drawn.len() != keys.len() + between * (keys.len() - 1) {
+    if between == 0 || between > MAX_STEPS || drawn.len() != keys.len() + between * (keys.len() - 1) || drawn.len() > MAX_BLEND_OBJECTS {
         return None;
     }
+    // Both orientations are laid out.
+    let cost = drawn.len().saturating_mul(2);
+    if cost > *budget {
+        return None;
+    }
+    *budget -= cost;
+    // The drawn steps' centres and paints, once.
+    let drawn: Vec<(Point, Fill)> = drawn.iter().map(|d| Some((centre(d)?, fill(d)))).collect::<Option<_>>()?;
     let keys: Vec<Arc<Node>> = keys
         .into_iter()
         .map(|k| {
@@ -149,36 +165,68 @@ fn centre(n: &Node) -> Option<Point> {
     n.geometric_bounds().map(|b| b.center()).filter(|p| p.x.is_finite() && p.y.is_finite())
 }
 
-/// An object's first solid fill colour, as RGB.
-fn fill(n: &Node) -> Option<[f32; 3]> {
-    n.appearance.items.iter().find_map(|i| match i {
-        AppearanceItem::Fill(f) => match &f.paint {
-            Paint::Solid { color, .. } => Some(Color::to_rgb(color)),
-            _ => None,
-        },
-        _ => None,
-    })
+/// An object's fill, as far as the check compares it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Fill {
+    /// No fill.
+    None,
+    /// A solid colour, as RGB.
+    Solid([f32; 3]),
+    /// A fill this can't compare (a gradient, a pattern): the blend isn't made live.
+    Other,
 }
 
-/// How far the objects `laid` are from `drawn` (the farthest centre, each drawn object matched to
-/// the nearest laid one), when they are as many and each matches in place and colour; else `None`.
-fn how_far(laid: &[Node], drawn: &[&Arc<Node>]) -> Option<f64> {
+/// An object's first fill.
+fn fill(n: &Node) -> Fill {
+    n.appearance
+        .items
+        .iter()
+        .find_map(|i| match i {
+            AppearanceItem::Fill(f) => Some(match &f.paint {
+                Paint::None => Fill::None,
+                Paint::Solid { color, .. } => Fill::Solid(Color::to_rgb(color)),
+                _ => Fill::Other,
+            }),
+            _ => None,
+        })
+        .unwrap_or(Fill::None)
+}
+
+/// Do two fills match: both none, or solid colours within the tolerance?
+fn same_fill(a: Fill, b: Fill) -> bool {
+    match (a, b) {
+        (Fill::None, Fill::None) => true,
+        (Fill::Solid(a), Fill::Solid(b)) => a.iter().zip(b).all(|(x, y)| (x - y).abs() <= COLOR_TOLERANCE),
+        _ => false,
+    }
+}
+
+/// How far the objects `laid` are from the drawn ones (`drawn`: their centres and fills): the
+/// farthest, each drawn object matched to a laid one within the tolerance (through a grid of
+/// cells the tolerance wide, so each finds its neighbours without looking at them all), when they
+/// are as many and each matches in place and fill; else `None`.
+fn how_far(laid: &[Node], drawn: &[(Point, Fill)]) -> Option<f64> {
     if laid.len() != drawn.len() {
         return None;
     }
+    let cell = |p: Point| ((p.x / PLACE_TOLERANCE).floor() as i64, (p.y / PLACE_TOLERANCE).floor() as i64);
+    let laid: Vec<(Point, Fill)> = laid.iter().map(|l| Some((centre(l)?, fill(l)))).collect::<Option<_>>()?;
+    let mut grid: HashMap<(i64, i64), Vec<usize>> = HashMap::with_capacity(laid.len());
+    for (i, (p, _)) in laid.iter().enumerate() {
+        grid.entry(cell(*p)).or_default().push(i);
+    }
     let mut worst: f64 = 0.0;
-    for d in drawn {
-        let c = centre(d)?;
-        let (near, off) = laid.iter().filter_map(|l| Some((l, (centre(l)? - c).hypot()))).min_by(|a, b| a.1.total_cmp(&b.1))?;
-        if off > PLACE_TOLERANCE {
-            return None;
-        }
-        if let (Some(a), Some(b)) = (fill(near), fill(d))
-            && a.iter().zip(b).any(|(x, y)| (x - y).abs() > COLOR_TOLERANCE)
-        {
-            return None;
-        }
-        worst = worst.max(off);
+    for &(c, f) in drawn {
+        let (cx, cy) = cell(c);
+        let near = (-1..=1)
+            .flat_map(|dx| (-1..=1).map(move |dy| (cx + dx, cy + dy)))
+            .filter_map(|k| grid.get(&k))
+            .flatten()
+            .filter_map(|&i| laid.get(i))
+            .filter(|(p, lf)| (*p - c).hypot() <= PLACE_TOLERANCE && same_fill(*lf, f))
+            .map(|(p, _)| (*p - c).hypot())
+            .min_by(f64::total_cmp)?;
+        worst = worst.max(near);
     }
     Some(worst)
 }
@@ -212,5 +260,16 @@ mod tests {
         assert_eq!(hex_bytes(b"4A4"), None);
         assert_eq!(hex_bytes(b"4G"), None);
         assert_eq!(hex_bytes(b"4a4B"), Some(vec![0x4a, 0x4b]));
+    }
+
+    /// A blend that would lay out more than the import's budget has left isn't made live, and
+    /// takes nothing from it.
+    #[test]
+    fn a_blend_past_the_budget_isnt_made_live() {
+        let edit = Node::new(NodeId(1), NodeKind::Group { children: vec![], clip: false });
+        let drawn = Node::new(NodeId(2), NodeKind::Group { children: vec![], clip: false });
+        let mut budget = 1;
+        assert!(live_blend(&edit, &drawn, &["A".into(), "B".into()], &Roles::new(), &mut budget).is_none());
+        assert_eq!(budget, 1);
     }
 }

@@ -1647,41 +1647,67 @@ fn a_blend_comes_in_as_a_live_blend() {
     assert!(!s.warnings.iter().any(|w| w == super::blend::DRAWN), "{:?}", s.warnings);
 }
 
-/// A curved spine (a line, a curve and a line) keeps its points exactly; written from the right
-/// key to the left or the other way, the keys stay in their order on it.
+/// A spine written from the right key to the left one keeps the keys in their order on it (the
+/// red key first), sitting on its last and first anchors.
 #[test]
-fn a_blends_spine_keeps_its_points_and_its_keys_order() {
-    for spine in ["%_110 50 m\n%_95 45 l\n%_80 20 40 20 25 45 c\n%_10 50 L\n", "%_10 50 m\n%_25 45 l\n%_40 20 80 20 95 45 c\n%_110 50 L\n"] {
-        // Drawn steps on a curve lie off the straight line: this blend comes out as drawn only
-        // where its steps follow the spine, so the spine and the key order are what's checked.
-        let (blend, _) = read_blend(&blend_file(spine, [Some("A"), Some("B")], &blend_record(&['A', 'B'])));
-        let NodeKind::Blend { children, spec } = &blend.kind else {
-            // Steps laid along this curve aren't where the straight drawing has them: the drawn
-            // steps stay, which is right too; the spine's own reading is checked below.
-            continue;
-        };
-        let red = |n: &Node| matches!(fill(n), Paint::Solid { color, .. } if color.to_rgb()[0] > 0.9);
-        assert!(red(&children[0]), "the first key is the red one");
-        let spine = spec.spine.as_ref().unwrap();
-        assert_eq!(spine.subpaths[0].anchors.len(), 4);
-    }
-    // The spine's points as read, through the blend's own art.
+fn a_blends_spine_written_backwards_keeps_its_keys_order() {
+    let (blend, warnings) = read_blend(&blend_file("%_110 50 m\n%_10 50 L\n", [Some("A"), Some("B")], &blend_record(&['A', 'B'])));
+    let NodeKind::Blend { children, spec } = &blend.kind else { panic!("a live blend: {:?} {warnings:?}", blend.kind) };
+    assert!(matches!(fill(&children[0]), Paint::Solid { color, .. } if color.to_rgb()[0] > 0.9), "the first key is the red one");
+    assert_eq!(spec.key_anchors, vec![1, 0], "the red key on the spine's end, the blue one on its start");
+}
+
+/// A curved spine (a line, a curve and a line) is read with its points exactly; a blend whose drawn
+/// steps don't follow it (they are drawn on a straight line here) keeps its drawn steps.
+#[test]
+fn a_curved_spine_keeps_its_points() {
     let spine = "%_110 50 m\n%_95 45 l\n%_80 20 40 20 25 45 c\n%_10 50 L\n";
     let s = read_ok(&layer(&format!("%_u\n{spine}%_N\n%_U\n")));
-    let path = s.doc.layers[0].children().unwrap().iter().find_map(|n| {
-        let mut found = None;
+    let mut found = None;
+    for n in art(&s.doc) {
         n.walk(&mut |c| {
             if let NodeKind::Path { path, .. } = &c.kind {
                 found = Some(path.clone());
             }
         });
-        found
-    });
-    if let Some(path) = path {
-        let a = &path.subpaths[0].anchors;
-        assert_eq!(a.len(), 4);
-        assert!((a[1].h_out.x - 80.0).abs() < 1e-9 && (a[2].h_in.x - 40.0).abs() < 1e-9 && (a[2].p.x - 25.0).abs() < 1e-9, "{a:?}");
     }
+    let path = found.expect("the spine is read");
+    let a = &path.subpaths[0].anchors;
+    assert_eq!(a.len(), 4);
+    assert!((a[1].h_out.x - 80.0).abs() < 1e-9 && (a[2].h_in.x - 40.0).abs() < 1e-9 && (a[2].p.x - 25.0).abs() < 1e-9, "{a:?}");
+    let (blend, warnings) = read_blend(&blend_file(spine, [Some("A"), Some("B")], &blend_record(&['A', 'B'])));
+    assert!(!matches!(blend.kind, NodeKind::Blend { .. }), "steps drawn off the spine aren't made live");
+    assert_eq!(blend.children().map(|c| c.len()), Some(5));
+    assert!(warnings.iter().any(|w| w == super::blend::DRAWN));
+}
+
+/// Steps with a gradient fill can't be compared: the blend keeps its drawn steps.
+#[test]
+fn a_blend_whose_steps_it_cant_compare_keeps_its_drawn_steps() {
+    let body = blend_file("%_10 50 m\n%_110 50 L\n", [Some("A"), Some("B")], &blend_record(&['A', 'B']));
+    // The drawn squares' fill made a gradient's.
+    let gradient = "%AI5_BeginGradient: (g)\n(g) 0 2 Bd\n[\n1 0 0 0 1 %_Bs\n0 0 0 1 0 %_Bs\nBD\n%AI5_EndGradient\n";
+    let drawn_from = body.find("\nu\n").expect("the drawn group") + 1;
+    let (head, tail) = body.split_at(drawn_from);
+    let tail = tail.replacen("Xa\n", "Xa\n0 1 0 0 1 0 0 1 0 0 Bb\n(g) 0 0 0 1 1 0 0 1 0 0 Bg\n", 5).replace("\nf\n", "\nf\n0 BB\n");
+    let (blend, _) = read_blend(&format!("{gradient}{head}{tail}"));
+    assert!(!matches!(blend.kind, NodeKind::Blend { .. }), "{:?}", blend.kind);
+}
+
+/// The blend's own art (its keys and spine) isn't left drawn when what follows it isn't a group of
+/// drawn steps.
+#[test]
+fn a_blends_own_art_goes_when_its_steps_arent_a_group() {
+    let body = blend_file("%_10 50 m\n%_110 50 L\n", [Some("A"), Some("B")], &blend_record(&['A', 'B']));
+    // The drawn steps as one square, not a group.
+    let at = body.find("\nu\n").expect("the drawn group") + 1;
+    let end = body.find("U\n9 () XW\n0 Ae\n").expect("its end");
+    let body = format!("{}{}{}", &body[..at], square(0.0, 40.0, 20.0, [1.0, 0.0, 0.0], false), &body[end + 2..]);
+    let s = read_ok(&layer(&body));
+    let objects = art(&s.doc);
+    assert_eq!(objects.len(), 1, "the drawn square alone: {objects:?}");
+    assert!(matches!(objects[0].kind, NodeKind::Path { .. }));
+    assert!(s.warnings.iter().any(|w| w == super::blend::DRAWN));
 }
 
 /// A record that isn't one, a key with no id, or ids the record doesn't list: the drawn steps

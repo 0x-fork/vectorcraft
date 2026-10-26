@@ -75,6 +75,9 @@ const MAX_DEPTH: usize = 256;
 const MAX_STACK: usize = 1 << 20;
 /// Most objects read.
 const MAX_NODES: usize = 4_000_000;
+/// The most objects all the blends of one import may lay out to be checked (each twice) and made
+/// live; past it, blends keep their drawn steps.
+const BLEND_BUDGET: usize = 50_000;
 /// Most points in one path.
 const MAX_POINTS: usize = 4_000_000;
 /// Largest image read (pixels).
@@ -509,6 +512,8 @@ struct Reader<'a> {
     blend_roles: super::blend::Roles,
     /// A blend's record being read from the `%` lines after its `XP`: its length and hex digits.
     blend_record: Option<(usize, Vec<u8>)>,
+    /// How many more objects blends may lay out in this import ([`super::blend::live_blend`]).
+    blend_budget: usize,
     /// A group just ended, its state (`Xy`, `Xd`, `XW`) not yet read.
     group_ended: bool,
     /// A layer's own state (`Xy` after its art, before `LB`), until something says the art moves on.
@@ -673,6 +678,7 @@ impl<'a> Reader<'a> {
             hidden_ids: HashSet::new(),
             blend_roles: HashMap::new(),
             blend_record: None,
+            blend_budget: BLEND_BUDGET,
             clip_fills: HashSet::new(),
             looks: HashSet::new(),
             compound_groups: HashSet::new(),
@@ -1685,15 +1691,25 @@ impl<'a> Reader<'a> {
         let (Some(at), Some(drawn)) = (n.checked_sub(2), n.checked_sub(1)) else { return };
         let part_of_blend = |node: &Node| node.children().is_some_and(|c| c.iter().any(|k| roles.contains_key(&k.id)));
         let (Some(edit), Some(steps)) = (f.children.get(at), f.children.get(drawn)) else { return };
-        if !part_of_blend(edit) || !matches!(steps.kind, NodeKind::Group { clip: false, .. }) {
+        if !part_of_blend(edit) {
+            return;
+        }
+        if !matches!(steps.kind, NodeKind::Group { clip: false, .. }) {
+            // The steps aren't a group of drawn steps: the blend's own art goes all the same, so
+            // its keys and spine aren't drawn over what the file draws.
+            f.children.remove(at);
             self.warn(super::blend::DRAWN);
             return;
         }
-        let live = ids.and_then(|ids| super::blend::live_blend(edit, steps, &ids, roles));
+        let mut budget = self.blend_budget;
+        let live = ids.and_then(|ids| super::blend::live_blend(edit, steps, &ids, roles, &mut budget));
+        self.blend_budget = budget;
         let Some(mut steps) = f.children.pop() else { return };
         let Some(_edit) = f.children.pop() else { return };
         match live {
             Some(kind) => {
+                // The steps the blend lays out count as the objects they draw, as its drawn steps
+                // did (they were counted as read).
                 let mut blend = Node::new(self.doc.alloc_id(), kind);
                 (blend.name, blend.visible, blend.locked) = (steps.name.take(), steps.visible, steps.locked);
                 (blend.opacity, blend.blend, blend.isolate, blend.knockout) = (steps.opacity, steps.blend, steps.isolate, steps.knockout);
