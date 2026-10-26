@@ -1170,6 +1170,16 @@ pub struct Prefs {
     pub constrain_proportions: bool,
     /// One Corner Radius field sets every corner of a live rectangle (off: a field per corner).
     pub single_corner_radius: bool,
+    /// The Transform panel menu's Transform Object Only / Transform Pattern Only / Transform Both
+    /// (`object`, `pattern`, `both`): what the panel's fields, flips and menu flips transform
+    /// (they pass `objects` and `patterns` to the transform commands). `default` (and any other
+    /// value), until one is chosen: they pass neither, so patterns follow General › Transform
+    /// Pattern Tiles (`transformPatternTiles`), as before the menu acted.
+    pub transform_panel_patterns: String,
+    /// The Transform panel menu's Use Registration Point for Symbol: with one symbol instance
+    /// selected, the panel and the Properties panel's Transform section measure and transform it
+    /// from its symbol's registration point instead of the reference point.
+    pub use_registration_point_for_symbol: bool,
     /// The tools' persistent options by store (a tool id, or a store a family shares: `liquify`
     /// holds the Liquify tools' Global Brush Dimensions), see [`vectorcraft_tools::settings`]:
     /// kept across tool switches and saved with the preferences. Not a Preferences dialog field:
@@ -1344,6 +1354,8 @@ impl Default for Prefs {
             print_presets: vec![],
             constrain_proportions: false,
             single_corner_radius: true,
+            transform_panel_patterns: "default".to_string(),
+            use_registration_point_for_symbol: false,
             tool_settings: Default::default(),
             perspective_presets: vec![],
             blend_options: None,
