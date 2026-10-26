@@ -1497,6 +1497,7 @@ fn join_scrub(s: &mut Session, p: &Value) -> Result<Value> {
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map_or(0.0, |x| x.0)
     };
+    let (first_pt, last_pt) = (pts.first().copied(), pts.last().copied());
     let mut ends: Vec<(f64, NodeId, usize, bool, Point)> = vec![];
     for id in target_paths(&st.doc, &st.selection, poly_bounds(&pts, tol)) {
         let (pd, _) = path_of(&st.doc, id)?;
@@ -1505,9 +1506,20 @@ fn join_scrub(s: &mut Session, p: &Value) -> Result<Value> {
                 continue;
             }
             for (start, a) in [(true, sp.anchors[0].p), (false, sp.anchors[sp.anchors.len() - 1].p)] {
-                if dist_to_polyline(&pts, a) <= tol {
-                    ends.push((order(a), id, si, start, a));
+                let on_scrub = dist_to_polyline(&pts, a) <= tol;
+                let near_start = first_pt.is_some_and(|p| a.distance(p) <= tol);
+                let near_end = last_pt.is_some_and(|p| a.distance(p) <= tol);
+                if !on_scrub && !near_start && !near_end {
+                    continue;
                 }
+                let ord = if on_scrub {
+                    order(a)
+                } else if near_start && (!near_end || first_pt.is_some_and(|p| a.distance(p) <= a.distance(last_pt.unwrap_or(p)))) {
+                    -1.0
+                } else {
+                    1e30
+                };
+                ends.push((ord, id, si, start, a));
             }
         }
     }
