@@ -4,7 +4,7 @@
 use serde_json::{Value, json};
 use vectorcraft_color::Paint;
 
-use super::*;
+use super::{NodeId, Session};
 
 fn run(s: &mut Session, id: &str, p: Value) -> Value {
     s.execute(id, &p).unwrap()

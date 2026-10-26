@@ -7,7 +7,7 @@ use vectorcraft_doc::{LiveShape, NodeKind};
 use vectorcraft_geom::{Point, Vec2};
 use vectorcraft_tools::{Mods, PointerEvent, PointerKind, ToolKey};
 
-use super::*;
+use super::{NodeId, Session, ViewInfo};
 
 fn new_doc() -> Session {
     let mut s = Session::new();

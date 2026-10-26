@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use vectorcraft_doc::NodeKind;
 use vectorcraft_text::test_fonts::{SVG_CHAR, source_sans_gid, svg_font};
 
-use super::*;
+use super::{NodeId, Session};
 
 fn session() -> Session {
     let mut s = Session::new();

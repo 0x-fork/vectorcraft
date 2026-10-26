@@ -8,7 +8,7 @@ use vectorcraft_doc::{LiveShape, NodeKind, TextKind};
 use vectorcraft_geom::{PathData, Point, Rect};
 use vectorcraft_tools::{Mods, PointerEvent, PointerKind};
 
-use super::*;
+use super::{NodeId, Session, ViewInfo, constrain_click};
 
 use PointerKind::{Down, Drag, Up};
 

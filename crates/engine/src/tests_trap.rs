@@ -5,7 +5,7 @@ use vectorcraft_color::{Color, Paint};
 use vectorcraft_doc::{Node, NodeKind};
 use vectorcraft_geom::Rect;
 
-use super::*;
+use super::{NodeId, Session};
 
 const YELLOW: Color = Color::Cmyk { c: 0.0, m: 0.0, y: 1.0, k: 0.0 };
 const BLUE: Color = Color::Cmyk { c: 1.0, m: 0.6, y: 0.0, k: 0.0 };
