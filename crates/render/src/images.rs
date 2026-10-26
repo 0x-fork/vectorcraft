@@ -31,10 +31,17 @@ fn default_budget() -> usize {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn default_budget() -> usize {
-    physical_memory().map_or(IMAGE_CACHE_MAX, |m| usize::try_from(m / 8).unwrap_or(usize::MAX).min(IMAGE_CACHE_MAX))
+    physical_memory().map_or(IMAGE_CACHE_MAX, budget_for)
 }
 
-/// Installed memory in bytes, where the system says without a native call (Linux).
+/// The default budget on a machine with `memory` bytes installed: an eighth of it, at most
+/// [`IMAGE_CACHE_MAX`].
+#[cfg(not(target_arch = "wasm32"))]
+fn budget_for(memory: u64) -> usize {
+    usize::try_from(memory / 8).unwrap_or(usize::MAX).min(IMAGE_CACHE_MAX)
+}
+
+/// Installed memory in bytes (`MemTotal` in `/proc/meminfo`).
 #[cfg(target_os = "linux")]
 fn physical_memory() -> Option<u64> {
     let info = std::fs::read_to_string("/proc/meminfo").ok()?;
@@ -43,7 +50,28 @@ fn physical_memory() -> Option<u64> {
     kib.checked_mul(1024)
 }
 
-#[cfg(not(any(target_os = "linux", target_arch = "wasm32")))]
+/// Installed memory in bytes (`GlobalMemoryStatusEx`).
+#[cfg(windows)]
+fn physical_memory() -> Option<u64> {
+    winsafe::GlobalMemoryStatusEx().ok().map(|m| m.ullTotalPhys)
+}
+
+/// Installed memory in bytes, as `sysctl` prints it (`hw.memsize` on macOS, `hw.physmem` on
+/// FreeBSD).
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
+fn physical_memory() -> Option<u64> {
+    let (sysctl, name) = if cfg!(target_os = "macos") { ("/usr/sbin/sysctl", "hw.memsize") } else { ("/sbin/sysctl", "hw.physmem") };
+    let out = std::process::Command::new(sysctl).args(["-n", name]).output().ok().filter(|o| o.status.success())?;
+    sysctl_bytes(&out.stdout)
+}
+
+/// The byte count `sysctl -n` prints for a memory size.
+#[cfg(any(target_os = "macos", target_os = "freebsd", test))]
+fn sysctl_bytes(out: &[u8]) -> Option<u64> {
+    std::str::from_utf8(out).ok()?.trim().parse().ok()
+}
+
+#[cfg(not(any(target_os = "linux", windows, target_os = "macos", target_os = "freebsd", target_arch = "wasm32")))]
 fn physical_memory() -> Option<u64> {
     None
 }
@@ -328,6 +356,27 @@ mod tests {
         s.set_budget(400);
         assert!(s.peek(&key("b")).is_none() && s.peek(&key("c")).is_some(), "now b goes first");
         assert_eq!(s.bytes(), 400);
+    }
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn default_budget_is_an_eighth_of_installed_memory_at_most_1_gib() {
+        assert_eq!(budget_for(4 << 30), 512 << 20);
+        assert_eq!(budget_for(8 << 30), IMAGE_CACHE_MAX);
+        assert_eq!(budget_for(64 << 30), IMAGE_CACHE_MAX);
+    }
+
+    #[test]
+    #[cfg(any(target_os = "linux", windows, target_os = "macos", target_os = "freebsd"))]
+    fn installed_memory_is_read() {
+        assert!(physical_memory().is_some_and(|m| m >= 256 << 20), "{:?}", physical_memory());
+    }
+
+    #[test]
+    fn sysctl_prints_the_memory_size_in_bytes() {
+        assert_eq!(sysctl_bytes(b"17179869184\n"), Some(16 << 30));
+        assert_eq!(sysctl_bytes(b""), None);
+        assert_eq!(sysctl_bytes(b"unknown oid 'hw.memsize'\n"), None);
     }
 
     #[test]
