@@ -1193,6 +1193,22 @@ fn a_linked_images_colour_space_operator_is_ignored() {
     assert_eq!(art(&read_ok(&layer(&art_)).doc).len(), 1);
 }
 
+/// Editing data past the old 256 MiB limit still opens on a 64-bit build (#3510): a card file with
+/// embedded rasters unpacks to over 300 MiB.
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn editing_data_past_256_mib_is_read() {
+    let mut body = stream(&layer("")).into_bytes();
+    // Comment lines the reader skips, so the data stays valid while it grows past the old limit.
+    let filler = vec![b'%'; (257 << 20) - body.len()];
+    body.extend_from_slice(&filler);
+    let raw = [&b"%AI12_CompressedData"[..], &crate::ps::deflate(&body)].concat();
+    assert!(raw.len() < 1 << 20, "zeros compress");
+    let data = decode_private(&raw).unwrap();
+    assert_eq!(data.len(), body.len());
+    assert!(too_large().contains("512 MB"));
+}
+
 #[test]
 fn many_zstandard_frames_are_read_in_one_pass_and_capped() {
     let frame = zstd(b" ");
