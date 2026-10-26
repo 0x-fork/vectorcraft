@@ -2383,10 +2383,3 @@ impl Document {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod tests_lookups;
-#[cfg(test)]
-mod tests_slices;
-#[cfg(test)]
-mod tests_units;

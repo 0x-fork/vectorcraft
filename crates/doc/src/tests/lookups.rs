@@ -2,7 +2,7 @@
 //! with the one-id ones on nested trees with missing and duplicated ids, and the edits of many nodes
 //! ([`Document::remove_many`], `wrap`, `insert_beside`) leave the tree that `remove`, `insert` and
 //! `move_node` leave one node at a time.
-use super::*;
+use crate::*;
 use vectorcraft_geom::shapes;
 
 /// Layers with paths and groups nested `depth` deep; every 7th id is reused (a damaged file), so

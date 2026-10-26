@@ -1,6 +1,10 @@
 use super::*;
 use vectorcraft_geom::shapes;
 
+mod lookups;
+mod slices;
+mod units;
+
 /// Zooming in on an inch ruler divided the inch into tenths (#2827). Its steps below an inch
 /// are binary fractions now, and the minor ticks between them stay binary too; every other
 /// unit is still read in tenths.

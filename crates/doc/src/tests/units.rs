@@ -3,7 +3,7 @@
 
 use proptest::prelude::*;
 
-use super::Unit;
+use crate::Unit;
 
 #[test]
 fn every_unit_round_trips_through_its_field_text() {
@@ -133,7 +133,7 @@ fn a_negative_operand_after_an_operator_is_a_sign() {
     assert_eq!(Unit::Points.parse("5 - -3"), Some(8.0));
     assert_eq!(Unit::Points.parse("5+-3"), Some(2.0));
     assert_eq!(Unit::Points.parse("10-2"), Some(8.0));
-    assert_eq!(super::parse_number("90*-1"), Some(-90.0));
+    assert_eq!(crate::parse_number("90*-1"), Some(-90.0));
 }
 
 #[test]
