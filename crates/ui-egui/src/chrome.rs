@@ -512,7 +512,9 @@ pub fn doc_tabs(app: &mut VectorcraftApp, ui: &mut Ui) {
         x += w;
     }
     crate::document_drag::finish_tabs(ui.ctx(), hovering_art);
-    // The » button: every open document, the active one checked.
+    // The » button: every open document, the active one checked. The list scrolls once it
+    // reaches the bottom of the window, so every document of a large session stays reachable
+    // (#4017).
     if overflow {
         let more = egui::Rect::from_min_max(egui::pos2(strip.right() - MORE, strip.top()), egui::pos2(strip.right(), strip.bottom() - 1.0));
         let resp = ui.interact(more, ui.scope_id().with("tabs-more"), Sense::click());
@@ -520,12 +522,14 @@ pub fn doc_tabs(app: &mut VectorcraftApp, ui: &mut Ui) {
         icons::paint(ui, "chevrons-right", egui::Rect::from_center_size(more.center(), vec2(14.0, 14.0)), t.text);
         let resp = resp.on_hover_text(tl!("Show all open documents"));
         egui::Popup::menu(&resp).show(|ui| {
-            for (i, (title, _)) in tabs.iter().enumerate() {
-                if widgets::menu_item_name(ui, title, true, Some(i) == active) {
-                    activate = Some(i);
-                    ui.close();
+            widgets::menu_scroll(ui, |ui| {
+                for (i, (title, _)) in tabs.iter().enumerate() {
+                    if widgets::menu_item_name(ui, title, true, Some(i) == active) {
+                        activate = Some(i);
+                        ui.close();
+                    }
                 }
-            }
+            });
         });
     }
     if let Some(i) = close {
