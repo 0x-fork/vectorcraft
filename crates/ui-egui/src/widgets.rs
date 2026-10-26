@@ -345,9 +345,24 @@ pub(crate) fn typed_unit(ctx: &egui::Context, unit: Unit) -> Unit {
 
 /// `text` typed in a numeric field, with a decimal comma read as a point: `0,1 mm` is `0.1 mm`
 /// (#3837). Text with a point keeps its commas, so `1,000.5` is still refused rather than read
-/// with two decimal separators.
+/// with two decimal separators, and so does a number that reads as thousands ([`thousands`]).
 fn decimal_point(text: &str) -> std::borrow::Cow<'_, str> {
-    if text.contains(',') && !text.contains('.') { text.replace(',', ".").into() } else { text.into() }
+    if text.contains(',') && !text.contains('.') && !thousands(text) { text.replace(',', ".").into() } else { text.into() }
+}
+
+/// Is `text` a number written with a thousands comma, as `1,000` or `12,500 mm`: one to three
+/// digits (not a lone 0), a comma, exactly three digits, then at most a unit? Read as a decimal it
+/// would be a thousand times too small, so the field refuses it instead (`0,125` and `1,25` are
+/// decimals).
+fn thousands(text: &str) -> bool {
+    let number = text.trim().trim_start_matches('-');
+    let Some((whole, rest)) = number.split_once(',') else { return false };
+    let (part, unit) = rest.split_at(rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len()));
+    (1..=3).contains(&whole.len())
+        && whole.bytes().all(|b| b.is_ascii_digit())
+        && !whole.starts_with('0')
+        && part.len() == 3
+        && unit.trim().chars().all(char::is_alphabetic)
 }
 
 /// A recessed numeric field showing `value` (points) in `unit`. Returns the new value (points)
@@ -3245,7 +3260,8 @@ mod decimal_point_tests {
     use super::*;
 
     /// A decimal comma reads as a point, in a length, with arithmetic and in a percentage; text
-    /// with a point keeps its commas and is refused as before (#3837).
+    /// with a point keeps its commas and is refused as before, and so does a thousands comma
+    /// (#3837).
     #[test]
     fn a_decimal_comma_reads_as_a_point() {
         let mm = |s: &str| Unit::Millimeters.parse(&decimal_point(s)).map(|pt| Unit::Millimeters.from_pt(pt));
@@ -3255,6 +3271,13 @@ mod decimal_point_tests {
         }
         assert_eq!(mm("1,000.5"), None, "a point and a comma");
         assert_eq!(mm("1,2,3"), None, "two commas");
+        for thousand in ["1,000", "12,500 mm", "-1,000", "999,999mm"] {
+            assert_eq!(mm(thousand), None, "{thousand} reads as thousands: refused, not a thousand times too small");
+        }
+        for (text, want) in [("0,125", 0.125), ("1,25", 1.25), ("1,0000", 1.0), ("1,500+2", 3.5)] {
+            let got = mm(text).unwrap_or(f64::NAN);
+            assert!((got - want).abs() < 1e-9, "{text} is a decimal: {got}");
+        }
         assert_eq!(share_of(&decimal_point("12,5%"), 200.0), Some(25.0));
     }
 }
