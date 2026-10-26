@@ -1587,5 +1587,4 @@ fn ime_surrounding_window(
 }
 
 #[cfg(test)]
-#[path = "text_tests.rs"]
 mod tests;
