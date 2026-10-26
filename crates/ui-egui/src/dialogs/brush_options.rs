@@ -586,6 +586,34 @@ mod tests {
         assert_eq!(app.run("brush.get", json!({"name": "Arrow"})).unwrap()["scale"], json!({"mode": "stretch"}));
     }
 
+    /// Art Brush Options' Width menu: Pressure takes a second width for the heaviest pen pressure,
+    /// and a stroke drawn without pressure is half way between the two; Fixed drops the second width.
+    #[test]
+    fn art_options_width_follows_the_pen_pressure() {
+        let mut app = app();
+        let (id, before) = brushed(&mut app, "Tapered Stroke");
+        app.run("ui.brushOptions", json!({"name": "Tapered Stroke"})).unwrap();
+        let d = app.ui.dialog.as_ref().unwrap();
+        assert_eq!((d.str("widthMode"), d.f64("widthMax", 0.0)), ("fixed".into(), 100.0));
+        assert!(shown(&mut app).contains("Fixed"));
+        set(&mut app, json!({"widthMode": "pressure", "widthMax": 300}));
+        assert!(shown(&mut app).contains("Pressure"));
+        super::super::confirm(&mut app).unwrap();
+        let def = app.run("brush.get", json!({"name": "Tapered Stroke"})).unwrap();
+        assert_eq!((&def["width"], &def["width_mode"], &def["width_max"]), (&json!(100.0), &json!("pressure"), &json!(300.0)));
+        let after = drawn_height(&app, id);
+        assert!((after - 2.0 * before).abs() < 0.01 * before, "200 % half way: {before} then {after}");
+        // Opened again, it shows what was set; Fixed drops the second width.
+        app.run("ui.brushOptions", json!({"name": "Tapered Stroke"})).unwrap();
+        let d = app.ui.dialog.as_ref().unwrap();
+        assert_eq!((d.str("widthMode"), d.f64("widthMax", 0.0)), ("pressure".into(), 300.0));
+        set(&mut app, json!({"widthMode": "fixed"}));
+        super::super::confirm(&mut app).unwrap();
+        let def = app.run("brush.get", json!({"name": "Tapered Stroke"})).unwrap();
+        assert!(def.get("width_mode").is_none() && def.get("width_max").is_none(), "{def}");
+        assert!((drawn_height(&app, id) - before).abs() < 1e-6);
+    }
+
     /// A context with the app's fonts and theme, for [`frame`].
     fn ctx() -> egui::Context {
         let ctx = egui::Context::default();
