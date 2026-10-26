@@ -536,7 +536,7 @@
 	History	ისტორია
 	Info	ინფორმაცია
 	Layers	შრეები
-	Libraries	ბიბლიოთეკები
+	Libraries	ბიბლიოთეკა
 	Links	ბმულები
 	{count} linked image(s) changed on disk. Show the new versions?	დისკზე შეიცვალა დაკავშირებული გამოსახულებები ({count}). ვაჩვენო ახალი ვერსიები?
 	Update Changed Links	შეცვლილი ბმულების განახლება
@@ -1764,10 +1764,10 @@ lighting	Light	სინათლე
 	Right to Left	მარჯვნიდან მარცხნივ
 	Top to Bottom	ზემოდან ქვემოთ
 	Bottom to Top	ქვემოდან ზემოთ
-	Outer Corner Tile	გარე კუთხის ფილა
-	Side Tile	გვერდითი ფილა
-	Inner Corner Tile	შიდა კუთხის ფილა
-	Start Tile	საწყისი ფილა
+	Outer Corner Tile	გარე კუთხე
+	Side Tile	გვერდითი
+	Inner Corner Tile	შიდა კუთხე
+	Start Tile	საწყისი
 	End Tile	ბოლო ფილა
 	Fit	მორგება
 	Stretch to fit	მორგებამდე გაწელვა
@@ -2868,7 +2868,7 @@ theme	Appearance	იერსახე
 	Arrange by Column	სვეტების მიხედვით დალაგება
 	Save Preset	პრესეტის შენახვა
 	Screen (72 ppi)	ეკრანი (72 ppi)
-	Social Square Post 1080×1080	სოციალური ქსელის კვადრატული პოსტი 1080×1080
+	Social Square Post 1080×1080	კვადრატული პოსტი 1080×1080
 	Distribute	განაწილება
 	Distribute Spacing	შუალედების განაწილება
 	Enter Isolation Mode	იზოლაციის რეჟიმში შესვლა
@@ -2960,7 +2960,7 @@ theme	Appearance	იერსახე
 	90° & 45° & 30° Angles	90°, 45° და 30° კუთხეები
 	90° & 45° Angles	90° და 45° კუთხეები
 	90° Angles	90° კუთხეები
-	Additional Plug-ins Folder	პლაგინების დამატებითი საქაღალდე
+	Additional Plug-ins Folder	დამატებითი პლაგინები
 	Additional Fonts Folder	შრიფტების დამატებითი საქაღალდე
 	Alignment Guides	გასწორების დამხმარე ხაზები
 	Anchor Points, Handle, and Bounding Box Display	საყრდენი წერტილების, სახელურებისა და შემომსაზღვრელი ჩარჩოს ჩვენება
@@ -3003,19 +3003,19 @@ theme	Appearance	იერსახე
 	Enable Touch Workspace	სენსორული სამუშაო სივრცის ჩართვა
 	English: UK	ინგლისური: ბრიტანეთი
 	Every (minutes)	ყოველ (წუთში)
-	Exceptions (comma separated)	გამონაკლისები (მძიმით გამოყოფილი)
+	Exceptions (comma separated)	გამონაკლისები (მძიმით)
 	Feet	ფუტები
 	Files	ფაილები
 	Fill New Type Objects With Placeholder Text	ახალი ტექსტური ობიექტების ჩანაცვლების ტექსტით შევსება
 	Folder	საქაღალდე
-	Font Preview Size	შრიფტის წინასწარი ნახვის ზომა
+	Font Preview Size	შრიფტის ნიმუშის ზომა
 	Get Preferences	პარამეტრების მიღება
 	GPU Performance	GPU-ს წარმადობა
 	Graphics Processor	გრაფიკული პროცესორი
 	Gridline every	ბადის ხაზი ყოველ
 	Grids In Back	ბადე უკანა პლანზე
 	Handles	სახელურები
-	Hide Corner Widget for angles greater than	კუთხის ვიჯეტის დამალვა კუთხეებისთვის, რომლებიც აღემატება
+	Hide Corner Widget for angles greater than	ვიჯეტის დამალვა, თუ კუთხე >
 	High Performance (discrete)	მაღალი წარმადობა (დისკრეტული)
 	Highlight Alternate Glyphs	ალტერნატიული გლიფების გამოკვეთა
 	Highlight anchors on mouse over	საყრდენი წერტილების გამოკვეთა მაუსის მიტანისას
@@ -3042,8 +3042,8 @@ theme	Appearance	იერსახე
 	Measurement Labels	გაზომვის წარწერები
 	Meters	მეტრები
 	Move Locked and Hidden Artwork with Artboard	ჩაკეტილი და დამალული ნახატის სამუშაო დაფასთან ერთად გადაადგილება
-	Number of Recent Files to Display	საჩვენებელი ბოლოს გახსნილი ფაილების რაოდენობა
-	Number of Recent Fonts	ბოლოდროინდელი შრიფტების რაოდენობა
+	Number of Recent Files to Display	ბოლო ფაილების რაოდენობა
+	Number of Recent Fonts	ბოლო შრიფტების რაოდენობა
 	Numbers Without Units Are Points	ერთეულის გარეშე რიცხვები პუნქტებია
 	Object Highlighting	ობიექტების გამოკვეთა
 	Object Name	ობიექტის სახელი
@@ -3066,7 +3066,7 @@ theme	Appearance	იერსახე
 	Primary	ძირითადი
 	Printing / Exporting	ბეჭდვა / ექსპორტირება
 	Real-time Drawing and Editing	რეალურ დროში ხატვა და რედაქტირება
-	Render Threads (-1 = Automatic)	რენდერის ნაკადები (-1 = ავტომატური)
+	Render Threads (-1 = Automatic)	ნაკადები (-1 = ავტომატური)
 	Reset Preferences	პარამეტრების ჩამოყრა
 	Scale Corners	კუთხეების მასშტაბირება
 	Scale Cursor Proportional to UI	კურსორის მასშტაბირება ინტერფეისის პროპორციულად
@@ -3821,7 +3821,7 @@ font-technology	Variable	ცვლადი
 @msg	internal error: {msg} (please report this bug)	შიდა შეცდომა: {msg} (გთხოვთ, შეგვატყობინოთ ამ ხარვეზის შესახებ)
 @msg	invalid PDF setting: {0}	PDF-ის არასწორი პარამეტრი: {0}
 @msg	invalid image data for `{0}`	არასწორი გამოსახულების მონაცემები `{0}`-სთვის
-@msg	invalid parameters for `{cmd}`: {msg}	არასწორი პარამეტრები `{cmd}`-სთვის: {msg}
+@msg	invalid parameters for `{cmd}`: {msg}	`{cmd}`: არასწორი პარამეტრები — {msg}
 @msg	is not an image VectorCraft reads	ეს არ არის გამოსახულება, რომელსაც VectorCraft კითხულობს
 @msg	it uses `{at}`, which VectorCraft's PostScript reader doesn't know	ის იყენებს `{at}`-ს, რომელიც VectorCraft-ის PostScript-ის წამკითხველმა არ იცის
 @msg	it uses `{at}`, which VectorCraft's PostScript reader doesn't know, in {procs}	ის იყენებს `{at}`-ს, რომელიც VectorCraft-ის PostScript-ის წამკითხველმა არ იცის, {procs}-ში
@@ -4605,7 +4605,7 @@ font-technology	Variable	ცვლადი
 3d	Bevel	წაკვეთა
 3d	Rounded	მომრგვალებული
 3d	Space	დაშორება
-	Bevel Shape	წაკვეთის ფორმა
+	Bevel Shape	ფორმა
 	Bevel Inside	წაკვეთა შიგნით
 	Bevel both sides	წაკვეთა ორივე მხარეს
 	Presets	პრესეტები
