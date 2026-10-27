@@ -74,6 +74,10 @@ pub fn open(app: &mut VectorcraftApp, p: &Value) -> Result<Value, String> {
     if let Some(item) = p.get("item") {
         fields.insert("__item".into(), item.clone());
     }
+    // A shared row of a mixed selection: OK edits each object's own copy of the effect.
+    if p.get("aligned").and_then(Value::as_bool) == Some(true) {
+        fields.insert("__aligned".into(), json!(true));
+    }
     match p.get("index").and_then(Value::as_u64) {
         Some(k) => {
             let e = applied.get(k as usize).ok_or_else(|| format!("no effect at index {k}"))?;
@@ -737,6 +741,9 @@ fn command(d: &Dialog) -> (&'static str, Value) {
         if super::warp_effect::is_warp(&id) && d.bool("__warp_style_changed") {
             p["warpStyle"] = json!(id.strip_prefix("warp."));
         }
+        if d.bool("__aligned") {
+            p["aligned"] = json!(true);
+        }
         return ("effect.setParams", p);
     }
     let mut p = json!({"effect": d.str("__effect"), "params": params});
@@ -765,6 +772,27 @@ fn confirm(app: &mut VectorcraftApp, d: &Dialog) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// An applied effect's dialog opened on a shared row of a mixed selection (`aligned`) edits
+    /// each object's own copy on OK; opened otherwise it edits the index as given.
+    #[test]
+    fn a_shared_rows_dialog_edits_each_objects_copy() {
+        let dialog = |aligned: bool| {
+            let mut fields = Map::new();
+            fields.insert("__effect".into(), json!("stylize.feather"));
+            fields.insert("__index".into(), json!(0));
+            fields.insert("__item".into(), Value::Null);
+            fields.insert("radius".into(), json!(8));
+            if aligned {
+                fields.insert("__aligned".into(), json!(true));
+            }
+            Dialog { kind: "effect".into(), fields }
+        };
+        let (cmd, p) = command(&dialog(true));
+        assert_eq!((cmd, &p["aligned"], &p["params"]["radius"]), ("effect.setParams", &json!(true), &json!(8)));
+        assert!(p["params"].get("__aligned").is_none());
+        assert!(command(&dialog(false)).1.get("aligned").is_none());
+    }
 
     #[test]
     fn fields_that_pick_a_value_are_dropdowns_of_its_values() {

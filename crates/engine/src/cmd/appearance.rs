@@ -313,12 +313,13 @@ pub(crate) fn appearances_differ(d: &vectorcraft_doc::Document, ids: &[NodeId]) 
     aps.any(|a| a != first)
 }
 
-/// Indices `idx` of the first target's items (aligned with `aligned`) in each of `ids`: where
-/// each target has the item equal to the first's (see [`SharedStack`]), else the same indices.
-/// A target missing one of them gets only those it has.
+/// Indices `idx` of the first target's items (aligned with `aligned`) in each of `ids`: the first
+/// target's own, and in each other one the items equal to them there (see [`SharedStack`]), each
+/// index on its own: one the targets don't share is left out of the others (never taken as the
+/// same index there). Not aligned, or one target: the same indices in each.
 pub(crate) fn items_per_target(d: &vectorcraft_doc::Document, ids: &[NodeId], idx: &[usize], aligned: bool) -> Vec<Vec<usize>> {
-    match shared_stack(d, ids).filter(|sh| aligned && idx.iter().all(|i| sh.has_item(*i))) {
-        Some(sh) => (0..ids.len()).map(|k| idx.iter().filter_map(|i| sh.item_in(*i, k)).collect()).collect(),
+    match shared_stack(d, ids).filter(|_| aligned) {
+        Some(sh) => (0..ids.len()).map(|k| if k == 0 { idx.to_vec() } else { idx.iter().filter_map(|i| sh.item_in(*i, k)).collect() }).collect(),
         None => vec![idx.to_vec(); ids.len()],
     }
 }

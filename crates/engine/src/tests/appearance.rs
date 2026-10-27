@@ -585,3 +585,16 @@ fn shared_effects_and_new_fills_reach_every_selected_object() {
     // Rows of different stacks aren't reordered together.
     assert!(s.execute("appearance.moveItem", &json!({"from": 1, "to": 0, "aligned": true})).is_err());
 }
+
+/// Rows deleted together, one shared (the stroke) and one not (a's fill): each object loses its
+/// own copy of the shared row, and the other object keeps the items at those indices of a's stack.
+#[test]
+fn removing_shared_and_unshared_rows_removes_only_the_shared_ones_elsewhere() {
+    let mut s = session();
+    let (a, b) = mixed_circles(&mut s, true);
+    // b is [Fill, Fill, Stroke]; a's rows 0 (its fill) and 1 (the shared stroke).
+    let fills_b: Vec<_> = node(&s, b).appearance.items.iter().take(2).cloned().collect();
+    run(&mut s, "appearance.removeItem", json!({"indices": [0, 1], "aligned": true}));
+    assert!(node(&s, a).appearance.items.is_empty(), "a loses both");
+    assert_eq!(node(&s, b).appearance.items, fills_b, "b loses only its stroke, keeping both fills");
+}

@@ -326,11 +326,8 @@ fn mixed_appearances_share_their_equal_rows() {
     assert_eq!(shared.items, vec![vec![1, 1]], "the stroke, not the fills");
     assert_eq!(shared.effects, vec![vec![0, 0]]);
     // The stroke under an extra fill in the second object.
-    let c = Appearance {
-        items: vec![fill(Color::BLACK), fill(Color::WHITE), stroke.clone()],
-        effects: vec![feather.clone()],
-        ..Appearance::default()
-    };
+    let c =
+        Appearance { items: vec![fill(Color::BLACK), fill(Color::WHITE), stroke.clone()], effects: vec![feather.clone()], ..Appearance::default() };
     let shared = SharedStack::of(&[&a, &c]);
     assert_eq!(shared.items, vec![vec![1, 2]]);
     assert_eq!(shared.item_in(1, 1), Some(2));

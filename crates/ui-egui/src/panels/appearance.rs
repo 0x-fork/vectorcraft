@@ -774,7 +774,7 @@ fn effect_row(app: &mut VectorcraftApp, ui: &mut Ui, item: Option<usize>, k: usi
     if link(ui, pos2(lx, r.center().y), ("ap-fx-link", item, k), &shown_effect_label(&e.id)) {
         select_row(app, ui.ctx(), this);
         if has_options(&e.id) {
-            app.run("effect.dialog", json!({"effect": e.id, "index": k, "item": item})).ok();
+            app.run("effect.dialog", aligned(app, json!({"effect": e.id, "index": k, "item": item}))).ok();
         } else {
             set_pstate(ui.ctx(), &open_key, !open);
         }
@@ -916,7 +916,7 @@ fn effect_editor(app: &mut VectorcraftApp, ui: &mut Ui, item: Option<usize>, k: 
         app.run("effect.setParams", aligned(app, json!({"item": item, "index": k, "params": {key: v}}))).ok();
     }
     if edit {
-        app.run("effect.dialog", json!({"effect": e.id, "index": k, "item": item})).ok();
+        app.run("effect.dialog", aligned(app, json!({"effect": e.id, "index": k, "item": item}))).ok();
     }
 }
 
