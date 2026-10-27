@@ -40,8 +40,7 @@ pub fn checked(app: &VectorcraftApp, id: &str, p: &Value) -> Option<bool> {
         "type.orientation.vertical" | "type.orientation.horizontal" => {
             selected_text(false).is_some_and(|t| t.vertical == (id == "type.orientation.vertical"))
         }
-        // Checked when the first type object `selected_text` finds has it on.
-        "type.opticalMarginAlignment" => selected_text(false).is_some_and(|t| t.optical_margin),
+        "type.opticalMarginAlignment" => crate::panels::character::shared_text_flag(app, |t| t.optical_margin) == Some(true),
         "view.outline" => v.outline,
         "view.pixelPreview" => v.pixel_preview,
         "view.trimView" => v.trim_view,

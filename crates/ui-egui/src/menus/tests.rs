@@ -239,6 +239,22 @@ fn optical_margin_alignment_is_a_checked_type_menu_item() {
     assert_eq!(checked(&app, "type.orientation.horizontal", &Value::Null), Some(false));
 }
 
+/// Type › Optical Margin Alignment menu check uses `shared_text_flag`; mixed values stay unchecked.
+#[test]
+fn optical_margin_alignment_menu_unchecked_when_shared_flag_none() {
+    let mut app = VectorcraftApp::new(vectorcraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", json!({})).unwrap();
+    let off = app.run("text.create", json!({"x": 10, "y": 40, "text": "Off"})).unwrap()["id"].clone();
+    let on = app.run("text.create", json!({"x": 10, "y": 80, "text": "On"})).unwrap()["id"].clone();
+    app.run("type.opticalMarginAlignment", json!({"on": true, "id": on})).unwrap();
+    app.run("select.set", json!({"ids": [off, on]})).unwrap();
+    let id = "type.opticalMarginAlignment";
+    assert_eq!(crate::panels::character::shared_text_flag(&app, |t| t.optical_margin), None);
+    assert_eq!(checked(&app, id, &Value::Null), Some(false));
+    app.run("select.set", json!({"ids": [on]})).unwrap();
+    assert_eq!(checked(&app, id, &Value::Null), Some(true));
+}
+
 #[test]
 fn panel_ids_are_case_insensitive_and_labels_work() {
     assert_eq!(normalize_panel("layers"), Some("layers"));
