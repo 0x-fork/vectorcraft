@@ -38,9 +38,9 @@ pub use color::{
     color_slider_named, color_slider_stepped, color_slider_valued, harmony_wheel, hex_field, hex_field_named, region_texture,
 };
 pub use drag::{PanelDrag, SwatchRows, art_drop, doc_preview, drag_source};
-pub(crate) use dropdowns::combo;
 #[cfg(test)]
 use dropdowns::combo_button_id;
+pub(crate) use dropdowns::{combo, combo_menu};
 pub use dropdowns::{
     dropdown, dropdown_named, dropdown_names, dropdown_names_named, dropdown_with, dropdown_with_named, list_scroll_style, menu_room, menu_scroll,
     panel_scroll, popover, set_menu_floor, strip_scroll,
@@ -227,7 +227,7 @@ pub(crate) mod accessibility_tests {
             angle_dial(ui, "angle", 45.0, 28.0);
             channel_slider_named(ui, "channel", "H", 0.5, vec2(22.0, 80.0), &|_| Color32::GRAY);
             harmony_wheel(ui, "wheel", 120.0, &[red], Some(0));
-            combo(ui, "font", "Regular", 120.0, true, |_| None::<usize>);
+            combo_menu(ui, "font", "Regular", 120.0, |_| None::<usize>);
         });
         let slider = |label| {
             let n = named(&tree, label);

@@ -13,7 +13,7 @@ pub fn blend_separator_before(i: usize) -> bool {
 /// The blend-mode dropdown, its groups separated (Normal | darken | lighten | contrast | inversion
 /// | component modes). `None` (objects that differ) shows blank. Returns the chosen mode.
 pub fn blend_dropdown(ui: &mut Ui, id: impl std::hash::Hash, current: Option<BlendMode>, width: f32) -> Option<BlendMode> {
-    combo(ui, id, current.map_or("", |m| tl!(m.label())), width, false, |ui| {
+    combo(ui, id, current.map_or("", |m| tl!(m.label())), width, |ui| {
         let mut chosen = None;
         for (i, m) in BlendMode::ALL.into_iter().enumerate() {
             if blend_separator_before(i) {

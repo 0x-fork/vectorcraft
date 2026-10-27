@@ -260,7 +260,7 @@ pub(crate) fn trace_button(app: &mut VectorcraftApp, ui: &mut Ui, width: f32) {
 /// The selected Image Trace object's preset (Control bar, Properties): choosing another traces it
 /// again with that preset.
 pub(crate) fn preset_dropdown(app: &mut VectorcraftApp, ui: &mut Ui, current: &str, width: f32) {
-    if let Some(p) = widgets::combo(ui, "trace-preset", tl!(current), width, false, |ui| preset_list(app, ui, current)) {
+    if let Some(p) = widgets::combo(ui, "trace-preset", tl!(current), width, |ui| preset_list(app, ui, current)) {
         trace_with(app, &p);
     }
 }
@@ -436,7 +436,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 widgets::dim_label(ui, tl!("Library:"));
                 let key = st.params["library"].as_str().unwrap_or(DOCUMENT_SWATCHES).to_string();
-                if let Some(k) = widgets::combo(ui, "it-library", &library_label(app, &key), 170.0, false, |ui| library_list(app, ui, &key)) {
+                if let Some(k) = widgets::combo(ui, "it-library", &library_label(app, &key), 170.0, |ui| library_list(app, ui, &key)) {
                     if k != DOCUMENT_SWATCHES {
                         st.params["colorGroup"] = Value::Null;
                     }
@@ -451,7 +451,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
                     widgets::dim_label(ui, tl!("Colors:"));
                     let group = color_group(app, &st.params).map(str::to_string);
                     let label = group.clone().unwrap_or_else(|| tl!("All").to_string());
-                    if let Some(g) = widgets::combo(ui, "it-color-group", &label, 170.0, false, |ui| color_group_list(app, ui, group.as_deref())) {
+                    if let Some(g) = widgets::combo(ui, "it-color-group", &label, 170.0, |ui| color_group_list(app, ui, group.as_deref())) {
                         st.params["colorGroup"] = json!(g);
                         st.preset = "Custom".into();
                         retrace = true;

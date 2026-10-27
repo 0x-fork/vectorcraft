@@ -525,7 +525,7 @@ fn artboard_size_controls_inner(
     let mut fit = None;
     ui.horizontal(|ui| {
         dim_label(ui, tl!("Preset:"));
-        preset = widgets::combo(ui, "ab-preset", &current, 140.0, false, |ui| {
+        preset = widgets::combo(ui, "ab-preset", &current, 140.0, |ui| {
             let mut chosen = None;
             if let Some(enabled) = fits {
                 for (selection, label) in [(false, tl!("Fit to Artwork Bounds")), (true, tl!("Fit to Selected Art"))] {
