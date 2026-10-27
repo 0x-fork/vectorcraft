@@ -339,7 +339,7 @@ mod tests {
         // The cap itself: a quarter of the address space on wasm32, 1 GiB elsewhere.
         assert_eq!(MAX_JSON, if cfg!(target_arch = "wasm32") { 256 << 20 } else { 1 << 30 });
         let mut json = br#"{"format":"vectorcraft","pad":""#.to_vec();
-        json.extend(std::iter::repeat(b'x').take(4096));
+        json.extend(std::iter::repeat_n(b'x', 4096));
         json.extend(br#""}"#);
         let gz = gzip(&json);
         // Within the target's cap the file opens, and the JSON reads back whole.
