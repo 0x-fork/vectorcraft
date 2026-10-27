@@ -161,6 +161,7 @@ fn body(app: &mut VectorcraftApp, ui: &mut egui::Ui, d: &mut Dialog) -> bool {
         None if id == GLASS => glass_fields(app, ui, d, GLASS),
         None if id == TEXTURIZER => glass_fields(app, ui, d, TEXTURIZER),
         None if id == TRANSFORM => transform_fields(ui, d, app.session.general_unit()),
+        None if id == SCRIBBLE => scribble_fields(ui, d, app.session.general_unit()),
         None if id == ZIG_ZAG => zig_zag_fields(ui, d, app.session.general_unit()),
         None if id == DROP_SHADOW => drop_shadow_fields(ui, d, app.session.general_unit()),
         None if id == "artistic.filmGrain" => film_grain_fields(ui, d),
@@ -477,6 +478,53 @@ fn values_changed(d: &mut Dialog) -> bool {
 
 /// The Transform effect (Effect › Distort & Transform › Transform…).
 const TRANSFORM: &str = "distort.transform";
+
+/// Scribble (Effect › Stylize › Scribble…).
+const SCRIBBLE: &str = "stylize.scribble";
+
+/// Dialog-only: which Settings preset is selected (`custom` when the values match none).
+const SCRIBBLE_SETTING: &str = "__scribbleSetting";
+
+/// Scribble's dialog: a Settings preset menu, then its parameters. Returns whether the values differ
+/// from those last previewed.
+fn scribble_fields(ui: &mut egui::Ui, d: &mut Dialog, unit: vectorcraft_doc::Unit) -> bool {
+    if !d.fields.contains_key(SCRIBBLE_SETTING) {
+        let id = vectorcraft_effects::scribble_setting_id(&form::params(d)).unwrap_or("custom");
+        d.fields.insert(SCRIBBLE_SETTING.into(), json!(id));
+    }
+    let presets = vectorcraft_effects::scribble_settings();
+    let cur = d.fields.get(SCRIBBLE_SETTING).and_then(Value::as_str).unwrap_or("default");
+    let labels: Vec<&str> = presets.iter().map(|p| p.label).chain(["Custom"]).collect();
+    let ids: Vec<&str> = presets.iter().map(|p| p.id).chain(["custom"]).collect();
+    let current = if cur == "custom" { "Custom" } else { presets.iter().find(|p| p.id == cur).map(|p| p.label).unwrap_or(labels[0]) };
+    widgets::subheader(ui, tl!("Settings"));
+    let mut settings_changed = false;
+    ui.horizontal(|ui| {
+        if let Some(i) = widgets::dropdown(ui, "fx-scribble-setting", current, &labels, 160.0) {
+            let picked = ids[i];
+            d.fields.insert(SCRIBBLE_SETTING.into(), json!(picked));
+            if picked != "custom"
+                && let Some(preset) = presets.iter().find(|p| p.id == picked)
+                && let Some(m) = preset.params.as_object()
+            {
+                for (k, v) in m {
+                    d.fields.insert(k.clone(), v.clone());
+                }
+            }
+            settings_changed = true;
+        }
+    });
+    ui.add_space(4.0);
+    let doc = vectorcraft_effects::effect_info(SCRIBBLE).map(|e| e.params).unwrap_or_default();
+    let fields_changed =
+        form::param_fields(ui, d, &|k| vectorcraft_effects::is_length(SCRIBBLE, k, false), &|k| choices(SCRIBBLE, k), &|k| doc_rank(doc, k), unit);
+    if let Value::Object(m) = vectorcraft_effects::upgrade_params(SCRIBBLE, &Value::Object(d.fields.clone())) {
+        d.fields = m;
+    }
+    let id = vectorcraft_effects::scribble_setting_id(&form::params(d)).unwrap_or("custom");
+    d.fields.insert(SCRIBBLE_SETTING.into(), json!(id));
+    settings_changed || fields_changed
+}
 
 /// The Transform effect's dialog: Transform Each's Scale and Move sliders and Rotate dial, then
 /// the options Transform Objects, Transform Patterns and Scale Strokes & Effects (#885), Copies,
