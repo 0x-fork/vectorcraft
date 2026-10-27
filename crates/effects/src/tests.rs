@@ -4,6 +4,9 @@ use vectorcraft_geom::{Affine, PathData, Point, Rect, Shape, SubPath, shapes};
 
 use super::*;
 
+mod scale;
+mod transformfx;
+
 fn fx(id: &str, params: Value) -> Effect {
     Effect { id: id.into(), params, visible: true }
 }
