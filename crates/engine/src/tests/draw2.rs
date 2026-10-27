@@ -2812,3 +2812,33 @@ fn pencil_with_live_preview_off_draws_the_filled_path_on_release() {
     assert!(n.path_data().is_some() && !n.appearance.fill_paint().is_none(), "{:?}", n.appearance);
     assert_eq!(s.doc().unwrap().history.undo.len(), undo + 1, "one undo step");
 }
+
+fn shape_anchors(cmd: &str, params: &serde_json::Value) -> usize {
+    let mut s = session();
+    let r = s.execute(cmd, params).unwrap();
+    let doc = &s.doc().unwrap().doc;
+    doc.node(NodeId(r["id"].as_u64().unwrap())).unwrap().path_data().unwrap().anchors().count()
+}
+
+#[test]
+fn shape_counts_written_as_whole_floats_are_honoured() {
+    let poly = |v: serde_json::Value| shape_anchors("shape.polygon", &json!({"cx": 100, "cy": 100, "radius": 50, "sides": v}));
+    assert_eq!(poly(json!(5.0)), 5);
+    assert_eq!(poly(json!(5)), 5);
+    let star = |v: serde_json::Value| shape_anchors("shape.star", &json!({"cx": 100, "cy": 100, "radius1": 50, "points": v}));
+    assert_eq!(star(json!(7.0)), star(json!(7)));
+    assert_ne!(star(json!(7.0)), star(json!(5)));
+    let spiral = |v: serde_json::Value| shape_anchors("shape.spiral", &json!({"cx": 100, "cy": 100, "radius": 50, "segments": v}));
+    assert_eq!(spiral(json!(4.0)), spiral(json!(4)));
+    assert_ne!(spiral(json!(4.0)), spiral(json!(10)));
+}
+
+#[test]
+fn shape_counts_that_are_not_whole_numbers_are_errors() {
+    for bad in [json!(5.5), json!(-3), json!(-3.0), json!("5")] {
+        let mut s = session();
+        assert!(s.execute("shape.polygon", &json!({"cx": 1, "cy": 1, "radius": 5, "sides": bad})).is_err(), "{bad}");
+        assert!(s.execute("shape.star", &json!({"cx": 1, "cy": 1, "radius1": 5, "points": bad})).is_err(), "{bad}");
+        assert!(s.execute("shape.spiral", &json!({"cx": 1, "cy": 1, "radius": 5, "segments": bad})).is_err(), "{bad}");
+    }
+}
