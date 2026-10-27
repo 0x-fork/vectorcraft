@@ -324,7 +324,7 @@ fn a_combos_keyboard_guard_reads_the_combos_own_button_id() {
         // `ComboBox::from_id_salt` gives the button: they must be equal, or the guard
         // reads and gives back the keyboard of nothing.
         let expected = combo_button_id(ui, &"combo-guard-test");
-        let response = egui::ComboBox::from_id_salt("combo-guard-test").selected_text("One").show_ui(ui, |_| ());
+        let response = craft_ui::ComboBox::from_id_salt("combo-guard-test").selected_text("One").show_ui(ui, |_| ());
         seen.set(expected == response.response.id);
     });
     h.run_steps(2);
