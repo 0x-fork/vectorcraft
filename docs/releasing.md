@@ -129,8 +129,8 @@ to the target triple, so host build scripts aren't affected.
   executable's own folder is read-only). Flatpak isn't supported: `/app` is read-only and the
   sandbox has no folder "beside the app", so a Flatpak install always uses its own config folder.
 - `vectorcraft.wxs` (WiX) is a dual-scope package (per-user by default into
-  `%LOCALAPPDATA%\Programs\ArtCraft\VectorCraft`, per-machine into `Program Files\ArtCraft\VectorCraft`;
-  (see `packaging/windows/INSTALLATION.md`)) with a Start Menu shortcut
+  `%LOCALAPPDATA%\Programs\ArtCraft\VectorCraft`, per-machine into `Program Files\ArtCraft\VectorCraft` (`Program Files (x86)` for the 32-bit build),
+  see `packaging/windows/INSTALLATION.md`) with a Start Menu shortcut
   and an App Paths entry (Win+R `vectorcraft`). Same-version upgrades are allowed, so release
   candidates replace each other.
 - Double-clicking the MSI opens a setup wizard (WixUI_InstallDir without the licence page):
