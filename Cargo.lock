@@ -6214,6 +6214,7 @@ dependencies = [
  "image",
  "jpeg-encoder",
  "log",
+ "png 0.18.1",
  "proptest",
  "psd",
  "serde_json",
@@ -6230,6 +6231,7 @@ dependencies = [
  "vello_cpu",
  "wat",
  "weezl 0.2.1",
+ "winsafe",
 ]
 
 [[package]]
