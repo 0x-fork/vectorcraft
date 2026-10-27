@@ -86,6 +86,7 @@ pub use solids::{
     EXTRUDE, INFLATE, ROTATE, ROTATION_PRESETS, SOLIDS, extrude_options, has_solid, inflate_options, is_three_d, solid_art, validate_solid,
     validate_three_d, view_options,
 };
+pub use stylize::{ScribbleSetting, scribble_setting_id, scribble_settings};
 pub use trap::TRAP;
 pub use warp::{WarpStyle, warp_point};
 

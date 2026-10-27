@@ -926,6 +926,17 @@ fn scribble_reads_its_earlier_single_variation() {
 }
 
 #[test]
+fn scribble_settings_presets_are_distinct_and_recognized() {
+    let presets = crate::scribble_settings();
+    assert_eq!(presets.len(), 11);
+    assert_eq!(presets[0].id, "default");
+    assert_eq!(crate::scribble_setting_id(&presets[0].params), Some("default"));
+    assert_eq!(crate::scribble_setting_id(&presets[9].params), Some("tight"));
+    let custom = json!({"angle": 30.0, "overlap": 0.0, "overlapVariation": 0.5, "strokeWidth": 3.0, "curviness": 5.0, "curvinessVariation": 0.0, "spacing": 4.0, "spacingVariation": 0.5});
+    assert_eq!(crate::scribble_setting_id(&custom), None);
+}
+
+#[test]
 fn scribble_angle_is_stored_above_minus_180_and_up_to_180() {
     for (given, stored) in [(270.0, -90.0), (-180.0, 180.0), (180.0, 180.0), (540.0, 180.0), (-270.0, 90.0), (-200.0, 160.0)] {
         assert_eq!(new_effect("stylize.scribble", &json!({"angle": given})).unwrap().params["angle"].as_f64(), Some(stored), "{given}");
