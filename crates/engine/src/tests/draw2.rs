@@ -2394,6 +2394,111 @@ fn join_selected_paths_honors_ends_parameter() {
     assert_eq!(pts, [(100.0, 0.0), (0.0, 0.0), (200.0, 0.0), (110.0, 0.0)]);
 }
 
+/// An explicit `ends` wins over a direct-selected end pair when `ids` is omitted, as on `main`.
+#[test]
+fn join_explicit_ends_win_over_direct_selected_end_points() {
+    let pts = |s: &Session, id: NodeId| path(s, id).subpaths[0].anchors.iter().map(|x| (x.p.x, x.p.y)).collect::<Vec<_>>();
+    // (picked anchor of a, picked anchor of b, the ends asked for, the result they ask for)
+    let cases = [
+        // Picks say a's last to b's first (also the nearest pair); the ends ask for the far ends.
+        (1, 0, ["first", "last"], [(100.0, 0.0), (0.0, 0.0), (200.0, 0.0), (110.0, 0.0)]),
+        // Picks say a's first to b's first; the ends ask for a's last to b's first.
+        (0, 0, ["last", "first"], [(0.0, 0.0), (100.0, 0.0), (110.0, 0.0), (200.0, 0.0)]),
+    ];
+    for (pick_a, pick_b, ends, want) in cases {
+        let mut s = session();
+        let a = line(&mut s, 0.0, 0.0, 100.0, 0.0);
+        let b = line(&mut s, 110.0, 0.0, 200.0, 0.0);
+        s.execute("select.anchors", &json!({"id": a.0, "anchors": [[0, pick_a]], "mode": "set"})).unwrap();
+        s.execute("select.anchors", &json!({"id": b.0, "anchors": [[0, pick_b]], "mode": "add"})).unwrap();
+        let sel_before = s.doc().unwrap().selection.anchors.clone();
+        s.execute("path.join", &json!({"ends": ends})).unwrap();
+        assert_eq!(pts(&s, a), want, "ends {ends:?} with a:{pick_a} b:{pick_b} picked");
+        assert!(s.doc().unwrap().doc.node(b).is_none(), "b was joined into a");
+        // One undo step puts both lines, and the selection they had, back.
+        s.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(pts(&s, a), [(0.0, 0.0), (100.0, 0.0)]);
+        assert_eq!(pts(&s, b), [(110.0, 0.0), (200.0, 0.0)]);
+        assert_eq!(s.doc().unwrap().selection.objects, vec![a, b], "the selection came back");
+        assert_eq!(s.doc().unwrap().selection.anchors, sel_before, "with its direct-selected anchors");
+    }
+}
+
+/// The ends asked for apply to the selection order: with b selected first, both lines reverse and b keeps its id.
+#[test]
+fn join_explicit_ends_follow_the_selection_order() {
+    let mut s = session();
+    let a = line(&mut s, 0.0, 0.0, 100.0, 0.0);
+    let b = line(&mut s, 110.0, 0.0, 200.0, 0.0);
+    // In selection order the picks (b's first, a's last) match the ends asked for; the head reads the
+    // pick map in id order (a before b), so it joins the other pair, which this pins.
+    s.execute("select.anchors", &json!({"id": b.0, "anchors": [[0, 0]], "mode": "set"})).unwrap();
+    s.execute("select.anchors", &json!({"id": a.0, "anchors": [[0, 1]], "mode": "add"})).unwrap();
+    s.execute("path.join", &json!({"ends": ["first", "last"]})).unwrap();
+    let pts: Vec<(f64, f64)> = path(&s, b).subpaths[0].anchors.iter().map(|x| (x.p.x, x.p.y)).collect();
+    assert_eq!(pts, [(200.0, 0.0), (110.0, 0.0), (100.0, 0.0), (0.0, 0.0)], "b keeps its id and runs 200 to 0");
+    assert!(s.doc().unwrap().doc.node(a).is_none(), "a was joined into b");
+}
+
+/// Two open subpaths of one path take the ends asked for, not the picked pair.
+#[test]
+fn join_explicit_ends_on_two_subpaths_of_one_path() {
+    let mut s = session();
+    let id = NodeId(s.execute("path.create", &json!({"d": "M0 0 L100 0 M200 0 L110 0"})).unwrap()["id"].as_u64().unwrap());
+    s.execute("select.anchors", &json!({"id": id.0, "anchors": [[0, 1], [1, 0]], "mode": "set"})).unwrap();
+    // The picks say subpath 0's last to subpath 1's first; the ends ask for subpath 1's last.
+    s.execute("path.join", &json!({"ends": ["last", "last"]})).unwrap();
+    let pd = path(&s, id);
+    assert_eq!(pd.subpaths.len(), 1, "the two subpaths became one");
+    let pts: Vec<(f64, f64)> = pd.subpaths[0].anchors.iter().map(|x| (x.p.x, x.p.y)).collect();
+    assert_eq!(pts, [(0.0, 0.0), (100.0, 0.0), (110.0, 0.0), (200.0, 0.0)]);
+}
+
+/// `ends` names two paths: three open subpaths are refused, with and without a picked pair, and nothing changes.
+#[test]
+fn join_explicit_ends_refuses_more_than_two_open_subpaths() {
+    for picks in [false, true] {
+        let mut s = session();
+        let a = line(&mut s, 0.0, 0.0, 100.0, 0.0);
+        let b = line(&mut s, 110.0, 0.0, 200.0, 0.0);
+        let c = line(&mut s, 210.0, 0.0, 300.0, 0.0);
+        s.select(|_, sel| sel.set([a, b, c])).unwrap();
+        if picks {
+            // A picked pair cannot narrow a three-path request: two paths is what `ends` names.
+            s.execute("select.anchors", &json!({"id": a.0, "anchors": [[0, 1]], "mode": "add"})).unwrap();
+            s.execute("select.anchors", &json!({"id": b.0, "anchors": [[0, 0]], "mode": "add"})).unwrap();
+        }
+        let before = s.doc().unwrap().doc.clone();
+        let sel_before = s.doc().unwrap().selection.objects.clone();
+        let err = s.execute("path.join", &json!({"ends": ["first", "last"]})).unwrap_err();
+        assert!(err.to_string().contains("exactly two paths"), "{err}");
+        assert_eq!(s.doc().unwrap().doc, before, "nothing was joined");
+        assert_eq!(s.doc().unwrap().selection.objects, sel_before, "the selection is unchanged");
+    }
+}
+
+/// Controls: explicit `ids` take `ends` over the picks, and without `ends` the picks still decide.
+#[test]
+fn join_direct_selected_end_points_controls() {
+    let pts = |s: &Session, id: NodeId| path(s, id).subpaths[0].anchors.iter().map(|x| (x.p.x, x.p.y)).collect::<Vec<_>>();
+    let pick = |s: &mut Session, a: NodeId, b: NodeId, pa: usize, pb: usize| {
+        s.execute("select.anchors", &json!({"id": a.0, "anchors": [[0, pa]], "mode": "set"})).unwrap();
+        s.execute("select.anchors", &json!({"id": b.0, "anchors": [[0, pb]], "mode": "add"})).unwrap();
+    };
+    let mut s = session();
+    let a = line(&mut s, 0.0, 0.0, 100.0, 0.0);
+    let b = line(&mut s, 110.0, 0.0, 200.0, 0.0);
+    pick(&mut s, a, b, 1, 0);
+    s.execute("path.join", &json!({"ids": [a.0, b.0], "ends": ["first", "last"]})).unwrap();
+    assert_eq!(pts(&s, a), [(100.0, 0.0), (0.0, 0.0), (200.0, 0.0), (110.0, 0.0)], "ids: the ends win");
+    let mut s = session();
+    let a = line(&mut s, 0.0, 0.0, 100.0, 0.0);
+    let b = line(&mut s, 110.0, 0.0, 200.0, 0.0);
+    pick(&mut s, a, b, 0, 0);
+    s.execute("path.join", &json!({})).unwrap();
+    assert_eq!(pts(&s, a), [(100.0, 0.0), (0.0, 0.0), (110.0, 0.0), (200.0, 0.0)], "no ends: the picks decide");
+}
+
 /// Without `ends`, the end points picked with the direct selection are the ones joined.
 #[test]
 fn join_uses_the_selected_end_points() {

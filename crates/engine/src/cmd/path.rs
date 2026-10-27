@@ -714,7 +714,10 @@ fn join(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
 
-    let direct_ends: Vec<(NodeId, usize, &'static str)> = {
+    // An explicit `ends` names the ends to join: the direct selection only decides when it is absent.
+    let direct_ends: Vec<(NodeId, usize, &'static str)> = if ends.is_some() {
+        vec![]
+    } else {
         let st = s.doc()?;
         let mut ends = vec![];
         for (&id, picked) in &st.selection.anchors {
