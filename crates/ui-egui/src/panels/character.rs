@@ -54,6 +54,38 @@ pub(crate) fn first_selected_text(app: &VectorcraftApp) -> Option<&vectorcraft_d
     None
 }
 
+/// A boolean on every selected text object (`Some(true)` / `Some(false)`), or `None` when they
+/// differ. When the Type tool edits text, only that object counts.
+pub(crate) fn shared_text_flag(app: &VectorcraftApp, f: impl Fn(&vectorcraft_doc::TextObject) -> bool) -> Option<bool> {
+    if let Some((id, _, _)) = text_editing(app) {
+        return app.session.active().and_then(|st| st.doc.node(id)).and_then(|n| match &n.kind {
+            NodeKind::Text(t) => Some(f(t)),
+            _ => None,
+        });
+    }
+    let st = app.session.active()?;
+    let mut value: Option<bool> = None;
+    let mut mixed = false;
+    let mut saw = false;
+    for node in st.selection.objects.iter().filter_map(|id| st.doc.node(*id)) {
+        node.walk(&mut |n| {
+            if let NodeKind::Text(t) = &n.kind {
+                saw = true;
+                if mixed {
+                    return;
+                }
+                let v = f(t);
+                match value {
+                    None => value = Some(v),
+                    Some(a) if a == v => {}
+                    Some(_) => mixed = true,
+                }
+            }
+        });
+    }
+    if !saw || mixed { None } else { value }
+}
+
 /// `f` of the character styles the panels act on: the runs the Type tool's selection covers (the
 /// caret's style at a caret), else every run of the selected type, groups' included. `None` (a
 /// blank field) where they differ, or with no type.

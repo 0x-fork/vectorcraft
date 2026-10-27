@@ -488,6 +488,30 @@ fn character_direction_checks_the_direction_of_the_selection() {
     assert_eq!(checked(&mut app), ["Default"]);
 }
 
+#[test]
+fn shared_text_flag_optical_margin_three_object_selections() {
+    let mut app = VectorcraftApp::new(Session::new(), Default::default());
+    app.run("file.new", json!({})).unwrap();
+    let a = app.run("text.create", json!({"x": 10, "y": 40, "text": "a"})).unwrap()["id"].clone();
+    let b = app.run("text.create", json!({"x": 10, "y": 80, "text": "b"})).unwrap()["id"].clone();
+    let c = app.run("text.create", json!({"x": 10, "y": 120, "text": "c"})).unwrap()["id"].clone();
+    app.run("type.opticalMarginAlignment", json!({"on": true, "id": a})).unwrap();
+    app.run("type.opticalMarginAlignment", json!({"on": false, "id": b})).unwrap();
+    app.run("type.opticalMarginAlignment", json!({"on": false, "id": c})).unwrap();
+    app.run("select.set", json!({"ids": [a.clone(), b.clone(), c.clone()]})).unwrap();
+    assert_eq!(shared_text_flag(&app, |t| t.optical_margin), None);
+    app.run("type.opticalMarginAlignment", json!({"on": false, "id": a})).unwrap();
+    app.run("type.opticalMarginAlignment", json!({"on": true, "id": b})).unwrap();
+    app.run("type.opticalMarginAlignment", json!({"on": true, "id": c})).unwrap();
+    app.run("select.set", json!({"ids": [a.clone(), b.clone(), c.clone()]})).unwrap();
+    assert_eq!(shared_text_flag(&app, |t| t.optical_margin), None);
+    app.run("type.opticalMarginAlignment", json!({"on": true, "id": a})).unwrap();
+    app.run("type.opticalMarginAlignment", json!({"on": true, "id": b})).unwrap();
+    app.run("type.opticalMarginAlignment", json!({"on": true, "id": c})).unwrap();
+    app.run("select.set", json!({"ids": [a, b, c]})).unwrap();
+    assert_eq!(shared_text_flag(&app, |t| t.optical_margin), Some(true));
+}
+
 /// Small Caps, Superscript and Subscript buttons and menu items stay off when the selection mixes them.
 #[test]
 fn character_mixed_small_caps_and_position_show_off() {
