@@ -133,7 +133,8 @@ to the target triple, so host build scripts aren't affected.
   see `packaging/windows/INSTALLATION.md`) with a Start Menu shortcut
   and an App Paths entry (Win+R `vectorcraft`). Same-version upgrades are allowed, so release
   candidates replace each other.
-- Double-clicking the MSI opens a setup wizard (WixUI_InstallDir without the licence page):
+- Double-clicking the MSI opens a setup wizard (WixUI_InstallDir without the licence page; the scope page appears only for a new full-UI install, not for
+  maintenance, uninstall or reduced and silent runs):
   a scope page ("Only for me" or "Everyone on this computer"), Welcome, install folder (remembered for
   upgrades in `HKLM` or `HKCU\Software\VectorCraft\InstallDir` according to scope),
   Shortcuts (a ticked "Create a desktop shortcut" box), Ready, a progress page, and a Finish page
