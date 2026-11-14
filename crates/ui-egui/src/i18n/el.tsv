@@ -6626,7 +6626,7 @@ axis	Y Axis	Άξονας Y
 @plural	Result: {n}|Results: {n}	Αποτέλεσμα: {n}|Αποτελέσματα: {n}
 @msg	select one object	επιλέξτε ένα αντικείμενο
 @msg	Global Edit works on paths, compound paths, symbol instances and groups of them	Η καθολική επεξεργασία λειτουργεί σε διαδρομές, σύνθετες διαδρομές, παρουσίες συμβόλων και ομάδες τους
-@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	δεν βρέθηκαν παρόμοια αντικείμενα (τα περιστραμμένα ή κατοπτρισμένα αντίγραφα δεν εντοπίζονται)· αλλάξτε τις επιλογές καθολικής επεξεργασίας και δοκιμάστε ξανά
+@msg	no similar objects found (reflected copies are not matched); change the Global Edit Options and try again	δεν βρέθηκαν παρόμοια αντικείμενα (τα κατοπτρισμένα αντίγραφα δεν εντοπίζονται)· αλλάξτε τις επιλογές καθολικής επεξεργασίας και δοκιμάστε ξανά
 @msg	Global Edit is off	Η καθολική επεξεργασία δεν είναι ενεργή
 @msg	only an object of the Global Edit other than the one it started from can be left out	μπορεί να εξαιρεθεί μόνο ένα αντικείμενο της καθολικής επεξεργασίας εκτός από εκείνο με το οποίο ξεκίνησε
 @msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all ή ένα εύρος όπως 1, 3-5, όχι {v}
