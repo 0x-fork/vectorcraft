@@ -3608,7 +3608,7 @@ already walks Image Trace. Short agent entry points:
   is changed, renamed or deleted. In the app,
   `ui.imageTracePresetDialog {params?, rename?}` opens the Image Trace panel's Save as New Preset… or Rename… dialog.
 - Live Paint: `livePaint.make`, `livePaint.merge`, `livePaint.fill {group?, point}`, `livePaint.strokeEdge`,
-  `livePaint.info {group}`, `livePaint.release`, `livePaint.expand`, and `livePaint.gapOptions {ids?, detect?, size?,
+  `livePaint.info {group?|id?}`, `livePaint.release`, `livePaint.expand`, and `livePaint.gapOptions {ids?, detect?, size?,
   color?, closeGaps?}` (Object › Live Paint › Gap Options). Make gives each covered face the fill of its front-most
   covering source, including compound paths with shared curved boundaries. Expand keeps those face fills.
   `livePaint.expand` keeps each face and edge that draws, with all its fill and stroke rows: it is shown, its opacity
@@ -3617,6 +3617,13 @@ already walks Image Trace. Short agent entry points:
   row is hidden is removed. `livePaint.merge` copies the fill and stroke rows, visibility, opacity and blending mode of
   each face that draws by this rule, and of each edge, to the rebuilt parts, with their gradients kept at their fit on
   the old outline and without the strokes' pen pressure, tilt, bearing and rotation.
+  `livePaint.info` lists each face's top fill as `fill` and each edge's top stroke and its weight as `stroke` and
+  `width`, and lists every fill and stroke row of each face and edge in `appearance`, bottom first, as
+  `{index, kind, paint, opacity, visible, width?, drawn}`: `index` counts fills and strokes together, `opacity` runs
+  from 0 to 1, and `width` (strokes only) is the weight in points. `drawn` is true when the row draws by the rule
+  above: the part is shown with an opacity above 0, and the row is shown, has paint and has an opacity above 0 (a
+  stroke also a weight above 0). An unpainted top row can sit over a lower row that draws, so `fill`, `stroke` and
+  `width` alone may not describe what the part draws.
   With `detect: true`, paint stops at the gaps that run
   from a loose end of a path to the nearest path, up to `size` wide (`small` 3 pt, `medium` 6 pt, `large` 12 pt, or a
   number of points up to 72); `closeGaps: true` adds an unpainted path across each of them. `color` (the Gap Preview
