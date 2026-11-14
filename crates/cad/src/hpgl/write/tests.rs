@@ -183,7 +183,7 @@ fn meshes_in_blends_are_outlines_and_clear_meshes_draw_nothing() {
 #[test]
 fn plots_nothing_picks_what_a_plot_draws_nothing_of() {
     type Make = fn(&mut Document) -> Node;
-    let cases: [(&str, Make, bool); 6] = [
+    let cases: [(&str, Make, bool); 7] = [
         ("stroked", |d| stroked(d, rect(10.0, 10.0, 40.0, 40.0), Color::BLACK), false),
         ("unpainted", |d| Node::path(d.alloc_id(), rect(10.0, 10.0, 40.0, 40.0), Appearance::basic(Paint::None, Paint::None, 1.0)), true),
         (
@@ -211,6 +211,24 @@ fn plots_nothing_picks_what_a_plot_draws_nothing_of() {
             },
             true,
         ),
+        (
+            "image with Crop Marks",
+            |d| {
+                let image = vectorcraft_doc::ImageObject {
+                    key: "raster-1".into(),
+                    width: 4,
+                    height: 2,
+                    xf: Affine::translate((10.0, 20.0)) * Affine::scale(5.0),
+                    link: None,
+                    placement: Default::default(),
+                    pixels: None,
+                };
+                let mut n = Node::new(d.alloc_id(), NodeKind::Image(Box::new(image)));
+                n.appearance.effects.push(vectorcraft_doc::Effect { id: "cropMarks".into(), params: serde_json::json!({}), visible: true });
+                n
+            },
+            false,
+        ),
         ("mesh", |d| Node::new(d.alloc_id(), NodeKind::Mesh(mesh_at(10.0))), false),
         (
             "clear mesh",
@@ -230,16 +248,16 @@ fn plots_nothing_picks_what_a_plot_draws_nothing_of() {
             vec![n]
         });
         let Some(n) = held else { panic!("{name}") };
-        assert_eq!(plots_nothing(&n), nothing, "{name}");
+        assert_eq!(plots_nothing(&d, &n), nothing, "{name}");
         assert_eq!(text(&plot(&d, &opts(&d))) == "IN;PU;SP0;", nothing, "{name}");
     }
     let mut d = doc_with(|d| vec![stroked(d, rect(10.0, 10.0, 40.0, 40.0), Color::BLACK)]);
     let layer = d.layers[0].id;
-    assert!(!plots_nothing(&d.layers[0]));
+    assert!(!plots_nothing(&d, &d.layers[0]));
     if let Some(NodeKind::Layer { printable, .. }) = d.node_mut(layer).map(|n| &mut n.kind) {
         *printable = false;
     }
-    assert!(plots_nothing(&d.layers[0]));
+    assert!(plots_nothing(&d, &d.layers[0]));
     assert_eq!(text(&plot(&d, &opts(&d))), "IN;PU;SP0;");
 }
 

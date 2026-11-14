@@ -254,6 +254,29 @@ fn a_plot_of_the_arts_bounds_leaves_out_images_in_symbol_art() {
     }
 }
 
+/// A placed image with a Vector Halftone effect is measured when the effect makes dots, and left
+/// out when it would take more cells than the effect makes.
+#[test]
+fn a_plot_of_the_arts_bounds_measures_images_by_their_halftone_dots() {
+    let mut s = two_boards();
+    let plot = |s: &mut Session| s.execute("document.export", &json!({"format": "hpgl", "useArtboards": false})).map(|v| bytes(&v));
+    let printing = s.doc().unwrap().doc.layers[0].id;
+    s.execute("layer.new", &json!({})).unwrap();
+    let mut png = vec![];
+    image::DynamicImage::new_rgb8(100, 100).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    s.execute("file.place", &json!({"name": "dots.png", "dataBase64": b64(&png), "at": [300, 300]})).unwrap();
+    s.execute("layer.setProps", &json!({"id": printing, "visible": false})).unwrap();
+
+    // At 300 lines per inch a 100 pt image takes more cells than the effect makes.
+    s.execute("effect.apply", &json!({"effect": "addon.color.halftone", "params": {"frequency": 300}})).unwrap();
+    let e = plot(&mut s).unwrap_err().to_string();
+    assert!(e.contains("no visible art"), "{e}");
+
+    s.execute("effect.apply", &json!({"effect": "addon.color.halftone", "params": {"frequency": 20}})).unwrap();
+    let out = String::from_utf8(plot(&mut s).unwrap()).unwrap();
+    assert!(out.contains("PD"), "{out}");
+}
+
 #[test]
 fn export_options_are_checked() {
     let mut s = two_boards();

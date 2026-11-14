@@ -444,7 +444,7 @@ pub(super) fn art_page(cmd: &str, doc: &Document, p: &Value, left_out: impl Fn(&
 /// when there is none, which such an export refuses.
 pub fn export_art_bounds(doc: &Document, format: &str) -> Option<Rect> {
     let doc = &*doc.without_edit_modes();
-    bounds_without(doc, &|n| format == "hpgl" && vectorcraft_cad::hpgl::write::plots_nothing(n))
+    bounds_without(doc, &|n| format == "hpgl" && vectorcraft_cad::hpgl::write::plots_nothing(doc, n))
 }
 
 /// The bounds of the visible art of `doc` with the objects that `left_out` picks hidden
@@ -770,7 +770,7 @@ fn encode_files(doc: &Document, f: &Format, p: &Value) -> Result<Encoded> {
     {
         return Ok(enc);
     }
-    let left_out = |n: &Node| f.id == "hpgl" && vectorcraft_cad::hpgl::write::plots_nothing(n);
+    let left_out = |n: &Node| f.id == "hpgl" && vectorcraft_cad::hpgl::write::plots_nothing(doc, n);
     if use_artboards == Some(false)
         && let Some((art, q)) = art_page(C, doc, p, left_out)?
     {
