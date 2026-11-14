@@ -5434,6 +5434,7 @@ imageTrace	Outline	Körvonal
 @msg	no action set to save	nincs menthető műveletkészlet
 @msg	the action set file can't be read in full	a műveletkészlet-fájl nem olvasható be teljesen
 @msgplural	Loaded “{name}”: {n} step was left out|Loaded “{name}”: {n} steps were left out	„{name}” betöltve; kihagyott lépések: {n}
+@msgplural	Loaded “{name}”: {n} step has an unknown command and was kept: “{action}”, step {step}, `{command}`|Loaded “{name}”: {n} steps have unknown commands and were kept; the first: “{action}”, step {step}, `{command}`	„{name}” betöltve; megtartott lépések ismeretlen paranccsal: {n}; az első: „{action}”, lépés: {step}, `{command}`
 @msg	not an action set file	nem műveletkészlet-fájl
 @msg	the action set file is larger than 8 MiB	a műveletkészlet-fájl nagyobb 8 MiB-nál
 @msg	`{ID}`: the reference would be larger than {MAX_BYTES} bytes	`{ID}`: a referencia nagyobb lenne {MAX_BYTES} bájtnál
@@ -5807,6 +5808,7 @@ imageTrace	Outline	Körvonal
 @msg	truncated	csonka
 @msg	Unembedded to {_1}	Beágyazás megszüntetve, ide: {_1}
 @msg	unknown command `{0}`	ismeretlen parancs: `{0}`
+@msg	step {step} of “{action}” runs the unknown command `{command}`	„{action}”, lépés: {step}: ismeretlen parancsot futtat: `{command}`
 @msg	unknown command `{0}`; did you mean `{1}`?	ismeretlen parancs: `{0}`; erre gondolt: `{1}`?
 @msg	unknown effect `{id}`	ismeretlen effektus: `{id}`
 @msg	unknown format	ismeretlen formátum
@@ -7454,6 +7456,12 @@ breakText	Glyphs	Glifák
 @msg	open the practice sample of `{id}` first (see learn.openSample)	előbb nyissa meg a gyakorló mintafájlt ehhez: `{id}` (lásd: learn.openSample)
 @msg	finish `{id}` first (see learn.finish)	előbb fejezze be ezt: `{id}` (lásd: learn.finish)
 @msg	`{id}` is the last tutorial in its skill	a készsége utolsó oktatóanyaga: `{id}`
+	Reset progress	Előrehaladás visszaállítása
+	Mark Tutorial Step	Oktatóanyag lépésének megjelölése
+	Reset Learn Progress	Tanulási előrehaladás visszaállítása
+@msg	missing `step` (see learn.show)	hiányzik: `step` (lásd: learn.show)
+@msg	`step` must be a step number from 0 to {last}	a `step` értéke 0 és {last} közötti lépésszám legyen
+@msg	`{id}` is finished (see learn.resetProgress)	befejezve: `{id}` (lásd: learn.resetProgress)
 
 # Deferred plug-in effects
 	Refresh Deferred Effects	Elhalasztott effektusok frissítése
