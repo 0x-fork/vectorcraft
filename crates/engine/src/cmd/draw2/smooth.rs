@@ -571,11 +571,9 @@ fn smooth_subpath(sp: &SubPath, pts: &[Point], radius: f64, share: usize, tol: f
             if let Some(r0) = res.first_mut() {
                 *r0 = Anchor::with_handles(r0.p, l.h_in, r0.h_out);
             }
-            // The path starts where it did when the refit keeps an anchor there.
-            if let Some(j) = res.iter().position(|a| a.p == sp.anchors[0].p) {
-                res.rotate_left(j);
-            }
-            return Some(SubPath::new(res, true));
+            // The path starts where it did when the refit keeps an anchor there, and otherwise at its
+            // point nearest there.
+            return Some(start_nearest(SubPath::new(res, true), start, sp));
         };
         // Rotate so an untouched anchor comes first, duplicate it at the end and treat as open.
         let mut open = sp.clone();
