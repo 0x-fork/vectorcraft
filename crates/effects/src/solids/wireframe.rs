@@ -4,13 +4,13 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use vectorcraft_doc::color::{Color, Paint};
-use vectorcraft_doc::{Appearance, Document, Effect, Node, NodeId};
+use vectorcraft_doc::{Appearance, AppearanceItem, Document, Effect, FillLayer, Node, NodeId};
 use vectorcraft_geom::{Anchor, CubicBez, PathData, Point, SubPath};
 use vectorcraft_three_d::Facet;
 
 use super::{
-    Profile, ROTATE, built_solids, facets, geometry, has_solid, is_container, is_plane, is_three_d, label_of, members, object_profile, region,
-    reshape_members, resolve, resolve_for, solid, solid_paint_sources, solid_parts, union_bounds,
+    CLASSIC_EXTRUDE, CLASSIC_ROTATE, Profile, ROTATE, built_solids, facets, geometry, has_solid, is_container, is_plane, is_three_d, label_of,
+    members, object_profile, region, reshape_members, resolve, resolve_for, solid, solid_paint_sources, solid_parts, union_bounds,
 };
 use crate::{GeomContext, is_geometry};
 
@@ -54,7 +54,7 @@ pub fn three_d_wireframe_in(doc: Option<&Document>, n: &Node) -> Result<Vec<Path
     // cuts it ([`crate::revolve_art_in`]).
     let n = &*if revolve { resolve_for(doc, n, label, false)? } else { resolve(doc, n, label)? };
     let (faces, shadow) = if revolve { crate::revolve::revolve_face_paths(doc, n)? } else { solid_face_paths(doc, n)? };
-    let faces = after_geometry(doc, n, faces, shadow, revolve);
+    let faces: Vec<PathData> = after_geometry(doc, n, faces, shadow, revolve).into_iter().map(|f| f.path).collect();
     let wire = edges(&faces)?;
     if wire.is_empty() {
         return Err(format!("{label} draws no faces for this object"));
@@ -66,19 +66,27 @@ pub fn three_d_wireframe_in(doc: Option<&Document>, n: &Node) -> Result<Vec<Path
 /// ([`reshaped_beside`]): its first visible Revolve when `revolve` is set, else its first visible
 /// Extrude & Bevel, Inflate or Rotate. The effects measure the faces together with `shadow`, the
 /// shadow the canvas draws behind them, as they measure the drawn art.
-fn after_geometry(doc: Option<&Document>, n: &Node, faces: Vec<PathData>, shadow: Vec<Arc<Node>>, revolve: bool) -> Vec<PathData> {
+fn after_geometry(doc: Option<&Document>, n: &Node, faces: Vec<WireFace>, shadow: Vec<Arc<Node>>, revolve: bool) -> Vec<WireFace> {
     let fx = &n.appearance.effects;
     let drawn = if revolve { fx.iter().position(|e| e.visible && crate::revolve::is_revolve(&e.id)) } else { solid(fx).map(|(i, _)| i) };
     let Some(index) = drawn else { return faces };
     reshaped_beside(faces, shadow, fx.get(index + 1..).unwrap_or_default(), &GeomContext { doc, ..GeomContext::of(n) })
 }
 
+/// One face of a drawn 3D surface: its outline and the width of the stroke the canvas draws around
+/// it (the seam between faces, or a wire edge), which a later Outline Stroke outlines.
+pub(crate) struct WireFace {
+    pub(crate) path: PathData,
+    pub(crate) stroke: f64,
+}
+
 /// `faces` reshaped by the visible geometry effects in `later` (the effects after a 3D effect), as
 /// they reshape the faces of the drawn surface ([`crate::reshape::reshape_leaves`]): each effect
 /// reshapes each face on its own, about the bounds all the faces have before it, and the faces keep
-/// to one budget of anchors together. `ctx` gives the object's id, the seed of a random Transform,
-/// and the document.
-pub(crate) fn reshaped(faces: Vec<PathData>, later: &[Effect], ctx: &GeomContext) -> Vec<PathData> {
+/// to one budget of anchors together. Each face is filled and carries its round-joined stroke, as on
+/// the canvas, so an Outline Stroke outlines that stroke. `ctx` gives the object's id, the seed of a
+/// random Transform, and the document.
+pub(crate) fn reshaped(faces: Vec<WireFace>, later: &[Effect], ctx: &GeomContext) -> Vec<WireFace> {
     reshaped_beside(faces, vec![], later, ctx)
 }
 
@@ -87,15 +95,17 @@ const FACE: &str = "face";
 
 /// [`reshaped`] with `shadow`, the shadow drawn behind the faces, in the art the effects reshape:
 /// each effect measures the faces and the shadow together, and only the faces are returned.
-fn reshaped_beside(faces: Vec<PathData>, shadow: Vec<Arc<Node>>, later: &[Effect], ctx: &GeomContext) -> Vec<PathData> {
+fn reshaped_beside(faces: Vec<WireFace>, shadow: Vec<Arc<Node>>, later: &[Effect], ctx: &GeomContext) -> Vec<WireFace> {
     let after: Vec<&Effect> = later.iter().filter(|e| e.visible && is_geometry(&e.id)).collect();
     if after.is_empty() {
         return faces;
     }
     let id = NodeId(ctx.seed);
-    let fill = Appearance::basic(Paint::solid(Color::BLACK), Paint::None, 0.0);
-    let face = |f: PathData| {
-        let mut face = Node::path(id, f, fill.clone());
+    let paint = Paint::solid(Color::BLACK);
+    let face = |f: WireFace| {
+        let items =
+            vec![AppearanceItem::Fill(FillLayer::new(paint.clone())), AppearanceItem::Stroke(crate::lighting::seam_stroke(paint.clone(), f.stroke))];
+        let mut face = Node::path(id, f.path, Appearance { items, ..Default::default() });
         face.name = Some(FACE.into());
         Arc::new(face)
     };
@@ -106,12 +116,12 @@ fn reshaped_beside(faces: Vec<PathData>, shadow: Vec<Arc<Node>>, later: &[Effect
     out
 }
 
-/// The paths of the faces in `n` ([`FACE`]), `inside` one or not: a face that a Transform effect
-/// copies or a live-effect plug-in cuts into pieces becomes a group with its name.
-fn face_paths(n: &Node, inside: bool, out: &mut Vec<PathData>) {
+/// The faces in `n` ([`FACE`]), `inside` one or not, each with the width of its stroke: a face that
+/// a Transform effect copies or a live-effect plug-in cuts into pieces becomes a group with its name.
+fn face_paths(n: &Node, inside: bool, out: &mut Vec<WireFace>) {
     let inside = inside || n.name.as_deref() == Some(FACE);
-    if inside {
-        out.extend(n.path_data().cloned());
+    if inside && let Some(path) = n.path_data() {
+        out.push(WireFace { path: path.clone(), stroke: n.appearance.stroke().map_or(0.0, |s| s.width) });
     }
     for c in n.children().into_iter().flatten() {
         face_paths(c, inside, out);
@@ -120,7 +130,7 @@ fn face_paths(n: &Node, inside: bool, out: &mut Vec<PathData>) {
 
 /// The faces of a 3D effect on an object, group or layer itself, and the shadow the canvas draws
 /// behind them (none with the shadow off, or with the effect on fills and strokes).
-pub(crate) type FacesAndShadow = (Vec<PathData>, Vec<Arc<Node>>);
+pub(crate) type FacesAndShadow = (Vec<WireFace>, Vec<Arc<Node>>);
 
 /// The outline of every face [`super::solid_art`] draws for `n` (already resolved): with the effect
 /// on the object, its solids; with it on fills and strokes, the solid of each; on a group or layer,
@@ -159,17 +169,20 @@ fn solid_face_paths(doc: Option<&Document>, n: &Node) -> Result<FacesAndShadow, 
 /// Rotate (Classic) turn every fill and stroke; Extrude & Bevel and Inflate build a solid from each shape's
 /// top fill and from the outline of each stroke. A stroke whose solid is past the limits is left out,
 /// as it is left out of the drawn art; past the limits of the object's solids together, the result
-/// is an error, as the canvas draws the source art.
-fn facet_paths(fx: &Effect, shapes: &[Profile]) -> Result<Vec<PathData>, String> {
+/// is an error, as the canvas draws the source art. Each facet carries the width of the stroke the
+/// canvas draws around it.
+fn facet_paths(fx: &Effect, shapes: &[Profile]) -> Result<Vec<WireFace>, String> {
     let label = label_of(&fx.id);
     let b = union_bounds(shapes).ok_or_else(|| format!("{label} requires a shape with at least two anchors"))?;
     let p = crate::merged_params(&fx.id, &fx.params);
+    let classic = fx.id == CLASSIC_EXTRUDE || fx.id == CLASSIC_ROTATE;
+    let face = |f: &Facet| WireFace { path: f.path(), stroke: if classic { super::classic::stroke_width(f, &p) } else { super::seam_width(f) } };
     let mut out = vec![];
     if is_plane(&fx.id) {
         for s in shapes {
             for item in &s.items {
                 let (area, rule) = region(&s.path, s.rule, item);
-                out.extend(facets(ROTATE, &area, rule, b, &p)?.iter().map(Facet::path));
+                out.extend(facets(ROTATE, &area, rule, b, &p)?.iter().map(face));
             }
         }
         return Ok(out);
@@ -177,7 +190,7 @@ fn facet_paths(fx: &Effect, shapes: &[Profile]) -> Result<Vec<PathData>, String>
     let (parts, bounds) = solid_parts(shapes, b);
     // The solids the art draws, each past the limits of the object's solids together as it is.
     for f in built_solids(&fx.id, &p, &parts, bounds, vectorcraft_three_d::MAX_OBJECT_FACES) {
-        out.extend(f?.iter().flatten().map(Facet::path));
+        out.extend(f?.iter().flatten().map(face));
     }
     Ok(out)
 }
