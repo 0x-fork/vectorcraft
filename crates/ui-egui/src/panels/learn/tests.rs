@@ -523,6 +523,19 @@ fn the_tabs_rows_and_back_run_their_commands() {
     press(&mut app, "Back", View { tab: Tab::Skills, skill: None, tutorial: None });
 }
 
+/// A click on the tab the panel already shows runs no command.
+#[test]
+fn a_click_on_the_shown_tab_runs_no_command() {
+    let mut app = app();
+    let ctx = context();
+    for name in ["Skills", "For you"] {
+        click(&mut app, &ctx, name, show);
+        let commands = app.run_count;
+        click(&mut app, &ctx, name, show);
+        assert_eq!(app.run_count, commands, "{name}");
+    }
+}
+
 /// `learn.tab` switches tabs and keeps what the Skills tab had open; `learn.skill` opens a skill's
 /// tutorials and answers the skill as `learn.list` lists it; `learn.back` goes up one level and
 /// keeps the view on the list of skills and on the For you tab.

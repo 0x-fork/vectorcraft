@@ -60,7 +60,7 @@ pub fn show(app: &mut VectorcraftApp, ui: &mut Ui) {
     let mut chosen = None;
     ui.horizontal(|ui| {
         for ((tab, name), label) in TABS.into_iter().zip([tl!("For you"), tl!("Skills")]) {
-            if ui.selectable_label(app.ui.learn.tab == tab, label).clicked() {
+            if ui.selectable_label(app.ui.learn.tab == tab, label).clicked() && app.ui.learn.tab != tab {
                 chosen = Some(name);
             }
         }
