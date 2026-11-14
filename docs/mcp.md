@@ -2952,11 +2952,11 @@ finished and every step marked. The desktop app keeps the progress in its prefer
 when two windows change it, the one that saves last keeps its progress. The web build keeps it while the page is open.
 Marking steps by hand, keeping the progress and Reset progress are VectorCraft's own rules.
 `learn.markStep {tutorial, step, complete?}` runs a step's check box → `{tutorial, step, complete}`: `step` is the
-zero-based step number, and `complete` marks the step done (`true`, omitted or null) or not done (`false`). A missing
-`step` or one the tutorial does not have, a `complete` that is not true or false, a tutorial whose sample was not
-opened, and a finished tutorial are errors. `learn.resetProgress {}` runs Reset progress and answers what `learn.list`
-answers; open documents, opened samples and the Learn view stay as they are. For both, a missing, non-string or
-unknown `tutorial` is an error, and an error changes nothing.
+zero-based step number, and `complete` marks the step done (`true`, omitted or null) or not done (`false`). A missing,
+non-string or unknown `tutorial`, a missing `step` or one the tutorial does not have, a `complete` that is not true or
+false, a tutorial whose sample was not opened, and a finished tutorial are errors, and an error changes nothing.
+`learn.resetProgress {}` runs Reset progress and answers what `learn.list` answers; open documents, opened samples and
+the Learn view stay as they are.
 
 The Home screen has a Learn section between Recent Files and the new-file presets, as
 [the help page](https://helpx.adobe.com/illustrator/desktop/get-started/learn-the-basics/homescreen-overview.html)
