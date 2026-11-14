@@ -6266,7 +6266,7 @@ axis	Y Axis	Y-Achse
 @plural	Result: {n}|Results: {n}	Ergebnis: {n}|Ergebnisse: {n}
 @msg	select one object	wählen Sie ein Objekt aus
 @msg	Global Edit works on paths, compound paths, symbol instances and groups of them	Globale Bearbeitung funktioniert mit Pfaden, zusammengesetzten Pfaden, Symbolinstanzen und Gruppen daraus
-@msg	no similar objects found (rotated or reflected copies are not matched); change the Global Edit Options and try again	keine ähnlichen Objekte gefunden (gedrehte oder gespiegelte Kopien werden nicht erkannt); ändern Sie die Optionen für globale Bearbeitung und versuchen Sie es erneut
+@msg	no similar objects found (reflected copies are not matched); change the Global Edit Options and try again	keine ähnlichen Objekte gefunden (gespiegelte Kopien werden nicht erkannt); ändern Sie die Optionen für globale Bearbeitung und versuchen Sie es erneut
 @msg	Global Edit is off	Globale Bearbeitung ist nicht aktiv
 @msg	only an object of the Global Edit other than the one it started from can be left out	nur ein Objekt der globalen Bearbeitung außer dem, mit dem sie begonnen hat, kann ausgeschlossen werden
 @msg	`artboards`: all or a range such as 1, 3-5, not {v}	`artboards`: all oder ein Bereich wie 1, 3-5, nicht {v}

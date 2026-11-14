@@ -2771,11 +2771,11 @@ nearest to the pointer.
 ## Global Edit
 
 Select › Start Global Edit is `select.globalEdit {appearance?, size?, artboards?, includeCanvas?}`. With one path,
-compound path or symbol instance selected, it finds the objects of the same shape (moved or scaled copies; not rotated
-ones), among those `select.all` would take and the objects in their groups, and returns `{active: true, count, ids}`,
+compound path or symbol instance selected, it finds the objects of the same shape (moved, scaled or rotated copies;
+not reflected ones), among those `select.all` would take and the objects in their groups, and returns `{active: true, count, ids}`,
 the selected object first (at most 10,000). With a group of such objects selected (nested groups and clipping paths
 included; not type or images), it finds the groups like it: as many objects, in the same order, each of the same
-shape, lying the same way relative to each other (the group moved or scaled as a whole). While Global Edit is off,
+shape, lying the same way relative to each other (the group moved, scaled or rotated as a whole). While Global Edit is off,
 the command is disabled for any other selection, including a group that holds type, an image or nothing (it is off in
 the Select menu, the Properties panel's Quick Actions do not show it, and the Control bar does not show its Global Edit
 Options). `appearance` also asks for
@@ -2784,7 +2784,9 @@ the same fill and stroke (for groups, of each object in them), `size` for the sa
 params come from `select.globalEditOptions` (the Global Edit Options, kept for the session; it returns them with
 `count`, the objects a start would take now). The selection stays the one object. Until the next `select.globalEdit`
 (Stop Global Edit, `{active: false}`), what an edit of a selected match changed is given to the other matches, in the
-same undo step, and nothing else. A changed outline or anchors go to each match in proportion to its size. A changed
+same undo step, and nothing else. A changed outline or anchors go to each match in proportion to its size, and to a
+rotated copy turned by its angle: an anchor moved to the right on the selected object moves upward on a copy rotated
+a quarter turn counter-clockwise. A changed
 opacity or blending, and each changed setting of a fill or stroke (paint, weight, opacity, blending, effects…), are
 copied as they are to the match's fill or stroke of the same kind and rank; its other fills and strokes, and their
 unchanged settings, stay its own (a stroke weight change leaves the fills). A stroke weight set on the selected match
@@ -2799,6 +2801,16 @@ are left. An edit that would take any match past the canvas fails with the coord
 nothing. Nothing of it is saved. Before Global Edit starts, while one object that `select.globalEdit` accepts is
 selected with the Selection tool, the canvas highlights the other objects a start would take with the current Global
 Edit Options (none while a drag is in progress, or when there are none).
+
+Rotated copies are edited together as in [Design a modern geometric
+logo](https://helpx.adobe.com/vn_vi/illustrator/how-to/modern-logo-design.html), where copies of a group rotated
+around a point are edited at once from one of their objects. These rules for them are VectorCraft's own. A copy's
+angle is the one that lays each anchor and handle of the selected object on the copy's anchor and handle of the same
+order, so a square whose anchors were turned a quarter turn is a copy rotated a quarter turn. The copy is the same
+shape when, laid so, every anchor and handle lies within a millionth of the larger side of the copy's box of its own. A
+reflected copy is another shape, and so is a copy stretched along one direction. With `size`, a rotated copy has the
+same size when it is the selected object rotated without scaling: a 30 × 70 pt object and its copy rotated a quarter
+turn (70 × 30 pt by its box) have the same size.
 
 `select.globalEditExclude {id}` leaves the match `id` out of the Global Edit, as a Shift-click on a highlighted match
 (or on an object inside it) with the Selection tool does: it is no longer highlighted, and later edits leave it as it
