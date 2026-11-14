@@ -814,6 +814,9 @@ antiAlias	Sharp	Nítido
 	The selected character's font is not available.	A fonte do caractere selecionado não está disponível.
 	No alternates for the selected character.	Nenhuma alternativa para o caractere selecionado.
 	Double-click to replace	Clique duplo para substituir
+	Click to replace	Clique para substituir
+	Show all alternates in the Glyphs panel	Mostrar todas as alternativas no painel Glifos
+	Show Character Alternates	Mostrar Alternativas de Caractere
 	Select one character with the Type tool first.	Primeiro selecione um caractere com a ferramenta Texto.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} é um glifo de {font}, não da fonte do texto selecionado ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} pertence a {base} (U+{base_code}) {place}; sua seleção é {sel} (U+{code}).

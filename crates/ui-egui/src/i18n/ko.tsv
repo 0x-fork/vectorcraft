@@ -1547,6 +1547,9 @@ antiAlias	Sharp	날카롭게
 	The selected character's font is not available.	선택한 문자의 글꼴을 사용할 수 없습니다.
 	No alternates for the selected character.	선택한 문자의 대체 글리프가 없습니다.
 	Double-click to replace	더블클릭하여 바꾸기
+	Click to replace	클릭하여 바꾸기
+	Show all alternates in the Glyphs panel	글리프 패널에서 모든 대체 글리프 표시
+	Show Character Alternates	문자의 대체 글리프 표시
 	Select one character with the Type tool first.	먼저 문자 도구로 문자 하나를 선택하세요.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph}은(는) {font}의 글리프이며, 선택한 텍스트의 글꼴({text_font})의 것이 아닙니다.
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph}은(는) {base}(U+{base_code})의 {place} 글리프입니다. 선택한 문자는 {sel}(U+{code})입니다.

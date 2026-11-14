@@ -6371,6 +6371,10 @@ Pen's second anchor at (150, 431), in line with the square's centre.
 - `highlightAlternateGlyphs` (off by default): Preferences › Type › Highlight Alternate Glyphs. On, the canvas paints
   pink behind OpenType substitutions (ligatures, contextual forms). Document Setup's Highlight Substituted Glyphs
   stays separate. Agents set it with `prefs.set`; the desktop canvas reads it on the next paint.
+- `showCharacterAlternates` (on by default): Preferences › Type › Show Character Alternates. On, the desktop canvas
+  shows the alternate glyphs of the one character selected with a Type tool beside it (see
+  [Alternate glyphs](#alternate-glyphs)). Off, it shows none. It is VectorCraft's own option. `prefs.set` refuses a
+  value that is not a boolean.
 - `highlightSubstitutedFonts` (on by default): Preferences › Type › Highlight Substituted Fonts. On, the canvas paints
   pink behind text drawn in a substitute for a missing font, in every open document. Off, no document shows that
   highlight. `document.setup` ignores this key and adds a `warnings` entry that names `prefs.set` to its reply. A file
@@ -9487,6 +9491,15 @@ refuse a character whose font is not available, and `text.setGlyphAlternate` ref
 and a glyph that the character's style does not draw (All Caps, Small Caps or another numeral
 system). Choosing the glyph a character already draws is not an edit. Character styles do not take `glyphAlternate`:
 `charStyle.new`, `charStyle.edit` and `charStyle.setAttrs` refuse it.
+
+On the desktop canvas, a Type tool with exactly one character selected shows up to five of that character's alternates
+in a row beside it, in the same order and without the glyph the character is drawn with; a character drawn with an
+alternate gets its default glyph first. A click on a glyph runs the same command as the panel's double-click
+(`text.setRangeStyle {featureChanges}`, or `text.setGlyphAlternate` for a glyph no feature draws there), as one undo
+step. When the character has more alternates than the row shows, an arrow at the end of the row opens the Glyphs panel
+on Alternates for Current Selection. The row has no command of its own: an agent reads the alternates with
+`text.glyphAlternates` and applies one with the commands above. The `showCharacterAlternates` preference turns the row
+off.
 
 ```json
 {"name":"run_command","arguments":{"command":"text.glyphAlternates","params":{"id":7,"start":2}}}

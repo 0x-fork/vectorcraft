@@ -1701,6 +1701,9 @@ digits	Malayalam	Malajalam
 	The selected character's font is not available.	Font odabranog znaka nije dostupan.
 	No alternates for the selected character.	Nema alternativa za odabrani znak.
 	Double-click to replace	Dvostruki klik za zamjenu
+	Click to replace	Klik za zamjenu
+	Show all alternates in the Glyphs panel	Prikaži sve alternative u panelu Glifovi
+	Show Character Alternates	Prikaži alternative znaka
 	Select one character with the Type tool first.	Prvo odaberite jedan znak alatom za tekst.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} je glif fonta {font}, a ne fonta kojim je postavljen odabrani tekst ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} pripada znaku {base} (U+{base_code}) {place}; vaš odabir je {sel} (U+{code}).

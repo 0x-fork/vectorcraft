@@ -1065,6 +1065,9 @@ font-technology	Variable	Biến thiên
 	The selected character's font is not available.	Phông chữ của ký tự đã chọn không khả dụng.
 	No alternates for the selected character.	Ký tự đã chọn không có glyph thay thế.
 	Double-click to replace	Bấm đúp để thay thế
+	Click to replace	Bấm để thay thế
+	Show all alternates in the Glyphs panel	Hiện tất cả glyph thay thế trong bảng Glyph
+	Show Character Alternates	Hiện glyph thay thế của ký tự
 	Select one character with the Type tool first.	Trước hết hãy chọn một ký tự bằng công cụ Chữ.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} là glyph của {font}, không phải của phông chữ mà văn bản đã chọn đang dùng ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} thuộc về {base} (U+{base_code}) {place}; ký tự bạn chọn là {sel} (U+{code}).

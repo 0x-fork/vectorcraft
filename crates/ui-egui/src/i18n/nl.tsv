@@ -2154,6 +2154,9 @@ digits	Malayalam	Malayalam
 	The selected character's font is not available.	Het lettertype van het geselecteerde teken is niet beschikbaar.
 	No alternates for the selected character.	Geen alternatieven voor het geselecteerde teken.
 	Double-click to replace	Dubbelklik om te vervangen
+	Click to replace	Klik om te vervangen
+	Show all alternates in the Glyphs panel	Alle alternatieven tonen in het paneel Glyphs
+	Show Character Alternates	Tekenalternatieven tonen
 	Select one character with the Type tool first.	Selecteer eerst één teken met het Type-gereedschap.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} is een glyph van {font}, niet van het lettertype van de geselecteerde tekst ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} hoort bij {base} (U+{base_code}) {place}; uw selectie is {sel} (U+{code}).
