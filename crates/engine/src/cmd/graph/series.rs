@@ -886,9 +886,9 @@ fn run_paint_change(was: &Node, now: &Node, fill: bool) -> Option<(CharStyle, Ve
 }
 
 /// Does graph `g` pick the fill of its legend labels itself, white on a dark wedge and black on the others: a pie with
-/// Legends in Wedges whose legend labels keep no fill of their own ([`vectorcraft_doc::LabelStyles::legend_fill_is_own`])?
+/// Legends in Wedges whose legend labels keep no fill of their own ([`GraphSpec::picks_legend_fill`])?
 pub(super) fn picks_legend_fill(g: &GraphSpec) -> bool {
-    g.kind == GraphKind::Pie && g.legend && g.pie_legend_in_wedges && !g.label_styles.legend_fill_is_own()
+    g.picks_legend_fill()
 }
 
 /// The graph labels among `roots` and inside them, for an edit that reaches graph labels without naming them.

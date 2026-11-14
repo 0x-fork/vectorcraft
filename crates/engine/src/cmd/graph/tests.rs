@@ -6409,6 +6409,27 @@ fn a_color_mode_change_keeps_the_default_wedge_legend_fill() {
     assert!(spec(&s, id).label_styles.legend_fill_set, "the converted red is still the labels' own");
 }
 
+/// The default black legend fill of a graph that keeps its legend beside the marks stays the default through a color
+/// mode change, so turning on Legends in Wedges later still draws the labels on dark wedges white.
+#[test]
+fn a_color_mode_change_keeps_the_default_legend_fill_of_other_graphs() {
+    // A pie made here keeps its legend beside the pies.
+    for kind in ["column", "pie"] {
+        let mut s = Session::new();
+        s.execute("file.new", &json!({"width": 800, "height": 800})).unwrap();
+        let id = make(&mut s, kind, ",a,b\nP1,1,2");
+        s.execute("select.set", &json!({"ids": [id.0]})).unwrap();
+        s.execute("text.setStyle", &json!({"size": 11})).unwrap();
+        let black = Paint::solid(vectorcraft_color::Color::BLACK);
+        let before = spec(&s, id).label_styles;
+        assert_eq!(before.legend.as_ref().map(|st| st.fill.clone()), Some(black.clone()), "{kind}: {before:?}");
+        s.execute("file.documentColorMode", &json!({"mode": "cmyk"})).unwrap();
+        let after = spec(&s, id).label_styles;
+        assert_eq!(after.legend.as_ref().map(|st| st.fill.clone()), Some(black), "{kind}: {after:?}");
+        assert!(!after.legend_fill_set && !after.legend_fill_is_own(), "{kind}: still the default: {after:?}");
+    }
+}
+
 #[test]
 fn labels_are_told_apart_by_where_they_come_not_by_their_text() {
     let mut s = Session::new();

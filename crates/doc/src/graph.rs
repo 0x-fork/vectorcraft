@@ -548,6 +548,14 @@ impl GraphSpec {
         self.series_kinds.get(s).copied().flatten().filter(|k| k.combines_with(self.kind)).unwrap_or(self.kind)
     }
 
+    /// Does the graph pick the fill of its legend labels itself, white on a dark wedge and black on the others: a pie
+    /// with Legends in Wedges whose legend labels keep no fill of their own ([`LabelStyles::legend_fill_is_own`])? Only
+    /// then is a black legend fill it keeps the default, which edits that map the kept paints leave as it is; other
+    /// graphs draw the kept fill as it is.
+    pub fn picks_legend_fill(&self) -> bool {
+        self.kind == GraphKind::Pie && self.legend && self.pie_legend_in_wedges && !self.label_styles.legend_fill_is_own()
+    }
+
     /// The data with blank cells as `None`, every row as long as the longest (at most [`MAX_GRAPH_CATEGORIES`] rows
     /// of [`MAX_GRAPH_SERIES`] cells).
     pub fn cells(&self) -> Vec<Vec<Option<f64>>> {
