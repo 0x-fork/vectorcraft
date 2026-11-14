@@ -89,7 +89,8 @@ fn settled_by(mut q: Quantized, img: &Raster, own: &[bool], per_share: usize) ->
 /// The labels a pass changes in one part of a picture, `len` pixels long, counting each pixel from
 /// the part's first. They are kept as pairs of a pixel and its new label until the pairs would take
 /// more memory than a copy of the part's labels, and as that copy, with the changes made, after
-/// that. A part takes at most about as much memory as a copy of its labels either way.
+/// that. The pairs take at most as much memory as the copy, and a part holds both only while it
+/// moves the pairs into the copy.
 struct Changes {
     len: usize,
     few: Vec<(usize, u16)>,
@@ -110,16 +111,23 @@ impl Changes {
             }
             return;
         }
-        self.few.push((at, to));
-        if self.few.len() * size_of::<(usize, u16)>() > self.len * size_of::<u16>() {
-            let mut copy = labels();
-            for (at, to) in std::mem::take(&mut self.few) {
-                if let Some(l) = copy.get_mut(at) {
-                    *l = to;
-                }
+        // The most pairs that take no more memory than a copy of the part's labels. The pairs grow
+        // by doubling up to that many, and no further.
+        let most = self.len * size_of::<u16>() / size_of::<(usize, u16)>();
+        if self.few.len() < most {
+            if self.few.len() == self.few.capacity() {
+                self.few.reserve_exact(self.few.capacity().max(4).min(most - self.few.len()));
             }
-            self.copy = Some(copy);
+            self.few.push((at, to));
+            return;
         }
+        let mut copy = labels();
+        for (at, to) in std::mem::take(&mut self.few).into_iter().chain([(at, to)]) {
+            if let Some(l) = copy.get_mut(at) {
+                *l = to;
+            }
+        }
+        self.copy = Some(copy);
     }
 
     fn is_empty(&self) -> bool {
@@ -789,6 +797,7 @@ mod tests {
             changes.set(at * 3, 99, || labels.clone());
         }
         assert!(changes.copy.is_none());
+        assert!(changes.few.capacity() <= pairs, "the pairs take no more memory than a copy of the labels");
         changes.set(63, 98, || labels.clone());
         assert!(changes.few.is_empty() && changes.copy.is_some());
         changes.set(1, 97, || labels.clone());
@@ -831,6 +840,40 @@ mod tests {
             let out: Vec<Quantized> = shares.iter().map(|&s| settle(s)).collect();
             assert_ne!(out[0], q, "{name} settles some blend pixels");
             assert!(out.iter().all(|o| *o == out[0]), "{name}");
+        }
+    }
+
+    #[test]
+    fn blend_pixels_settle_the_same_when_most_of_a_share_changes() {
+        // Columns of red and blue own pixels, two blend pixels between each pair: one nearer to red
+        // and one nearer to blue, both labeled with an olive. Half the pixels of each band of rows and
+        // of each group of strips change, more than the eighth at which a share's changes are copied
+        // out (see [`Changes`]). 44 columns, so that the last strip of 7 is short.
+        let (w, h) = (44u32, 5u32);
+        let (red, blue) = ([200u8, 30, 40], [20u8, 60, 180]);
+        let mix = |t: f64| [0, 1, 2].map(|k| (f64::from(red[k]) + t * (f64::from(blue[k]) - f64::from(red[k]))).round() as u8);
+        let img = Raster::from_fn(w, h, |x, _| {
+            let c = [red, mix(0.3), mix(0.7), blue][x as usize % 4];
+            [c[0], c[1], c[2], 255]
+        });
+        let own: Vec<bool> = (0..w * h).map(|i| matches!(i % w % 4, 0 | 3)).collect();
+        let labels = (0..w * h).map(|i| [0, 2, 2, 1][(i % w % 4) as usize]).collect();
+        let q = Quantized { labels, palette: vec![red, blue, [120, 120, 60]] };
+        let expected = Quantized { labels: (0..w * h).map(|i| [0, 0, 1, 1][(i % w % 4) as usize]).collect(), palette: vec![red, blue] };
+        let all = (w * h) as usize;
+        for s in [1, 3 * 7 * h as usize, all] {
+            assert_eq!(settled_by(q.clone(), &img, &own, s), expected, "settled, {s} pixels per share");
+            assert_eq!(settled_wide_by(q.clone(), &img, &own, false, s), expected, "settled_wide, {s} pixels per share");
+        }
+    }
+
+    #[test]
+    fn a_picture_with_no_pixels_settles_to_itself() {
+        let q = Quantized { labels: vec![], palette: vec![[0, 0, 0], [255, 255, 255]] };
+        for (w, h) in [(u32::MAX, 0), (0, u32::MAX)] {
+            let img = Raster::new(w, h, vec![]).unwrap();
+            assert_eq!(settled_by(q.clone(), &img, &[], PIXELS_PER_SHARE), q, "settled, {w} x {h}");
+            assert_eq!(settled_wide_by(q.clone(), &img, &[], false, PIXELS_PER_SHARE), q, "settled_wide, {w} x {h}");
         }
     }
 

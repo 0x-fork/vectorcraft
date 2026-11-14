@@ -374,9 +374,9 @@ mod tests {
             [c[0], c[1], c[2], if y + 2 >= h { 160 } else { 255 }]
         });
         let all = w as usize * h as usize;
-        // One row per share, a few rows per share, and the whole picture as one.
         let opaque: Vec<bool> = img.rgba.as_chunks::<4>().0.iter().map(|p| p[3] >= 128).collect();
-        let own: Vec<Vec<bool>> = [1, 3 * 173 + 5, all].iter().map(|&s| own_colours_among_by(&img, &opaque, s)).collect();
+        // One row per share, a few rows per share, and the whole picture as one.
+        let own: Vec<Vec<bool>> = [1, 3 * w as usize + 5, all].iter().map(|&s| own_colours_among_by(&img, &opaque, s)).collect();
         assert_eq!(own[0].len(), all);
         assert!(own[0].iter().any(|&o| !o), "the edges have blend pixels");
         assert!(own.iter().all(|o| *o == own[0]));
