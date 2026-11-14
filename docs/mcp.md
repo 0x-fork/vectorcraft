@@ -2925,9 +2925,10 @@ zero-based indexes of its steps marked done (every step of a finished tutorial).
 skills, with no skill and no tutorial open, as the Quick skill guide card and Back to skills do, and answers what
 `learn.list` answers. `learn.show {tutorial}` shows the panel on its Skills tab with that
 tutorial's steps → `{skill, tutorial, title, steps: [text]}`; choosing a tutorial's row runs it. A missing, non-string
-or unknown `tutorial` is an error and changes nothing. The For you and Skills tab buttons run `learn.tab {tab}`, with
-`tab` set to `forYou` or `skills`, which shows the panel on that tab → `{tab, skill, tutorial}`, with null for no
-skill or no tutorial open; the Skills tab keeps the skill and tutorial it had open. Choosing a skill's row runs
+or unknown `tutorial` is an error and changes nothing. A click on the For you or Skills tab button runs
+`learn.tab {tab}` when the panel shows the other tab, and runs no command when the panel already shows that tab.
+`learn.tab {tab}`, with `tab` set to `forYou` or `skills`, shows the panel on that tab → `{tab, skill, tutorial}`,
+with null for no skill or no tutorial open; the Skills tab keeps the skill and tutorial it had open. Choosing a skill's row runs
 `learn.skill {skill}`, which shows the panel on the Skills tab with that skill's tutorials → the skill as `learn.list`
 lists it. A missing, non-string or unknown `tab` or `skill` is an error and changes nothing. Back runs `learn.back {}`,
 which shows the panel and goes up one level on the Skills tab, from a tutorial's steps to its skill's tutorials and
