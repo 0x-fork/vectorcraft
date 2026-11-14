@@ -36,7 +36,10 @@ pub(crate) fn with_clip_effects_applied(n: &Node) -> Option<Node> {
 
 /// [`with_clip_effects_applied`] that calls `take` before it visits each member of a group, layer
 /// or compound path in `n`, at every depth: once `take` returns `false`, that member and the
-/// members after it stay as they are, with their effects.
+/// members after it are not visited. The members of a group or layer that are not visited stay as
+/// they are, with their effects. A compound path with geometry effects of its own, or of its fills
+/// and strokes, still becomes a path of its reshaped geometry: the paths in it that are not visited
+/// go into that geometry as they are, and their own effects are not applied.
 pub(crate) fn with_clip_effects_applied_while(n: &Node, take: fn() -> bool) -> Option<Node> {
     let paint = n.clip_paint();
     clip_effects_applied(n, paint.fill.is_none() && paint.stroke.is_none(), take)
