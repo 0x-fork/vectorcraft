@@ -902,6 +902,9 @@ font-technology	Variable	Вариативные
 	The selected character's font is not available.	Шрифт выделенного символа недоступен.
 	No alternates for the selected character.	У выделенного символа нет альтернатив.
 	Double-click to replace	Дважды щёлкните для замены
+	Click to replace	Щёлкните для замены
+	Show all alternates in the Glyphs panel	Показать все альтернативы в панели «Глифы»
+	Show Character Alternates	Показывать альтернативы символа
 	Select one character with the Type tool first.	Сначала выделите один символ инструментом «Текст».
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} — глиф шрифта {font}, а не шрифта выделенного текста ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} относится к символу {base} (U+{base_code}) {place}; выделен символ {sel} (U+{code}).

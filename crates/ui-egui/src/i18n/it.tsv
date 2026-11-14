@@ -912,6 +912,9 @@ font-technology	Variable	Variabili
 	The selected character's font is not available.	Il font del carattere selezionato non è disponibile.
 	No alternates for the selected character.	Nessuna alternativa per il carattere selezionato.
 	Double-click to replace	Fai doppio clic per sostituire
+	Click to replace	Fai clic per sostituire
+	Show all alternates in the Glyphs panel	Mostra tutte le alternative nel pannello Glifi
+	Show Character Alternates	Mostra alternative carattere
 	Select one character with the Type tool first.	Seleziona prima un carattere con lo strumento Testo.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} è un glifo di {font}, non del font del testo selezionato ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} appartiene a {base} (U+{base_code}) {place}; la tua selezione è {sel} (U+{code}).

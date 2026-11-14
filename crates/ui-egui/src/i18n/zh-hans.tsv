@@ -846,6 +846,9 @@ antiAlias	Sharp	锐利
 	The selected character's font is not available.	所选字符的字体不可用。
 	No alternates for the selected character.	所选字符没有替代字。
 	Double-click to replace	双击以替换
+	Click to replace	单击以替换
+	Show all alternates in the Glyphs panel	在“字形”面板中显示所有替代字
+	Show Character Alternates	显示字符的替代字
 	Select one character with the Type tool first.	请先用文字工具选择一个字符。
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} 是 {font} 的字形，不是所选文本所用字体（{text_font}）的字形。
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} 属于 {base}（U+{base_code}）{place}；您选择的是 {sel}（U+{code}）。

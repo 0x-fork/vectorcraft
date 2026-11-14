@@ -1642,6 +1642,9 @@ digits	Malayalam	Malajalam
 	The selected character's font is not available.	Czcionka zaznaczonego znaku jest niedostępna.
 	No alternates for the selected character.	Brak alternatyw dla zaznaczonego znaku.
 	Double-click to replace	Kliknij dwukrotnie, aby zastąpić
+	Click to replace	Kliknij, aby zastąpić
+	Show all alternates in the Glyphs panel	Pokaż wszystkie alternatywy w panelu Glify
+	Show Character Alternates	Pokaż alternatywy znaku
 	Select one character with the Type tool first.	Najpierw zaznacz jeden znak narzędziem Tekst.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} to glif czcionki {font}, a nie czcionki zaznaczonego tekstu ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} należy do znaku {base} (U+{base_code}) {place}; Twoje zaznaczenie to {sel} (U+{code}).

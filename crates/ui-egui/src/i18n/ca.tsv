@@ -1307,6 +1307,9 @@ antiAlias	Sharp	Nítid
 	The selected character's font is not available.	El tipus de lletra del caràcter seleccionat no està disponible.
 	No alternates for the selected character.	No hi ha alternatives per al caràcter seleccionat.
 	Double-click to replace	Feu doble clic per substituir
+	Click to replace	Feu clic per substituir
+	Show all alternates in the Glyphs panel	Mostra totes les alternatives al tauler Glifs
+	Show Character Alternates	Mostra les alternatives del caràcter
 	Select one character with the Type tool first.	Selecciona primer un caràcter amb l’eina de text.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} és un glif de {font}, no del tipus de lletra amb què està escrit el text seleccionat ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} pertany a {base} (U+{base_code}) {place}; la teva selecció és {sel} (U+{code}).

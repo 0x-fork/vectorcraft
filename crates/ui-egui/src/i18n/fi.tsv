@@ -1703,6 +1703,9 @@ digits	Malayalam	Malajalam
 	The selected character's font is not available.	Valitun merkin fontti ei ole saatavilla.
 	No alternates for the selected character.	Valitulla merkillä ei ole vaihtoehtoja.
 	Double-click to replace	Korvaa kaksoisnapsauttamalla
+	Click to replace	Korvaa napsauttamalla
+	Show all alternates in the Glyphs panel	Näytä kaikki vaihtoehdot Merkit-paneelissa
+	Show Character Alternates	Näytä merkin vaihtoehdot
 	Select one character with the Type tool first.	Valitse ensin yksi merkki tekstityökalulla.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} on fontin {font} glyfi, ei valitun tekstin fontin ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} kuuluu merkille {base} (U+{base_code}) {place}; valintasi on {sel} (U+{code}).

@@ -1730,6 +1730,9 @@ digits	Malayalam	Malajálamské
 	The selected character's font is not available.	Písmo vybraného znaku není k dispozici.
 	No alternates for the selected character.	Vybraný znak nemá žádné alternativy.
 	Double-click to replace	Dvojklikem nahradíte
+	Click to replace	Kliknutím nahradíte
+	Show all alternates in the Glyphs panel	Zobrazit všechny alternativy v panelu Glyfy
+	Show Character Alternates	Zobrazovat alternativy znaku
 	Select one character with the Type tool first.	Nejprve nástrojem Text vyberte jeden znak.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} je glyf písma {font}, ne písma, kterým je vybraný text nastaven ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} patří znaku {base} (U+{base_code}) {place}; váš výběr je {sel} (U+{code}).

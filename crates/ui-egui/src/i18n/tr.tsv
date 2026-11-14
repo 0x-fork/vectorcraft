@@ -883,6 +883,9 @@ font-technology	Variable	Değişken
 	The selected character's font is not available.	Seçili karakterin yazı tipi kullanılamıyor.
 	No alternates for the selected character.	Seçili karakter için alternatif yok.
 	Double-click to replace	Değiştirmek için çift tıklayın
+	Click to replace	Değiştirmek için tıklayın
+	Show all alternates in the Glyphs panel	Tüm alternatifleri Glifler panelinde göster
+	Show Character Alternates	Karakter Alternatiflerini Göster
 	Select one character with the Type tool first.	Önce Yazım aracıyla bir karakter seçin.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph}, seçili metnin yazı tipine ({text_font}) değil, {font} yazı tipine ait bir glif.
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph}, {base} (U+{base_code}) karakterine aittir ({place}); seçiminiz {sel} (U+{code}).

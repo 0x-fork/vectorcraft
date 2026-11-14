@@ -907,6 +907,9 @@ font-technology	Variable	Variables
 	The selected character's font is not available.	La police du caractère sélectionné n’est pas disponible.
 	No alternates for the selected character.	Aucune variante pour le caractère sélectionné.
 	Double-click to replace	Double-cliquez pour remplacer
+	Click to replace	Cliquez pour remplacer
+	Show all alternates in the Glyphs panel	Afficher toutes les variantes dans le panneau Glyphes
+	Show Character Alternates	Afficher les variantes de caractère
 	Select one character with the Type tool first.	Sélectionnez d’abord un caractère avec l’outil Texte.
 	{glyph} is a glyph of {font}, not of the font the selected text is set in ({text_font}).	{glyph} est un glyphe de {font}, et non de la police du texte sélectionné ({text_font}).
 	{glyph} belongs to {base} (U+{base_code}) {place}; your selection is {sel} (U+{code}).	{glyph} appartient à {base} (U+{base_code}) {place} ; votre sélection est {sel} (U+{code}).
