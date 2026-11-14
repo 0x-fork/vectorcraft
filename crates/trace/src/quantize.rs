@@ -10,6 +10,8 @@ mod rare;
 
 use cut_edge::{choosing_pixels, compact, settled, settled_wide, settles_wide};
 pub(crate) use cut_edge::{continuous_tone, settle_cut_edges};
+#[cfg(test)]
+use cut_edge::{settled_by, settled_wide_by};
 pub use denoise::denoise;
 pub(crate) use denoise::denoise_keeping;
 pub use palette::FULL_TONE_MAX;
@@ -191,6 +193,11 @@ fn own_colours(img: &Raster) -> Vec<bool> {
 /// [`own_colours`] among the pixels that `among` marks: the others are neither own colours nor
 /// the neighbours a pixel is a blend of.
 fn own_colours_among(img: &Raster, among: &[bool]) -> Vec<bool> {
+    own_colours_among_by(img, among, PIXELS_PER_SHARE)
+}
+
+/// [`own_colours_among`], with the rows worked on in bands of about `per_share` pixels (see [`over_rows`]).
+fn own_colours_among_by(img: &Raster, among: &[bool], per_share: usize) -> Vec<bool> {
     let (w, h) = (img.width as isize, img.height as isize);
     let px = img.rgba.as_chunks::<4>().0;
     let at = |x: isize, y: isize| {
@@ -198,28 +205,52 @@ fn own_colours_among(img: &Raster, among: &[bool]) -> Vec<bool> {
         let p = px.get(i).filter(|_| among.get(i).copied().unwrap_or(false))?;
         Some([f64::from(p[0]), f64::from(p[1]), f64::from(p[2])])
     };
-    let mut out = Vec::with_capacity(px.len());
-    for y in 0..h {
-        for x in 0..w {
-            let Some(p) = at(x, y) else {
-                out.push(false);
-                continue;
-            };
-            let blend = [(1, 0), (0, 1), (1, 1), (1, -1)].into_iter().any(|(dx, dy)| {
-                let (Some(a), Some(b)) = (at(x - dx, y - dy), at(x + dx, y + dy)) else { return false };
-                let d = [0, 1, 2].map(|k| b[k] - a[k]);
-                let len2: f64 = d.iter().map(|v| v * v).sum();
-                if len2 <= 400.0 {
-                    return false;
-                }
-                let t = (0..3).map(|k| (p[k] - a[k]) * d[k]).sum::<f64>() / len2;
-                let off2: f64 = (0..3).map(|k| (p[k] - a[k] - t * d[k]).powi(2)).sum();
-                t > 0.06 && t < 0.94 && off2 < len2 / 16.0
-            });
-            out.push(!blend);
+    over_rows(img.width as usize, img.height as usize, per_share, |rows| {
+        let mut out = Vec::with_capacity(rows.len() * img.width as usize);
+        for y in rows.start as isize..rows.end as isize {
+            for x in 0..w {
+                let Some(p) = at(x, y) else {
+                    out.push(false);
+                    continue;
+                };
+                let blend = [(1, 0), (0, 1), (1, 1), (1, -1)].into_iter().any(|(dx, dy)| {
+                    let (Some(a), Some(b)) = (at(x - dx, y - dy), at(x + dx, y + dy)) else { return false };
+                    let d = [0, 1, 2].map(|k| b[k] - a[k]);
+                    let len2: f64 = d.iter().map(|v| v * v).sum();
+                    if len2 <= 400.0 {
+                        return false;
+                    }
+                    let t = (0..3).map(|k| (p[k] - a[k]) * d[k]).sum::<f64>() / len2;
+                    let off2: f64 = (0..3).map(|k| (p[k] - a[k] - t * d[k]).powi(2)).sum();
+                    t > 0.06 && t < 0.94 && off2 < len2 / 16.0
+                });
+                out.push(!blend);
+            }
         }
+        out
+    })
+}
+
+/// About how many pixels one thread works through at a time in the passes over every pixel that
+/// [`over_rows`] spreads over the available cores. A picture of fewer pixels is worked through on
+/// one thread.
+const PIXELS_PER_SHARE: usize = 1 << 16;
+
+/// `f` of each band of rows of a picture `w` pixels wide and `h` rows high, each band about
+/// `per_share` pixels (at least one row), spread over the available cores (one thread on the web),
+/// and the results joined in row order. Each band's result depends only on its rows, so the
+/// joined result is the same however many threads there are. A picture with no pixels gives no
+/// result.
+fn over_rows<R: Send>(w: usize, h: usize, per_share: usize, f: impl Fn(std::ops::Range<usize>) -> Vec<R> + Sync) -> Vec<R> {
+    if w == 0 || h == 0 {
+        return Vec::new();
     }
-    out
+    let rows = (per_share / w.max(1)).max(1);
+    let bands: Vec<std::ops::Range<usize>> = (0..h).step_by(rows).map(|y| y..(y + rows).min(h)).collect();
+    if bands.len() <= 1 {
+        return bands.into_iter().flat_map(&f).collect();
+    }
+    crate::layers::parallel_map(&bands, |rows| f(rows.clone())).into_iter().flatten().collect()
 }
 
 /// Whether the palette is made from the picture's own colours alone (`own` of `all` opaque
@@ -324,4 +355,79 @@ fn merge_mixed(q: Quantized, w: usize, h: usize, keep: &[[u8; 3]]) -> Quantized 
     }
     let labels = q.labels.iter().map(|&l| into.get(l as usize).map_or(l, |&t| t as u16)).collect();
     compact(labels, color.iter().map(|c| [c[0].round() as u8, c[1].round() as u8, c[2].round() as u8]).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Rings of four colors around a point off the center, blended over three pixels at each edge,
+    /// with a little noise, and a band of half-transparent pixels along the bottom.
+    fn rings(w: u32, h: u32) -> Raster {
+        let colors = [[200.0, 30.0, 40.0], [20.0, 60.0, 180.0], [240.0, 210.0, 50.0], [25.0, 25.0, 25.0]];
+        Raster::from_fn(w, h, |x, y| {
+            let r = (f64::from(x) - 0.4 * f64::from(w)).hypot(f64::from(y) - 0.55 * f64::from(h)) / 9.0;
+            let (ring, t) = (r.floor() as usize, ((r.fract() - 0.8) / 0.2).clamp(0.0, 1.0));
+            let (a, b) = (colors[ring % 4], colors[(ring + 1) % 4]);
+            let noise = f64::from((x * 7 + y * 13) % 5) - 2.0;
+            let c = [0, 1, 2].map(|k| (a[k] + t * (b[k] - a[k]) + noise).clamp(0.0, 255.0) as u8);
+            [c[0], c[1], c[2], if y + 2 >= h { 160 } else { 255 }]
+        })
+    }
+
+    /// `img` labeled with the palette color nearest to each pixel (none for a transparent one).
+    fn nearest_labels(img: &Raster, palette: &[[u8; 3]]) -> Quantized {
+        let labels = img
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|p| {
+                let d = |c: &[u8; 3]| (0..3).map(|k| (i32::from(p[k]) - i32::from(c[k])).pow(2)).sum::<i32>();
+                (0..palette.len()).min_by_key(|&i| d(&palette[i])).map_or(TRANSPARENT, |i| i as u16)
+            })
+            .collect();
+        Quantized { labels, palette: palette.to_vec() }
+    }
+
+    #[test]
+    fn passes_over_every_pixel_give_the_same_result_however_the_picture_is_shared_out() {
+        // Odd sizes, so that the last band of rows and the last strip of columns are short.
+        let img = rings(173, 97);
+        let all = img.width as usize * img.height as usize;
+        // One row (or one strip) per share, a few rows per share, and the whole picture as one.
+        let shares = [1, 3 * 173 + 5, all];
+        let opaque: Vec<bool> = img.rgba.as_chunks::<4>().0.iter().map(|p| p[3] >= 128).collect();
+        let own: Vec<Vec<bool>> = shares.iter().map(|&s| own_colours_among_by(&img, &opaque, s)).collect();
+        assert_eq!(own[0].len(), all);
+        assert!(own[0].iter().any(|&o| !o), "the edges have blend pixels");
+        assert!(own.iter().all(|o| *o == own[0]));
+        // Two colors for each blend, and an olive that the blends lie nearer to than to their sides.
+        let palette = [[200, 30, 40], [20, 60, 180], [240, 210, 50], [25, 25, 25], [120, 120, 60]];
+        let q = nearest_labels(&img, &palette);
+        let own = &own[0];
+        for (name, settle) in [
+            ("settled", &(|s| settled_by(q.clone(), &img, own, s)) as &dyn Fn(usize) -> Quantized),
+            ("settled_wide", &|s| settled_wide_by(q.clone(), &img, own, false, s)),
+            ("settled_wide gray", &|s| settled_wide_by(q.clone(), &img, own, true, s)),
+        ] {
+            let out: Vec<Quantized> = shares.iter().map(|&s| settle(s)).collect();
+            assert_ne!(out[0], q, "{name} settles some blend pixels");
+            assert!(out.iter().all(|o| *o == out[0]), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_picture_with_no_pixels_is_not_shared_out() {
+        // No band for each of the rows of a picture with no columns, however many rows it has.
+        assert!(over_rows(0, usize::MAX, PIXELS_PER_SHARE, |_| vec![0u8]).is_empty());
+        assert!(over_rows(5, 0, PIXELS_PER_SHARE, |_| vec![0u8]).is_empty());
+        let img = Raster::new(0, u32::MAX, vec![]).unwrap();
+        assert!(own_colours_among(&img, &[]).is_empty());
+        // No strip for each of the columns of a picture with no rows.
+        let img = Raster::new(u32::MAX, 0, vec![]).unwrap();
+        let q = Quantized { labels: vec![], palette: vec![[0, 0, 0], [255, 255, 255]] };
+        assert_eq!(settled_wide_by(q.clone(), &img, &[], false, PIXELS_PER_SHARE), q);
+        assert_eq!(settled_by(q.clone(), &img, &[], PIXELS_PER_SHARE), q);
+    }
 }

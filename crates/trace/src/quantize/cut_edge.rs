@@ -1,5 +1,6 @@
 use super::palette::{Bin, HistKey, Used, centers, median_cut, nearest_lab};
-use super::{Mode, Palette, Quantized, Raster, TRANSPARENT, TraceParams, luma, oklab};
+use super::{Mode, PIXELS_PER_SHARE, Palette, Quantized, Raster, TRANSPARENT, TraceParams, luma, oklab, over_rows};
+use crate::layers::parallel_map;
 
 /// `q` with its blend pixels settled, and the colours that leaves unused dropped.
 ///
@@ -10,59 +11,76 @@ use super::{Mode, Palette, Quantized, Raster, TRANSPARENT, TraceParams, luma, ok
 /// own pixels within two pixels of it takes the side it is nearer to of the pair of those colours
 /// it is best a blend of, when that explains it twice as well as its own colour does. With one
 /// colour around it, it keeps its own.
-pub(super) fn settled(mut q: Quantized, img: &Raster, own: &[bool]) -> Quantized {
+pub(super) fn settled(q: Quantized, img: &Raster, own: &[bool]) -> Quantized {
+    settled_by(q, img, own, PIXELS_PER_SHARE)
+}
+
+/// [`settled`], with the rows worked on in bands of about `per_share` pixels (see [`over_rows`]).
+pub(super) fn settled_by(mut q: Quantized, img: &Raster, own: &[bool], per_share: usize) -> Quantized {
     let (w, h) = (img.width as usize, img.height as usize);
     if q.labels.len() != w * h || own.len() != w * h {
         return q;
     }
-    let before = q.labels.clone();
+    // Each pixel is settled by the labels as they were before any changed, so the bands of rows
+    // are settled apart and the changes made afterwards.
+    let before = &q.labels;
     let color = |l: u16| q.palette.get(l as usize).map(|c| c.map(f64::from));
     let dist = |a: [f64; 3], b: [f64; 3]| (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f64>().sqrt();
-    let mut changed = false;
-    for i in 0..w * h {
-        let mine_l = before[i];
-        if own[i] || mine_l == TRANSPARENT {
-            continue;
-        }
-        let (x, y) = (i % w, i / w);
-        // The colours of the picture's own pixels within two pixels (seldom more than three).
-        let mut near: Vec<u16> = Vec::new();
-        for yy in y.saturating_sub(2)..=(y + 2).min(h - 1) {
-            for xx in x.saturating_sub(2)..=(x + 2).min(w - 1) {
-                let j = yy * w + xx;
-                if own[j] && before[j] != TRANSPARENT && !near.contains(&before[j]) {
-                    near.push(before[j]);
+    let changes: Vec<(usize, u16)> = over_rows(w, h, per_share, |rows| {
+        let mut changes = vec![];
+        for i in rows.start * w..rows.end * w {
+            let mine_l = before[i];
+            if own[i] || mine_l == TRANSPARENT {
+                continue;
+            }
+            let (x, y) = (i % w, i / w);
+            // The colours of the picture's own pixels within two pixels (seldom more than three).
+            let mut near: Vec<u16> = Vec::new();
+            for yy in y.saturating_sub(2)..=(y + 2).min(h - 1) {
+                for xx in x.saturating_sub(2)..=(x + 2).min(w - 1) {
+                    let j = yy * w + xx;
+                    if own[j] && before[j] != TRANSPARENT && !near.contains(&before[j]) {
+                        near.push(before[j]);
+                    }
                 }
             }
-        }
-        let (Some(p), Some(mine)) = (img.rgba.get(i * 4..i * 4 + 3).map(|p| [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])]), color(mine_l))
-        else {
-            continue;
-        };
-        if near.len() < 2 || near.contains(&mine_l) {
-            continue;
-        }
-        let mut best: Option<(f64, u16)> = None;
-        for (n, &a) in near.iter().enumerate() {
-            for &b in &near[n + 1..] {
-                let (Some(ca), Some(cb)) = (color(a), color(b)) else { continue };
-                let d = [0, 1, 2].map(|k| cb[k] - ca[k]);
-                let len2: f64 = d.iter().map(|v| v * v).sum();
-                let t = if len2 > 0.0 { ((0..3).map(|k| (p[k] - ca[k]) * d[k]).sum::<f64>() / len2).clamp(0.0, 1.0) } else { 0.0 };
-                let off = dist(p, [0, 1, 2].map(|k| ca[k] + t * d[k]));
-                if best.is_none_or(|x| off < x.0) {
-                    best = Some((off, if t < 0.5 { a } else { b }));
+            let (Some(p), Some(mine)) = (img.rgba.get(i * 4..i * 4 + 3).map(|p| [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])]), color(mine_l))
+            else {
+                continue;
+            };
+            if near.len() < 2 || near.contains(&mine_l) {
+                continue;
+            }
+            let mut best: Option<(f64, u16)> = None;
+            for (n, &a) in near.iter().enumerate() {
+                for &b in &near[n + 1..] {
+                    let (Some(ca), Some(cb)) = (color(a), color(b)) else { continue };
+                    let d = [0, 1, 2].map(|k| cb[k] - ca[k]);
+                    let len2: f64 = d.iter().map(|v| v * v).sum();
+                    let t = if len2 > 0.0 { ((0..3).map(|k| (p[k] - ca[k]) * d[k]).sum::<f64>() / len2).clamp(0.0, 1.0) } else { 0.0 };
+                    let off = dist(p, [0, 1, 2].map(|k| ca[k] + t * d[k]));
+                    if best.is_none_or(|x| off < x.0) {
+                        best = Some((off, if t < 0.5 { a } else { b }));
+                    }
                 }
             }
+            if let Some((off, to)) = best
+                && off < 0.5 * dist(p, mine)
+            {
+                changes.push((i, to));
+            }
         }
-        if let Some((off, to)) = best
-            && off < 0.5 * dist(p, mine)
-        {
-            q.labels[i] = to;
-            changed = true;
+        changes
+    });
+    if changes.is_empty() {
+        return q;
+    }
+    for (i, to) in changes {
+        if let Some(l) = q.labels.get_mut(i) {
+            *l = to;
         }
     }
-    if changed { compact(q.labels, q.palette) } else { q }
+    compact(q.labels, q.palette)
 }
 
 /// The most colors (Color) or grays (Grayscale) a palette may ask for to have its blend pixels
@@ -122,12 +140,43 @@ const ON_THE_LINE: f64 = 0.15;
 /// their distance apart. Only the [`NEAR_COLORS`] colors nearest to its color are paired. It keeps
 /// its own color when that color is one of the pair, or when one color is all there is around it.
 /// With `gray` (Grayscale), a pixel's color is its gray (see [`luma`]).
-pub(super) fn settled_wide(mut q: Quantized, img: &Raster, own: &[bool], gray: bool) -> Quantized {
+pub(super) fn settled_wide(q: Quantized, img: &Raster, own: &[bool], gray: bool) -> Quantized {
+    settled_wide_by(q, img, own, gray, PIXELS_PER_SHARE)
+}
+
+/// [`settled_wide`], with its strips of columns worked on in groups of about `per_share` pixels
+/// (at least one strip), spread over the available cores (one thread on the web).
+pub(super) fn settled_wide_by(mut q: Quantized, img: &Raster, own: &[bool], gray: bool, per_share: usize) -> Quantized {
     let (w, h) = (img.width as usize, img.height as usize);
-    if q.labels.len() != w * h || own.len() != w * h {
+    if q.labels.len() != w * h || own.len() != w * h || w == 0 || h == 0 {
         return q;
     }
-    let before = q.labels.clone();
+    // Each pixel is settled by the labels as they were before any changed, so the strips are
+    // settled apart and the changes made afterwards. Strips are grouped so that each group holds
+    // about `per_share` pixels.
+    let strip = BLEND_STRIP.min(w).max(1);
+    let per_group = (per_share / (strip * h).max(1)).max(1);
+    let starts: Vec<usize> = (0..w).step_by(strip).collect();
+    let groups: Vec<&[usize]> = starts.chunks(per_group).collect();
+    let settle = |starts: &&[usize]| settled_wide_strips(&q, img, own, gray, starts);
+    let changes: Vec<(usize, u16)> =
+        if groups.len() <= 1 { groups.iter().flat_map(settle).collect() } else { parallel_map(&groups, settle).into_iter().flatten().collect() };
+    if changes.is_empty() {
+        return q;
+    }
+    for (i, to) in changes {
+        if let Some(l) = q.labels.get_mut(i) {
+            *l = to;
+        }
+    }
+    compact(q.labels, q.palette)
+}
+
+/// The labels that [`settled_wide`] changes in the strips of [`BLEND_STRIP`] columns that start at
+/// the columns `starts`, with the pixel each one is at.
+fn settled_wide_strips(q: &Quantized, img: &Raster, own: &[bool], gray: bool, starts: &[usize]) -> Vec<(usize, u16)> {
+    let (w, h) = (img.width as usize, img.height as usize);
+    let before = &q.labels;
     let colors: Vec<[f64; 3]> = q.palette.iter().map(|c| c.map(f64::from)).collect();
     let dist2 = |a: [f64; 3], b: [f64; 3]| (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f64>();
     // The colors of the own pixels within reach of each pixel, as bits (one word per 64 palette
@@ -135,7 +184,9 @@ pub(super) fn settled_wide(mut q: Quantized, img: &Raster, own: &[bool], gray: b
     // sliding along each row, kept for the last 2 × reach + 1 rows), then across those rows.
     let words = q.palette.len().div_ceil(64).max(1);
     let span = 2 * BLEND_REACH + 1;
-    let strip = BLEND_STRIP.min(w);
+    let strip = BLEND_STRIP.min(w).max(1);
+    let pixel = |p: &[u8]| if gray { [f64::from(luma([p[0], p[1], p[2], p[3]])); 3] } else { [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])] };
+    let mut changes = vec![];
     let mut rows = vec![0u64; span * strip * words];
     let mut counts = vec![0u32; q.palette.len()];
     let mut window = vec![0u64; words];
@@ -178,11 +229,9 @@ pub(super) fn settled_wide(mut q: Quantized, img: &Raster, own: &[bool], gray: b
             }
         }
     };
-    let mut changed = false;
     let mut near: Vec<u16> = Vec::new();
     let mut by_distance: Vec<(f64, u16)> = Vec::new();
-    let pixel = |p: &[u8]| if gray { [f64::from(luma([p[0], p[1], p[2], p[3]])); 3] } else { [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])] };
-    for (x0, y) in (0..w).step_by(strip.max(1)).flat_map(|x0| (0..h).map(move |y| (x0, y))) {
+    for (x0, y) in starts.iter().flat_map(|&x0| (0..h).map(move |y| (x0, y))) {
         let x1 = (x0 + strip).min(w);
         if y == 0 {
             for yy in 0..BLEND_REACH.min(h) {
@@ -265,12 +314,11 @@ pub(super) fn settled_wide(mut q: Quantized, img: &Raster, own: &[bool], gray: b
                 && !pair.contains(&mine_l)
                 && (off2 < BETTER_FIT * dist2(p, mine) || (between && off2 < ON_THE_LINE * ON_THE_LINE * apart2))
             {
-                q.labels[i] = to;
-                changed = true;
+                changes.push((i, to));
             }
         }
     }
-    if changed { compact(q.labels, q.palette) } else { q }
+    changes
 }
 
 /// Whether `img` is continuous tone (a photo, a gradient) rather than flat art, however noisy
