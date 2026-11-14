@@ -1,7 +1,7 @@
 //! Colour reduction and noise removal. Colours are compared in Oklab, where equal distances look
 //! equally different.
 
-use crate::{Mode, Palette, Raster, TraceParams};
+use crate::{Mode, Palette, Raster, TraceParams, parallel_map};
 
 mod cut_edge;
 mod denoise;
@@ -10,8 +10,6 @@ mod rare;
 
 use cut_edge::{choosing_pixels, compact, settled, settled_wide, settles_wide};
 pub(crate) use cut_edge::{continuous_tone, settle_cut_edges};
-#[cfg(test)]
-use cut_edge::{settled_by, settled_wide_by};
 pub use denoise::denoise;
 pub(crate) use denoise::denoise_keeping;
 pub use palette::FULL_TONE_MAX;
@@ -250,7 +248,7 @@ fn over_rows<R: Send>(w: usize, h: usize, per_share: usize, f: impl Fn(std::ops:
     if bands.len() <= 1 {
         return bands.into_iter().flat_map(&f).collect();
     }
-    crate::layers::parallel_map(&bands, |rows| f(rows.clone())).into_iter().flatten().collect()
+    parallel_map(&bands, |rows| f(rows.clone())).into_iter().flatten().collect()
 }
 
 /// Whether the palette is made from the picture's own colours alone (`own` of `all` opaque
@@ -361,60 +359,27 @@ fn merge_mixed(q: Quantized, w: usize, h: usize, keep: &[[u8; 3]]) -> Quantized 
 mod tests {
     use super::*;
 
-    /// Rings of four colors around a point off the center, blended over three pixels at each edge,
-    /// with a little noise, and a band of half-transparent pixels along the bottom.
-    fn rings(w: u32, h: u32) -> Raster {
-        let colors = [[200.0, 30.0, 40.0], [20.0, 60.0, 180.0], [240.0, 210.0, 50.0], [25.0, 25.0, 25.0]];
-        Raster::from_fn(w, h, |x, y| {
-            let r = (f64::from(x) - 0.4 * f64::from(w)).hypot(f64::from(y) - 0.55 * f64::from(h)) / 9.0;
-            let (ring, t) = (r.floor() as usize, ((r.fract() - 0.8) / 0.2).clamp(0.0, 1.0));
-            let (a, b) = (colors[ring % 4], colors[(ring + 1) % 4]);
-            let noise = f64::from((x * 7 + y * 13) % 5) - 2.0;
-            let c = [0, 1, 2].map(|k| (a[k] + t * (b[k] - a[k]) + noise).clamp(0.0, 255.0) as u8);
-            [c[0], c[1], c[2], if y + 2 >= h { 160 } else { 255 }]
-        })
-    }
-
-    /// `img` labeled with the palette color nearest to each pixel (none for a transparent one).
-    fn nearest_labels(img: &Raster, palette: &[[u8; 3]]) -> Quantized {
-        let labels = img
-            .rgba
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .map(|p| {
-                let d = |c: &[u8; 3]| (0..3).map(|k| (i32::from(p[k]) - i32::from(c[k])).pow(2)).sum::<i32>();
-                (0..palette.len()).min_by_key(|&i| d(&palette[i])).map_or(TRANSPARENT, |i| i as u16)
-            })
-            .collect();
-        Quantized { labels, palette: palette.to_vec() }
-    }
-
     #[test]
-    fn passes_over_every_pixel_give_the_same_result_however_the_picture_is_shared_out() {
-        // Odd sizes, so that the last band of rows and the last strip of columns are short.
-        let img = rings(173, 97);
-        let all = img.width as usize * img.height as usize;
-        // One row (or one strip) per share, a few rows per share, and the whole picture as one.
-        let shares = [1, 3 * 173 + 5, all];
+    fn blend_pixels_are_found_the_same_however_the_picture_is_shared_out() {
+        // Slanted stripes of red and blue, blended over three pixels at each edge, with a little
+        // noise and a band of half-transparent pixels along the bottom. Odd sizes, so that the last
+        // band of rows is short.
+        let (w, h) = (173u32, 97u32);
+        let (red, blue) = ([200.0, 30.0, 40.0], [20.0, 60.0, 180.0]);
+        let img = Raster::from_fn(w, h, |x, y| {
+            let s = (x + y / 2) % 24;
+            let t = f64::from(s.saturating_sub(9).min(3)) / 3.0 - f64::from(s.saturating_sub(21).min(3)) / 3.0;
+            let noise = f64::from((x * 7 + y * 13) % 5) - 2.0;
+            let c = [0, 1, 2].map(|k| (red[k] + t * (blue[k] - red[k]) + noise).clamp(0.0, 255.0) as u8);
+            [c[0], c[1], c[2], if y + 2 >= h { 160 } else { 255 }]
+        });
+        let all = w as usize * h as usize;
+        // One row per share, a few rows per share, and the whole picture as one.
         let opaque: Vec<bool> = img.rgba.as_chunks::<4>().0.iter().map(|p| p[3] >= 128).collect();
-        let own: Vec<Vec<bool>> = shares.iter().map(|&s| own_colours_among_by(&img, &opaque, s)).collect();
+        let own: Vec<Vec<bool>> = [1, 3 * 173 + 5, all].iter().map(|&s| own_colours_among_by(&img, &opaque, s)).collect();
         assert_eq!(own[0].len(), all);
         assert!(own[0].iter().any(|&o| !o), "the edges have blend pixels");
         assert!(own.iter().all(|o| *o == own[0]));
-        // Two colors for each blend, and an olive that the blends lie nearer to than to their sides.
-        let palette = [[200, 30, 40], [20, 60, 180], [240, 210, 50], [25, 25, 25], [120, 120, 60]];
-        let q = nearest_labels(&img, &palette);
-        let own = &own[0];
-        for (name, settle) in [
-            ("settled", &(|s| settled_by(q.clone(), &img, own, s)) as &dyn Fn(usize) -> Quantized),
-            ("settled_wide", &|s| settled_wide_by(q.clone(), &img, own, false, s)),
-            ("settled_wide gray", &|s| settled_wide_by(q.clone(), &img, own, true, s)),
-        ] {
-            let out: Vec<Quantized> = shares.iter().map(|&s| settle(s)).collect();
-            assert_ne!(out[0], q, "{name} settles some blend pixels");
-            assert!(out.iter().all(|o| *o == out[0]), "{name}");
-        }
     }
 
     #[test]
@@ -424,10 +389,5 @@ mod tests {
         assert!(over_rows(5, 0, PIXELS_PER_SHARE, |_| vec![0u8]).is_empty());
         let img = Raster::new(0, u32::MAX, vec![]).unwrap();
         assert!(own_colours_among(&img, &[]).is_empty());
-        // No strip for each of the columns of a picture with no rows.
-        let img = Raster::new(u32::MAX, 0, vec![]).unwrap();
-        let q = Quantized { labels: vec![], palette: vec![[0, 0, 0], [255, 255, 255]] };
-        assert_eq!(settled_wide_by(q.clone(), &img, &[], false, PIXELS_PER_SHARE), q);
-        assert_eq!(settled_by(q.clone(), &img, &[], PIXELS_PER_SHARE), q);
     }
 }

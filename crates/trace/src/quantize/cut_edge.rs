@@ -1,6 +1,6 @@
 use super::palette::{Bin, HistKey, Used, centers, median_cut, nearest_lab};
 use super::{Mode, PIXELS_PER_SHARE, Palette, Quantized, Raster, TRANSPARENT, TraceParams, luma, oklab, over_rows};
-use crate::layers::parallel_map;
+use crate::parallel_map;
 
 /// `q` with its blend pixels settled, and the colours that leaves unused dropped.
 ///
@@ -16,19 +16,20 @@ pub(super) fn settled(q: Quantized, img: &Raster, own: &[bool]) -> Quantized {
 }
 
 /// [`settled`], with the rows worked on in bands of about `per_share` pixels (see [`over_rows`]).
-pub(super) fn settled_by(mut q: Quantized, img: &Raster, own: &[bool], per_share: usize) -> Quantized {
+fn settled_by(mut q: Quantized, img: &Raster, own: &[bool], per_share: usize) -> Quantized {
     let (w, h) = (img.width as usize, img.height as usize);
     if q.labels.len() != w * h || own.len() != w * h {
         return q;
     }
-    // Each pixel is settled by the labels as they were before any changed, so the bands of rows
-    // are settled apart and the changes made afterwards.
+    // Each pixel is settled by the labels as they were before any label changed. Each band of rows
+    // keeps its changes (see [`Changes`]), and they are made once every band is done.
     let before = &q.labels;
     let color = |l: u16| q.palette.get(l as usize).map(|c| c.map(f64::from));
     let dist = |a: [f64; 3], b: [f64; 3]| (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f64>().sqrt();
-    let changes: Vec<(usize, u16)> = over_rows(w, h, per_share, |rows| {
-        let mut changes = vec![];
-        for i in rows.start * w..rows.end * w {
+    let bands: Vec<(usize, Changes)> = over_rows(w, h, per_share, |rows| {
+        let (first, end) = (rows.start * w, rows.end * w);
+        let mut band = Changes::new(end - first);
+        for i in first..end {
             let mine_l = before[i];
             if own[i] || mine_l == TRANSPARENT {
                 continue;
@@ -67,20 +68,71 @@ pub(super) fn settled_by(mut q: Quantized, img: &Raster, own: &[bool], per_share
             if let Some((off, to)) = best
                 && off < 0.5 * dist(p, mine)
             {
-                changes.push((i, to));
+                band.set(i - first, to, || before.get(first..end).unwrap_or_default().to_vec());
             }
         }
-        changes
+        if band.is_empty() { vec![] } else { vec![(first, band)] }
     });
-    if changes.is_empty() {
+    if bands.is_empty() {
         return q;
     }
-    for (i, to) in changes {
-        if let Some(l) = q.labels.get_mut(i) {
-            *l = to;
-        }
+    for (first, band) in bands {
+        band.each(|at, to| {
+            if let Some(l) = q.labels.get_mut(first + at) {
+                *l = to;
+            }
+        });
     }
     compact(q.labels, q.palette)
+}
+
+/// The labels a pass changes in one part of a picture, `len` pixels long, counting each pixel from
+/// the part's first. They are kept as pairs of a pixel and its new label until the pairs would take
+/// more memory than a copy of the part's labels, and as that copy, with the changes made, after
+/// that. A part takes at most about as much memory as a copy of its labels either way.
+struct Changes {
+    len: usize,
+    few: Vec<(usize, u16)>,
+    copy: Option<Vec<u16>>,
+}
+
+impl Changes {
+    fn new(len: usize) -> Self {
+        Changes { len, few: vec![], copy: None }
+    }
+
+    /// Changes the label of the pixel `at` to `to`. `labels` gives the part's labels as they were
+    /// before any changed, for the copy.
+    fn set(&mut self, at: usize, to: u16, labels: impl FnOnce() -> Vec<u16>) {
+        if let Some(copy) = &mut self.copy {
+            if let Some(l) = copy.get_mut(at) {
+                *l = to;
+            }
+            return;
+        }
+        self.few.push((at, to));
+        if self.few.len() * size_of::<(usize, u16)>() > self.len * size_of::<u16>() {
+            let mut copy = labels();
+            for (at, to) in std::mem::take(&mut self.few) {
+                if let Some(l) = copy.get_mut(at) {
+                    *l = to;
+                }
+            }
+            self.copy = Some(copy);
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.few.is_empty() && self.copy.is_none()
+    }
+
+    /// `f` of each changed pixel and its new label (of every pixel of the part, once it is a copy).
+    fn each(self, mut f: impl FnMut(usize, u16)) {
+        match self.copy {
+            Some(copy) => copy.into_iter().enumerate().for_each(|(at, to)| f(at, to)),
+            None => self.few.into_iter().for_each(|(at, to)| f(at, to)),
+        }
+    }
 }
 
 /// The most colors (Color) or grays (Grayscale) a palette may ask for to have its blend pixels
@@ -146,36 +198,40 @@ pub(super) fn settled_wide(q: Quantized, img: &Raster, own: &[bool], gray: bool)
 
 /// [`settled_wide`], with its strips of columns worked on in groups of about `per_share` pixels
 /// (at least one strip), spread over the available cores (one thread on the web).
-pub(super) fn settled_wide_by(mut q: Quantized, img: &Raster, own: &[bool], gray: bool, per_share: usize) -> Quantized {
+fn settled_wide_by(mut q: Quantized, img: &Raster, own: &[bool], gray: bool, per_share: usize) -> Quantized {
     let (w, h) = (img.width as usize, img.height as usize);
     if q.labels.len() != w * h || own.len() != w * h || w == 0 || h == 0 {
         return q;
     }
-    // Each pixel is settled by the labels as they were before any changed, so the strips are
-    // settled apart and the changes made afterwards. Strips are grouped so that each group holds
-    // about `per_share` pixels.
+    // Each pixel is settled by the labels as they were before any label changed. Each group of
+    // strips keeps its changes (see [`Changes`]), and they are made once every group is done.
     let strip = BLEND_STRIP.min(w).max(1);
     let per_group = (per_share / (strip * h).max(1)).max(1);
-    let starts: Vec<usize> = (0..w).step_by(strip).collect();
-    let groups: Vec<&[usize]> = starts.chunks(per_group).collect();
-    let settle = |starts: &&[usize]| settled_wide_strips(&q, img, own, gray, starts);
-    let changes: Vec<(usize, u16)> =
-        if groups.len() <= 1 { groups.iter().flat_map(settle).collect() } else { parallel_map(&groups, settle).into_iter().flatten().collect() };
-    if changes.is_empty() {
+    let cols = strip.saturating_mul(per_group);
+    let groups: Vec<std::ops::Range<usize>> = (0..w).step_by(cols).map(|x| x..x.saturating_add(cols).min(w)).collect();
+    let settle = |cols: &std::ops::Range<usize>| (cols.clone(), settled_wide_strips(&q, img, own, gray, cols.clone()));
+    let mut settled: Vec<(std::ops::Range<usize>, Changes)> =
+        if groups.len() <= 1 { groups.iter().map(settle).collect() } else { parallel_map(&groups, settle) };
+    settled.retain(|(_, changes)| !changes.is_empty());
+    if settled.is_empty() {
         return q;
     }
-    for (i, to) in changes {
-        if let Some(l) = q.labels.get_mut(i) {
-            *l = to;
-        }
+    for (cols, group) in settled {
+        let gw = cols.len().max(1);
+        group.each(|at, to| {
+            if let Some(l) = q.labels.get_mut((at / gw) * w + cols.start + at % gw) {
+                *l = to;
+            }
+        });
     }
     compact(q.labels, q.palette)
 }
 
-/// The labels that [`settled_wide`] changes in the strips of [`BLEND_STRIP`] columns that start at
-/// the columns `starts`, with the pixel each one is at.
-fn settled_wide_strips(q: &Quantized, img: &Raster, own: &[bool], gray: bool, starts: &[usize]) -> Vec<(usize, u16)> {
+/// The labels that [`settled_wide`] changes in the columns `cols` (whole strips of [`BLEND_STRIP`]
+/// columns, or the picture's last columns), each pixel counted row by row across those columns.
+fn settled_wide_strips(q: &Quantized, img: &Raster, own: &[bool], gray: bool, cols: std::ops::Range<usize>) -> Changes {
     let (w, h) = (img.width as usize, img.height as usize);
+    let gw = cols.len();
     let before = &q.labels;
     let colors: Vec<[f64; 3]> = q.palette.iter().map(|c| c.map(f64::from)).collect();
     let dist2 = |a: [f64; 3], b: [f64; 3]| (0..3).map(|k| (a[k] - b[k]).powi(2)).sum::<f64>();
@@ -186,7 +242,7 @@ fn settled_wide_strips(q: &Quantized, img: &Raster, own: &[bool], gray: bool, st
     let span = 2 * BLEND_REACH + 1;
     let strip = BLEND_STRIP.min(w).max(1);
     let pixel = |p: &[u8]| if gray { [f64::from(luma([p[0], p[1], p[2], p[3]])); 3] } else { [f64::from(p[0]), f64::from(p[1]), f64::from(p[2])] };
-    let mut changes = vec![];
+    let mut settled = Changes::new(gw * h);
     let mut rows = vec![0u64; span * strip * words];
     let mut counts = vec![0u32; q.palette.len()];
     let mut window = vec![0u64; words];
@@ -231,8 +287,8 @@ fn settled_wide_strips(q: &Quantized, img: &Raster, own: &[bool], gray: bool, st
     };
     let mut near: Vec<u16> = Vec::new();
     let mut by_distance: Vec<(f64, u16)> = Vec::new();
-    for (x0, y) in starts.iter().flat_map(|&x0| (0..h).map(move |y| (x0, y))) {
-        let x1 = (x0 + strip).min(w);
+    for (x0, y) in cols.clone().step_by(strip).flat_map(|x0| (0..h).map(move |y| (x0, y))) {
+        let x1 = (x0 + strip).min(cols.end);
         if y == 0 {
             for yy in 0..BLEND_REACH.min(h) {
                 row_colors(yy, x0, x1, &mut rows);
@@ -314,11 +370,13 @@ fn settled_wide_strips(q: &Quantized, img: &Raster, own: &[bool], gray: bool, st
                 && !pair.contains(&mine_l)
                 && (off2 < BETTER_FIT * dist2(p, mine) || (between && off2 < ON_THE_LINE * ON_THE_LINE * apart2))
             {
-                changes.push((i, to));
+                settled.set(y * gw + x - cols.start, to, || {
+                    (0..h).flat_map(|yy| before.get(yy * w + cols.start..yy * w + cols.end).unwrap_or_default()).copied().collect()
+                });
             }
         }
     }
-    changes
+    settled
 }
 
 /// Whether `img` is continuous tone (a photo, a gradient) rather than flat art, however noisy
@@ -707,6 +765,74 @@ fn edge_blend_of(own: [f64; 3], beside: [u8; 3], alpha: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Rings of four colors around a point off the center, blended over three pixels at each edge,
+    /// with a little noise, and a band of half-transparent pixels along the bottom.
+    fn rings(w: u32, h: u32) -> Raster {
+        let colors = [[200.0, 30.0, 40.0], [20.0, 60.0, 180.0], [240.0, 210.0, 50.0], [25.0, 25.0, 25.0]];
+        Raster::from_fn(w, h, |x, y| {
+            let r = (f64::from(x) - 0.4 * f64::from(w)).hypot(f64::from(y) - 0.55 * f64::from(h)) / 9.0;
+            let (ring, t) = (r.floor() as usize, ((r.fract() - 0.8) / 0.2).clamp(0.0, 1.0));
+            let (a, b) = (colors[ring % 4], colors[(ring + 1) % 4]);
+            let noise = f64::from((x * 7 + y * 13) % 5) - 2.0;
+            let c = [0, 1, 2].map(|k| (a[k] + t * (b[k] - a[k]) + noise).clamp(0.0, 255.0) as u8);
+            [c[0], c[1], c[2], if y + 2 >= h { 160 } else { 255 }]
+        })
+    }
+
+    #[test]
+    fn changes_are_copied_out_once_their_pairs_would_take_more_memory_than_the_labels() {
+        let labels: Vec<u16> = (0..64).collect();
+        let pairs = labels.len() * size_of::<u16>() / size_of::<(usize, u16)>();
+        let mut changes = Changes::new(labels.len());
+        for at in 0..pairs {
+            changes.set(at * 3, 99, || labels.clone());
+        }
+        assert!(changes.copy.is_none());
+        changes.set(63, 98, || labels.clone());
+        assert!(changes.few.is_empty() && changes.copy.is_some());
+        changes.set(1, 97, || labels.clone());
+        let mut out = labels.clone();
+        changes.each(|at, to| out[at] = to);
+        let mut expected = labels.clone();
+        (0..pairs).for_each(|at| expected[at * 3] = 99);
+        (expected[63], expected[1]) = (98, 97);
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn blend_pixels_settle_the_same_however_the_picture_is_shared_out() {
+        // Odd sizes, so that the last band of rows and the last strip of columns are short.
+        let img = rings(173, 97);
+        let all = img.width as usize * img.height as usize;
+        let opaque: Vec<bool> = img.rgba.as_chunks::<4>().0.iter().map(|p| p[3] >= 128).collect();
+        let own = super::super::own_colours_among(&img, &opaque);
+        // Two colors for each blend, and an olive that the blends lie nearer to than to their sides,
+        // each pixel labeled with the nearest of them (none for a transparent one).
+        let palette = vec![[200, 30, 40], [20, 60, 180], [240, 210, 50], [25, 25, 25], [120, 120, 60]];
+        let labels = img
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|p| {
+                let d = |c: &[u8; 3]| (0..3).map(|k| (i32::from(p[k]) - i32::from(c[k])).pow(2)).sum::<i32>();
+                (0..palette.len()).min_by_key(|&i| d(&palette[i])).map_or(TRANSPARENT, |i| i as u16)
+            })
+            .collect();
+        let q = Quantized { labels, palette };
+        // One row (or one strip) per share, a few rows per share, and the whole picture as one.
+        let shares = [1, 3 * 173 + 5, all];
+        for (name, settle) in [
+            ("settled", &(|s| settled_by(q.clone(), &img, &own, s)) as &dyn Fn(usize) -> Quantized),
+            ("settled_wide", &|s| settled_wide_by(q.clone(), &img, &own, false, s)),
+            ("settled_wide gray", &|s| settled_wide_by(q.clone(), &img, &own, true, s)),
+        ] {
+            let out: Vec<Quantized> = shares.iter().map(|&s| settle(s)).collect();
+            assert_ne!(out[0], q, "{name} settles some blend pixels");
+            assert!(out.iter().all(|o| *o == out[0]), "{name}");
+        }
+    }
 
     #[test]
     fn a_gray_blend_takes_the_closer_of_two_pairs_it_lies_between_despite_rounding() {
