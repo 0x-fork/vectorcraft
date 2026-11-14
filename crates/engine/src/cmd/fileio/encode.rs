@@ -2,6 +2,7 @@
 //! (unknown keys are ignored, so one params object can carry the options of several formats).
 
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use serde::Deserialize;
@@ -447,14 +448,94 @@ pub fn export_art_bounds(doc: &Document, format: &str) -> Option<Rect> {
 }
 
 /// The bounds of the visible art of `doc` with the objects that `left_out` picks hidden
-/// ([`hidden_nodes`]).
+/// ([`hidden_nodes`]) and the ones in the art of the symbols that instances show taken out
+/// ([`without_nodes`]: symbol art is measured with its hidden objects). An instance of a symbol
+/// whose art is all picked or hidden is hidden too. The art of a dynamic symbol is measured whole:
+/// an instance can paint its objects, and finds them by their places in the art.
 fn bounds_without(doc: &Document, left_out: &dyn Fn(&Node) -> bool) -> Option<Rect> {
-    let drawn = hidden_nodes(&doc.layers, left_out).map(|layers| {
-        let mut d = doc.clone();
+    // The symbols instances show (the first of each name) that aren't dynamic.
+    let mut names = HashSet::new();
+    let shown: Vec<(usize, &vectorcraft_doc::Symbol)> =
+        doc.symbols.iter().enumerate().filter(|(_, s)| names.insert(s.name.as_str())).filter(|(_, s)| !s.dynamic).collect();
+    // The symbols whose art `left_out` leaves nothing of, those that only hold instances of such
+    // symbols included.
+    let mut empty: HashSet<&str> = HashSet::new();
+    while let Some((_, s)) = shown.iter().find(|(_, s)| !empty.contains(s.name.as_str()) && all_left_out(&s.art, left_out, &empty)) {
+        empty.insert(&s.name);
+    }
+    let left_out =
+        &|n: &Node| left_out(n) || matches!(&n.kind, NodeKind::SymbolInstance { symbol, .. } if empty.contains(symbol.as_str()) && !has_effects(n));
+    let layers = hidden_nodes(&doc.layers, left_out);
+    let symbols: Vec<(usize, Arc<Node>)> = shown
+        .iter()
+        .filter(|(_, s)| !empty.contains(s.name.as_str()))
+        .filter_map(|(i, s)| without_nodes(&s.art, left_out).map(|art| (*i, art)))
+        .collect();
+    if layers.is_none() && symbols.is_empty() {
+        return vectorcraft_render::encode::art_bounds(doc);
+    }
+    let mut d = doc.clone();
+    if let Some(layers) = layers {
         d.layers = layers;
-        d
-    });
-    vectorcraft_render::encode::art_bounds(drawn.as_ref().unwrap_or(doc))
+    }
+    for (i, art) in symbols {
+        if let Some(s) = d.symbols.get_mut(i) {
+            s.art = art;
+        }
+    }
+    vectorcraft_render::encode::art_bounds(&d)
+}
+
+/// Whether `n` is hidden, picked by `left_out`, an instance of one of the `empty` symbols, or a
+/// layer or a group holding only such objects (its clipping path among them when it clips). A
+/// Shaper group, or a layer, group or instance with effects, fills or strokes of its own, is none
+/// of these unless it is hidden or picked.
+fn all_left_out(n: &Node, left_out: &dyn Fn(&Node) -> bool, empty: &HashSet<&str>) -> bool {
+    !n.visible
+        || left_out(n)
+        || !has_effects(n)
+            && n.extras().shaper.is_none()
+            && match &n.kind {
+                NodeKind::Layer { children, .. } | NodeKind::Group { children, .. } => children.iter().all(|c| all_left_out(c, left_out, empty)),
+                NodeKind::SymbolInstance { symbol, .. } => empty.contains(symbol.as_str()),
+                _ => false,
+            }
+}
+
+/// Whether `n` has a visible effect, fill or stroke of its own, which the objects it holds can
+/// take part in.
+fn has_effects(n: &Node) -> bool {
+    n.appearance.effects.iter().any(|e| e.visible) || n.appearance.items.iter().any(|i| i.visible())
+}
+
+/// `n` without the objects that `left_out` picks in it, when it is a layer or a group, and in the
+/// layers and groups in it at any depth; `None` when it picks none of them. A clipping layer or
+/// group keeps its clipping path, its first object, and a Shaper group and a layer or group with
+/// effects, fills or strokes of its own keep all they hold.
+fn without_nodes(n: &Arc<Node>, left_out: &dyn Fn(&Node) -> bool) -> Option<Arc<Node>> {
+    let (NodeKind::Layer { children, clip, .. } | NodeKind::Group { children, clip }) = &n.kind else { return None };
+    if has_effects(n) || n.extras().shaper.is_some() {
+        return None;
+    }
+    let mut changed = false;
+    let kept: Vec<Arc<Node>> = children
+        .iter()
+        .enumerate()
+        .filter_map(|(i, c)| {
+            if left_out(c) && !(*clip && i == 0) {
+                changed = true;
+                return None;
+            }
+            Some(without_nodes(c, left_out).inspect(|_| changed = true).unwrap_or_else(|| c.clone()))
+        })
+        .collect();
+    changed.then(|| {
+        let mut new = (**n).clone();
+        if let NodeKind::Layer { children, .. } | NodeKind::Group { children, .. } = &mut new.kind {
+            *children = kept;
+        }
+        Arc::new(new)
+    })
 }
 
 /// The `rect` param of a raster export: `[x, y, width, height]` in points, y down. `None` when

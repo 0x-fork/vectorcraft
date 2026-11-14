@@ -221,6 +221,39 @@ fn a_plot_of_the_arts_bounds_leaves_out_the_layers_it_does_not_plot() {
     assert!(e.contains("no visible art"), "{e}");
 }
 
+/// A placed image in a symbol's art doesn't move a plot of the art's bounds either, and a
+/// document whose only other visible art is an instance of that symbol is refused.
+#[test]
+fn a_plot_of_the_arts_bounds_leaves_out_images_in_symbol_art() {
+    let mut s = two_boards();
+    let plot = |s: &mut Session| s.execute("document.export", &json!({"format": "hpgl", "useArtboards": false})).map(|v| bytes(&v));
+    let alone = plot(&mut s).unwrap();
+    let printing = s.doc().unwrap().doc.layers[0].id;
+    s.execute("layer.new", &json!({})).unwrap();
+    let mut png = vec![];
+    image::DynamicImage::new_rgb8(4, 4).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+    s.execute("file.place", &json!({"name": "far.png", "dataBase64": b64(&png), "at": [-600, 800]})).unwrap();
+    s.execute("symbol.new", &json!({"name": "Far"})).unwrap();
+    assert!(s.doc().unwrap().doc.symbols.iter().any(|sym| sym.name == "Far"));
+    assert_eq!(plot(&mut s).unwrap(), alone, "an image in symbol art");
+
+    s.execute("layer.setProps", &json!({"id": printing, "visible": false})).unwrap();
+    let e = plot(&mut s).unwrap_err().to_string();
+    assert!(e.contains("no visible art"), "{e}");
+
+    // A symbol of a square and an image is measured by its square.
+    let bounds = |s: &Session| super::export_art_bounds(&s.doc().unwrap().doc, "hpgl").unwrap();
+    let square = s.execute("shape.rectangle", &json!({"x": 200, "y": 200, "width": 20, "height": 20})).unwrap()["id"].clone();
+    let before = bounds(&s);
+    let image = s.execute("file.place", &json!({"name": "near.png", "dataBase64": b64(&png), "at": [400, 600]})).unwrap()["ids"][0].clone();
+    s.execute("symbol.new", &json!({"name": "Both", "ids": [square, image]})).unwrap();
+    assert_eq!(s.doc().unwrap().doc.symbols.len(), 2);
+    let after = bounds(&s);
+    for (a, b) in [(before.x0, after.x0), (before.y0, after.y0), (before.x1, after.x1), (before.y1, after.y1)] {
+        assert!((a - b).abs() < 1e-6, "{before:?} {after:?}");
+    }
+}
+
 #[test]
 fn export_options_are_checked() {
     let mut s = two_boards();
