@@ -849,6 +849,28 @@ fn nested_groups_with_effects_count_toward_the_depth_limit() {
     assert!(deepest.is_some_and(|d| crate::reshape::geometry_effects(&d).len() == 1), "the deepest member keeps its effect");
 }
 
+/// The members of a clipping path count toward the member limit: with room for two more members,
+/// the third member of a clipping group keeps its own effect as it is.
+#[test]
+fn clipping_path_members_past_the_member_limit_stay_as_they_are() {
+    let member = |id: u64| {
+        let mut m = with_effect(square_at_100(), offset_10());
+        m.id = NodeId(id);
+        Arc::new(m)
+    };
+    let clipping = Node::group(NodeId(20), vec![member(2), member(3), member(4)]);
+    let mut clipped = Node::new(NodeId(5), NodeKind::Group { children: vec![Arc::new(clipping), Arc::new(square_at_100())], clip: true });
+    // An enclosing call that has visited all the members it may but two.
+    let _outer = DrawnFrame::enter().unwrap();
+    DRAWN.with(|d| d.set((1, crate::SYMBOL_ART_MAX_NODES - 2)));
+    members_as_drawn(None, &mut clipped);
+    let clipping = clipped.children().unwrap()[0].clone();
+    let effects: Vec<usize> = clipping.children().unwrap().iter().map(|m| crate::reshape::geometry_effects(m).len()).collect();
+    assert_eq!(effects, [0, 0, 1], "the first two members take their Offset Path, the third keeps it");
+    let widths: Vec<f64> = clipping.children().unwrap().iter().map(|m| m.geometric_bounds().unwrap().width()).collect();
+    assert!((widths[0] - 120.0).abs() < 0.5 && (widths[1] - 120.0).abs() < 0.5 && (widths[2] - 100.0).abs() < 0.5, "{widths:?}");
+}
+
 /// An image or a symbol instance that a group's Transform effect moves takes the placed gradients
 /// of its own fills along, as a path does, and each copy takes them as many times as it takes the
 /// transform.
